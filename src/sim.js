@@ -1,4 +1,6 @@
 // Units: meters, seconds, knots, degrees clockwise from north. No rendering here.
+import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from './environment.js';
+import {emitSound,updateAcoustics} from './acoustics.js';
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const rad=d=>d*Math.PI/180;
 export const bearing=(a,b)=>(Math.atan2(b.x-a.x,b.y-a.y)*180/Math.PI+360)%360;
@@ -16,9 +18,9 @@ export function bottom(x,y){
 }
 function rand(s){s.rng^=s.rng<<13;s.rng^=s.rng>>>17;s.rng^=s.rng<<5;return(s.rng>>>0)/4294967296;}
 export function log(s,text,kind='info'){s.events.unshift({t:s.time,text,kind});s.events=s.events.slice(0,45);}
-export function createGame(mission='recon',seed=19830604){
+export function createGame(mission='recon',seed=19830604,options={}){
  const m=MISSIONS.find(m=>m.id===mission)||MISSIONS[0];
- return {version:1,rng:seed,time:0,status:'patrol',mission:m.id,phase:'objective',trackTime:0,photos:[],hull:100,battery:92,oxygen:100,fuel:86,flood:0,repair:0,torps:m.torps,noise:12,alert:0,pingAge:999,pingCooldown:0,photoCooldown:0,decoys:3,engine:'electric',silent:false,scope:true,scopeAngle:0,speed:4,targetSpeed:4,depth:12,targetDepth:12,heading:32,targetHeading:32,x:0,y:0,route:null,home:{x:-1500,y:-1700},events:[{t:0,text:'Helm steady. Faint screws bearing 028. Your patrol begins.',kind:'info'}],contacts:[],projectiles:[],blasts:[],nextId:1,drone:{mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0},ships:[
+ return {version:1,rng:seed,time:0,status:'patrol',mission:m.id,phase:'objective',trackTime:0,photos:[],hull:100,battery:92,oxygen:100,fuel:86,flood:0,repair:0,torps:m.torps,noise:12,alert:0,pingAge:999,pingCooldown:0,photoCooldown:0,decoys:3,engine:'electric',silent:false,scope:true,scopeAngle:0,speed:4,targetSpeed:4,depth:12,targetDepth:12,heading:32,targetHeading:32,x:0,y:0,route:null,home:{x:-1500,y:-1700},environment:makeEnvironment(seed,options),lightning:[],nextLightningAt:8+hash01(seed)*8,acoustics:[],soundSequence:1,events:[{t:0,text:'Helm steady. Faint screws bearing 028. Your patrol begins.',kind:'info'}],contacts:[],projectiles:[],blasts:[],nextId:1,drone:{mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0},ships:[
  {id:'cobalt',name:'Cobalt',kind:'merchant',military:true,x:1450,y:2700,heading:255,speed:5,hull:100,alert:0,attack:0},
  {id:'meridian',name:'Meridian',kind:'merchant',military:false,x:2350,y:2900,heading:255,speed:5,hull:100,alert:0,attack:0},
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
@@ -26,9 +28,10 @@ export function createGame(mission='recon',seed=19830604){
  {id:'echo',name:'Unknown submarine',kind:'sub',military:true,x:3800,y:900,depth:75,heading:280,speed:4,hull:100,alert:0,attack:0}
  ]};
 }
-export function isVisible(s,ship,look=null){
+export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y),v.depth,drone?.4:5);}
+export function isVisible(s,ship,look=null,env=environmentAt(s)){
  if(ship.hull<=0||ship.kind==='sub'||s.depth>15||!s.scope)return false;
- return distance(s,ship)<6500&&(look===null||Math.abs(delta(bearing(s,ship),look))<19);
+ return !scopeWashed(s,env)&&distance(s,ship)<env.opticalRange&&(look===null||Math.abs(delta(bearing(s,ship),look))<19);
 }
 export function contact(s,ship,method){
  let c=s.contacts.find(c=>c.id===ship.id);
@@ -79,6 +82,13 @@ export function step(s,dt,input={}){
 }
 function tick(s,dt,input){
  s.time+=dt;s.pingAge+=dt;s.pingCooldown=Math.max(0,s.pingCooldown-dt);s.photoCooldown=Math.max(0,s.photoCooldown-dt);s.shock=Math.max(0,(s.shock||0)-dt);
+ const env=environmentAt(s);
+ if(s.time>=s.nextLightningAt){
+  if(env.storm>.35){const angle=rand(s)*Math.PI*2,range=1200+rand(s)*5500,strike={id:s.soundSequence,time:s.time,x:s.x+Math.sin(angle)*range,y:s.y+Math.cos(angle)*range,height:850+rand(s)*900,seed:Math.floor(rand(s)*1000000)};
+   s.lightning.push(strike);emitSound(s,{type:'thunder',x:strike.x,y:strike.y,altitude:strike.height*.65,power:.8+rand(s)*.4});}
+  s.nextLightningAt=s.time+18+rand(s)*36;
+ }
+ s.lightning=s.lightning.filter(e=>s.time-e.time<20);
  if(s.route){s.targetHeading=bearing(s,s.route);if(distance(s,s.route)<100){s.route=null;s.targetSpeed=0;log(s,'Waypoint reached. All stop.');}}
  const electric=s.engine==='electric',diesel=!electric&&s.depth<=14&&s.fuel>0;
  const maxSpeed=s.silent?3:(electric?(s.battery>0?14:0):(diesel?17:0));
@@ -104,16 +114,16 @@ function tick(s,dt,input){
  for(const ship of s.ships){
    if(ship.hull<=0)continue;
    const d=distance(s,ship);
-   if((s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
-   if(isVisible(s,ship,input.look??((s.heading+s.scopeAngle)%360)))contact(s,ship,'visual');
+   if((s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)*(1-env.storm*.25*Math.exp(-s.depth/80))&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
+   if(isVisible(s,ship,input.look??((s.heading+s.scopeAngle)%360),env))contact(s,ship,'visual');
    if(ship.kind==='escort'||ship.kind==='sub'){
      const exposure=s.depth<3?95:(s.scope&&s.depth<=15?23:0);
      const sound=s.noise*(s.depth>100?.55:1);
-     const detection=clamp(1-d/5500,0,1)*(exposure+sound*.7);
+     const detection=clamp(1-d/env.subVisualRange,0,1)*exposure+clamp(1-d/5500,0,1)*sound*.7*(1-env.storm*.38*Math.exp(-s.depth/70));
      ship.alert=clamp(ship.alert+dt*(detection*.06-.65),0,100);
      if(ship.alert>42){ship.heading=(ship.heading+clamp(delta(bearing(ship,s),ship.heading),-dt*2.5,dt*2.5)+360)%360;ship.speed=ship.kind==='escort'?15:8;danger=Math.max(danger,ship.alert);}
      if(ship.alert>55&&d<(ship.kind==='sub'?2300:420)){
-       ship.attack-=dt;if(ship.attack<=0){ship.attack=35;s.blasts.push({x:s.x+(rand(s)-.5)*180,y:s.y+(rand(s)-.5)*180,depth:s.depth,delay:7,age:0});log(s,ship.kind==='sub'?'Incoming hostile weapon. Evade!':'Depth charges in the water. Evade!','damage');}
+       ship.attack-=dt;if(ship.attack<=0){ship.attack=35;dropDepthCharge(s,{x:s.x+(rand(s)-.5)*180,y:s.y+(rand(s)-.5)*180,depth:s.depth,delay:Math.max(4,s.depth/4.5),kind:ship.kind==='sub'?'weapon':'charge'});log(s,ship.kind==='sub'?'Incoming hostile weapon. Evade!':'Depth charges in the water. Evade!','damage');}
      }
    }
    ship.x+=Math.sin(rad(ship.heading))*ship.speed*.514444*dt;ship.y+=Math.cos(rad(ship.heading))*ship.speed*.514444*dt;
@@ -127,11 +137,12 @@ function tick(s,dt,input){
    if(p.age>4)for(const ship of s.ships){if(ship.hull<=0)continue;const d=distance(p,ship);if(d<1500&&Math.abs(delta(bearing(p,ship),p.heading))<34){const score=(ship.kind==='merchant'?1.5:1)/(d+50);if(score>bestScore){best=ship;bestScore=score;}}}
    if(best){p.lock=best.id;p.heading=(p.heading+clamp(delta(bearing(p,best),p.heading),-dt*9,dt*9)+360)%360;}
    p.x+=Math.sin(rad(p.heading))*24*dt;p.y+=Math.cos(rad(p.heading))*24*dt;
-   for(const ship of s.ships)if(ship.hull>0&&distance(p,ship)<65){ship.hull=0;p.age=999;log(s,ship.military?`Heavy detonation. ${ship.name} is sinking.`:`Neutral vessel hit: ${ship.name}. Patrol compromised.`,ship.military?'success':'damage');if(!ship.military)s.status='compromised';}
+   for(const ship of s.ships)if(ship.hull>0&&distance(p,ship)<65){ship.hull=0;p.age=999;emitSound(s,{type:'detonation',x:ship.x,y:ship.y,depth:ship.depth||4,power:1});log(s,ship.military?`Heavy detonation. ${ship.name} is sinking.`:`Neutral vessel hit: ${ship.name}. Patrol compromised.`,ship.military?'success':'damage');if(!ship.military)s.status='compromised';}
  }
  s.projectiles=s.projectiles.filter(p=>p.age<150);
- for(const b of s.blasts){b.delay-=dt;if(b.delay<=0&&b.age===0){const d=Math.hypot(s.x-b.x,s.y-b.y,(s.depth-b.depth)*2);if(d<210)hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');else log(s,'Distant detonations. That pattern missed.');}if(b.delay<=0)b.age+=dt;}
+ for(const b of s.blasts){b.delay-=dt;if(b.delay<=0&&!b.exploded){b.exploded=true;b.explodedAt=s.time;emitSound(s,{type:'blast',x:b.x,y:b.y,depth:b.depth,power:1.2});}if(b.exploded)b.age=s.time-b.explodedAt;}
  s.blasts=s.blasts.filter(b=>b.age<5);
+ updateAcoustics(s,(source,d)=>{if(d<210)hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');else if(d<2500)log(s,'Depth charge detonation. That pattern missed.');});
  const dr=s.drone;
  if(dr.mode==='remote'||dr.mode==='return'){
    dr.battery=Math.max(0,dr.battery-dt*(.08+dr.speed*dr.speed*.0007));
@@ -151,13 +162,18 @@ function tick(s,dt,input){
  if(s.time>1800&&s.status==='patrol'){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
 }
 export function save(s){return JSON.stringify(s);}
+export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charge={id:s.soundSequence++,x,y,depth,delay,totalDelay:delay,age:0,exploded:false,kind};s.blasts.push(charge);return charge;}
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
  // Migrate existing v1 patrols without discarding their progress or drone state.
  if(s.scopeAngle===undefined)s.scopeAngle=0;
+ if(s.environment===undefined)s.environment=makeEnvironment(s.rng);
+ if(s.lightning===undefined)s.lightning=[];if(s.acoustics===undefined)s.acoustics=[];
+ if(s.nextLightningAt===undefined)s.nextLightningAt=s.time+8;if(s.soundSequence===undefined)s.soundSequence=1;
  if(s.drone){for(const [k,v] of Object.entries({speed:0,targetSpeed:0,targetDepth:s.drone.depth,targetHeading:s.drone.heading}))if(s.drone[k]===undefined)s.drone[k]=v;}
  const template=createGame(s.mission);for(const [k,v] of Object.entries(template)){if(typeof v==='number'&&!Number.isFinite(s[k]))return null;if(typeof v==='boolean'&&typeof s[k]!=='boolean')return null;if(Array.isArray(v)&&!Array.isArray(s[k]))return null;}
  if(!['objective','extract'].includes(s.phase)||!['electric','diesel'].includes(s.engine)||!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y)||!s.drone||!['stowed','remote','return','lost'].includes(s.drone.mode))return null;
+ if(!s.environment||!WEATHER[s.environment.startWeather]||!Number.isFinite(s.environment.startHour)||!Number.isFinite(s.environment.seed)||typeof s.environment.changing!=='boolean')return null;
  for(const k of ['x','y','heading','depth','battery','speed','targetSpeed','targetDepth','targetHeading'])if(!Number.isFinite(s.drone[k]))return null;
  if(s.route&&(!Number.isFinite(s.route.x)||!Number.isFinite(s.route.y)))return null;
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
@@ -165,6 +181,8 @@ export function restore(raw){try{
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k])))return null;
  for(const e of s.events)if(!e||typeof e.text!=='string'||typeof e.kind!=='string'||!Number.isFinite(e.t))return null;
  for(const p of s.projectiles)if(!['x','y','heading','age'].every(k=>Number.isFinite(p[k])))return null;
- for(const b of s.blasts)if(!['x','y','depth','delay','age'].every(k=>Number.isFinite(b[k])))return null;
+ for(const b of s.blasts){if(!['x','y','depth','delay','age'].every(k=>Number.isFinite(b[k])))return null;if(b.id===undefined)b.id=s.soundSequence++;if(b.totalDelay===undefined)b.totalDelay=Math.max(1,b.delay);if(b.exploded===undefined)b.exploded=b.age>0;if(b.exploded&&b.explodedAt===undefined)b.explodedAt=s.time-b.age;}
+ for(const e of s.lightning)if(!['id','time','x','y','height','seed'].every(k=>Number.isFinite(e[k])))return null;
+ for(const e of s.acoustics)if(!['id','time','x','y','power'].every(k=>Number.isFinite(e[k]))||!['thunder','blast','detonation'].includes(e.type)||typeof e.heard!=='boolean')return null;
  return s;
 }catch{return null;}}

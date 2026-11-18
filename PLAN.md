@@ -31,4 +31,19 @@ Initial prototype evidence: a reconnaissance patrol returned to extraction in 13
 
 Correction evidence: a full reconnaissance patrol arrived at pickup at 90 meters without completing, then surfaced and completed in 14m 56s of simulated time with both photographs and full hull health. Browser checks confirmed opaque inactive feeds, ignored inactive periscope dragging/zooming, an upright rearward camera, a scope that turns with its hull while preserving relative angle, actual/requested keyboard orders, a fixed-ahead drone camera, drone recovery, paused command guards, heading-up sonar, chart pan/zoom/recenter, and 16px body / 14px helm and contact text without horizontal overflow at the tested desktop viewport. No browser errors or warnings were logged. The Nix build passes 27 checks, including a sweep of 720 camera headings against Three.js matrices, chart coordinate invariants, pause guards, inertia/time-batching invariance, and old-save migration.
 
-Future design choices, outside this prototype: campaign progression, variable weather and mission layouts, richer acoustic propagation, crew specialties and repair choices, detailed periscope waves, more audio layers, full conning-tower binoculars, and a balance pass based on actual play sessions. Nuclear propulsion remains excluded because it removes the recharge vulnerability at the center of the design.
+## Environment and sound
+
+- [x] Show total water depth and hull-offset clearance prominently.
+- [x] Share weather and day/night parameters across optics, detection and rendering.
+- [x] Add configurable patrol conditions, weather fronts, rougher storm seas, cloud cover, night lights and periscope wash.
+- [x] Emit located lightning and compute moving-listener thunder arrival through air or air/water paths.
+- [x] Apply depth-dependent thunder muffling and distance/bearing-dependent engine audio.
+- [x] Model sinking depth charges, their pressure fronts, nearby damage and spatial blast audio.
+- [x] Preserve old saves and retain heard-sound history.
+- [x] Pass the Nix build and 47 automated checks.
+- [x] Complete browser checks for soundings, conditions, thunder and explosion audio routing.
+- [x] Prepare the source and static output for private publication and artifact packaging.
+
+Environment browser evidence: inspected clear daylight, night running lights and rainy storm seas; observed a continuing patrol change from Dusk to Night. The soundings strip reported 230m water depth and 213m below the keel at 12m reference depth. WebAudio created five nearby engine sources. Distinct storm events produced a 14.894s surface thunder path with a 3200Hz cutoff and a 5.837s submerged path with a 665Hz cutoff. Those events had different source locations; the depth comparison is established by the independent model checks, not that pair of observations. An intentional exposed/pinging patrol provoked charge patterns and nearby blast damage; the final acoustic receipt was a blast with a 0.036s travel time and strong near-field gain. The patrol was lost at 3m 43s. No browser errors or warnings were logged. Sound routing and timing were checked; the mix was not independently auditioned or calibrated. Transient lightning sources and thunder arrivals were verified through the simulation and browser event state; a bolt screenshot is not used as an acceptance oracle.
+
+Future design choices, outside this prototype: campaign progression, variable mission layouts, calibrated acoustic propagation and temperature layers, crew specialties and repair choices, full conning-tower binoculars, and a balance pass based on actual play sessions. Nuclear propulsion remains excluded because it removes the recharge vulnerability at the center of the design.

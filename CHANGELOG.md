@@ -1,5 +1,18 @@
 # Changes
 
+## 0.3.0
+
+- Add prominent water depth and below-keel clearance, including the hull offset and shallow-water warnings. The drone station shows its own bottom clearance.
+- Add selectable dawn/day/dusk/night, optional changing weather fronts, and clear/cloudy/rain/storm starting conditions.
+- Couple lighting, running lights, clouds, rain, wave height/speed and visual detection range to one environmental state. Storms can wash over the scope.
+- Add located lightning with delayed thunder. Air and water paths use different sound speeds; underwater thunder is quieter and more muffled with depth, including its ongoing tail.
+- Add continuous ship-engine voices with distance attenuation and stereo bearing.
+- Model sinking depth charges, underwater detonation bubbles, and a traveling pressure front that triggers nearby damage and spatial explosion audio.
+- Preserve environmental state, pending sounds and heard events in saves; migrate older patrols.
+- Generate wave slopes analytically from the shared component definitions and use a local procedural cloud texture to keep rendering lighter.
+
+Validation: Nix build and 47 checks, including independent interface-path search, sound travel and attenuation, moving-listener arrival, weather/detection effects, all starting-time presets, waves, legacy saves and existing regressions. Browser checks cover the day/night cycle, weather scenes, soundings, engine sources, thunder scheduling and blast routing. No calibrated acoustics or subjective audio-quality claim.
+
 ## 0.2.0
 
 - Blank and disable inactive periscope/drone feeds instead of dimming live scenes.

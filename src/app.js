@@ -1,5 +1,7 @@
-import {createGame,step,bottom,bearing,delta,distance,rad,clamp,ping,photograph,fire,decoy,deployDrone,recallDrone,log,MISSIONS,save,restore} from './sim.js';
+import {createGame,step,bottom,bearing,delta,distance,rad,clamp,ping,photograph,fire,decoy,deployDrone,recallDrone,log,MISSIONS,save,restore,getSoundings} from './sim.js';
 import {OceanScene} from './scene.js';
+import {SoundSystem} from './audio.js';
+import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,canIssue,feedActive,helmFor,setHelmOrder,applyHelmKeys,chartTransform,chartWorldAt,panChart,zoomChart} from './controls.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,19 +14,10 @@ try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',
 const keys=new Set(),commandControls=[];
 const context=()=>({view,paused,modal:!!document.querySelector('dialog[open]')});
 const pilotEnabled=()=>view!=='drone'||state.drone.mode==='remote';
-class Sound{
- constructor(){this.on=false;this.ctx=null;}
- toggle(){
-  if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(!A)return;this.ctx=new A();this.master=this.ctx.createGain();this.master.gain.value=0;this.master.connect(this.ctx.destination);
-   const n=this.ctx.createBuffer(1,this.ctx.sampleRate*3,this.ctx.sampleRate),a=n.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=(Math.random()*2-1)*.18;const sea=this.ctx.createBufferSource();sea.buffer=n;sea.loop=true;const filter=this.ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=280;sea.connect(filter).connect(this.master);sea.start();
-   this.engine=this.ctx.createOscillator();this.engine.type='sine';this.engine.frequency.value=42;this.engineGain=this.ctx.createGain();this.engineGain.gain.value=.05;this.engine.connect(this.engineGain).connect(this.master);this.engine.start();
-  }
-  this.on=!this.on;this.ctx.resume();$('sound').innerHTML=`♩ <span>SOUND ${this.on?'ON':'OFF'}</span>`;$('sound').setAttribute('aria-label',this.on?'Disable sound':'Enable sound');this.update();if(this.on)this.tone('contact');
- }
- tone(type){if(!this.on||!this.ctx||!canIssue(state,context()))return;const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.connect(g).connect(this.master);o.type=type==='damage'?'sawtooth':'sine';o.frequency.setValueAtTime(type==='ping'?1240:type==='photo'?620:type==='damage'?55:type==='fire'?95:440,t);o.frequency.exponentialRampToValueAtTime(type==='damage'?22:type==='ping'?970:200,t+1);g.gain.setValueAtTime(type==='damage'?.32:.2,t);g.gain.exponentialRampToValueAtTime(.001,t+(type==='ping'?2:1));o.start();o.stop(t+2.1);}
- update(){if(!this.ctx)return;this.master.gain.setTargetAtTime((this.on&&canIssue(state,context()))?0.48:0,this.ctx.currentTime,.15);this.engine.frequency.setTargetAtTime(32+Math.abs(state.speed)*2,this.ctx.currentTime,.5);this.engineGain.gain.setTargetAtTime(state.engine==='diesel'?.12:.035,this.ctx.currentTime,.5);}
-}
-const sound=new Sound();
+const sound=new SoundSystem(()=>state,context,status=>{
+ const el=$('sound');el.dataset.audioContext=status.context;el.dataset.engineSources=status.engines;el.dataset.effects=status.effects;
+ if(status.last){el.dataset.lastAcoustic=status.last.type;el.dataset.lastDelay=status.last.delay.toFixed(3);el.dataset.lastGain=(status.last.currentGain??status.last.gain).toFixed(4);el.dataset.lastCutoff=(status.last.currentCutoff??status.last.cutoff).toFixed(0);}else{for(const key of ['lastAcoustic','lastDelay','lastGain','lastCutoff'])delete el.dataset[key];}
+});
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 function persist(){try{if(state.status==='patrol')localStorage.setItem('quiet-depths-v1',save(state));else localStorage.removeItem('quiet-depths-v1');$('save-status').textContent='PATROL SAVED';setTimeout(()=>$('save-status').textContent='LOCAL AUTOSAVE',1400);}catch{$('save-status').textContent='SAVING UNAVAILABLE';}}
 function bindCommand(element,event,action,enabled=()=>true){
@@ -38,20 +31,22 @@ function setView(v){view=v;keys.clear();drag=null;all('[data-view]').forEach(b=>
 function chooseMission(id){missionChoice=id;all('.mission-option').forEach(b=>b.classList.toggle('active',b.dataset.mission===id));document.querySelector('.briefing-tip p').innerHTML=esc(MISSIONS.find(m=>m.id===id).desc)+' <strong>Esc pauses everything.</strong>';}
 function openBriefing(){keys.clear();persist();$('briefing').showModal();$('resume').classList.toggle('hidden',!saved&&state.time===0);sound.update();}
 function start(resuming=false){
- if(resuming)state=saved||state;else{state=createGame(missionChoice,19830604+Math.floor(Math.random()*100000));selected=null;}
+ if(resuming)state=saved||state;else{state=createGame(missionChoice,19830604+Math.floor(Math.random()*100000),{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked});selected=null;}
  chart={x:state.x,y:state.y,zoom:1,follow:true};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?'scope':'sonar');setPaused(false);persist();
 }
+$('patrol-time').innerHTML=Object.entries(TIMES).map(([id,t])=>`<option value="${id}" ${id==='dusk'?'selected':''}>${t.name}</option>`).join('');
+$('patrol-weather').innerHTML=Object.entries(WEATHER).map(([id,w])=>`<option value="${id}">${w.name}</option>`).join('');
 $('mission-picker').innerHTML=MISSIONS.map(m=>`<button class="mission-option ${m.id==='recon'?'active':''}" data-mission="${m.id}"><span></span><div><b>${m.name}</b><small>${m.type}</small></div><span>${m.minutes}</span></button>`).join('');
 $('mission-picker').addEventListener('click',e=>{const b=e.target.closest('[data-mission]');if(b)chooseMission(b.dataset.mission);});
 $('start').onclick=()=>start(false);$('resume').onclick=()=>start(true);$('close-briefing').onclick=()=>{$('briefing').close();updateUI();};$('another-patrol').onclick=()=>{$('result-dialog').close();$('briefing').showModal();$('resume').classList.add('hidden');};
-$('sound').onclick=()=>sound.toggle();$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{keys.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
+$('sound').onclick=()=>{const on=sound.toggle();$('sound').innerHTML=`♩ <span>SOUND ${on?'ON':'OFF'}</span>`;$('sound').setAttribute('aria-label',on?'Disable sound':'Enable sound');};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{keys.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
 all('dialog').forEach(d=>d.addEventListener('close',()=>{keys.clear();updateUI();}));
 all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(+b.dataset.time)));
 function scopeToggle(){if(!canIssue(state,context()))return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}state.scope=!state.scope;if(!state.scope)scene?.clear();updateUI();}
-function takePhoto(){if(!canIssue(state,context())||view!=='scope'||!feedActive(state,'scope'))return;if(photograph(state,scopeBearing(state))){sound.tone('photo');toast(`Photograph recorded. ${state.photos.length}/2 silhouettes.`);}else toast(state.photoCooldown>0?'Camera reloading.':'Center a merchant silhouette in the reticle.');updateUI();}
+function takePhoto(){if(!canIssue(state,context())||view!=='scope'||!feedActive(state,'scope'))return;if(scopeWashed(state)){toast('A wave washed over the lens. Wait for the trough.');return;}if(photograph(state,scopeBearing(state))){sound.tone('photo');toast(`Photograph recorded. ${state.photos.length}/2 silhouettes.`);}else toast(state.photoCooldown>0?'Camera reloading.':'Center a merchant silhouette in the reticle.');updateUI();}
 function doPing(){if(!canIssue(state,context()))return;if(ping(state)){sound.tone('ping');setRate(1);}else toast('Sonar capacitors recharging.');updateUI();}
 function silent(){if(!canIssue(state,context())||view==='drone')return;state.silent=!state.silent;if(state.silent){state.targetSpeed=clamp(state.targetSpeed,-3,3);log(state,'Rig for silent running. Maximum three knots.');}updateUI();}
-bindCommand('scope-toggle','click',scopeToggle);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0);bindCommand('ping','click',doPing,()=>state.pingCooldown===0);bindCommand('silent','click',silent,()=>view!=='drone');
+bindCommand('scope-toggle','click',scopeToggle);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0);bindCommand('silent','click',silent,()=>view!=='drone');
 for(const axis of ['heading','depth','speed'])bindCommand(axis,'input',e=>order(axis,+e.target.value),pilotEnabled);
 bindCommand('port','click',()=>order('heading',helmFor(state,view).targetHeading-15),pilotEnabled);bindCommand('starboard','click',()=>order('heading',helmFor(state,view).targetHeading+15),pilotEnabled);
 all('[data-depth]').forEach(b=>bindCommand(b,'click',()=>order('depth',+b.dataset.depth),pilotEnabled));
@@ -104,7 +99,7 @@ window.addEventListener('blur',()=>{keys.clear();if(!context().modal&&state.stat
 document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();setPaused(true);}});window.addEventListener('pagehide',persist);
 
 function updateUI(){
- const s=state,m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=extract&&distance(s,s.home)<400;
+ const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=extract&&distance(s,s.home)<400;
  $('mission-type').textContent=m.type;$('mission-name').innerHTML=esc(m.name).replace('observation','<br>observation.').replace('home','<br>home.').replace('through','<br>through.');
  $('mission-desc').textContent=extract?'Your work is done. Bring everyone home.':s.mission==='recon'?'Listen first. Look carefully. Leave no trace.':s.mission==='intercept'?'Identify. Intercept. Disappear.':'No shots. Just bring back the story.';
  $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':extract?'RETURN TO EXTRACTION':s.mission==='recon'?'PHOTOGRAPH THE CONVOY':s.mission==='intercept'?'INTERCEPT COBALT':'LISTEN WITHOUT BEING SEEN';
@@ -131,7 +126,7 @@ function updateUI(){
  $('electric').classList.toggle('active',s.engine==='electric');$('diesel').classList.toggle('active',s.engine==='diesel');$('silent').classList.toggle('active',s.silent);
  $('engine-hint').textContent=drone?'Boat holds its own helm orders.':s.silent?'Silent running limits actual speed to 3 kn.':s.engine==='diesel'?(s.depth<=14?'Charging. High acoustic signature.':'No intake. Rise to 14 m or switch.'):s.battery<=0?'Battery exhausted. Surface for diesel.':'Quiet motors. Electric limit: 14 kn.';
  const active=feedActive(s,view),absLook=drone?s.drone.heading:scopeBearing(s),optical=view==='scope'||drone;
- const labels={scope:['OPTICAL OBSERVATION',active?`PERISCOPE · ${deg(s.scopeAngle)}° RELATIVE · ${(6*zoom).toFixed(0)}×`:'OPTICS OFFLINE'],sonar:['ACOUSTIC OBSERVATION',`HEADING UP · ${deg(s.heading)}° TRUE · ESTIMATED CONTACTS`],chart:['NAVIGATION CHART',`NORTH UP · ${chart.zoom.toFixed(1)}× · ${chart.follow?'FOLLOWING BOAT':'FREE PAN'}`],drone:['REMOTE INSPECTION',`ROV ${s.drone.mode.toUpperCase()} · BATTERY ${Math.round(s.drone.battery)}%`]};
+ const labels={scope:['OPTICAL OBSERVATION',active?`PERISCOPE · ${scopeWashed(s,env)?'LENS AWASH':deg(s.scopeAngle)+'° RELATIVE'} · ${(6*zoom).toFixed(0)}×`:'OPTICS OFFLINE'],sonar:['ACOUSTIC OBSERVATION',`HEADING UP · ${deg(s.heading)}° TRUE · ESTIMATED CONTACTS`],chart:['NAVIGATION CHART',`NORTH UP · ${chart.zoom.toFixed(1)}× · ${chart.follow?'FOLLOWING BOAT':'FREE PAN'}`],drone:['REMOTE INSPECTION',`ROV ${s.drone.mode.toUpperCase()} · BATTERY ${Math.round(s.drone.battery)}%`]};
  $('view-label').textContent=labels[view][0];$('view-subtitle').textContent=labels[view][1];$('view-tag').textContent=optical?active?(paused?'FROZEN':'LIVE FEED'):'OFFLINE':view==='chart'?'SECTOR 07':'HEADING UP';
  $('look-heading').textContent=deg(absLook)+'° TRUE';all('.compass span').forEach((el,i)=>el.textContent=deg(absLook+(i-2)*(drone?15:7.5/zoom)));
  const world=$('world');if(!active&&world.dataset.online!=='false')scene?.clear();world.dataset.online=String(active);world.style.display=active?'block':'none';world.setAttribute('aria-hidden',String(!active));world.style.opacity='1';
@@ -142,16 +137,24 @@ function updateUI(){
  $('scope-tools').classList.toggle('hidden',view!=='scope');$('chart-tools').classList.toggle('hidden',view!=='chart');$('drone-tools').classList.toggle('hidden',view!=='drone');
  $('scope-toggle').innerHTML=(s.scope?'LOWER SCOPE':'RAISE SCOPE')+' <kbd>P</kbd>';
  $('view-hint').textContent=view==='scope'?(active?'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM':'NO OPTICAL SIGNAL'):view==='sonar'?'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL':view==='chart'?'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT':active?'CAMERA FIXED AHEAD · W/S SPEED · A/D HEADING':'NO DRONE SIGNAL';
- $('view-range').textContent=drone?(active?`HDG ${deg(v.heading)}° · ${v.speed.toFixed(1)} KN · ${v.depth.toFixed(0)} M`:''):view==='chart'?`ZOOM ${chart.zoom.toFixed(1)}×`:'VISIBILITY 6.5 KM';
+ $('view-range').textContent=drone?(active?`HDG ${deg(v.heading)}° · ${v.speed.toFixed(1)} KN · ${v.depth.toFixed(0)} M`:''):view==='chart'?`ZOOM ${chart.zoom.toFixed(1)}×`:'VISIBILITY '+(env.opticalRange/1000).toFixed(1)+' KM';
  $('station-status').textContent=s.depth<=1?'SURFACED · EXPOSED':s.depth<=15?'PERISCOPE DEPTH':s.silent?'SILENT RUNNING':'SUBMERGED';
- $('sim-time').textContent=new Date((18*3600+42*60+s.time)*1000).toISOString().slice(11,19);$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>G</kbd>';
+ $('sim-time').textContent='SKY '+new Date(Math.floor(env.hour*3600)*1000).toISOString().slice(11,16);
+ $('weather').textContent=env.phase+' · '+env.weather+' · SEA '+env.seaState;
+ $('viewport').dataset.weather=env.weatherId;$('viewport').dataset.dayPhase=env.phase;$('viewport').dataset.lightningActive=String(env.flash>.1);$('viewport').dataset.simSeconds=s.time.toFixed(2);
+ $('viewport').dataset.lastLightning=s.lightning.at(-1)?.id||'';$('viewport').dataset.heardThunder=s.acoustics.filter(a=>a.type==='thunder'&&a.heard).length;
+ const droneSounding=view==='drone'&&feedActive(s,'drone'),seabed=getSoundings(s,droneSounding);
+ $('below-label').textContent=droneSounding?'BELOW DRONE':'BELOW KEEL';$('below-keel').textContent=seabed.belowKeel.toFixed(0)+' m';$('water-depth').textContent=seabed.waterDepth>0?seabed.waterDepth.toFixed(0)+' m':'LAND';
+ const warning=seabed.belowKeel<0?'BOTTOM CONTACT':seabed.belowKeel<10?'DANGER · RISE':seabed.belowKeel<30?'SHALLOW CLEARANCE':'CLEAR BELOW';if($('seabed-advice').textContent!==warning)$('seabed-advice').textContent=warning;
+ $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
+ $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>G</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
  $('contacts').innerHTML=s.contacts.length?s.contacts.map(c=>`<button class="contact-row ${selected===c.id?'active':''}" data-contact="${esc(c.id)}" aria-pressed="${selected===c.id}"><span class="contact-icon">${c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):'◌'}</span><span><strong>${esc(c.identified?c.name:c.label)}</strong><small>${c.identified?(c.military?'MILITARY':'NEUTRAL'):'UNCLASSIFIED'} · ${c.range?(c.range/1000).toFixed(1)+' KM':'RANGE ?'}</small></span><span class="contact-bearing">${deg(relativeBearing(c.bearing,s.heading))}° R</span></button>`).join(''):'<div class="empty-contacts">Listening to the dark.<br>Contacts appear as you hear them.</div>';
  $('torp-count').textContent=String(s.torps).padStart(2,'0');$('tubes').innerHTML=Array.from({length:4},(_,i)=>`<i class="${i>=s.torps?'spent':''}"></i>`).join('');
  const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(target.bearing)}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';
  for(const id of ['battery','oxygen','fuel']){$(id+'-value').textContent=Math.round(s[id])+'%';$(id+'-bar').style.width=s[id]+'%';$(id+'-value').style.color=s[id]<20?'var(--red)':'';}
  $('alert-label').textContent=s.alert>60?'UNDER PURSUIT':s.alert>30?'POSSIBLE DETECTION':'UNDETECTED';$('alert-label').style.color=s.alert>30?'var(--red)':'var(--green)';$('alert-dot').style.background=s.alert>30?'var(--red)':'var(--green)';
- $('noise-value').textContent='SELF NOISE '+Math.round(s.noise)+' dB';$('clearance').textContent='KEEL CLEARANCE '+Math.round(bottom(s.x,s.y)-s.depth)+' m';$('damage-flash').style.opacity=s.shock?String(s.shock*.2):'0';$('cracks').classList.toggle('hidden',s.hull>30);
+ $('noise-value').textContent='SELF NOISE '+Math.round(s.noise)+' dB';$('clearance').textContent='KEEL CLEARANCE '+Math.round(getSoundings(s).belowKeel)+' m';$('damage-flash').style.opacity=s.shock?String(s.shock*.2):'0';$('cracks').classList.toggle('hidden',s.hull>30);
  $('viewport').dataset.paused=String(paused);$('viewport').dataset.station=view;
  for(const {el,enabled} of commandControls)el.disabled=!canIssue(s,context())||!enabled();
 }
@@ -209,19 +212,20 @@ function drawScope(){
  const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);if(!state.scope||state.depth>15)return;
  const vignette=c.createRadialGradient(w/2,h*.48,Math.min(w,h)*.18,w/2,h*.48,Math.max(w,h)*.62);vignette.addColorStop(0,'#06101400');vignette.addColorStop(.65,'#06101405');vignette.addColorStop(1,'#030b11e0');c.fillStyle=vignette;c.fillRect(0,0,w,h);
  const cy=h*.5,cx=w/2;c.strokeStyle='#d5d8ba8c';c.lineWidth=.8;c.beginPath();c.moveTo(cx-100,cy);c.lineTo(cx-17,cy);c.moveTo(cx+17,cy);c.lineTo(cx+100,cy);c.moveTo(cx,cy-53);c.lineTo(cx,cy-15);c.moveTo(cx,cy+15);c.lineTo(cx,cy+53);for(let x=-80;x<=80;x+=20){if(!x)continue;c.moveTo(cx+x,cy-4);c.lineTo(cx+x,cy+4);}c.stroke();c.strokeStyle='#d5d8ba55';c.beginPath();c.arc(cx,cy,13,0,Math.PI*2);c.stroke();c.fillStyle='#c8ccb3';c.font='14px IBM Plex Mono,monospace';c.textAlign='center';c.fillText('6',cx+124,cy+3);c.fillText('6',cx-124,cy+3);
+ if(scopeWashed(state))return;
  for(const q of state.contacts){if(!q.identified||q.age>3||q.kind==='sub')continue;const d=delta(q.bearing,look);if(Math.abs(d)>19/zoom)continue;const x=clamp(cx+Math.tan(rad(d))/Math.tan(rad(19/zoom))*cx,105,w-105);c.fillStyle='#d8d9b5';c.font='14px IBM Plex Mono,monospace';c.fillText(q.name.toUpperCase(),x,h*.59);c.fillStyle='#bdc7b0';c.font='12px IBM Plex Mono,monospace';c.fillText((q.range/1000).toFixed(1)+' KM · '+(q.military?'MILITARY':'NEUTRAL'),x,h*.59+19);}
 }
 function showResult(){if(resultShown)return;resultShown=true;persist();const win=state.status==='won';$('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';$('result-body').textContent=win?'The intelligence is aboard. The crew is safe. Somewhere out there, the convoy sails on.':state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.':'Your boat could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';$('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span>`;$('result-dialog').showModal();}
 function frame(now){
- const realDt=Math.min((now-last)/1000,.12);last=now;const ctx=context();
+ const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
  if(canIssue(state,ctx)){
   const before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400;
   applyHelmKeys(state,ctx,keys,realDt);const hadRoute=!!state.route;step(state,realDt*rate);renderClock=state.time;
   if(hadRoute&&!state.route){setRate(1);toast('Waypoint reached. All stop. Time compression disengaged.');}
   if(wasOutsidePickup&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
   if(state.alert>40&&priorAlert<=40){setRate(1);toast('Possible detection. Time compression disengaged.');sound.tone('contact');}
-  if(before!==state.events[0]){const e=state.events[0];if(e.kind==='contact'||e.kind==='damage'||(state.alert>40&&rate>1))setRate(1);if(e.kind==='damage')sound.tone('damage');if(e.kind==='contact')sound.tone('contact');if(e.kind==='success'&&lastToast!==e.text){toast(e.text);lastToast=e.text;}}
-  if(state.status!=='patrol')showResult();
+  if(before!==state.events[0]){const e=state.events[0];if(e.kind==='contact'||e.kind==='damage'||(state.alert>40&&rate>1))setRate(1);if(e.kind==='damage'&&!e.text.includes('Depth charge shock'))sound.tone(e.text.includes('in the water')?'contact':'damage');if(e.kind==='contact')sound.tone('contact');if(e.kind==='success'&&lastToast!==e.text){toast(e.text);lastToast=e.text;}}
+  sound.update(state,ctx);if(state.status!=='patrol')showResult();
  }
  if(String(feedActive(state,view))!==$('world').dataset.online)updateUI();
  const r=vp.getBoundingClientRect();

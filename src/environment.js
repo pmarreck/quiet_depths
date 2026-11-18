@@ -1,0 +1,42 @@
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const mix=(a,b,t)=>a+(b-a)*t;
+const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);};
+export const DAY_SECONDS=2880; // One environmental day in 48 simulated minutes.
+export const WEATHER=Object.freeze({
+ clear:{name:'Clear',cloud:.12,rain:0,storm:0,waveScale:.55,waveSpeed:.75,wind:9,visibility:1},
+ cloudy:{name:'Cloudy',cloud:.82,rain:0,storm:0,waveScale:1,waveSpeed:1,wind:22,visibility:.82},
+ rain:{name:'Rain',cloud:.95,rain:.6,storm:0,waveScale:1.45,waveSpeed:1.2,wind:38,visibility:.65},
+ storm:{name:'Storm',cloud:1,rain:1,storm:1,waveScale:2.6,waveSpeed:1.55,wind:65,visibility:.46}
+});
+export const TIMES=Object.freeze({dawn:{name:'Dawn',hour:6},day:{name:'Day',hour:12},dusk:{name:'Dusk',hour:18},night:{name:'Night',hour:22}});
+export function hash01(seed,n=0){let x=(seed+Math.imul(n+1,0x9e3779b9))|0;x=Math.imul(x^(x>>>16),0x21f0aaad);x=Math.imul(x^(x>>>15),0x735a2d97);return((x^(x>>>15))>>>0)/4294967296;}
+export function makeEnvironment(seed=19830604,options={}){
+ return{startHour:TIMES[options.timeOfDay]?.hour??18,startWeather:WEATHER[options.weather]?options.weather:'clear',changing:options.changing!==false,seed:seed>>>0};
+}
+export function environmentAt(s){
+ const cfg=s.environment||makeEnvironment(),time=s.time||0,ids=Object.keys(WEATHER),slot=Math.floor(time/300);
+ const idAt=n=>n<=0?cfg.startWeather:ids[Math.floor(hash01(cfg.seed,n)*ids.length)];
+ const a=WEATHER[idAt(cfg.changing?slot-1:0)],b=WEATHER[idAt(cfg.changing?slot:0)],blend=slot>0&&cfg.changing?smooth(0,75,time%300):0,e={};
+ for(const k of ['cloud','rain','storm','waveScale','waveSpeed','wind','visibility'])e[k]=mix(a[k],b[k],blend);
+ e.weather=(blend<.5?a:b).name;e.weatherId=blend<.5?idAt(cfg.changing?slot-1:0):idAt(cfg.changing?slot:0);
+ e.hour=((cfg.startHour+time*24/DAY_SECONDS)%24+24)%24;const angle=(e.hour-6)*Math.PI/12;
+ e.sunAltitude=Math.sin(angle);e.daylight=smooth(-.14,.18,e.sunAltitude);e.twilight=1-Math.abs(e.daylight*2-1);
+ e.phase=e.daylight<.12?'Night':e.daylight>.9?'Day':e.hour<12?'Dawn':'Dusk';
+ e.sunDirection={x:Math.cos(angle),y:Math.sin(angle),z:-.32};
+ e.opticalRange=(3900+2600*e.daylight)*e.visibility;
+ e.subVisualRange=(1800+3700*e.daylight)*e.visibility;
+ e.lightRange=(7000-1000*e.daylight)*(.65+.35*e.visibility);
+ e.seaState=e.waveScale<.7?2:e.waveScale<1.2?3:e.waveScale<1.8?4:6;
+ e.flash=0;for(const strike of s.lightning||[]){const age=time-strike.time;if(age>=0&&age<.75){const pulse=Math.exp(-age*13)+.75*Math.exp(-(((age-.22)/.05)**2));const d=Math.hypot(strike.x-s.x,strike.y-s.y);e.flash=Math.max(e.flash,pulse/(1+d/14000));}}
+ return e;
+}
+export const WAVE_COMPONENTS=Object.freeze([
+ {kx:.023,ky:0,omega:.85,amplitude:1.1},{kx:0,ky:.038,omega:1.1,amplitude:.65},
+ {kx:.065,ky:.065,omega:-1.3,amplitude:.24},{kx:.14,ky:.06,omega:1.8,amplitude:.3},{kx:0,ky:.31,omega:-2.3,amplitude:.11}
+]);
+export function surfaceHeight(x,y,time,e){return e.waveScale*WAVE_COMPONENTS.reduce((n,w)=>n+w.amplitude*Math.sin(x*w.kx+y*w.ky+time*e.waveSpeed*w.omega),0);}
+export const SEA_GLSL='float sea(vec2 p){return waveScale*('+WAVE_COMPONENTS.map(w=>`sin(p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+time*waveSpeed*${w.omega.toFixed(3)})*${w.amplitude.toFixed(3)}`).join('+')+');}';
+export const SEA_SAMPLE_GLSL='vec3 seaSample(vec2 p){vec3 s=vec3(0.);'+WAVE_COMPONENTS.map((w,i)=>`float phase${i}=p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+time*waveSpeed*${w.omega.toFixed(3)};s+=${w.amplitude.toFixed(3)}*vec3(sin(phase${i}),cos(phase${i})*${w.kx.toFixed(3)},cos(phase${i})*${w.ky.toFixed(3)});`).join('')+'return s*waveScale;}';
+export function scopeEyeHeight(s,e){return s.depth<2?9+surfaceHeight(s.x,s.y,s.time,e)*.6:3.8+Math.sin(s.time*.72)*.35*e.waveScale;}
+export function scopeWashed(s,e=environmentAt(s)){return scopeEyeHeight(s,e)<=surfaceHeight(s.x,s.y,s.time,e)+.15;}
+export function soundings(waterDepth,referenceDepth,keelOffset=5){return{waterDepth,referenceDepth,belowKeel:waterDepth-referenceDepth-keelOffset,keelOffset};}

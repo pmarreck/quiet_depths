@@ -35,10 +35,24 @@ The helm shows white actual ticks and gold requested ticks for heading, depth an
 
 Diesel runs above 14 meters, charging air and battery but making noise. Electric runs submerged and consumes finite battery and oxygen. The boat can hit generated bathymetry or exceed 220-meter test depth. Pursuing escorts drop delayed charge patterns. Repairs take time and battery. Acoustic torpedoes may acquire the wrong ship; identified neutrals are protected by the UI, but a seeker can still stray.
 
+## Weather, soundings and sound
+
+New patrols let you select dawn, day, dusk or night, plus clear, cloudy, rain or storm conditions. Changing weather fronts are optional. The environmental sky clock completes a day in 48 simulated minutes, independently of the patrol's elapsed-time counter. Fronts change every five simulated minutes and blend over 75 seconds. Night and storms reduce optical identification and the distance at which escorts can spot an unlit submarine. Running lights remain visible farther than dark hull silhouettes. Heavy weather masks some near-surface passive sound; deeper water reduces that masking.
+
+The renderer and simulation share the same wave components and weather parameters. Storms increase wave height, speed, ship motion, rain and occasional periscope wash. Daylight, cloud cover, sun/moon direction, stars, running lights and lightning respond to the environmental state. The seafloor strip shows total water depth and space beneath the submarine's keel, five meters below its pressure-depth reference. The drone uses its own position and a 0.4-meter hull offset. Shallow clearance is highlighted.
+
+Enable Sound for continuous nearby engine/propeller noise, panned relative to the submarine's heading and attenuated by three-dimensional distance. Engine pitch follows vessel kind and speed. Thunder, torpedo detonations and charge explosions are located events with emission times. Their wavefronts are checked against the moving listener, and already-heard events are saved to prevent replay after loading.
+
+Acoustic travel uses approximate constant speeds of 340 m/s in air and 1500 m/s in seawater, following [NOAA's sound reference](https://oceanservice.noaa.gov/facts/sound.html). Surface thunder uses direct three-dimensional air travel. Submerged thunder uses the minimum-time two-segment path through a flat air/water interface, found by a bounded numerical search. Thunder is represented by an effective point 65% of the way up the visible lightning channel. Its gain and low-pass cutoff decrease with listener depth, including while a rumble is already playing. Wavefront timing uses simulated seconds, so time compression also compresses flash-to-thunder delays.
+
+Depth charges have a location, fuse depth and sinking interval. On detonation they emit an underwater pressure front. Nearby damage and sound occur when that front reaches the submarine. The drone can see sinking canisters and expanding underwater blast bubbles. Explosions get quieter and more filtered with distance; their propagation is distinct from air-origin thunder. The audio is procedural, with bounded effect voices and a master compressor.
+
+This is a game approximation: no temperature/salinity profiles, full lightning-channel acoustics, sea-interface wave refraction, multipath echoes or calibrated sound-pressure levels. Unit checks compare the interface-path solver against an independent exhaustive search and verify attenuation, moving-listener arrival, charge timing and save round trips. The browser checks verify rendering and WebAudio scheduling/graph activity; subjective mix quality still needs listening-based playtesting.
+
 ## Prototype boundaries
 
 Single-player, procedural waves and terrain, approximate acoustic detection, simplified repairs, and synthesized audio. No crew interior or nuclear propulsion. The freely controlled inspection ROV is a deliberate historical liberty. Passive contacts reveal bearings; visual observations and active pings store aging position estimates. The chart never renders live hostile positions. It shows your submarine symbol for navigation; an exterior 3D boat view is available only through the drone.
 
-The simulation is independent of rendering, runs in fixed substeps, and saves its random seed with state. The tests include time-step batching invariance and state serialization round trips. These checks cover rules, not game balance or historical accuracy. Browser playtesting is still needed to tune difficulty and pacing.
+The simulation is independent of rendering, runs in bounded substeps, and saves its random seed and environmental state. The tests include time-step batching invariance, state serialization round trips, optics/detection effects, wave amplitude, acoustics and control guards. These checks cover rules, not game balance or historical accuracy. Browser playtesting is still needed to tune difficulty and pacing.
 
 Three.js 0.170.0 is vendored under its MIT license. DM Sans, IBM Plex Mono, and Libre Caslon Display are vendored under their included SIL Open Font Licenses. The built game makes no external requests. No accounts, tracking, multiplayer, or backend.
