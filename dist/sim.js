@@ -18,7 +18,7 @@ function rand(s){s.rng^=s.rng<<13;s.rng^=s.rng>>>17;s.rng^=s.rng<<5;return(s.rng
 export function log(s,text,kind='info'){s.events.unshift({t:s.time,text,kind});s.events=s.events.slice(0,45);}
 export function createGame(mission='recon',seed=19830604){
  const m=MISSIONS.find(m=>m.id===mission)||MISSIONS[0];
- return {version:1,rng:seed,time:0,status:'patrol',mission:m.id,phase:'objective',trackTime:0,photos:[],hull:100,battery:92,oxygen:100,fuel:86,flood:0,repair:0,torps:m.torps,noise:12,alert:0,pingAge:999,pingCooldown:0,photoCooldown:0,decoys:3,engine:'electric',silent:false,scope:true,speed:4,targetSpeed:4,depth:12,targetDepth:12,heading:32,targetHeading:32,x:0,y:0,route:null,home:{x:-1500,y:-1700},events:[{t:0,text:'Helm steady. Faint screws bearing 028. Your patrol begins.',kind:'info'}],contacts:[],projectiles:[],blasts:[],nextId:1,drone:{mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100},ships:[
+ return {version:1,rng:seed,time:0,status:'patrol',mission:m.id,phase:'objective',trackTime:0,photos:[],hull:100,battery:92,oxygen:100,fuel:86,flood:0,repair:0,torps:m.torps,noise:12,alert:0,pingAge:999,pingCooldown:0,photoCooldown:0,decoys:3,engine:'electric',silent:false,scope:true,scopeAngle:0,speed:4,targetSpeed:4,depth:12,targetDepth:12,heading:32,targetHeading:32,x:0,y:0,route:null,home:{x:-1500,y:-1700},events:[{t:0,text:'Helm steady. Faint screws bearing 028. Your patrol begins.',kind:'info'}],contacts:[],projectiles:[],blasts:[],nextId:1,drone:{mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0},ships:[
  {id:'cobalt',name:'Cobalt',kind:'merchant',military:true,x:1450,y:2700,heading:255,speed:5,hull:100,alert:0,attack:0},
  {id:'meridian',name:'Meridian',kind:'merchant',military:false,x:2350,y:2900,heading:255,speed:5,hull:100,alert:0,attack:0},
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
@@ -64,7 +64,7 @@ export function fire(s,id){
 }
 export function decoy(s){if(s.decoys<=0)return false;s.decoys--;s.alert=Math.max(0,s.alert-35);for(const v of s.ships)v.alert=Math.max(0,v.alert-50);log(s,'Noisemaker away. Change course and go quiet.');return true;}
 export function deployDrone(s){
- if(s.drone.mode==='stowed'&&s.depth<=80&&s.drone.battery>5){Object.assign(s.drone,{mode:'remote',x:s.x+60,y:s.y,depth:s.depth+8,heading:s.heading});log(s,'Inspection drone deployed. Helm control transferred to ROV.');return true;}
+ if(s.drone.mode==='stowed'&&s.depth<=80&&s.drone.battery>5){const x=s.x+60,y=s.y,heading=bearing({x,y},s);Object.assign(s.drone,{mode:'remote',x,y,depth:s.depth+8,targetDepth:s.depth+8,heading,targetHeading:heading,speed:0,targetSpeed:0});log(s,'Inspection drone deployed. Helm control transferred to ROV.');return true;}
  return false;
 }
 export function recallDrone(s){if(s.drone.mode!=='stowed'&&s.drone.mode!=='lost'){s.drone.mode='return';log(s,'Drone returning to the boat.');}}
@@ -73,7 +73,7 @@ export function hurt(s,amount,text){
  if(s.hull<=0){s.status='lost';log(s,'Pressure hull lost. All stations, abandon ship.','damage');}
 }
 export function step(s,dt,input={}){
- if(s.status!=='patrol'||dt<=0)return;
+ if(s.status!=='patrol'||dt<=0||input.paused||input.modal)return;
  // Fixed substeps make time compression obey the same collision and resource rules.
  let left=Math.min(dt,60);while(left>0&&s.status==='patrol'){const t=Math.min(.25,left);tick(s,t,input);left-=t;}
 }
@@ -82,7 +82,7 @@ function tick(s,dt,input){
  if(s.route){s.targetHeading=bearing(s,s.route);if(distance(s,s.route)<100){s.route=null;s.targetSpeed=0;log(s,'Waypoint reached. All stop.');}}
  const electric=s.engine==='electric',diesel=!electric&&s.depth<=14&&s.fuel>0;
  const maxSpeed=s.silent?3:(electric?(s.battery>0?14:0):(diesel?17:0));
- s.speed+=clamp(Math.min(s.targetSpeed,maxSpeed)-s.speed,-dt*.35,dt*.35);
+ s.speed+=clamp(clamp(s.targetSpeed,-Math.min(4,maxSpeed),maxSpeed)-s.speed,-dt*.35,dt*.35);
  s.heading=(s.heading+clamp(delta(s.targetHeading,s.heading),-dt*1.7,dt*1.7)+360)%360;
  s.depth=clamp(s.depth+clamp(s.targetDepth-s.depth,-dt*.7,dt*.7),0,320);
  s.x+=Math.sin(rad(s.heading))*s.speed*.514444*dt;s.y+=Math.cos(rad(s.heading))*s.speed*.514444*dt;
@@ -105,7 +105,7 @@ function tick(s,dt,input){
    if(ship.hull<=0)continue;
    const d=distance(s,ship);
    if((s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
-   if(isVisible(s,ship,input.look))contact(s,ship,'visual');
+   if(isVisible(s,ship,input.look??((s.heading+s.scopeAngle)%360)))contact(s,ship,'visual');
    if(ship.kind==='escort'||ship.kind==='sub'){
      const exposure=s.depth<3?95:(s.scope&&s.depth<=15?23:0);
      const sound=s.noise*(s.depth>100?.55:1);
@@ -134,27 +134,31 @@ function tick(s,dt,input){
  s.blasts=s.blasts.filter(b=>b.age<5);
  const dr=s.drone;
  if(dr.mode==='remote'||dr.mode==='return'){
-   dr.battery=Math.max(0,dr.battery-dt*.1);
-   if(dr.mode==='return'){dr.heading=bearing(dr,s);dr.depth+=clamp(s.depth+4-dr.depth,-dt,dt);}
-   else{dr.heading=(dr.heading+(input.droneTurn||0)*dt*24+360)%360;dr.depth=clamp(dr.depth+(input.droneDepth||0)*dt*2,3,150);}
-   const velocity=dr.mode==='return'?7:(input.droneMove||0)*5;
-   dr.x+=Math.sin(rad(dr.heading))*velocity*dt;dr.y+=Math.cos(rad(dr.heading))*velocity*dt;
-   if(dr.mode==='return'&&distance(dr,s)<25){dr.mode='stowed';log(s,'Drone recovered.');}
+   dr.battery=Math.max(0,dr.battery-dt*(.08+dr.speed*dr.speed*.0007));
+   if(dr.mode==='return'){dr.targetHeading=bearing(dr,s);dr.targetDepth=clamp(s.depth+4,0,150);dr.targetSpeed=14;}
+   dr.speed+=clamp(clamp(dr.targetSpeed,-3,dr.mode==='return'?14:10)-dr.speed,-dt,dt);
+   dr.heading=(dr.heading+clamp(delta(dr.targetHeading,dr.heading),-dt*12,dt*12)+360)%360;
+   dr.depth=clamp(dr.depth+clamp(dr.targetDepth-dr.depth,-dt,dt),0,150);
+   dr.x+=Math.sin(rad(dr.heading))*dr.speed*.514444*dt;dr.y+=Math.cos(rad(dr.heading))*dr.speed*.514444*dt;
+   if(dr.mode==='return'&&distance(dr,s)<25&&Math.abs(dr.depth-s.depth)<10){dr.mode='stowed';dr.speed=dr.targetSpeed=0;log(s,'Drone recovered.');}
    if(dr.battery<20&&dr.mode==='remote'){dr.mode='return';log(s,'Drone battery low. Automatic return.','warning');}
    if(dr.battery<=0||bottom(dr.x,dr.y)<dr.depth){dr.mode='lost';log(s,'Drone signal lost.','warning');}
  }
  if(s.mission==='shadow'&&s.noise<27&&s.depth>15&&s.ships.some(c=>c.kind==='merchant'&&c.hull>0&&distance(s,c)<4000))s.trackTime+=dt;
  const done=s.mission==='recon'?s.photos.length>=2:s.mission==='intercept'?s.ships.find(c=>c.id==='cobalt')?.hull===0:s.trackTime>=180;
- if(done&&s.phase==='objective'){s.phase='extract';log(s,'Objective complete. Return to the extraction circle, southwest.','success');}
- if(s.phase==='extract'&&distance(s,s.home)<400){s.status='won';log(s,'Patrol complete. Boat and crew home safely.','success');}
+ if(done&&s.phase==='objective'){s.phase='extract';log(s,'Objective complete. Return to extraction and surface for pickup.','success');}
+ if(s.phase==='extract'&&distance(s,s.home)<400&&s.depth<=1){s.status='won';log(s,'Patrol complete. Surfaced at pickup. Boat and crew home safely.','success');}
  if(s.time>1800&&s.status==='patrol'){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
 }
 export function save(s){return JSON.stringify(s);}
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
+ // Migrate existing v1 patrols without discarding their progress or drone state.
+ if(s.scopeAngle===undefined)s.scopeAngle=0;
+ if(s.drone){for(const [k,v] of Object.entries({speed:0,targetSpeed:0,targetDepth:s.drone.depth,targetHeading:s.drone.heading}))if(s.drone[k]===undefined)s.drone[k]=v;}
  const template=createGame(s.mission);for(const [k,v] of Object.entries(template)){if(typeof v==='number'&&!Number.isFinite(s[k]))return null;if(typeof v==='boolean'&&typeof s[k]!=='boolean')return null;if(Array.isArray(v)&&!Array.isArray(s[k]))return null;}
  if(!['objective','extract'].includes(s.phase)||!['electric','diesel'].includes(s.engine)||!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y)||!s.drone||!['stowed','remote','return','lost'].includes(s.drone.mode))return null;
- for(const k of ['x','y','heading','depth','battery'])if(!Number.isFinite(s.drone[k]))return null;
+ for(const k of ['x','y','heading','depth','battery','speed','targetSpeed','targetDepth','targetHeading'])if(!Number.isFinite(s.drone[k]))return null;
  if(s.route&&(!Number.isFinite(s.route.x)||!Number.isFinite(s.route.y)))return null;
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
  if(!s.ships.some(c=>c.id==='cobalt'))return null;

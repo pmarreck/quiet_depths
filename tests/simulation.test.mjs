@@ -13,7 +13,7 @@ test('scope cannot see from deep water or through a lowered mast',()=>{
  const s=createGame(),ship=s.ships[0];assert.ok(isVisible(s,ship,bearing(s,ship)));s.scope=false;assert.ok(!isVisible(s,ship));s.scope=true;s.depth=20;assert.ok(!isVisible(s,ship));assert.equal(photograph(s,bearing(s,ship)),false);
 });
 test('camera needs a centered silhouette and separate photographs',()=>{
- const s=createGame();assert.equal(photograph(s,180),false);assert.equal(photograph(s,bearing(s,s.ships[0])),true);assert.deepEqual(s.photos,['cobalt']);assert.equal(photograph(s,bearing(s,s.ships[1])),false);step(s,5);assert.ok(photograph(s,bearing(s,s.ships[1])));assert.equal(s.photos.length,2);step(s,.25);assert.equal(s.phase,'extract');assert.notEqual(s.status,'won');s.x=s.home.x;s.y=s.home.y;step(s,.25);assert.equal(s.status,'won');
+ const s=createGame();assert.equal(photograph(s,180),false);assert.equal(photograph(s,bearing(s,s.ships[0])),true);assert.deepEqual(s.photos,['cobalt']);assert.equal(photograph(s,bearing(s,s.ships[1])),false);step(s,5);assert.ok(photograph(s,bearing(s,s.ships[1])));assert.equal(s.photos.length,2);step(s,.25);assert.equal(s.phase,'extract');assert.notEqual(s.status,'won');s.x=s.home.x;s.y=s.home.y;step(s,.25);assert.equal(s.status,'patrol');s.depth=s.targetDepth=0;step(s,.25);assert.equal(s.status,'won');
 });
 test('time batching preserves simulation outcomes (metamorphic)',()=>{
  for(const dt of [1,5,20,60]){const a=createGame(),b=structuredClone(a);a.scope=b.scope=false;a.depth=a.targetDepth=b.depth=b.targetDepth=90;step(a,dt);for(let t=0;t<dt*4;t++)step(b,.25);for(const k of ['x','y','speed','depth','oxygen','battery','heading','hull','alert'])assert.ok(Math.abs(a[k]-b[k])<1e-8,`${dt}: ${k}`);assert.deepEqual(a.contacts,b.contacts);}

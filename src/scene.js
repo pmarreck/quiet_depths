@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
+import {feedActive,scopeBearing,cameraEuler} from './controls.js';
 const waterVertex=`
 uniform float time;uniform vec2 origin;
 varying vec3 vWorld;
@@ -43,13 +44,17 @@ export class OceanScene{
  }
  makeSub(){const g=new T.Group(),m=this.mat(0x253a3a),trim=this.mat(0x1c2c2e);const hull=new T.Mesh(new T.CapsuleGeometry(5,55,8,24),m);hull.rotation.x=Math.PI/2;g.add(hull);this.box(g,[5,9,12],[0,7,-5],m);this.box(g,[.5,6,.5],[0,14,-7],trim);this.box(g,[20,.6,6],[0,0,20],m);this.box(g,[.6,10,7],[0,0,27],m);this.box(g,[17,.5,5],[0,3,-22],m);this.box(g,[3.5,.5,25],[0,5,2],trim);for(const z of [-18,-7,8,20]){const seam=new T.Mesh(new T.TorusGeometry(5.015,.045,4,36),trim);seam.position.z=z;g.add(seam);}const hatch=new T.Mesh(new T.CylinderGeometry(1.3,1.3,.4,16),trim);hatch.position.set(0,5.1,-17);g.add(hatch);const prop=new T.Mesh(new T.ConeGeometry(2,4,8),this.mat(0x8c8152));prop.rotation.x=Math.PI/2;prop.position.z=34;g.add(prop);return g;}
  resize(w,h){if(this.canvas.width!==Math.floor(w*this.renderer.getPixelRatio())||this.canvas.height!==Math.floor(h*this.renderer.getPixelRatio())){this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}}
- render(s,view,look,zoom,time){
-  const underwater=view==='drone';this.waterUniforms.time.value=time;this.waterUniforms.underwater.value=underwater?1:0;this.water.position.set(s.x,0,-s.y);this.waterUniforms.origin.value.set(s.x,s.y);this.renderer.setClearColor(underwater?0x0c3339:0x627475);this.hemi.intensity=underwater?.7:2;this.sun.intensity=underwater?.15:2.7;
+ clear(){this.renderer.setClearColor(0x0a171b);this.renderer.clear();}
+ render(s,view,zoom,time){
+  if(!feedActive(s,view)){this.clear();return;}
+  const drone=view==='drone',underwater=drone&&s.drone.depth>1.5;this.waterUniforms.time.value=time;this.waterUniforms.underwater.value=underwater?1:0;this.water.position.set(s.x,0,-s.y);this.waterUniforms.origin.value.set(s.x,s.y);this.renderer.setClearColor(underwater?0x0c3339:0x627475);this.hemi.intensity=underwater?.7:2;this.sun.intensity=underwater?.15:2.7;
   this.scene.fog.color.setHex(underwater?0x0c3339:0x627475);this.scene.fog.density=underwater?.007:.00015;this.sky.visible=!underwater;this.particles.visible=underwater;this.light.visible=underwater;
   for(const ship of s.ships){let mesh=this.ships.get(ship.id);if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}mesh.visible=ship.hull>0;mesh.position.set(ship.x,ship.kind==='sub'?-ship.depth:Math.sin(time+ship.x)*.7,-ship.y);mesh.rotation.y=-rad(ship.heading);mesh.rotation.z=Math.sin(time*.8+ship.x)*.012;}
-  this.own.visible=underwater;this.own.position.set(s.x,-s.depth,-s.y);this.own.rotation.y=-rad(s.heading);
-  if(underwater){const d=s.drone;const a=rad(d.heading+look);this.camera.position.set(d.x,-d.depth,-d.y);this.camera.lookAt(d.x+Math.sin(a)*100,-d.depth-3,-d.y-Math.cos(a)*100);this.light.position.copy(this.camera.position);this.light.target.position.set(d.x+Math.sin(a)*100,-d.depth-5,-d.y-Math.cos(a)*100);this.particles.position.copy(this.camera.position);this.camera.fov=65;}
-  else {const a=rad(look);const y=s.depth<2?9:3.8;this.camera.position.set(s.x,y+Math.sin(time*.72)*.35,-s.y);this.camera.lookAt(s.x+Math.sin(a)*1000,y-3+Math.sin(time*.3)*1.5,-s.y-Math.cos(a)*1000);this.camera.rotation.z=Math.sin(time*.55)*.005;this.camera.fov=38/zoom;}
+  this.own.visible=drone;this.own.position.set(s.x,-s.depth,-s.y);this.own.rotation.y=-rad(s.heading);
+  let pose;
+  if(drone){const d=s.drone,a=rad(d.heading);this.camera.position.set(d.x,d.depth<.5?.8:-d.depth,-d.y);pose=cameraEuler(d.heading,-Math.atan2(3,100),0);this.light.position.copy(this.camera.position);this.light.target.position.set(d.x+Math.sin(a)*100,-d.depth-5,-d.y-Math.cos(a)*100);this.particles.position.copy(this.camera.position);this.camera.fov=65;}
+  else {const y=s.depth<2?9:3.8;this.camera.position.set(s.x,y+Math.sin(time*.72)*.35,-s.y);pose=cameraEuler(scopeBearing(s),Math.atan2(-3+Math.sin(time*.3)*1.5,1000),Math.sin(time*.55)*.005);this.camera.fov=38/zoom;}
+  this.camera.rotation.set(pose.x,pose.y,pose.z,pose.order);
   this.camera.updateProjectionMatrix();this.sky.position.copy(this.camera.position);this.renderer.render(this.scene,this.camera);
  }
 }

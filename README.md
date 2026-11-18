@@ -15,15 +15,23 @@ For development preview, copy the Nix build output into `dist/` first (`mkdir -p
 
 ## Play
 
-Choose reconnaissance, interception, or passive surveillance. Photograph silhouettes, intercept a military freighter, or quietly collect traffic intelligence. Complete the task and return to the chart's extraction circle. The patrol window is 30 simulated minutes. Use 5× and 20× for transit; new contacts and attacks return time to 1×. Space pauses; progress autosaves in this browser's local storage.
+Choose reconnaissance, interception, or passive surveillance. Photograph silhouettes, intercept a military freighter, or quietly collect traffic intelligence. Complete the task, return to the chart's extraction circle, and surface to 1 meter or less for pickup. The patrol window is 30 simulated minutes. Use 5× and 20× for transit; new contacts and attacks return time to 1×. Esc pauses; progress autosaves in this browser's local storage.
 
 - **1–4**: periscope, sonar, chart, drone.
 - **P**: raise/lower scope at 15 meters or less. Drag to pan; scroll to zoom.
-- **C**: photograph a merchant within five degrees of the reticle. Separate silhouettes require separate framing.
+- **F**: photograph a merchant within five degrees of the reticle. Separate silhouettes require separate framing.
 - **G**: active sonar. Range information also exposes you.
 - **R**: silent running, limited to 3 knots.
-- **Drone**: deploy at 80 meters or less; W/S move, A/D turn, Q/E descend/ascend. Recall before its battery runs out.
-- Click the chart to order a waypoint. Ordered depth stays under your control.
+- **W/S**: increase/decrease requested speed of the vehicle under control, including astern.
+- **A/D**: turn requested heading left/right. Actual heading follows with a bounded turn rate.
+- **Space/C**: change requested depth toward the surface/deeper. Actual depth follows gradually.
+- **Esc**: pause or resume. Physical camera movement, helm orders, sonar pings, weapons, repairs and drone deployment are blocked while paused. Station selection and chart inspection remain available.
+- **Drone**: deploy at 80 meters or less. Its camera is fixed dead ahead; the same keyboard and helm controls pilot the drone while its station is selected. Recall before its battery runs out. The submarine keeps its own orders.
+- **Periscope**: angle is relative to the submarine, so turning the hull turns the view. Inactive optics are fully blank and cannot rotate or zoom. A stowed/lost drone also has no view.
+- **Sonar**: heading-up, with relative contact bearings and a rotating north indicator. True bearings remain available through navigation and the periscope.
+- Drag the chart to pan and use the wheel to zoom around the cursor. Click without dragging to order a waypoint. Requested depth stays under your control; Center Boat restores following.
+
+The helm shows white actual ticks and gold requested ticks for heading, depth and speed. Its numeric readouts identify both values. The interface uses 16-pixel body text, 14-pixel controls and 12-pixel secondary metadata, with reflow on smaller displays. Existing patrol saves migrate to the new control fields.
 
 Diesel runs above 14 meters, charging air and battery but making noise. Electric runs submerged and consumes finite battery and oxygen. The boat can hit generated bathymetry or exceed 220-meter test depth. Pursuing escorts drop delayed charge patterns. Repairs take time and battery. Acoustic torpedoes may acquire the wrong ship; identified neutrals are protected by the UI, but a seeker can still stray.
 
