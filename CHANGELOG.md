@@ -4,6 +4,7 @@
 
 - Replace the phone layout with a fixed helm, vertical speed slider, compact status, exact-order sheets and station actions below the scene. Keep a visible Sound OFF/ON label, resource access and touch sonar ping.
 - Preserve contact buttons and gun target options across telemetry updates, fixing missed selections. Assign stable contact codes and share surfaced eligibility across gun and tower/status views.
+- Preserve the existing patrol/library when the initial briefing is opened, hidden or closed before you choose to start or resume.
 - Clear casualty scenery between mission types, fixing a renderer exception that froze a patrol started after rescue or survey.
 - Route ROV recall through a deterministic hull-clearance path, including a surfaced moving boat, without bypassing collisions. Attach and animate its cable and show global deployment, range and condition-aware outrun warnings.
 - Replace pitched flower-like blades with compact gray helical screw geometry and refine period-inspired stern planes and rudders.
@@ -12,7 +13,7 @@
 - Add the approved fictional 1972 classified orbital prototype: 10 km chart tasking, overpass warmup, two exposures, weather/night limits, depth-limited staged transmission and a long cooldown.
 - Keep timestamped surface fixes, measured velocity, growing uncertainty and firing bearings independent of the live target position. Freeze camera pixels at the shutter even when immediately switching stations. Archive bounded real scene photographs and frozen monochrome recon plates across patrols/reloads.
 
-Validation: the canonical Nix gate passes 179 tests, syntax checks and the static build. Regression tests were observed failing before their fixes. Independent vehicle acceptance covers 96 recovery scenarios. Browser evidence and device/audio limitations are recorded in PLAN.md.
+Validation: the canonical Nix gate passes 181 tests, syntax checks and the static build. Regression tests were observed failing before their fixes. Independent vehicle acceptance covers 96 recovery scenarios. Browser evidence and device/audio limitations are recorded in PLAN.md.
 
 ## 0.5.0
 

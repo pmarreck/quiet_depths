@@ -1,4 +1,4 @@
-import {createGame,step,bottom,bearing,delta,distance,rad,clamp,ping,photograph,fire,decoy,deployDrone,recallDrone,log,MISSIONS,save,restore,getSoundings} from './sim.js';
+import {createGame,step,bottom,bearing,delta,distance,rad,clamp,ping,photograph,fire,decoy,deployDrone,recallDrone,log,MISSIONS,restore,getSoundings} from './sim.js';
 import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
 import {objectiveState,operationApproach,dronePhotograph} from './missions.js';
@@ -15,11 +15,12 @@ import {captureOptics,captureSatellite} from './photo-capture.js';
 import {requestRecon,reconStatus,reconAreaForDisplay} from './recon.js';
 import {estimateAt} from './track-estimates.js';
 import {lossPresentation} from './loss.js';
+import {persistPatrol} from './persistence.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,missionChoice='recon',last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0;
-let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null;
+let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
 let orderAxis=null,reconPlacement=false,photoKey='',lossStartedAt=0;const zooms={scope:1,tower:1,gun:1};let library=[];
 try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
 state.photoArchive=library;
@@ -34,7 +35,7 @@ const sound=new SoundSystem(()=>state,context,status=>{
  if(status.last){el.dataset.lastAcoustic=status.last.type;el.dataset.lastDelay=status.last.delay.toFixed(3);el.dataset.lastGain=(status.last.currentGain??status.last.gain).toFixed(4);el.dataset.lastCutoff=(status.last.currentCutoff??status.last.cutoff).toFixed(0);}else{for(const key of ['lastAcoustic','lastDelay','lastGain','lastCutoff'])delete el.dataset[key];}
 });
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
-function persist(){try{library=photoArchive(state);localStorage.setItem('quiet-depths-photos-v1',JSON.stringify(library));if(state.status==='patrol')localStorage.setItem('quiet-depths-v1',save({...state,photoArchive:[]}));else localStorage.removeItem('quiet-depths-v1');$('save-status').textContent='PATROL SAVED';setTimeout(()=>$('save-status').textContent='LOCAL AUTOSAVE',1400);}catch{$('save-status').textContent='SAVING UNAVAILABLE';}}
+function persist(){if(!patrolStarted)return;try{persistPatrol(localStorage,state,patrolStarted);library=photoArchive(state);$('save-status').textContent='PATROL SAVED';setTimeout(()=>$('save-status').textContent='LOCAL AUTOSAVE',1400);}catch{$('save-status').textContent='SAVING UNAVAILABLE';}}
 function bindCommand(element,event,action,enabled=()=>true){
  const el=typeof element==='string'?$(element):element;commandControls.push({el,enabled});el.dataset.command='true';
  el.addEventListener(event,e=>{if(!canIssue(state,context())||!enabled())return;action(e);updateUI();});
@@ -47,6 +48,7 @@ function setView(v){zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sh
 function chooseMission(id){missionChoice=id;all('.mission-option').forEach(b=>b.classList.toggle('active',b.dataset.mission===id));document.querySelector('.briefing-tip p').innerHTML=esc(MISSIONS.find(m=>m.id===id).desc)+' <strong>Esc pauses everything.</strong>';}
 function openBriefing(){held.clear();persist();$('briefing').showModal();$('resume').classList.toggle('hidden',!saved&&state.time===0);sound.update();}
 function start(resuming=false){
+ patrolStarted=true;
  if(resuming)state=saved||state;else{const seedText=$('patrol-seed').value.trim(),seed=seedText?Number(seedText)>>>0:crypto.getRandomValues(new Uint32Array(1))[0];state=createGame(missionChoice,seed,{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked});selected=null;}
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
  chart={x:state.x,y:state.y,zoom:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
@@ -55,9 +57,10 @@ $('patrol-time').innerHTML='<option value="random">Random</option>'+Object.entri
 $('patrol-weather').innerHTML='<option value="random">Random</option>'+Object.entries(WEATHER).map(([id,w])=>`<option value="${id}">${w.name}</option>`).join('');
 $('mission-picker').innerHTML=MISSIONS.map(m=>`<button class="mission-option ${m.id==='recon'?'active':''}" data-mission="${m.id}"><span></span><div><b>${m.name}</b><small>${m.type}</small></div><span>${m.minutes}</span></button>`).join('');
 $('mission-picker').addEventListener('click',e=>{const b=e.target.closest('[data-mission]');if(b)chooseMission(b.dataset.mission);});
-$('start').onclick=()=>start(false);$('resume').onclick=()=>start(true);$('close-briefing').onclick=()=>{$('briefing').close();updateUI();};$('another-patrol').onclick=()=>{$('result-dialog').close();$('briefing').showModal();$('resume').classList.add('hidden');};
+$('start').onclick=()=>start(false);$('resume').onclick=()=>start(true);$('close-briefing').onclick=()=>{if(!patrolStarted){start(!!saved);return;}$('briefing').close();updateUI();};$('another-patrol').onclick=()=>{$('result-dialog').close();$('briefing').showModal();$('resume').classList.add('hidden');};
 $('sound').onclick=()=>{sound.toggle();renderSound();};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{held.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
 all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI();}));
+$('briefing').addEventListener('cancel',e=>{e.preventDefault();if(!patrolStarted)start(!!saved);else{$('briefing').close();updateUI();}});
 all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
 function scopeToggle(){if(!canIssue(state,context())||state.systems.periscope===0)return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}state.scope=!state.scope;if(!state.scope)scene?.clear();updateUI();}
 function takePhoto(){
