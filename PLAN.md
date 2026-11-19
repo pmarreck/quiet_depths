@@ -46,4 +46,22 @@ Correction evidence: a full reconnaissance patrol arrived at pickup at 90 meters
 
 Environment browser evidence: inspected clear daylight, night running lights and rainy storm seas; observed a continuing patrol change from Dusk to Night. The soundings strip reported 230m water depth and 213m below the keel at 12m reference depth. WebAudio created five nearby engine sources. Distinct storm events produced a 14.894s surface thunder path with a 3200Hz cutoff and a 5.837s submerged path with a 665Hz cutoff. Those events had different source locations; the depth comparison is established by the independent model checks, not that pair of observations. An intentional exposed/pinging patrol provoked charge patterns and nearby blast damage; the final acoustic receipt was a blast with a 0.036s travel time and strong near-field gain. The patrol was lost at 3m 43s. No browser errors or warnings were logged. Sound routing and timing were checked; the mix was not independently auditioned or calibrated. Transient lightning sources and thunder arrivals were verified through the simulation and browser event state; a bolt screenshot is not used as an acceptance oracle.
 
-Future design choices, outside this prototype: campaign progression, variable mission layouts, calibrated acoustic propagation and temperature layers, crew specialties and repair choices, full conning-tower binoculars, and a balance pass based on actual play sessions. Nuclear propulsion remains excluded because it removes the recharge vulnerability at the center of the design.
+Earlier deferred design choices, some addressed below: campaign progression, variable mission layouts, calibrated acoustic propagation and temperature layers, crew specialties and repair choices, full conning-tower binoculars, and a balance pass based on actual play sessions. Nuclear propulsion remains excluded because it removes the recharge vulnerability at the center of the design.
+
+
+## Rescue and vehicle systems
+
+- [x] Reproduce missing drone collision, range, deeper launch and charging rules with failing checks.
+- [x] Add capsule collisions including boat pitch, finite drone range/battery and mission-permanent loss.
+- [x] Add damaged drone mobility/buoyancy/camera, charge pressure damage, onboard repair and ship-powered charging.
+- [x] Add ballast dynamics, planes, flooding weight, pumps, subsystem condition and crew-dependent repair.
+- [x] Add three complete mission types, survivor assessment/casualties, crew return, scanning/photography and finds.
+- [x] Render detailed hull/control surfaces, propeller/cavitation, rescue hatch/divers/launches and marine life.
+- [x] Add conning tower, mast loss, shallow collision/ram damage, gunfire and shell impacts.
+- [x] Improve lightning visibility, flash cues and the air/water sound-range distinction.
+- [x] Preserve muted startup and verify no audio device opens before a user enables Sound.
+- [x] Finish final browser visual checks and prepare the private update's build output.
+
+Rules evidence: automated rescue runs use normal waypoint, heading, speed and depth controls, then complete only after assessment, survivor transfer and rescue-team recovery. Conservation checks cover both rescue types across 16 seeds each, including empty casualties. Capsule distances are compared against Three.js nearest-segment geometry across headings and pitches. No subjective audio audition is included in this update’s final browser checks; those sessions stay muted.
+
+Final browser evidence: a rescue returned 13 survivors, and a separate empty casualty completed assessment and team recovery. A paused drone snapshot shows 3 aboard / 5 awaiting transfer, a diver swimming beside the wreck, seabed life and a fish in the live rendered scene. The drone operated at 104 m with an 18 m link and onboard condition readouts. A storm snapshot shows an actual lightning channel from the conning tower; three delayed thunder receipts accumulated with Sound OFF. Daylight tower inspection showed the hull below the bridge, and requesting a dive blanked the feed with the surface-only message. No browser errors or warnings were logged in these checks. The final Nix gate passes 74 checks and builds the complete static output. Difficulty, subjective sound quality and historical calibration remain playtesting work.

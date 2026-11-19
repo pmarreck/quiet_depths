@@ -7,7 +7,7 @@
   in {
     packages = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
       default = pkgs.stdenvNoCC.mkDerivation {
-        pname = "quiet-depths"; version = "0.3.0"; src = self;
+        pname = "quiet-depths"; version = "0.4.0"; src = self;
         nativeBuildInputs = [ pkgs.nodejs ];
         buildPhase = "node --test tests/*.test.mjs && node scripts/build.mjs";
         installPhase = "mkdir -p $out; cp -r dist/. $out/";

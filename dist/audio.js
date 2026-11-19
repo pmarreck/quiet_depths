@@ -25,7 +25,7 @@ export class SoundSystem{
   const p=source.perceived||perceivedSound(source,this.getState());if(p.gain<.002||this.effects>=12)return;
   const c=this.ctx,t=c.currentTime,thunder=source.type==='thunder',duration=thunder?4.8:3;
   const noise=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain(),pan=c.createStereoPanner(),spatialGain=c.createGain();noise.buffer=this.noise;noise.loop=true;filter.type='lowpass';filter.frequency.value=p.cutoff;filter.Q.value=.6;pan.pan.value=p.pan*.9;spatialGain.gain.value=p.gain;
-  const peak=thunder?.7:.95;gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(peak,t+(thunder?.13:.008));gain.gain.exponentialRampToValueAtTime(.0001,t+duration);noise.connect(filter).connect(gain).connect(pan).connect(spatialGain).connect(this.master);
+  const peak=thunder?1.2:.95;gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(peak,t+(thunder?.08:.008));gain.gain.exponentialRampToValueAtTime(.0001,t+duration);noise.connect(filter).connect(gain).connect(pan).connect(spatialGain).connect(this.master);
   const rumble=c.createOscillator(),bass=c.createGain();rumble.type='sine';rumble.frequency.setValueAtTime(thunder?42:85,t);rumble.frequency.exponentialRampToValueAtTime(20,t+duration);bass.gain.setValueAtTime(peak*.35,t);bass.gain.exponentialRampToValueAtTime(.0001,t+duration);rumble.connect(bass).connect(pan);
   const voice={source,filter,pan,spatialGain,stop:()=>{noise.stop();rumble.stop();}};this.effectVoices.add(voice);this.effects++;noise.onended=()=>{this.effects--;this.effectVoices.delete(voice);noise.disconnect();filter.disconnect();gain.disconnect();rumble.disconnect();bass.disconnect();pan.disconnect();spatialGain.disconnect();};noise.start(t);noise.stop(t+duration);rumble.start(t);rumble.stop(t+duration);
   this.tailUntil=Math.max(this.tailUntil,t+duration);this.lastReceipt={id:source.id,type:source.type,delay:p.delay,distance:p.distance,gain:p.gain,cutoff:p.cutoff};
@@ -37,7 +37,7 @@ export class SoundSystem{
   for(const event of s.acoustics){if(!event.heard||this.played.has(event.id))continue;this.played.add(event.id);if(this.on&&!context.paused&&!context.modal)this.impulse(event);}
   for(const voice of this.effectVoices){const p=perceivedSound(voice.source,s);voice.spatialGain.gain.setTargetAtTime(p.gain,t,.1);voice.filter.frequency.setTargetAtTime(p.cutoff,t,.12);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.1);if(this.lastReceipt?.id===voice.source.id){this.lastReceipt.currentGain=p.gain;this.lastReceipt.currentCutoff=p.cutoff;}}
   const tail=s.status!=='patrol'&&t<this.tailUntil&&!context.paused;
-  this.master.gain.setTargetAtTime(this.on&&(active||tail)?.42:0,t,.12);
+  this.master.gain.setTargetAtTime(this.on&&(active||tail)?.55:0,t,.12);
   const wet=s.depth<=2?1:.18*Math.exp(-s.depth/200),running=this.on&&active;
   this.sea.filter.frequency.setTargetAtTime(120+e.wind*6,t,.5);this.sea.gain.gain.setTargetAtTime(running?(.03+e.waveScale*.035)*wet:0,t,.3);
   this.rain.filter.frequency.setTargetAtTime(s.depth>2?330:2400,t,.3);this.rain.gain.gain.setTargetAtTime(running?e.rain*.11*wet:0,t,.3);

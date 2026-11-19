@@ -16,7 +16,7 @@ export function airWaterPath(horizontal,airHeight,waterDepth){
 }
 export function propagationTime(source,listener){
  const horizontal=Math.hypot(source.x-listener.x,source.y-listener.y),depth=Math.max(0,listener.depth||0);
- if(source.type==='thunder')return depth<=1?Math.hypot(horizontal,Math.max(0,(source.altitude||0)-3))/AIR_SOUND_SPEED:airWaterPath(horizontal,source.altitude||0,depth);
+ if(source.type==='thunder'||source.type==='gunfire')return depth<=1?Math.hypot(horizontal,Math.max(0,(source.altitude||0)-3))/AIR_SOUND_SPEED:airWaterPath(horizontal,source.altitude||0,depth);
  return Math.hypot(horizontal,(source.depth||0)-depth)/WATER_SOUND_SPEED;
 }
 export function spatialPan(source,listener){
@@ -24,13 +24,14 @@ export function spatialPan(source,listener){
 }
 export function perceivedSound(source,listener){
  const depth=Math.max(0,listener.depth||0),horizontal=Math.hypot(source.x-listener.x,source.y-listener.y),distance=Math.hypot(horizontal,(source.depth||0)-depth),under=depth>1;
- if(source.type==='thunder')return{distance,delay:propagationTime(source,listener),pan:spatialPan(source,listener),gain:(source.power||1)/(1+(Math.hypot(horizontal,source.altitude||0)/2800)**1.2)*(under?.42*Math.exp(-depth/140):1),cutoff:under?Math.max(85,950/(1+depth/28)):3200};
+ if(source.type==='thunder'||source.type==='gunfire')return{distance,delay:propagationTime(source,listener),pan:spatialPan(source,listener),gain:(source.power||1)/(1+(Math.hypot(horizontal,source.altitude||0)/3400)**1.2)*(under?.55*Math.exp(-depth/170):1),cutoff:under?Math.max(85,950/(1+depth/28)):3200};
  return{distance,delay:propagationTime(source,listener),pan:spatialPan(source,listener),gain:clamp((source.power||1)/(1+(distance/220)**1.25),0,1),cutoff:Math.max(130,4200/(1+distance/1200))};
 }
 export function engineSound(ship,listener){
  const distance=Math.hypot(ship.x-listener.x,ship.y-listener.y,(ship.depth||0)-(listener.depth||0)),speed=Math.abs(ship.speed||0);
  const base=ship.kind==='merchant'?.28:ship.kind==='escort'?.34:ship.kind==='fishing'?.19:.12;
- const gain=ship.hull<=0||distance>8000?0:base*(.2+speed/9)/(1+(distance/350)**1.35);
+ const under=(listener.depth||0)>1,scale=under?480:220,limit=under?10000:4500;
+ const gain=ship.hull<=0||distance>limit?0:base*(.2+speed/9)/(1+(distance/scale)**(under?1.25:1.6));
  return{distance,gain:Math.min(.36,gain),pan:spatialPan(ship,listener),cutoff:Math.max(110,1800/(1+distance/1000+(listener.depth||0)/180)),frequency:(ship.kind==='escort'?47:ship.kind==='fishing'?68:ship.kind==='sub'?25:34)+speed*2.2,bladeRate:1.4+speed*.28};
 }
 export function emitSound(s,data){

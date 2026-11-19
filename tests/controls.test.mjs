@@ -21,7 +21,7 @@ test('space requests shallower water; C requests deeper; limits hold',()=>{
 });
 test('inactive optics and drone cannot provide feeds; drone helm cannot change the sub',()=>{
  const s=createGame();s.scope=false;assert.equal(feedActive(s,'scope'),false);s.scope=true;s.depth=30;assert.equal(feedActive(s,'scope'),false);assert.equal(feedActive(s,'drone'),false);
- const ctx={...live,view:'drone'};assert.equal(setHelmOrder(s,ctx,'heading',90),false);assert.ok(deployDrone(s));assert.equal(feedActive(s,'drone'),true);
+ const ctx={...live,view:'drone'};assert.equal(setHelmOrder(s,ctx,'heading',90),false);s.speed=s.targetSpeed=0;assert.ok(deployDrone(s));assert.equal(feedActive(s,'drone'),true);
  const h=s.heading,v=s.speed,d=s.depth;applyHelmKeys(s,ctx,new Set(['KeyW','KeyD','KeyC']),.2);assert.equal(s.heading,h);assert.equal(s.speed,v);assert.equal(s.depth,d);assert.ok(s.drone.targetSpeed>0);assert.notEqual(s.drone.targetHeading,s.drone.heading);assert.ok(s.drone.targetDepth>s.drone.depth);
  const heading=s.drone.heading;step(s,.25);assert.ok(Math.abs(relativeBearing(s.drone.heading,heading))<=3.01);assert.notEqual(s.drone.speed,s.drone.targetSpeed);
 });
@@ -47,5 +47,5 @@ test('legacy saves gain drone orders and a hull-relative scope without losing th
  const s=createGame();delete s.scopeAngle;for(const k of ['speed','targetSpeed','targetDepth','targetHeading'])delete s.drone[k];const old=JSON.stringify(s),r=restore(old);assert.ok(r);assert.equal(r.scopeAngle,0);assert.equal(r.drone.targetSpeed,0);assert.equal(r.drone.targetDepth,r.drone.depth);assert.equal(r.drone.targetHeading,r.drone.heading);
 });
 test('drone inertia and orders preserve time batching invariance',()=>{
- for(const dt of [1,5,20]){const a=createGame();a.scope=false;deployDrone(a);a.drone.targetHeading=20;a.drone.targetSpeed=8;a.drone.targetDepth=45;const b=structuredClone(a);step(a,dt);for(let i=0;i<dt*4;i++)step(b,.25);for(const k of ['x','y','speed','heading','depth','battery'])assert.ok(Math.abs(a.drone[k]-b.drone[k])<1e-8,k);}
+ for(const dt of [1,5,20]){const a=createGame();a.scope=false;a.speed=a.targetSpeed=0;assert.ok(deployDrone(a));a.drone.targetHeading=20;a.drone.targetSpeed=8;a.drone.targetDepth=45;const b=structuredClone(a);step(a,dt);for(let i=0;i<dt*4;i++)step(b,.25);for(const k of ['x','y','speed','heading','depth','battery'])assert.ok(Math.abs(a.drone[k]-b.drone[k])<1e-8,k);}
 });

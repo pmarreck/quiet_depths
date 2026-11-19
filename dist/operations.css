@@ -1,0 +1,28 @@
+/* Readable operational details without crowding the live instruments. */
+.left-panel{overflow-y:auto;scrollbar-width:thin}
+.operation-card,.drone-bay{padding:18px 20px;border-bottom:1px solid var(--line)}
+.operation-card p,.drone-bay p{font-size:14px;line-height:1.65;color:#b3c7c2;margin:12px 0}
+.operation-card button{border:1px solid #6e8e7f;padding:10px 9px;text-align:left;width:100%;font:12px var(--mono);color:#cfdbbd;margin:4px 0}
+.operation-card button:first-of-type{border-color:#b99b69;color:var(--gold)}
+.system-detail{margin-top:17px;font:12px var(--mono);color:#b1c4bf}
+.system-detail summary{cursor:pointer;color:var(--gold);padding:8px 0;line-height:1.5}
+#subsystems>div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #5a716029}
+#buoyancy-readout{font:12px/1.8 var(--mono);color:#95b6ab}
+#drone-bay-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px;margin-top:16px;font:12px var(--mono)}
+#drone-bay-metrics b{display:block;color:#d8d8b9;font-size:16px;margin-top:5px}
+.damaged{color:#f18a7c!important}
+.drone-instruments{position:absolute;top:145px;right:22px;display:grid;gap:8px;padding:14px 16px;background:#081d23c9;border:1px solid #77958966;pointer-events:none;font:12px var(--mono);color:#bcdbc9;max-width:260px}
+.drone-instruments b{font-size:14px;color:#e2d19a}
+.lightning-cue{position:absolute;left:22px;top:150px;max-width:230px;background:#111f2ada;border:1px solid #a7bed173;color:#d5e7fa;padding:11px 13px;font:12px/1.7 var(--mono);pointer-events:none}
+.stations{grid-template-columns:repeat(5,minmax(0,1fr))}
+.stations:has([data-view=scope].hidden){grid-template-columns:repeat(4,minmax(0,1fr))}
+.stations button{font-size:12px;padding:0 6px;line-height:1.4;letter-spacing:.3px}
+.stations button span{font-size:10px;margin-right:4px}
+.mission-option{padding:12px;margin:7px 0}
+#mission-picker{max-height:390px;overflow:auto;scrollbar-width:thin;padding-right:5px}
+.briefing-art{min-height:650px}
+.right-panel{overflow-y:auto;scrollbar-width:thin}
+.paused .viewport:after{top:auto;bottom:14px;font-size:14px;padding:9px 14px;transform:translateX(-50%)}
+.paused .view-bottom{visibility:hidden}
+@media(max-width:1100px){.stations button{font-size:11px}.stations button span{display:none}.drone-instruments{top:136px;font-size:11px;gap:5px;padding:10px}.lightning-cue{top:265px;left:22px;right:auto;font-size:11px;max-width:250px}.operation-card,.drone-bay{padding:16px}}
+@media(max-width:850px){.stations button{font-size:12px}.lightning-cue{top:145px}.drone-instruments{top:140px}}
