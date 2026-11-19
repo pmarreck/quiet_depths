@@ -1,5 +1,29 @@
 # Quiet Depths prototype
 
+## Mobile and reconnaissance release: 0.6.0
+
+- [x] Reproduce target flicker, surfaced gun mismatch, recall failures and missing evidence controls with failing tests.
+- [x] Implement the fixed mobile helm with a vertical speed slider, compact status and accessible sound state.
+- [x] Retain contact button identity and stable track designations; remove update-driven click loss.
+- [x] Share surfaced eligibility between gun, camera and status; keep pause and damage limits.
+- [x] Make recall converge with collisions intact, render a correctly attached moving tether and show deployed-ROV range/warnings globally.
+- [x] Replace flower-like blades with researched helical geometry and a gray nonmetallic finish; refine stern surfaces.
+- [x] Increase chart and optical zoom; retain anchored zoom and add coherent sea-driven optical sway.
+- [x] Add terminal cracking, red wash and rising bubbles with bounded, mute-respecting loss audio.
+- [x] Add the approved fictional classified satellite prototype with tasking, capture, depth-limited transfer, cooldown, coverage and progress.
+- [x] Grow uncertainty from frozen observations, including transfer time, without leaking current ship truth.
+- [x] Add a bounded photo archive with actual scene captures and frozen satellite imagery.
+- [x] Verify desktop/phone flows, legacy save migration and the full Nix gate.
+- [ ] Verify the exact-commit GitHub Pages deployment and public game.
+
+TDD evidence: the initial integrated red gate exposed recovery collisions/orbiting, absent status/presentation modules and insufficient zoom. The independent vehicle author did not read production, qualified the original 28 failures, and later confirmed all 38 original tests passed across 96 recovery frames. The acceptance file's SHA-256 was unchanged between red, green and the final checkout. Additional observed red regressions covered an aged-track firing bearing, short-screen sonar geometry, photo-renderer cleanup, a moving search square, mission-scene replacement and synchronous shutter capture. The final canonical gate passes 179 tests plus syntax/static-build checks. Existing pause, camera, acoustic, damage and mission coverage remains required.
+
+Browser evidence: 393 × 852 has a 524-pixel scene without the ROV warning, visible OFF text, 44-pixel vertical-slider hit width and no page overflow. A physical slider drag changed requested speed to 9.6 knots while actual speed followed gradually. Portrait 320 × 568 and landscape 852 × 393 also fit without page scrolling; compact sonar uses contact codes instead of overlapping long labels. The desktop 1440 × 900 view fits its footer and retains internally scrollable side panels. A 1.2-second contact press survived telemetry refreshes; firing reduced torpedoes from six to five. The surface gun fired in storm conditions. A surfaced boat continued at three knots while its ROV completed recall. At 15.5 knots, the global red warning reported a 34-meter link and the ten-knot catch limit. Inspection showed the gray screw and cable attached to the hull hatch. Chart zoom reached 128× with a 25-meter grid; tower binoculars reached 12×.
+
+Recon/photography evidence: a deep request visibly queued for uplink, then progressed through retasking, exposures and reception. A clear-day plate captured at 2m 58s arrived at 3m 28s with four surface tracks; the 640 × 640 image and scope exposure survived reload. The overhead wave aliasing was corrected to use a mean sea tone at the plate's resolution, preserving scene materials on success/failure. Switching from survey to reconnaissance initially threw on a stale casualty reference and stopped the simulation; after the fix, the same renderer continued advancing. Simultaneous F + 7 initially left a shutter request unarchived; replaying it after synchronous capture increased the archive from three to four immediately. A lost patrol displayed cracks, red tint and 36 rising bubbles behind its report. Sound stayed OFF throughout this release's browser QA. The original exception remains in session log history, with no additional instance after correction. Hardware iPhone/Safari, subjective sound mix and calibrated historical/radio performance remain unverified.
+
+Delivery uses the existing public GitHub repository and GitHub Pages. No new Codex visualization, ZIP deliverable or private staging deployment is part of this release. The 1972 real-time reconnaissance prototype is a user-approved fictional exception; communication limits and imagery timestamps remain explicit. The existing DU ammunition exception remains.
+
 The design centers on uncertainty: observation should improve a player's picture while exposing the boat. Short patrols should have a clear objective and an extraction, with simple helm orders and time compression for transit.
 
 - [x] Browser-native, locally vendored rendering and fonts, no runtime services.

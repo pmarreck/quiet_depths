@@ -21,11 +21,16 @@ export class SoundSystem{
   if(!this.on||!this.ctx||this.getContext().paused||this.getContext().modal)return;
   const c=this.ctx,t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.connect(g).connect(this.master);o.type=type==='damage'?'sawtooth':'sine';o.frequency.setValueAtTime(type==='ping'?1240:type==='photo'?620:type==='damage'?55:type==='fire'?95:440,t);o.frequency.exponentialRampToValueAtTime(type==='damage'?22:type==='ping'?970:200,t+1);g.gain.setValueAtTime(type==='damage'?.23:.15,t);g.gain.exponentialRampToValueAtTime(.001,t+(type==='ping'?2:1));o.start();o.stop(t+2.1);
  }
+ loss(s=this.getState()){
+  if(!this.on||!this.ctx||s.status!=='lost')return false;
+  this.impulse({id:'loss-'+s.patrol.seed,type:'implosion',x:s.x,y:s.y,depth:s.depth,power:1.2,perceived:{gain:1,cutoff:1400,pan:0,distance:0,delay:0}});return true;
+ }
  impulse(source){
   const p=source.perceived||perceivedSound(source,this.getState());if(p.gain<.002||this.effects>=12)return;
-  const c=this.ctx,t=c.currentTime,thunder=source.type==='thunder',gun=source.type==='gunfire',seeker=source.type==='seeker',duration=thunder?4.8:gun?.24:seeker?.7:3;
+  const c=this.ctx,t=c.currentTime,thunder=source.type==='thunder',gun=source.type==='gunfire',seeker=source.type==='seeker',loss=source.type==='implosion',duration=loss?8:thunder?4.8:gun?.24:seeker?.7:3;
   const noise=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain(),pan=c.createStereoPanner(),spatialGain=c.createGain();noise.buffer=this.noise;noise.loop=true;filter.type='lowpass';filter.frequency.value=p.cutoff;filter.Q.value=.6;pan.pan.value=p.pan*.9;spatialGain.gain.value=p.gain;
   const peak=thunder?1.2:.95;gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(seeker?.015:peak,t+(thunder?.08:.008));gain.gain.exponentialRampToValueAtTime(.0001,t+duration);noise.connect(filter).connect(gain).connect(pan).connect(spatialGain).connect(this.master);
+  if(loss){filter.frequency.setValueAtTime(1800,t);filter.frequency.exponentialRampToValueAtTime(110,t+1.2);filter.frequency.exponentialRampToValueAtTime(650,t+3);filter.frequency.exponentialRampToValueAtTime(90,t+duration);gain.gain.setValueAtTime(.28,t+1.5);gain.gain.linearRampToValueAtTime(.65,t+2);gain.gain.exponentialRampToValueAtTime(.001,t+duration);}
   if(seeker)gain.gain.setValueAtTime(.0001,t);
   const rumble=c.createOscillator(),bass=c.createGain();rumble.type='sine';rumble.frequency.setValueAtTime(seeker?1480:thunder?42:gun?130:85,t);rumble.frequency.exponentialRampToValueAtTime(seeker?1180:20,t+duration);bass.gain.setValueAtTime(peak*(seeker?.45:.35),t);bass.gain.exponentialRampToValueAtTime(.0001,t+duration);rumble.connect(bass).connect(pan);
   const voice={source,filter,pan,spatialGain,stop:()=>{noise.stop();rumble.stop();}};this.effectVoices.add(voice);this.effects++;noise.onended=()=>{this.effects--;this.effectVoices.delete(voice);noise.disconnect();filter.disconnect();gain.disconnect();rumble.disconnect();bass.disconnect();pan.disconnect();spatialGain.disconnect();};noise.start(t);noise.stop(t+duration);rumble.start(t);rumble.stop(t+duration);
@@ -36,7 +41,7 @@ export class SoundSystem{
   if(this.lastState!==s){this.lastState=s;this.played=new Set(s.acoustics.filter(e=>e.heard).map(e=>e.id));for(const v of this.voices.values()){v.osc.stop();v.pulse.stop();}for(const v of this.effectVoices)v.stop();this.effectVoices.clear();this.voices.clear();this.lastReceipt=null;this.tailUntil=0;}
   const c=this.ctx,t=c.currentTime,active=!context.paused&&!context.modal&&s.status==='patrol',e=environmentAt(s);
   for(const event of s.acoustics){if(!event.heard||this.played.has(event.id))continue;this.played.add(event.id);if(this.on&&!context.paused&&!context.modal)this.impulse(event);}
-  for(const voice of this.effectVoices){const p=perceivedSound(voice.source,s);voice.spatialGain.gain.setTargetAtTime(p.gain,t,.1);voice.filter.frequency.setTargetAtTime(p.cutoff,t,.12);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.1);if(this.lastReceipt?.id===voice.source.id){this.lastReceipt.currentGain=p.gain;this.lastReceipt.currentCutoff=p.cutoff;}}
+  for(const voice of this.effectVoices){const p=voice.source.type==='implosion'?voice.source.perceived:perceivedSound(voice.source,s);voice.spatialGain.gain.setTargetAtTime(p.gain,t,.1);if(voice.source.type!=='implosion')voice.filter.frequency.setTargetAtTime(p.cutoff,t,.12);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.1);if(this.lastReceipt?.id===voice.source.id){this.lastReceipt.currentGain=p.gain;this.lastReceipt.currentCutoff=p.cutoff;}}
   const tail=s.status!=='patrol'&&t<this.tailUntil&&!context.paused;
   this.master.gain.setTargetAtTime(this.on&&(active||tail)?.55:0,t,.12);
   const wet=s.depth<=2?1:.18*Math.exp(-s.depth/200),running=this.on&&active;

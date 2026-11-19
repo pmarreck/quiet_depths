@@ -5,6 +5,9 @@ import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete} from './missions.js';
 import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone,shipCollision,siteCollision} from './systems.js';
 import {freshCombat,launchTorpedo,updateCombat} from './combat.js';
+import {freshRecon,updateRecon,validateReconState} from './recon.js';
+import {designation,fixContact,estimateAt,applyReconPacket} from './track-estimates.js';
+import {photoArchive,validPhoto,PHOTO_BUDGET} from './photos.js';
 export {clamp,rad,bearing,delta,distance,bottom,log,MISSIONS,deployDrone,recallDrone,hurt};
 export function createGame(mission='recon',seed=19830604,options={}){
  const m=MISSIONS.find(m=>m.id===mission)||MISSIONS[0];
@@ -14,7 +17,7 @@ export function createGame(mission='recon',seed=19830604,options={}){
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
  {id:'tern',name:'Tern',kind:'fishing',military:false,x:-850,y:1350,heading:110,speed:3,hull:100,alert:0,attack:0},
  {id:'echo',name:'Unknown submarine',kind:'sub',military:true,x:3800,y:900,depth:75,heading:280,speed:4,hull:100,alert:0,attack:0}
- ]};randomizePatrol(s,seed);return s;
+ ]};s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
 }
 export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y),v.depth,drone?.7:5+27.5*Math.abs(Math.sin(s.pitch)));}
 export function isVisible(s,ship,look=null,env=environmentAt(s)){
@@ -24,10 +27,12 @@ export function isVisible(s,ship,look=null,env=environmentAt(s)){
 export function contact(s,ship,method){
  let c=s.contacts.find(c=>c.id===ship.id);
  const b=bearing(s,ship),d=distance(s,ship);
- if(!c){c={id:ship.id,label:`Sierra ${String(s.nextId++).padStart(2,'0')}`,bearing:b,range:0,confidence:0,age:0,identified:false,method:'passive',x:0,y:0};s.contacts.push(c);log(s,`New contact. ${c.label}, bearing ${Math.round(b)}.`, 'contact');}
+ if(!c){c={id:ship.id,label:designation(s.nextId++),bearing:b,range:0,confidence:0,age:0,identified:false,method:'passive',x:0,y:0};s.contacts.push(c);log(s,`New contact. ${c.label}, bearing ${Math.round(b)}.`, 'contact');}
  c.bearing=(b+(method==='passive'?(rand(s)-.5)*6:0)+360)%360;c.age=0;c.method=method;
  if(method!=='passive'){
    c.range=d*(method==='visual'?.94+rand(s)*.12:.97+rand(s)*.06);c.x=s.x+Math.sin(rad(c.bearing))*c.range;c.y=s.y+Math.cos(rad(c.bearing))*c.range;c.confidence=method==='visual'?.9:.75;
+   const existing=estimateAt(c,s.time),sigma=method==='visual'?Math.max(25,d*.045):Math.max(15,d*.03);
+   if(!c.fix||s.time-c.fix.time>=5&&existing.major>sigma*2.448)fixContact(c,{x:c.x,y:c.y,time:s.time,positionSigma:sigma,velocitySigma:1.5,maneuverSigma:.03,source:method});
    if(method==='visual'){c.identified=true;c.name=ship.name;c.kind=ship.kind;c.military=ship.military;}
  } else c.confidence=Math.max(.24,c.confidence);
  return c;
@@ -93,7 +98,8 @@ function tick(s,dt,input){
  }
  s.alert=clamp(Math.max(danger,s.alert-dt*.65),0,100);
  for(const c of s.contacts){c.age+=dt;c.confidence=Math.max(.05,c.confidence-dt*.0006);}
- s.contacts=s.contacts.filter(c=>c.age<240);
+ s.contacts=s.contacts.filter(c=>c.age<240||c.fix?.source==='satellite'&&s.time-c.fix.time<900);
+ const packet=updateRecon(s,dt);if(packet&&applyReconPacket(s,packet))log(s,`Orbital reconnaissance received. ${packet.tracks.length} timestamped surface tracks.`,'success');
  updateCombat(s,dt);
  for(const b of s.blasts){b.delay-=dt;if(b.delay<=0&&!b.exploded){b.exploded=true;b.explodedAt=s.time;emitSound(s,{type:'blast',x:b.x,y:b.y,depth:b.depth,power:1.2});}if(b.exploded)b.age=s.time-b.explodedAt;}
  s.blasts=s.blasts.filter(b=>b.age<5);
@@ -112,6 +118,10 @@ export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charg
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
  // Migrate existing v1 patrols without discarding their progress or drone state.
+ if(s.recon===undefined)s.recon=freshRecon();if(s.reconArchivedSequence===undefined)s.reconArchivedSequence=0;if(s.photoArchive===undefined)s.photoArchive=[];if(s.photoSequence===undefined)s.photoSequence=1;
+ if(!validateReconState(s.recon)||!Array.isArray(s.photoArchive)||s.photoArchive.length>24||!Number.isSafeInteger(s.photoSequence)||s.photoSequence<1)return null;
+ if(!s.photoArchive.every(p=>validPhoto(p)&&Number.isSafeInteger(p.id)&&p.id>0)||new Set(s.photoArchive.map(p=>p.id)).size!==s.photoArchive.length||s.photoArchive.reduce((n,p)=>n+p.image.length,0)>PHOTO_BUDGET)return null;
+ photoArchive(s);
  if(s.scopeAngle===undefined)s.scopeAngle=0;
  if(s.scopeSteerBearing===undefined)s.scopeSteerBearing=null;
  if(s.environment===undefined)s.environment=makeEnvironment(s.rng);
@@ -135,7 +145,7 @@ export function restore(raw){try{
  for(const p of s.aircraft)if(!['x','y','altitude','heading','speed','hull'].every(k=>Number.isFinite(p[k]))||typeof p.id!=='string')return null;
  for(const p of s.gunRounds)if(!['id','x','y','altitude','vx','vy','vz','age'].every(k=>Number.isFinite(p[k]))||!['player','aircraft'].includes(p.owner)||typeof p.tracer!=='boolean')return null;
  for(const p of s.impacts)if(!['id','x','y','altitude','time'].every(k=>Number.isFinite(p[k])))return null;
- for(const k of ['hull','mobility','buoyancy','camera','verticalSpeed','collisionCooldown'])if(!Number.isFinite(s.drone[k]))return null;
+ for(const k of ['hull','mobility','buoyancy','camera','verticalSpeed','collisionCooldown','returnStage','returnClearance','returnHoldSide','returnHoldForward'])if(!Number.isFinite(s.drone[k]))return null;
  if(['undersea-rescue','surface-rescue','survey'].includes(s.mission)){
   if(!s.site||!s.operation||!['x','y','depth','heading'].every(k=>Number.isFinite(s.site[k]))||!['surface','wreck','sub'].includes(s.site.kind)||typeof s.site.name!=='string')return null;
   const o=s.operation;if(!['rescued','remaining','dead','assessment','boarding','diverReturn','scan','lastCasualty'].every(k=>Number.isFinite(o[k])&&o[k]>=0)||!['known','holding','active','completed'].every(k=>typeof o[k]==='boolean')||!Array.isArray(o.photoAngles)||!o.photoAngles.every(Number.isFinite))return null;
@@ -146,6 +156,8 @@ export function restore(raw){try{
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
  if(s.mission==='intercept'&&!s.ships.some(c=>c.id==='cobalt'))return null;
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k])))return null;
+ if(s.drone.returnStage<0||s.drone.returnStage>3||!Number.isInteger(s.drone.returnStage))return null;
+ for(const c of s.contacts){if(c.fix&&!fixContact({},c.fix))return null;const old=/^Sierra (\d+)$/.exec(c.label);if(old)c.label=designation(Number(old[1]));}
  for(const e of s.events)if(!e||typeof e.text!=='string'||typeof e.kind!=='string'||!Number.isFinite(e.t))return null;
  for(const p of s.projectiles){if(!['x','y','heading','age'].every(k=>Number.isFinite(p[k])))return null;if(p.id===undefined)p.id=s.weaponSequence++;for(const [k,v] of Object.entries({intended:p.lock??null,depth:Math.min(s.depth,6),pingAge:99,path:[{x:p.x,y:p.y,depth:Math.min(s.depth,6),time:s.time}]}))if(p[k]===undefined)p[k]=v;if(!['id','depth','pingAge'].every(k=>Number.isFinite(p[k]))||!Array.isArray(p.path)||!p.path.every(v=>['x','y','depth','time'].every(k=>Number.isFinite(v[k]))))return null;}
  for(const b of s.blasts){if(!['x','y','depth','delay','age'].every(k=>Number.isFinite(b[k])))return null;if(b.id===undefined)b.id=s.soundSequence++;if(b.totalDelay===undefined)b.totalDelay=Math.max(1,b.delay);if(b.exploded===undefined)b.exploded=b.age>0;if(b.exploded&&b.explodedAt===undefined)b.explodedAt=s.time-b.age;}

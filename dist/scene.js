@@ -1,12 +1,13 @@
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
 import {feedActive,scopeBearing,cameraEuler} from './controls.js';
-import {environmentAt,SEA_SAMPLE_GLSL,surfaceHeight,scopeEyeHeight,scopeWashed} from './environment.js';
+import {environmentAt,SEA_SAMPLE_GLSL,surfaceHeight,scopeEyeHeight,scopeWashed,opticalSway} from './environment.js';
 import {Atmosphere} from './atmosphere.js';
 import {UnderseaLife} from './undersea.js';
 import {createSubmarine} from './submarine-model.js';
 import {SUB_DESIGN as D} from './hull-design.js';
 import {CombatScene} from './combat-scene.js';
+import {tetherPoints} from './tether.js';
 const waterVertex=`
 uniform float time;uniform vec2 origin;uniform float waveScale;uniform float waveSpeed;
 varying vec3 vWorld;
@@ -21,7 +22,7 @@ float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(ha
 void main(){vec3 V=normalize(cameraPosition-vWorld);vec3 N=normalize(vNormal);N.x+=sin(vWorld.x*.16+time*1.6)*.035+noise(vWorld.xz*.18+time*.1)*.06;N.z+=sin(vWorld.z*.23-time*1.4)*.045;N=normalize(N);float fres=pow(1.-max(dot(V,N),0.),3.);float spec=pow(max(dot(reflect(-sunDir,N),V),0.),90.);vec3 deep=mix(vec3(.005,.014,.026),mix(vec3(.025,.16,.23),vec3(.035,.10,.13),cloud),daylight);vec3 reflection=mix(vec3(.025,.05,.085),mix(vec3(.43,.60,.72),vec3(.27,.34,.39),cloud),daylight);vec3 col=mix(deep,reflection,fres*.85);col+=vec3(1.,.69,.35)*spec*daylight*(1.-cloud*.85);col+=vec3(.2,.075,.025)*twilight*pow(fres,2.)*.4;float band=sin(vWorld.x*.051+vWorld.z*.032+time)*sin(vWorld.z*.08-time*.7);float foam=smoothstep(1.2,1.9,vWorld.y/max(waveScale,.1))*smoothstep(.7,1.,band);col=mix(col,mix(vec3(.07,.11,.14),vec3(.65,.74,.77),daylight),foam*.6);float dist=length(cameraPosition-vWorld);if(underwater>.5)col=mix(vec3(.006,.03,.045),vec3(.05,.17,.18),max(dot(V,-N),0.));col=mix(col,fogColor,1.-exp(-pow(dist*fogDensity,2.)));col+=vec3(.32,.43,.6)*flash;gl_FragColor=vec4(col,1.);}`;
 export class OceanScene{
  constructor(canvas){
-  this.canvas=canvas;this.renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1));this.renderer.setClearColor(0x687a78);this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.15;
+  this.THREE=T;this.canvas=canvas;this.renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:false,preserveDrawingBuffer:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1));this.renderer.setClearColor(0x687a78);this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.15;
   this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0x627475,.00015);this.camera=new T.PerspectiveCamera(38,1,.5,23000);
   this.hemi=new T.HemisphereLight(0xd4d9c8,0x18353e,2);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffd6a0,2.7);this.scene.add(this.sun);this.moon=new T.DirectionalLight(0xb8d3ff,.2);this.scene.add(this.moon);
   this.waterUniforms={time:{value:0},origin:{value:new T.Vector2()},sunDir:{value:new T.Vector3(-.5,.12,-1).normalize()},underwater:{value:0},waveScale:{value:1},waveSpeed:{value:1},daylight:{value:1},cloud:{value:0},twilight:{value:0},fogColor:{value:new T.Color()},fogDensity:{value:.0002},flash:{value:0}};
@@ -33,7 +34,7 @@ export class OceanScene{
   this.combat=new CombatScene(this.scene,this.glowTexture());const cableGeo=new T.BufferGeometry();cableGeo.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(48*3),3));this.cable=new T.Line(cableGeo,new T.LineBasicMaterial({color:0x879183,transparent:true,opacity:.8}));this.scene.add(this.cable);
   const bubbles=new T.BufferGeometry();bubbles.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(256*3),3));this.bubbleUniforms={strength:{value:0}};
   this.bubbles=new T.Points(bubbles,new T.ShaderMaterial({transparent:true,depthWrite:false,uniforms:this.bubbleUniforms,vertexShader:'uniform float strength;void main(){vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp(160.*strength/-p.z,1.,8.);gl_Position=projectionMatrix*p;}',fragmentShader:'uniform float strength;void main(){float r=length(gl_PointCoord-.5)*2.;if(r>1.)discard;gl_FragColor=vec4(.72,.9,.96,(1.-r)*strength*.7);}'}));this.own.add(this.bubbles);
-  this.light=new T.SpotLight(0xc8efdc,3200,240,Math.PI/3,.8,1.3);this.scene.add(this.light,this.light.target);
+  this.light=new T.SpotLight(0xd5e5ea,3200,240,Math.PI/3,.8,1.3);this.scene.add(this.light,this.light.target);
   const particles=new T.BufferGeometry(),pts=[];for(let i=0;i<800;i++)pts.push((Math.random()-.5)*600,(Math.random()-.5)*220,(Math.random()-.5)*600);particles.setAttribute('position',new T.Float32BufferAttribute(pts,3));this.particles=new T.Points(particles,new T.PointsMaterial({size:.4,color:0x9fc6b2,transparent:true,opacity:.35}));this.scene.add(this.particles);
  }
  mat(color){return new T.MeshStandardMaterial({color,roughness:.86,metalness:.12});}
@@ -71,12 +72,14 @@ export class OceanScene{
   this.bubbles.visible=s.cavitation>.01;this.bubbleUniforms.strength.value=s.cavitation;
   if(this.bubbles.visible){const p=this.bubbles.geometry.attributes.position;for(let i=0;i<p.count;i++){const life=(time*2+i*.137)%1,angle=i*2.399+time*8,r=D.propellerRadius*(.55+Math.sin(i*7)*.15);p.setXYZ(i,Math.cos(angle)*r*(1+life*.2),Math.sin(angle)*r+life*.4,D.propellerZ+.2+life*(2+Math.abs(s.speed)*.3));}p.needsUpdate=true;}
   this.life.update(s,e);this.combat.update(s,e);
-  this.cable.visible=['remote','return'].includes(s.drone.mode);if(this.cable.visible){const p=this.cable.geometry.attributes.position,a=rad(s.heading),start={x:s.x+Math.cos(a)*5.3,y:s.y-Math.sin(a)*5.3,depth:s.depth+1},d=s.drone,slack=Math.max(0,100-Math.hypot(d.x-start.x,d.y-start.y,d.depth-start.depth))*.04;for(let i=0;i<48;i++){const f=i/47;p.setXYZ(i,start.x+(d.x-start.x)*f,-start.depth-(d.depth-start.depth)*f-Math.sin(f*Math.PI)*slack,-start.y-(d.y-start.y)*f);}p.needsUpdate=true;this.cable.geometry.computeBoundingSphere();}
+  const cable=tetherPoints(s,time);this.cable.visible=!!cable.length;if(cable.length){const p=this.cable.geometry.attributes.position;cable.forEach((v,i)=>p.setXYZ(i,v.x,-v.depth,-v.y));p.needsUpdate=true;this.cable.geometry.setDrawRange(0,cable.length);this.cable.geometry.computeBoundingSphere();}
+
+  const sway=opticalSway(s,view,time);this.sun.color.setHex(underwater?0xbad8dd:0xffd6a0);this.hemi.color.setHex(underwater?0xc1d6dc:0xd4d9c8);
   let pose;
   if(drone){const d=s.drone,a=rad(d.heading);this.camera.position.set(d.x,d.depth<.5?.8:-d.depth,-d.y);pose=cameraEuler(d.heading,-Math.atan2(3,100),0);this.light.position.copy(this.camera.position);this.light.target.position.set(d.x+Math.sin(a)*100,-d.depth-5,-d.y-Math.cos(a)*100);this.particles.position.copy(this.camera.position);this.camera.fov=65;}
   else if(gun){const a=rad(s.heading);this.camera.position.set(s.x+Math.sin(a)*16,6-s.depth,-s.y-Math.cos(a)*16);pose=cameraEuler(s.heading+s.gun.angle,rad(s.gun.elevation),0);this.camera.fov=55/zoom;}
-  else if(tower){const a=rad(s.heading);this.camera.position.set(s.x+Math.sin(a)*5+Math.cos(a)*3.2,12.9-s.depth+surfaceHeight(s.x,s.y,time,e)*.3,-s.y-Math.cos(a)*5+Math.sin(a)*3.2);pose=cameraEuler(s.heading+s.towerAngle,s.towerPitch,Math.sin(time*.55)*.004*e.waveScale);this.camera.fov=65/zoom;}
-  else {this.camera.position.set(s.x,scopeEyeHeight(s,e),-s.y);pose=cameraEuler(scopeBearing(s),Math.atan2(-3+Math.sin(time*.3)*1.5,1000),Math.sin(time*.55)*.005*e.waveScale);this.camera.fov=38/zoom;}
+  else if(tower){const a=rad(s.heading);this.camera.position.set(s.x+Math.sin(a)*5+Math.cos(a)*3.2,12.9-s.depth+surfaceHeight(s.x,s.y,time,e)*.3,-s.y-Math.cos(a)*5+Math.sin(a)*3.2);pose=cameraEuler(s.heading+s.towerAngle+sway.yaw*180/Math.PI,s.towerPitch+sway.pitch,sway.roll);this.camera.fov=65/zoom;}
+  else {this.camera.position.set(s.x,scopeEyeHeight(s,e),-s.y);pose=cameraEuler(scopeBearing(s)+sway.yaw*180/Math.PI,Math.atan2(-3+Math.sin(time*.3)*1.5,1000)+sway.pitch,sway.roll);this.camera.fov=38/zoom;}
   this.camera.rotation.set(pose.x,pose.y,pose.z,pose.order);
   this.camera.updateProjectionMatrix();const blastFlash=this.atmosphere.update(s,e,this.camera,underwater);this.waterUniforms.flash.value=Math.max(blastFlash*.45,e.flash*(underwater?.05:.35));this.renderer.render(this.scene,this.camera);
   const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));this.boltVisible=[...this.atmosphere.strikes.values()].some(group=>group.visible&&group.children[1].material.opacity>.2&&frustum.intersectsObject(group.children[1]));

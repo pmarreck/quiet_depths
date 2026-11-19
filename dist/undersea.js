@@ -31,7 +31,7 @@ export class UnderseaLife{
  }
  reset(s){
   for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
-  this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
+  this.site=null;this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
   if(s.site){this.site=s.site.kind==='surface'?this.makeShip({kind:'fishing'}):this.makeSub();this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
    const rust=material(0x705343);this.site.traverse(o=>{if(o.isMesh){o.material=rust;}});
    if(s.site.kind==='wreck'){const mast=new T.Mesh(new T.CylinderGeometry(.4,.7,25,8),rust);mast.rotation.z=.5;mast.position.set(0,11,0);this.site.add(mast);const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}

@@ -3,6 +3,8 @@ import {clamp,rad,bearing,delta,distance,log,rand,bottom} from './mechanics.js';
 import {hash01,environmentAt} from './environment.js';
 import {emitSound} from './acoustics.js';
 import {hurt} from './systems.js';
+import {isSurfaced} from './vehicle-status.js';
+import {estimateAt} from './track-estimates.js';
 
 export const freshCombat=()=>({gun:{ammo:240,cooldown:0,shots:0,angle:0,elevation:0},gunRounds:[],impacts:[],aircraft:[],airSupport:{status:'idle',requestedAt:null,launchAt:null,base:{x:-3200,y:3400},lastKnown:null},weaponSequence:1,gunLoudUntil:0});
 const wrap=n=>(n%360+360)%360;
@@ -12,16 +14,17 @@ export function chargeAltitude(charge){
  if(air&&elapsed<air)return (charge.airHeight||0)*(1-(elapsed/air)**2);
  return -charge.depth*clamp((elapsed-air)/Math.max(.001,charge.totalDelay-air),0,1)||0;
 }
+export function firingBearing(s,contact){const estimate=contact.fix?estimateAt(contact,s.time):null;return estimate?bearing(s,estimate):contact.bearing;}
 export function launchTorpedo(s,id){
  const c=s.contacts.find(v=>v.id===id);
  if(!c||s.torps<=0||s.status!=='patrol'||s.depth>100)return false;
  s.torps--;s.alert=clamp(s.alert+20,0,100);
  const target=s.ships.find(v=>v.id===id),depth=target?.kind==='sub'?s.depth:Math.min(6,s.depth);
- s.projectiles.push({id:s.weaponSequence++,x:s.x,y:s.y,depth,heading:c.bearing,age:0,intended:id,lock:null,pingAge:99,path:[{x:s.x,y:s.y,depth,time:s.time}]});
- log(s,`Tube away. Bearing ${Math.round(c.bearing)}. Seeker arms after its run-out.`,'warning');return true;
+ const heading=firingBearing(s,c);s.projectiles.push({id:s.weaponSequence++,x:s.x,y:s.y,depth,heading,age:0,intended:id,lock:null,pingAge:99,path:[{x:s.x,y:s.y,depth,time:s.time}]});
+ log(s,`Tube away. Bearing ${Math.round(heading)}. Seeker arms after its run-out.`,'warning');return true;
 }
 export function fireDeckGun(s,aim){
- if(s.status!=='patrol'||s.depth>.05||s.gun.ammo<=0||s.gun.cooldown>0||(s.systems.deckgun??100)<=10||!Number.isFinite(aim.bearing)||!Number.isFinite(aim.elevation))return false;
+ if(s.status!=='patrol'||!isSurfaced(s)||s.gun.ammo<=0||s.gun.cooldown>0||(s.systems.deckgun??100)<=10||!Number.isFinite(aim.bearing)||!Number.isFinite(aim.elevation))return false;
  s.gun.ammo--;s.gun.shots++;s.gun.cooldown=.25;
  const a=rad(s.heading),b=rad(aim.bearing),e=rad(clamp(aim.elevation,-15,85)),speed=600;
  s.gunRounds.push({id:s.weaponSequence++,owner:'player',x:s.x+Math.sin(a)*16,y:s.y+Math.cos(a)*16,altitude:6-s.depth,vx:Math.sin(b)*Math.cos(e)*speed,vy:Math.cos(b)*Math.cos(e)*speed,vz:Math.sin(e)*speed,age:0,tracer:s.gun.shots%5===0});

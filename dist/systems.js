@@ -1,10 +1,11 @@
 import {clamp,rad,bearing,delta,distance,separation,rand,log,bottom,capsuleContact,propellerState} from './mechanics.js';
 import {propagationTime,emitSound} from './acoustics.js';
+import {boatPoint,boatLocal,recoveryDock,droneReturnSpeed} from './vehicle-status.js';
 export const DRONE_LIMITS=Object.freeze({deploySpeed:3,depth:280,range:100,speed:10,returnSpeed:10});
 export const SYSTEM_NAMES=Object.freeze({engine:'ENGINE',propeller:'PROPELLER',oxygen:'AIR / SCRUBBERS',ballast:'BALLAST',planes:'DIVE PLANES',rudder:'RUDDER',sonar:'SONAR',periscope:'PERISCOPE',deckgun:'DECK GUN',crew:'REPAIR CREW'});
 export const freshSystems=()=>Object.fromEntries(Object.keys(SYSTEM_NAMES).map(k=>[k,100]));
 export const freshMotion=()=>({verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
-export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:''});
+export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:'',returnStage:0,returnClearance:8,returnHoldSide:18,returnHoldForward:0});
 export function droneDeployReason(s){
  const d=s.drone;if(d.mode==='lost')return d.lostReason||'Drone lost for this patrol.';
  if(d.mode!=='stowed')return 'Drone is already outside.';
@@ -20,7 +21,28 @@ export function deployDrone(s){
  Object.assign(s.drone,{mode:'remote',x,y,depth,targetDepth:depth,heading,targetHeading:heading,speed:0,targetSpeed:0,verticalSpeed:0,collisionCooldown:0});
  log(s,'Inspection drone deployed. Stay within 100 m; slow the boat for recovery.');return true;
 }
-export function recallDrone(s){if(s.drone.mode==='remote'){s.drone.mode='return';log(s,'Drone returning to the starboard recovery hatch.');}}
+export function recallDrone(s){if(s.drone.mode==='remote'){
+ const d=s.drone,p=boatLocal(s,d),below=s.depth+8<Math.min(279,bottom(s.x,s.y)-1);
+ Object.assign(d,{mode:'return',returnStage:p.side>=9&&Math.abs(p.forward)<24?3:0,returnClearance:below?8:s.depth>10?-8:8,returnHoldSide:p.side,returnHoldForward:p.forward});
+ log(s,'Drone returning by the clearance lane to the starboard recovery hatch.');
+}}
+
+function returnOrder(s,dt){
+ const d=s.drone,local=boatLocal(s,d),clear=d.returnClearance??8;
+ if(d.returnStage===0&&Math.abs(local.down-clear)<.7)d.returnStage=1;
+ if(d.returnStage===1&&Math.hypot(local.side-14,local.forward)<3&&Math.abs(local.down-clear)<1)d.returnStage=2;
+ if(d.returnStage===2&&Math.hypot(local.side-14,local.forward)<3&&Math.abs(local.down-2.5)<.7)d.returnStage=3;
+ const goal=d.returnStage===0?boatPoint(s,{side:d.returnHoldSide,forward:d.returnHoldForward,down:clear}):d.returnStage===1?boatPoint(s,{side:14,down:clear}):d.returnStage===2?boatPoint(s,{side:14,down:2.5}):recoveryDock(s);
+ d.targetDepth=clamp(goal.depth,0,280);
+ const a=rad(s.heading),turnRate=1.7*(.25+.75*Math.min(1,Math.abs(s.speed)/4))*s.systems.rudder/100,omega=rad(clamp(delta(s.targetHeading,s.heading)/Math.max(dt,.001),-turnRate,turnRate));
+ const vx=Math.sin(a)*s.speed*.514444+omega*(goal.y-s.y),vy=Math.cos(a)*s.speed*.514444-omega*(goal.x-s.x),dx=goal.x-d.x,dy=goal.y-d.y;
+ const currentX=Math.sin(rad(d.heading))*d.speed*.514444,currentY=Math.cos(rad(d.heading))*d.speed*.514444;
+ const requestX=vx+dx*.35-(currentX-vx)*.6,requestY=vy+dy*.35-(currentY-vy)*.6;
+ const magnitude=Math.hypot(requestX,requestY);
+ if(magnitude>.02)d.targetHeading=(Math.atan2(requestX,requestY)*180/Math.PI+360)%360;
+ const alignment=Math.max(0,Math.cos(rad(delta(d.targetHeading,d.heading))));
+ d.targetSpeed=Math.min(droneReturnSpeed(d),magnitude/.514444)*alignment*alignment;
+}
 export function loseDrone(s,reason){if(s.drone.mode==='lost')return;s.drone.mode='lost';s.drone.speed=s.drone.targetSpeed=0;s.drone.lostReason=reason;log(s,'DRONE LOST. '+reason,'damage');}
 export function damageSystem(s,key,amount){
  const old=s.systems[key];s.systems[key]=clamp(old-amount,0,100);
@@ -107,9 +129,9 @@ export function updateDrone(s,dt,diesel){
  const batteryBefore=d.battery;d.battery=Math.max(0,d.battery-dt*(.045+d.speed*d.speed*.0013+(100-d.hull)*.0003));
  if(batteryBefore>10&&d.battery<=10&&!d.lowAlarm){d.lowAlarm=true;log(s,'DRONE BATTERY 10%. Return immediately.','damage');}
  if(d.battery<=0){loseDrone(s,'Battery exhausted.');return;}
- const a=rad(s.heading),dock={x:s.x+Math.cos(a)*8,y:s.y-Math.sin(a)*8,depth:Math.min(280,s.depth+1)};
- if(d.mode==='return'){d.targetHeading=bearing(d,dock);d.targetDepth=dock.depth;d.targetSpeed=clamp(distance(d,dock)*.25,1,10);}
- const max=10*(.15+.85*d.mobility/100);d.speed+=clamp(clamp(d.targetSpeed,-3,max)-d.speed,-dt,dt);
+ const dock=recoveryDock(s);
+ if(d.mode==='return')returnOrder(s,dt);
+ const max=droneReturnSpeed(d);d.speed+=clamp(clamp(d.targetSpeed,-3,max)-d.speed,-dt,dt);
  d.heading=(d.heading+clamp(delta(d.targetHeading,d.heading),-dt*12*(.2+.8*d.mobility/100),dt*12*(.2+.8*d.mobility/100))+360)%360;
  const desired=clamp((d.targetDepth-d.depth)*.8,-1,1)*(d.buoyancy/100)+(100-d.buoyancy)*.003;
  d.verticalSpeed+=clamp(desired-d.verticalSpeed,-dt*.6,dt*.6);d.depth=clamp(d.depth+d.verticalSpeed*dt,0,280);
@@ -126,6 +148,6 @@ export function updateDrone(s,dt,diesel){
  // Pressure-front receipt is independent of when the boat hears the same blast.
  for(const sound of s.acoustics)if(sound.type==='blast'&&!sound.droneHit&&s.time-sound.time>=propagationTime(sound,d)){sound.droneHit=true;const r=separation(d,{...sound,depth:sound.depth||0});if(r<140)damageDrone(s,85*(1-r/140),'depth charge pressure wave');}
  if(d.mode==='lost')return;
- if(d.mode==='return'&&separation(d,dock)<5&&Math.abs(s.speed)<=3){d.mode='stowed';d.speed=d.targetSpeed=0;log(s,'Drone recovered. Charging and repairs underway.','success');}
+ if(d.mode==='return'&&d.returnStage===3&&separation(d,dock)<1.2&&Math.abs(s.speed)<=3){d.mode='stowed';d.speed=d.targetSpeed=0;log(s,'Drone recovered. Charging and repairs underway.','success');}
  if(separation(d,s)>100)loseDrone(s,'Control link exceeded 100 m.');
 }

@@ -1,10 +1,12 @@
 import {clamp,rad} from './sim.js';
+import {isSurfaced} from './vehicle-status.js';
 
 export const wrapHeading=n=>((n%360)+360)%360;
 export const relativeBearing=(absolute,heading)=>wrapHeading(absolute-heading);
 export const scopeBearing=s=>wrapHeading(s.heading+s.scopeAngle);
 export const canIssue=(s,context)=>s.status==='patrol'&&!context.paused&&!context.modal;
-export const feedActive=(s,view)=>view==='scope'?s.scope&&s.depth<=15&&s.systems?.periscope!==0:['tower','gun'].includes(view)?s.depth<=.05:view==='drone'?['remote','return'].includes(s.drone.mode):false;
+export const feedActive=(s,view)=>view==='scope'?s.scope&&s.depth<=15&&s.systems?.periscope!==0:['tower','gun'].includes(view)?isSurfaced(s):view==='drone'?['remote','return'].includes(s.drone.mode):false;
+export const opticalZoomLimit=view=>view==='tower'?12:view==='scope'?4:view==='gun'?5:1;
 export const helmFor=(s,view)=>view==='drone'?s.drone:s;
 
 export function setHelmOrder(s,context,axis,value){
@@ -48,5 +50,5 @@ export function chartWorldAt(chart,x,y,w,h,boat){const p=chartTransform(chart,w,
 function detachChart(chart,boat){if(chart.follow){chart.x=boat.x;chart.y=boat.y;chart.follow=false;}}
 export function panChart(chart,dx,dy,w,h,boat){const p=chartTransform(chart,w,h,boat);detachChart(chart,boat);chart.x-=dx/p.scale;chart.y+=dy/p.scale;}
 export function zoomChart(chart,factor,x,y,w,h,boat){
- const before=chartWorldAt(chart,x,y,w,h,boat);detachChart(chart,boat);chart.zoom=clamp(chart.zoom*factor,.25,6);const after=chartWorldAt(chart,x,y,w,h,boat);chart.x+=before.x-after.x;chart.y+=before.y-after.y;
+ const before=chartWorldAt(chart,x,y,w,h,boat);detachChart(chart,boat);chart.zoom=clamp(chart.zoom*factor,.25,128);const after=chartWorldAt(chart,x,y,w,h,boat);chart.x+=before.x-after.x;chart.y+=before.y-after.y;
 }

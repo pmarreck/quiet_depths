@@ -48,7 +48,7 @@ test('all six mission families start with torpedoes and explicit combat state',(
 });
 
 test('gun availability gates conserve ammunition and accepted shots cost exactly one round',()=>{
- for(const mutation of [s=>s.depth=s.targetDepth=.051,s=>s.status='won',s=>s.gun.ammo=0]){
+ for(const mutation of [s=>s.depth=s.targetDepth=1.001,s=>s.status='won',s=>s.gun.ammo=0]){
   const s=ocean();mutation(s);
   const before={ammo:s.gun.ammo,shots:s.gun.shots,cooldown:s.gun.cooldown,rounds:structuredClone(s.gunRounds)};
   assert.equal(fireDeckGun(s,{bearing:0,elevation:0}),false);

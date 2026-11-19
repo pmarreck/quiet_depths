@@ -4,6 +4,8 @@ A browser submarine game about incomplete information and calculated exposure. A
 
 [Play Quiet Depths](https://pmarreck.github.io/quiet_depths/). Sound starts OFF. Desktop keyboard/mouse and mobile touch controls are included; WebGL is needed for the ocean views. No account or installation is required.
 
+<img src="docs/screenshots/mobile-v6.jpg" width="280" alt="Phone layout showing the periscope, compact status and fixed helm with a vertical speed slider">
+
 ## Build and run
 
 Nix is the canonical build. The complete verification entry point is `./test`, which runs `nix build`. The build runs the simulation tests and produces the static site. Nix flakes must be enabled. On Windows, run through a Nix-enabled WSL distribution.
@@ -19,9 +21,9 @@ For development preview, copy the Nix build output into `dist/` first (`mkdir -p
 
 Choose reconnaissance, interception, passive surveillance, undersea rescue, surface rescue, or wreck survey. Photograph silhouettes, intercept a military freighter, or quietly collect traffic intelligence. Complete the task, return to the chart's extraction circle, and surface to 1 meter or less for pickup. The patrol window is 30 simulated minutes. Use 5× and 20× for transit; new contacts and attacks return time to 1×. Esc pauses; progress autosaves in this browser's local storage.
 
-- **1–6**: periscope, sonar, chart, drone, conning tower, deck gun.
+- **1–7**: periscope, sonar, chart, drone, conning tower, deck gun, photos.
 - **P**: raise/lower scope at 15 meters or less. Drag to pan; scroll to zoom.
-- **F**: photograph a merchant within five degrees of the reticle. Separate silhouettes require separate framing.
+- **F**: take a periscope photograph. A merchant within five degrees of the reticle also earns reconnaissance mission credit. Separate silhouettes require separate framing.
 - **G**: active sonar. Range information also exposes you.
 - **R**: silent running, limited to 3 knots.
 - **W/S**: increase/decrease requested speed of the vehicle under control, including astern.
@@ -75,11 +77,25 @@ Fully surface to use the gun station. Drag horizontally and vertically to aim, o
 
 Detected military traffic can radio Greybank island. Aircraft prepare for 45–59 simulated seconds, take off from the modeled runway and physically fly to the last report. They search, strafe visible surfaced boats and drop delayed ordnance. Diving and moving quietly breaks visual tracking, but does not erase the last reported position. Aircraft engines attenuate with distance and become muffled below the surface.
 
-On a phone, station tabs sit above the view. Mission/Boat and Contacts/Weapons open drawers; tap outside to close. Hold Port/Starboard, Faster/Slower and Rise/Dive to change requested orders. These support simultaneous fingers, and release/cancellation stops input. The three sliders show actual and requested values. Use ALIGN in the periscope view to center on the bow or turn the boat to the sight bearing. Drag optics to look or aim; drag the chart to pan, tap to plot, and use its +/− buttons to zoom. The mobile controls share the same pause and vehicle limits as the keyboard. The responsive layout is checked in a browser; hardware iPhone/Safari validation remains playtesting work.
+On a phone, a fixed helm stays below the scene. Hold Port/Starboard or Rise/Dive to change requested orders; use the vertical speed slider for ahead/astern. Its thumb marks the request and its light tick marks actual speed. Tap a numeric readout for an exact order. Actual and requested heading/depth stay visible as the vehicle responds. Mission, Contacts and Boat open compact sheets; tap outside to close. Boat includes propulsion, silent running, repair, resources and the ROV bay. Sonar has an Active Ping action. Scope, ROV, gun and chart actions sit directly below their scene. Use ALIGN to center the scope or turn the boat to its sight bearing, and +/− for magnification. The surface binoculars reach 12×; the scope reaches 24×. The helm supports simultaneous fingers and cancels held input on release, interruption, pause or rotation. Hardware iPhone/Safari validation remains playtesting work.
+
+The ROV cable is attached to its hull hatch and chassis and moves with the water. Recall follows a deterministic clearance lane to an underwater docking point, including when the submarine is surfaced. Hull collisions remain active. A status strip shows deployment and range outside the ROV station; it flashes if the boat outruns the drone's damage-dependent top speed. Slow to three knots or less for pickup. Both the surfaced indication and gun availability use the same one-meter threshold, independent of individual wave crests.
+
+## Classified reconnaissance and photographs
+
+On Chart, choose Recon Area, then tap the center of a 10 km square and request the pass. You can queue a request while deep, but uplink waits for 15 meters or less. The prototype spends 90–150 seconds retasking/awaiting an overpass, takes two exposures ten seconds apart to estimate velocity, and processes them before transmission. Each stage shows progress. Surface transfer takes 18 seconds; shallow submerged transfer takes `80 + 8 × depth` seconds for a full image. Reception holds below 30 meters and resumes when you rise. The next task is locked for eight minutes after delivery.
+
+Clear daylight can identify surface vessels. Clouds and rain produce partial, uncertain coverage; storms block requests. Night images locate running lights without giving new identities. Submarines, undetected ships under cloud and objects outside the square are not disclosed. Chart fixes retain their capture time, so transmission delay already counts against freshness. A constant-velocity estimate and growing 95% uncertainty ellipse account for velocity error and unobserved maneuvering. These are game probabilities, not a calibrated tracking solution. Unnamed contacts receive stable A1–A9, B1–B9 and subsequent designations; identification preserves the code. Torpedo firing bearings use the observed estimate from the current boat position.
+
+Photos archives actual rendered periscope/ROV exposures and north-up monochrome orbital plates, with capture and receipt timestamps. It preserves up to 24 images within a bounded local-storage budget across patrols and reloads. Old saves gain an empty archive rather than fabricated historical images. Recon images render frozen observations from exposure time, never the later live fleet. Photographic visibility and survey/recon mission credit remain separate requirements.
+
+The classified electronic imaging and underwater image relay are deliberate fictional exceptions to 1972. [NRO's history](https://www.nro.gov/Portals/135/documents/news/press/2021/2021-06-60th%20Anniversary%20Declassification_11162021.pdf) dates near-real-time electronic reconnaissance to KENNEN in 1976; earlier optical systems returned film. [GAO's submarine communications assessment](https://www.gao.gov/assets/psad-79-48a.pdf) describes very low throughput and shallow receiving antennas for VLF. The game's raised/trailing antenna abstraction, depth cutoffs and transfer times are play tuning. They do not imply that real 1972 boats could receive photographs through tens of meters of seawater at these rates.
 
 GitHub Actions runs the complete Nix build and tests before uploading the resulting static output to GitHub Pages. A failing build cannot deploy. Pull requests run the same build without publication.
 
 ## Historical design choices
+
+The [USS Blueback National Register nomination](https://heritagedata.prd.state.or.us/historic/index.cfm?do=main.loadFile&load=NR_Noms/08000947.pdf) describes cross-shaped stern surfaces ahead of a five-blade brass propeller. The game uses that arrangement with a smaller helical screw. Its matte gray coating follows the chosen game appearance; it is not a claim that Blueback's brass screw was painted gray.
 
 The compact dark propeller, tapered single-screw hull and sail planes draw on the [Barbel design described by NHHC](https://www.history.navy.mil/research/histories/ship-histories/danfs/b/barbel-ii.html). This is a fictional hybrid, not a Barbel replica. Television-equipped cabled underwater vehicles existed in the [1960s CURV program](https://navalunderseamuseum.org/wp-content/uploads/2026/02/NUM_2019_013_010_NOSCvehicleHistory_OCR.pdf), and [A-1 attack aircraft remained in service in 1972](https://www.nationalmuseum.af.mil/Visit/Museum-Exhibits/Fact-Sheets/Display/Article/3215320/douglas-a-1h-skyraider-the-proud-american/). The game uses a retained dual-purpose deck gun, simplified acoustic seekers, manual optics and diesel/electric propulsion. DU explosive deck-gun ammunition is an explicitly fictional exception to the 1972 setting. Sensors, weapon ranges, aircraft performance, repairs and resources are tuned for play, not real operations.
 

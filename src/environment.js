@@ -39,4 +39,10 @@ export const SEA_GLSL='float sea(vec2 p){return waveScale*('+WAVE_COMPONENTS.map
 export const SEA_SAMPLE_GLSL='vec3 seaSample(vec2 p){vec3 s=vec3(0.);'+WAVE_COMPONENTS.map((w,i)=>`float phase${i}=p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+time*waveSpeed*${w.omega.toFixed(3)};s+=${w.amplitude.toFixed(3)}*vec3(sin(phase${i}),cos(phase${i})*${w.kx.toFixed(3)},cos(phase${i})*${w.ky.toFixed(3)});`).join('')+'return s*waveScale;}';
 export function scopeEyeHeight(s,e){return s.depth<2?9+surfaceHeight(s.x,s.y,s.time,e)*.6:3.8+Math.sin(s.time*.72)*.35*e.waveScale;}
 export function scopeWashed(s,e=environmentAt(s)){return scopeEyeHeight(s,e)<=surfaceHeight(s.x,s.y,s.time,e)+.15;}
+export function opticalSway(s,view,time=s.time){
+ const e=environmentAt({...s,time}),tower=view==='tower',scale=e.waveScale*(tower?1:.38),heading=s.heading*Math.PI/180,forward={x:Math.sin(heading)*6,y:Math.cos(heading)*6},side={x:Math.cos(heading)*6,y:-Math.sin(heading)*6};
+ const along=(surfaceHeight(s.x+forward.x,s.y+forward.y,time,e)-surfaceHeight(s.x-forward.x,s.y-forward.y,time,e))/12;
+ const across=(surfaceHeight(s.x+side.x,s.y+side.y,time,e)-surfaceHeight(s.x-side.x,s.y-side.y,time,e))/12;
+ return{pitch:clamp(along*(tower?.16:.065)+Math.sin(time*.57)*.0015*scale,-.045,.045),roll:clamp(across*(tower?.2:.07)+Math.sin(time*.63)*.002*scale,-.045,.045),yaw:Math.sin(time*.39)*.002*scale};
+}
 export function soundings(waterDepth,referenceDepth,keelOffset=5){return{waterDepth,referenceDepth,belowKeel:waterDepth-referenceDepth-keelOffset,keelOffset};}

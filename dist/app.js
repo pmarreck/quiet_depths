@@ -3,16 +3,26 @@ import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
 import {objectiveState,operationApproach,dronePhotograph} from './missions.js';
 import {OceanScene} from './scene.js';
-import {fireDeckGun,aimGunAt} from './combat.js';
+import {fireDeckGun,aimGunAt,firingBearing} from './combat.js';
 import {HeldInput} from './input.js';
 import {SoundSystem} from './audio.js';
 import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
-import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,applyHelmKeys,chartTransform,chartWorldAt,panChart,zoomChart} from './controls.js';
+import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,applyHelmKeys,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
+import {isSurfaced,droneStatus} from './vehicle-status.js';
+import {reconcileKeyedChildren,contactRow,updateContactRow,sonarLayout} from './ui.js';
+import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js';
+import {captureOptics,captureSatellite} from './photo-capture.js';
+import {requestRecon,reconStatus,reconAreaForDisplay} from './recon.js';
+import {estimateAt} from './track-estimates.js';
+import {lossPresentation} from './loss.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,missionChoice='recon',last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0;
-let chart={x:0,y:0,zoom:1,follow:true},saved=null;
+let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null;
+let orderAxis=null,reconPlacement=false,photoKey='',lossStartedAt=0;const zooms={scope:1,tower:1,gun:1};let library=[];
+try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
+state.photoArchive=library;
 try{saved=restore(localStorage.getItem('quiet-depths-v1'));}catch{}
 let scene=null;
 try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',e);toast('WebGL unavailable. Sonar and chart are available.');view='sonar';}
@@ -24,39 +34,47 @@ const sound=new SoundSystem(()=>state,context,status=>{
  if(status.last){el.dataset.lastAcoustic=status.last.type;el.dataset.lastDelay=status.last.delay.toFixed(3);el.dataset.lastGain=(status.last.currentGain??status.last.gain).toFixed(4);el.dataset.lastCutoff=(status.last.currentCutoff??status.last.cutoff).toFixed(0);}else{for(const key of ['lastAcoustic','lastDelay','lastGain','lastCutoff'])delete el.dataset[key];}
 });
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
-function persist(){try{if(state.status==='patrol')localStorage.setItem('quiet-depths-v1',save(state));else localStorage.removeItem('quiet-depths-v1');$('save-status').textContent='PATROL SAVED';setTimeout(()=>$('save-status').textContent='LOCAL AUTOSAVE',1400);}catch{$('save-status').textContent='SAVING UNAVAILABLE';}}
+function persist(){try{library=photoArchive(state);localStorage.setItem('quiet-depths-photos-v1',JSON.stringify(library));if(state.status==='patrol')localStorage.setItem('quiet-depths-v1',save({...state,photoArchive:[]}));else localStorage.removeItem('quiet-depths-v1');$('save-status').textContent='PATROL SAVED';setTimeout(()=>$('save-status').textContent='LOCAL AUTOSAVE',1400);}catch{$('save-status').textContent='SAVING UNAVAILABLE';}}
 function bindCommand(element,event,action,enabled=()=>true){
  const el=typeof element==='string'?$(element):element;commandControls.push({el,enabled});el.dataset.command='true';
  el.addEventListener(event,e=>{if(!canIssue(state,context())||!enabled())return;action(e);updateUI();});
 }
 function order(axis,value){return setHelmOrder(state,context(),axis,value);}
 function closeDrawer(){drawer=null;document.body.removeAttribute('data-drawer');$('drawer-backdrop').classList.add('hidden');all('[data-panel]').forEach(b=>b.setAttribute('aria-expanded','false'));}
-function setRate(r){rate=r;all('[data-time]').forEach(b=>b.classList.toggle('active',+b.dataset.time===r));}
+function setRate(r){rate=r;all('[data-time]').forEach(b=>b.classList.toggle('active',+b.dataset.time===r));$('mobile-time').textContent=r+'×';$('mobile-time').setAttribute('aria-label','Time compression '+r+' times');}
 function setPaused(p){paused=p;held.clear();drag=null;document.body.classList.toggle('paused',p);$('pause').textContent=p?'RESUME · ESC':'PAUSE · ESC';$('pause').setAttribute('aria-label',p?'Resume patrol':'Pause patrol');updateUI();sound.update();persist();}
-function setView(v){if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();}
+function setView(v){zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();}
 function chooseMission(id){missionChoice=id;all('.mission-option').forEach(b=>b.classList.toggle('active',b.dataset.mission===id));document.querySelector('.briefing-tip p').innerHTML=esc(MISSIONS.find(m=>m.id===id).desc)+' <strong>Esc pauses everything.</strong>';}
 function openBriefing(){held.clear();persist();$('briefing').showModal();$('resume').classList.toggle('hidden',!saved&&state.time===0);sound.update();}
 function start(resuming=false){
  if(resuming)state=saved||state;else{const seedText=$('patrol-seed').value.trim(),seed=seedText?Number(seedText)>>>0:crypto.getRandomValues(new Uint32Array(1))[0];state=createGame(missionChoice,seed,{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked});selected=null;}
- chart={x:state.x,y:state.y,zoom:1,follow:true};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(state.depth<=.05?'tower':'scope'):'sonar');setPaused(false);persist();
+ state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
+ chart={x:state.x,y:state.y,zoom:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
 }
 $('patrol-time').innerHTML='<option value="random">Random</option>'+Object.entries(TIMES).map(([id,t])=>`<option value="${id}" ${''}>${t.name}</option>`).join('');
 $('patrol-weather').innerHTML='<option value="random">Random</option>'+Object.entries(WEATHER).map(([id,w])=>`<option value="${id}">${w.name}</option>`).join('');
 $('mission-picker').innerHTML=MISSIONS.map(m=>`<button class="mission-option ${m.id==='recon'?'active':''}" data-mission="${m.id}"><span></span><div><b>${m.name}</b><small>${m.type}</small></div><span>${m.minutes}</span></button>`).join('');
 $('mission-picker').addEventListener('click',e=>{const b=e.target.closest('[data-mission]');if(b)chooseMission(b.dataset.mission);});
 $('start').onclick=()=>start(false);$('resume').onclick=()=>start(true);$('close-briefing').onclick=()=>{$('briefing').close();updateUI();};$('another-patrol').onclick=()=>{$('result-dialog').close();$('briefing').showModal();$('resume').classList.add('hidden');};
-$('sound').onclick=()=>{const on=sound.toggle();$('sound').innerHTML=`♩ <span>SOUND ${on?'ON':'OFF'}</span>`;$('sound').setAttribute('aria-label',on?'Disable sound':'Enable sound');};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{held.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
+$('sound').onclick=()=>{sound.toggle();renderSound();};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{held.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
 all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI();}));
-all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(+b.dataset.time)));
+all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
 function scopeToggle(){if(!canIssue(state,context())||state.systems.periscope===0)return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}state.scope=!state.scope;if(!state.scope)scene?.clear();updateUI();}
-function takePhoto(){if(!canIssue(state,context()))return;if(view==='drone'){const result=dronePhotograph(state);toast(result.text);if(result.ok)sound.tone('photo');updateUI();return;}if(view!=='scope'||!feedActive(state,'scope'))return;if(scopeWashed(state)){toast('A wave washed over the lens. Wait for the trough.');return;}if(photograph(state,scopeBearing(state))){sound.tone('photo');toast(`Photograph recorded. ${state.photos.length}/${state.patrol.photoGoal} silhouettes.`);}else toast(state.photoCooldown>0?'Camera reloading.':'Center a merchant silhouette in the reticle.');updateUI();}
+function takePhoto(){
+ if(!canIssue(state,context())||state.photoCooldown>0)return;
+ if(view==='drone'&&feedActive(state,'drone')){if(state.mission==='survey'){const result=dronePhotograph(state);toast(result.text);}state.photoCooldown=4;expose({source:'drone',takenAt:state.time,bearing:state.drone.heading,depth:state.drone.depth,caption:state.mission==='survey'?'ROV survey exposure':'ROV camera exposure',seed:state.patrol.seed,mission:state.mission});sound.tone('photo');updateUI();return;}
+ if(view!=='scope'||!feedActive(state,'scope'))return;
+ if(scopeWashed(state)){toast('A wave washed over the lens. Wait for the trough.');return;}
+ const evidence=photograph(state,scopeBearing(state));state.photoCooldown=4;
+ expose({source:'scope',takenAt:state.time,bearing:scopeBearing(state),depth:state.depth,caption:evidence?'Merchant silhouette · '+state.photos.length+'/'+state.patrol.photoGoal:'Periscope exposure',seed:state.patrol.seed,mission:state.mission});sound.tone('photo');updateUI();
+}
 function doPing(){if(!canIssue(state,context()))return;if(ping(state)){sound.tone('ping');setRate(1);}else toast('Sonar capacitors recharging.');updateUI();}
-function silent(){if(!canIssue(state,context())||view==='drone')return;state.silent=!state.silent;if(state.silent){state.targetSpeed=clamp(state.targetSpeed,-3,3);log(state,'Rig for silent running. Maximum three knots.');}updateUI();}
+function silent(forceBoat=false){if(!canIssue(state,context())||view==='drone'&&!forceBoat)return;state.silent=!state.silent;if(state.silent){state.targetSpeed=clamp(state.targetSpeed,-3,3);log(state,'Rig for silent running. Maximum three knots.');}updateUI();}
 $('scope-align-toggle').onclick=()=>{const open=$('scope-alignment').classList.toggle('open');$('scope-align-toggle').setAttribute('aria-expanded',String(open));};
 bindCommand('center-scope','click',()=>{alignScope(state,context(),'center');$('scope-alignment').classList.remove('open');$('scope-align-toggle').setAttribute('aria-expanded','false');},()=>feedActive(state,'scope'));
 bindCommand('steer-scope','click',()=>{alignScope(state,context(),'helm-to-scope');$('scope-alignment').classList.remove('open');$('scope-align-toggle').setAttribute('aria-expanded','false');},()=>feedActive(state,'scope'));
 bindCommand('open-gun','click',()=>setView('gun'));
-bindCommand('aim-gun','click',()=>{const id=$('gun-target').value,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range)aimGunAt(state,{x:c.x,y:c.y,altitude:2});},()=>view==='gun'&&feedActive(state,'gun')&&!!$('gun-target').value);
+bindCommand('aim-gun','click',()=>{const id=$('gun-target').value,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range){const e=estimateAt(c,state.time);aimGunAt(state,{x:e.x,y:e.y,vx:c.fix?.vx||0,vy:c.fix?.vy||0,altitude:2});}},()=>view==='gun'&&feedActive(state,'gun')&&!!$('gun-target').value);
 bindCommand('scope-toggle','click',scopeToggle);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0&&state.systems.sonar>25);bindCommand('silent','click',silent,()=>view!=='drone');
 for(const axis of ['heading','depth','speed'])bindCommand(axis,'input',e=>order(axis,+e.target.value),pilotEnabled);
 bindCommand('port','click',()=>order('heading',helmFor(state,view).targetHeading-15),pilotEnabled);bindCommand('starboard','click',()=>order('heading',helmFor(state,view).targetHeading+15),pilotEnabled);
@@ -65,11 +83,11 @@ bindCommand('electric','click',()=>{state.engine='electric';log(state,'Electric 
 bindCommand('diesel','click',()=>{if(state.depth>14){toast('Diesel needs air. Rise to 14 meters or less first.');return;}if(state.fuel<=0){toast('Diesel fuel exhausted.');return;}state.engine='diesel';state.silent=false;log(state,'Diesels engaged. Recharging, but loud.','warning');},()=>view!=='drone');
 bindCommand('repair','click',()=>{if(state.hull>=100&&state.flood===0&&Object.values(state.systems).every(v=>v===100)){toast('No damage to repair.');return;}state.repair=120;log(state,'Damage control assigned. Patching hull and pumping compartments.');toast('Damage control working for 2 minutes. Uses battery.');});
 bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}},()=>state.decoys>0);
-bindCommand('fire','click',()=>{const c=state.contacts.find(c=>c.id===selected);if(state.depth>100){toast('Rise above 100 meters to fire.');return;}if(c.identified&&!c.military){toast('Identified neutral. Firing is withheld.');return;}if(fire(state,selected)){sound.tone('fire');setRate(1);toast('Torpedo running. Its own sonar will arm and acquire a return.');closeDrawer();}},()=>!!state.contacts.find(c=>c.id===selected)&&state.torps>0);
-function visualAircraft(){const e=environmentAt(state);return state.depth<=.05?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
+bindCommand('fire','click',launchSelected,()=>!!state.contacts.find(c=>c.id===selected)&&state.torps>0&&state.depth<=100);
+function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
 bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');toast('Drone helm: W/S speed, A/D heading, Space/C depth.');}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
-bindCommand('drone-photo','click',takePhoto,()=>state.mission==='survey'&&feedActive(state,'drone')&&state.photoCooldown===0);
+bindCommand('drone-photo','click',takePhoto,()=>feedActive(state,'drone')&&state.photoCooldown===0);
 bindCommand('approach-site','click',()=>{const p=operationApproach(state);if(!p)return;state.route={x:p.x,y:p.y,radius:p.radius};state.targetDepth=p.depth;state.targetSpeed=3;state.silent=false;toast('Approach plotted. Boat will stop beside the site. Watch clearance.');},()=>!!state.site);
 bindCommand('hold-position','click',()=>{state.route=null;state.targetSpeed=0;state.targetDepth=state.site?operationApproach(state).depth:state.depth;toast('All stop. Ballast and planes holding ordered depth.');});
 bindCommand('recall-drone','click',()=>recallDrone(state),()=>state.drone.mode==='remote');
@@ -77,12 +95,12 @@ bindCommand('clear-route','click',()=>{state.route=null;toast('Waypoint cleared.
 bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast('Extraction plotted. Surface inside the pickup circle to finish.');});
 $('center-chart').onclick=()=>{chart.follow=true;updateUI();};
  for(const [id,factor] of [['chart-zoom-in',1.4],['chart-zoom-out',1/1.4]])$(id).onclick=()=>{const r=$('viewport').getBoundingClientRect();zoomChart(chart,factor,r.width/2,r.height/2,r.width,r.height,state);updateUI();};
- all('[data-panel]').forEach(b=>b.onclick=()=>{const next=b.dataset.panel;if(drawer===next){closeDrawer();return;}drawer=next;document.body.dataset.drawer=next;$('drawer-backdrop').classList.remove('hidden');all('[data-panel]').forEach(el=>el.setAttribute('aria-expanded',String(el.dataset.panel===next)));});$('drawer-backdrop').onclick=closeDrawer;
- bindCommand('mobile-stop','click',()=>order('speed',0),pilotEnabled);bindCommand('mobile-silent','click',silent,()=>view!=='drone');bindCommand('mobile-engine','click',()=>{if(state.engine==='diesel'){state.engine='electric';return;}if(state.depth>14||state.fuel<=0){toast('Diesel needs air above 14 m and fuel.');return;}state.engine='diesel';state.silent=false;},()=>view!=='drone');
+ all('[data-panel]').forEach(b=>b.onclick=()=>{const next=b.dataset.panel;if(drawer===next){closeDrawer();return;}openDrawer(next);});$('drawer-backdrop').onclick=closeDrawer;
+ bindCommand('mobile-stop','click',()=>setHelmOrder(state,{...context(),view:'chart'},'speed',0));bindCommand('mobile-silent','click',()=>silent(true));bindCommand('mobile-engine','click',()=>{if(state.engine==='diesel'){state.engine='electric';return;}if(state.depth>14||state.fuel<=0){toast('Diesel needs air above 14 m and fuel.');return;}state.engine='diesel';state.silent=false;});
  all('[data-key]').forEach(button=>{button.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!canIssue(state,context())||button.dataset.key!=='KeyJ'&&!pilotEnabled())return;button.setPointerCapture(e.pointerId);held.press('touch:'+e.pointerId,button.dataset.key);applyHelmKeys(state,context(),new Set([button.dataset.key]),.12);button.classList.add('held');updateUI();});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,e=>{held.release('touch:'+e.pointerId);button.classList.remove('held');});});
 const vp=$('viewport');let drag=null;
 vp.addEventListener('pointerdown',e=>{
- if(e.target.closest('button'))return;
+ if(e.target.closest('button,input,select,.photo-card,.order-sheet'))return;
  if(view!=='chart'&&(!['scope','tower','gun'].includes(view)||!feedActive(state,view)||!canIssue(state,context())))return;
  e.preventDefault();drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};vp.setPointerCapture(e.pointerId);
 });
@@ -96,20 +114,20 @@ vp.addEventListener('pointermove',e=>{
  drag.x=e.clientX;drag.y=e.clientY;
 });
 vp.addEventListener('pointerup',e=>{
- if(drag&&view==='chart'&&!drag.moved&&canIssue(state,context())){const r=vp.getBoundingClientRect();state.scopeSteerBearing=null;state.route=chartWorldAt(chart,e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);state.targetSpeed=Math.max(4,state.targetSpeed);state.silent=false;toast('Waypoint plotted. Holding requested depth.');}
+ if(drag&&view==='chart'&&!drag.moved&&canIssue(state,context())){const r=vp.getBoundingClientRect(),point=chartWorldAt(chart,e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);if(reconPlacement){chart.reconArea={...point,size:10000};reconPlacement=false;openDrawer('recon');toast('10 km search square placed. Review conditions and request the pass.');}else{state.scopeSteerBearing=null;state.route=point;state.targetSpeed=Math.max(4,state.targetSpeed);state.silent=false;toast('Waypoint plotted. Holding requested depth.');}}
  drag=null;updateUI();
 });
 vp.addEventListener('pointercancel',()=>drag=null);
 vp.addEventListener('wheel',e=>{
  if(view==='chart'){e.preventDefault();const r=vp.getBoundingClientRect();zoomChart(chart,Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);updateUI();}
- else if(['scope','tower','gun'].includes(view)&&feedActive(state,view)&&canIssue(state,context())){e.preventDefault();zoom=clamp(zoom-e.deltaY*.002,1,2.5);updateUI();}
+ else if(['scope','tower','gun'].includes(view)&&feedActive(state,view)&&canIssue(state,context())){e.preventDefault();zoom=clamp(zoom-e.deltaY*.002,1,opticalZoomLimit(view));updateUI();}
 },{passive:false});
 const helmKeys=new Set(['KeyW','KeyA','KeyS','KeyD','Space','KeyC','KeyJ']);
 window.addEventListener('keydown',e=>{
  if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches('textarea,input:not([type="range"]),[contenteditable="true"]'))return;
  if(context().modal)return;
  if(e.code==='Escape'){e.preventDefault();if(!e.repeat)setPaused(!paused);return;}
- const stations={Digit1:'scope',Digit2:'sonar',Digit3:'chart',Digit4:'drone',Digit5:'tower',Digit6:'gun'};
+ const stations={Digit1:'scope',Digit2:'sonar',Digit3:'chart',Digit4:'drone',Digit5:'tower',Digit6:'gun',Digit7:'photos'};
  if(stations[e.code]){e.preventDefault();if(!e.repeat)setView(stations[e.code]);return;}
  if(helmKeys.has(e.code)){e.preventDefault();if(canIssue(state,context())&&pilotEnabled()){held.press('keyboard:'+e.code,e.code);if(!e.repeat){applyHelmKeys(state,context(),new Set([e.code]),.12);updateUI();}}return;}
  if(!canIssue(state,context())||e.repeat)return;
@@ -141,7 +159,7 @@ function updateUI(){
  $('heading-order').innerHTML=`<span>ACT ${deg(v.heading)}°</span><span>REQ ${deg(v.targetHeading)}°</span>`;
  $('depth-order').innerHTML=`<span>ACT ${v.depth.toFixed(0)} m</span><span>REQ ${v.targetDepth.toFixed(0)} m</span>`;
  $('speed-order').innerHTML=`<span>ACT ${v.speed.toFixed(1)} kn</span><span>REQ ${v.targetSpeed.toFixed(1)} kn</span>`;
- $('depth-label').textContent=v.depth<=1?'SURFACED':drone?'ROV':v.depth<=15?'SCOPE':v.depth>220?'STRAIN':'SUBMERGED';
+ $('depth-label').textContent=isSurfaced(v)?'SURFACED':drone?'ROV':v.depth<=15?'SCOPE':v.depth>220?'STRAIN':'SUBMERGED';
  $('noise-label').textContent=drone?(v.speed<0?'ASTERN':'ROV'):s.noise<28?'QUIET':s.noise<55?'AUDIBLE':'LOUD';$('noise-label').style.color=!drone&&s.noise>55?'var(--red)':'var(--green)';
  for(const axis of ['heading','depth','speed']){
   const el=$(axis);el.min=axis==='speed'?(drone?-3:-4):0;el.max=axis==='heading'?359.9:axis==='depth'?280:(drone?10:17);el.step=axis==='heading'?.1:axis==='speed'?.1:1;
@@ -151,7 +169,7 @@ function updateUI(){
  $('electric').classList.toggle('active',s.engine==='electric');$('diesel').classList.toggle('active',s.engine==='diesel');$('silent').classList.toggle('active',s.silent);
  $('engine-hint').textContent=drone?'Boat holds its own helm orders.':s.silent?'Silent running limits actual speed to 3 kn.':s.engine==='diesel'?(s.depth<=14?'Charging. High acoustic signature.':'No intake. Rise to 14 m or switch.'):s.battery<=0?'Battery exhausted. Surface for diesel.':'Quiet motors. Electric limit: 14 kn.';
  const active=feedActive(s,view),tower=view==='tower',gun=view==='gun',absLook=drone?s.drone.heading:gun?wrapHeading(s.heading+s.gun.angle):tower?wrapHeading(s.heading+s.towerAngle):scopeBearing(s),optical=view==='scope'||drone||tower||gun;
- const labels={gun:['DECK GUN',active?`DU EXPLOSIVE · ${s.gun.ammo} ROUNDS · ${s.gun.elevation.toFixed(1)}° ELEVATION`:'SURFACE TO MAN THE GUN'],tower:['CONNING TOWER',active?'OPEN BRIDGE · DRAG VERTICALLY TO LOOK DOWN':'SURFACE TO GO TOPSIDE'],scope:['OPTICAL OBSERVATION',active?`PERISCOPE · ${scopeWashed(s,env)?'LENS AWASH':deg(s.scopeAngle)+'° RELATIVE'} · ${(6*zoom).toFixed(0)}×`:'OPTICS OFFLINE'],sonar:['ACOUSTIC OBSERVATION',`HEADING UP · ${deg(s.heading)}° TRUE · ESTIMATED CONTACTS`],chart:['NAVIGATION CHART',`NORTH UP · ${chart.zoom.toFixed(1)}× · ${chart.follow?'FOLLOWING BOAT':'FREE PAN'}`],drone:['REMOTE INSPECTION',`ROV ${s.drone.mode.toUpperCase()} · BATTERY ${Math.round(s.drone.battery)}%`]};
+ const labels={photos:['PHOTOGRAPHIC EVIDENCE',photoArchive(s).length+' ARCHIVED EXPOSURES'],gun:['DECK GUN',active?`DU EXPLOSIVE · ${s.gun.ammo} ROUNDS · ${s.gun.elevation.toFixed(1)}° ELEVATION`:'SURFACE TO MAN THE GUN'],tower:['CONNING TOWER',active?'OPEN BRIDGE · DRAG VERTICALLY TO LOOK DOWN':'SURFACE TO GO TOPSIDE'],scope:['OPTICAL OBSERVATION',active?`PERISCOPE · ${scopeWashed(s,env)?'LENS AWASH':deg(s.scopeAngle)+'° RELATIVE'} · ${(6*zoom).toFixed(0)}×`:'OPTICS OFFLINE'],sonar:['ACOUSTIC OBSERVATION',`HEADING UP · ${deg(s.heading)}° TRUE · ESTIMATED CONTACTS`],chart:['NAVIGATION CHART',`NORTH UP · ${chart.zoom.toFixed(1)}× · ${chart.follow?'FOLLOWING BOAT':'FREE PAN'}`],drone:['REMOTE INSPECTION',`ROV ${s.drone.mode.toUpperCase()} · BATTERY ${Math.round(s.drone.battery)}%`]};
  const scopeTab=document.querySelector('[data-view=scope]'),droneTab=document.querySelector('[data-view=drone]');scopeTab.classList.toggle('hidden',s.systems.periscope===0);droneTab.classList.toggle('damaged',s.drone.mode==='lost');droneTab.innerHTML='<span>04</span> '+(s.drone.mode==='lost'?'DRONE LOST':'DRONE');
  all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-pressed',String(b.dataset.view===view));});
  $('view-label').textContent=labels[view][0];$('view-subtitle').textContent=labels[view][1];$('view-tag').textContent=optical?active?(paused?'FROZEN':'LIVE FEED'):'OFFLINE':view==='chart'?'SECTOR 07':'HEADING UP';
@@ -161,13 +179,13 @@ function updateUI(){
  for(const id of ['compass','look-heading']){$(id).classList.toggle('hidden',!optical||!active);$(id).style.opacity='1';}
  $('view-message').classList.toggle('hidden',!optical||active);
  $('view-message').innerHTML=gun?'DECK GUN OFFLINE<br><small>Surface fully to aim and fire the deck gun.</small>':tower?'CONNING TOWER OFFLINE<br><small>Surface to view from the top of the conning tower.</small>':view==='scope'?`PERISCOPE OFFLINE<br><small>${s.depth>15?'Rise to 15 meters or less to look.':'The mast is lowered. Press P to raise it.'}</small>`:s.drone.mode==='lost'?'DRONE LOST<br><small>'+esc(s.drone.lostReason)+'</small>':'DRONE STOWED<br><small>'+esc(droneDeployReason(s)||'Deploy at ≤3 knots, down to 280 meters. Keep within 100 m.')+'</small>';
- $('scope-tools').classList.toggle('hidden',view!=='scope');$('scope-alignment').classList.toggle('hidden',view!=='scope');$('bow-readout').classList.toggle('hidden',view!=='scope'||!active);const rel=((s.scopeAngle+540)%360)-180;$('bow-readout').textContent=`BOW ${deg(s.heading)}° · VIEW ${deg(scopeBearing(s))}° · ${Math.abs(rel).toFixed(0)}° ${rel<0?'PORT':'STARBOARD'}${s.scopeSteerBearing!==null?' · BOAT TURNING TO VIEW':''}`;$('gun-tools').classList.toggle('hidden',!gun);$('gun-trigger').disabled=!canIssue(s,context())||!active||s.gun.ammo<=0||s.systems.deckgun<=10;$('gun-sight-status').textContent=`${s.gun.ammo} ROUNDS · ELEV ${s.gun.elevation.toFixed(1)}°`;$('air-warning').classList.toggle('hidden',!['arming','airborne'].includes(s.airSupport.status));$('air-warning').textContent=s.airSupport.status==='arming'?`AIR SUPPORT PREPARING · ${Math.ceil(s.airSupport.launchAt-s.time)}s`:'AIRCRAFT AIRBORNE · DIVE TO BREAK VISUAL CONTACT';$('drone-photo').classList.toggle('hidden',s.mission!=='survey');
+ $('scope-tools').classList.toggle('hidden',view!=='scope');$('zoom-tools').classList.toggle('hidden',!['scope','tower','gun'].includes(view));$('zoom-readout').textContent=(view==='scope'?6*zoom:zoom).toFixed(zoom<2?1:0)+'×';$('scope-alignment').classList.toggle('hidden',view!=='scope');$('bow-readout').classList.toggle('hidden',view!=='scope'||!active);const rel=((s.scopeAngle+540)%360)-180;$('bow-readout').textContent=`BOW ${deg(s.heading)}° · VIEW ${deg(scopeBearing(s))}° · ${Math.abs(rel).toFixed(0)}° ${rel<0?'PORT':'STARBOARD'}${s.scopeSteerBearing!==null?' · BOAT TURNING TO VIEW':''}`;$('gun-tools').classList.toggle('hidden',!gun);$('gun-trigger').disabled=!canIssue(s,context())||!active||s.gun.ammo<=0||s.systems.deckgun<=10;$('gun-sight-status').textContent=`${s.gun.ammo} ROUNDS · ELEV ${s.gun.elevation.toFixed(1)}°`;$('air-warning').classList.toggle('hidden',!['arming','airborne'].includes(s.airSupport.status));$('air-warning').textContent=s.airSupport.status==='arming'?`AIR SUPPORT PREPARING · ${Math.ceil(s.airSupport.launchAt-s.time)}s`:'AIRCRAFT AIRBORNE · DIVE TO BREAK VISUAL CONTACT';$('drone-photo').textContent=s.mission==='survey'?'SURVEY PHOTO':'PHOTO';
  $('drone-instruments').classList.toggle('hidden',!drone||!active);$('drone-instruments').innerHTML=`<b>ROV ${s.drone.mode.toUpperCase()}</b><span>CHARGE ${Math.round(s.drone.battery)}% · HULL ${Math.round(s.drone.hull)}%</span><span>LINK ${Math.round(separation(s,s.drone))} / 100 M</span><span>MOBILITY ${Math.round(s.drone.mobility)}% · BUOYANCY ${Math.round(s.drone.buoyancy)}%</span>`;
  const strike=s.lightning.at(-1);$('lightning-cue').classList.toggle('hidden',!strike||s.time-strike.time>5||!optical||!active);$('lightning-cue').textContent=strike?`LIGHTNING · ${deg(bearing(s,strike))}° · ${(distance(s,strike)/1000).toFixed(1)} KM${sound.on?' · THUNDER TRAVELING':' · ENABLE SOUND FOR THUNDER'}`:'';$('chart-tools').classList.toggle('hidden',view!=='chart');$('drone-tools').classList.toggle('hidden',view!=='drone');
- $('scope-toggle').innerHTML=(s.scope?'LOWER SCOPE':'RAISE SCOPE')+' <kbd>P</kbd>';
+ $('scope-toggle').innerHTML=(s.scope?'LOWER SCOPE':'RAISE SCOPE')+' <kbd>P</kbd>';$('scope-toggle').dataset.short=s.scope?'Lower':'Raise';
  $('view-hint').textContent=gun?'DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING':tower?'DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS':view==='scope'?(active?'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM':'NO OPTICAL SIGNAL'):view==='sonar'?'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL':view==='chart'?'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT':active?'CAMERA FIXED AHEAD · W/S SPEED · A/D HEADING':'NO DRONE SIGNAL';
  $('view-range').textContent=drone?(active?`HDG ${deg(v.heading)}° · ${v.speed.toFixed(1)} KN · ${v.depth.toFixed(0)} M`:''):view==='chart'?`ZOOM ${chart.zoom.toFixed(1)}×`:'VISIBILITY '+(env.opticalRange/1000).toFixed(1)+' KM';
- $('station-status').textContent=s.depth<=1?'SURFACED · EXPOSED':s.depth<=15?'PERISCOPE DEPTH':s.silent?'SILENT RUNNING':'SUBMERGED';
+ $('station-status').textContent=isSurfaced(s)?'SURFACED · EXPOSED':s.depth<=15?'PERISCOPE DEPTH':s.silent?'SILENT RUNNING':'SUBMERGED';
  $('sim-time').textContent='SKY '+new Date(Math.floor(env.hour*3600)*1000).toISOString().slice(11,16);
  $('weather').textContent=env.phase+' · '+env.weather+' · SEA '+env.seaState;
  $('viewport').dataset.weather=env.weatherId;$('viewport').dataset.dayPhase=env.phase;$('viewport').dataset.lightningActive=String(env.flash>.1);$('viewport').dataset.simSeconds=s.time.toFixed(2);
@@ -179,12 +197,15 @@ function updateUI(){
  $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
  $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>G</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
- $('contacts').innerHTML=s.contacts.length?s.contacts.map(c=>`<button class="contact-row ${selected===c.id?'active':''}" data-contact="${esc(c.id)}" aria-pressed="${selected===c.id}"><span class="contact-icon">${c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):'◌'}</span><span><strong>${esc(c.identified?c.name:c.label)}</strong><small>${c.identified?(c.military?'MILITARY':'NEUTRAL'):'UNCLASSIFIED'} · ${c.range?(c.range/1000).toFixed(1)+' KM':'RANGE ?'}</small></span><span class="contact-bearing">${deg(relativeBearing(c.bearing,s.heading))}° R</span></button>`).join(''):'<div class="empty-contacts">Listening to the dark.<br>Contacts appear as you hear them.</div>';
+ const contactModels=s.contacts.map(c=>{const e=estimateAt(c,s.time),range=c.range&&e?Math.hypot(e.x-s.x,e.y-s.y):0;return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):'UNCLASSIFIED')+' · '+(range?(range/1000).toFixed(1)+' KM':'RANGE ?'),bearing:deg(relativeBearing(c.bearing,s.heading))+'° R'};});
+ reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
+
  $('torp-count').textContent=String(s.torps).padStart(2,'0');$('tubes').innerHTML=Array.from({length:6},(_,i)=>`<i class="${i>=s.torps?'spent':''}"></i>`).join('');
- const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(target.bearing)}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options='<option value="">MANUAL AIM</option>'+s.contacts.filter(c=>c.identified&&c.age<10&&c.range&&c.kind!=='sub').map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${(c.range/1000).toFixed(1)} KM</option>`).join('')+visualAircraft().map(p=>`<option value="${esc(p.id)}">${esc(p.name)} · ${Math.round(p.altitude)} M ALT</option>`).join('');if($('gun-target').innerHTML!==options){$('gun-target').innerHTML=options;$('gun-target').value=choice;}if(!choice&&selected)$('gun-target').value=selected;$('torpedo-status').textContent=s.projectiles.map((p,i)=>`TORP ${i+1} · ${p.age<4?'ARMING':p.lock?'SONAR TRACK':'SEARCHING'} · ${deg(p.heading)}°`).join(' / ');$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent=drone?'STOP ROV':'ALL STOP';
+ const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(firingBearing(s,target))}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('torpedo-status').textContent=s.projectiles.map((p,i)=>`TORP ${i+1} · ${p.age<4?'ARMING':p.lock?'SONAR TRACK':'SEARCHING'} · ${deg(p.heading)}°`).join(' / ');$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='BOAT STOP';
  for(const id of ['battery','oxygen','fuel']){$(id+'-value').textContent=Math.round(s[id])+'%';$(id+'-bar').style.width=s[id]+'%';$(id+'-value').style.color=s[id]<20?'var(--red)':'';}
  $('alert-label').textContent=s.alert>60?'UNDER PURSUIT':s.alert>30?'POSSIBLE DETECTION':'UNDETECTED';$('alert-label').style.color=s.alert>30?'var(--red)':'var(--green)';$('alert-dot').style.background=s.alert>30?'var(--red)':'var(--green)';
  $('noise-value').textContent='SELF NOISE '+Math.round(s.noise)+' dB';$('clearance').textContent='KEEL CLEARANCE '+Math.round(getSoundings(s).belowKeel)+' m';$('damage-flash').style.opacity=s.shock?String(s.shock*.2):'0';$('cracks').classList.toggle('hidden',!(drone?active&&s.drone.camera<65:view==='scope'&&active&&s.hull<=30));
+ updateExtras(s,env,v);
  $('viewport').dataset.paused=String(paused);$('viewport').dataset.station=view;
  for(const {el,enabled} of commandControls)el.disabled=!canIssue(s,context())||!enabled();
  all('[data-key]').forEach(b=>{b.disabled=!canIssue(s,context())||(b.dataset.key==='KeyJ'?view!=='gun'||!active||s.gun.ammo<=0||s.systems.deckgun<=10:!pilotEnabled());if(b.disabled||!keys.has(b.dataset.key))b.classList.remove('held');});
@@ -192,7 +213,7 @@ function updateUI(){
 
 function canvasContext(id){const c=$(id),r=c.getBoundingClientRect(),d=Math.min(devicePixelRatio,2);if(c.width!==Math.round(r.width*d)||c.height!==Math.round(r.height*d)){c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);}const ctx=c.getContext('2d');ctx.setTransform(d,0,0,d,0,0);return{ctx,w:r.width,h:r.height};}
 function drawSonar(id,mini,time){
- const {ctx:c,w,h}=canvasContext(id);if(!w||!h)return;const cx=w/2,cy=mini?h*.49:h*.47,R=mini?Math.min(w*.35,h*.32):Math.min(w*.33,h*.33);
+ const {ctx:c,w,h}=canvasContext(id);if(!w||!h)return;const layout=sonarLayout(w,h,mini),{cx,cy,radius:R}=layout,shortLabels=w<600||h<420;
  if(state.systems.sonar<=25){c.fillStyle='#102321';c.fillRect(0,0,w,h);c.fillStyle='#db8075';c.font='14px IBM Plex Mono,monospace';c.textAlign='center';c.fillText('ARRAY DAMAGED',w/2,h/2);return;}
  c.fillStyle=mini?'#102321':'#0e1f21';c.fillRect(0,0,w,h);const glow=c.createRadialGradient(cx,cy,0,cx,cy,R);glow.addColorStop(0,'#1c3930');glow.addColorStop(1,'#102320');c.fillStyle=glow;c.beginPath();c.arc(cx,cy,R,0,Math.PI*2);c.fill();
  c.lineWidth=.7;c.strokeStyle='#547c6050';for(let i=1;i<=4;i++){c.beginPath();c.arc(cx,cy,R*i/4,0,Math.PI*2);c.stroke();}for(let a=0;a<360;a+=30){c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.sin(rad(a))*R,cy-Math.cos(rad(a))*R);c.stroke();}
@@ -209,16 +230,17 @@ function drawSonar(id,mini,time){
  }
  const occupied=[];
  for(const {q,x,y} of labels.sort((a,b)=>a.y-b.y)){
+  if(shortLabels){let lx=clamp(x+9,15,w-35),ly=clamp(y-8,65,h-20);if(occupied.some(p=>Math.abs(p.x-lx)<25&&Math.abs(p.y-ly)<14))ly+=14;occupied.push({x:lx,y:ly});c.fillStyle=q.id===selected?'#efd19a':'#c2cfa5';c.textAlign='left';c.font='11px IBM Plex Mono,monospace';c.fillText(q.label,lx,ly);continue;}
   let ly=clamp(y-8,108,h-150),lx=clamp(x+15,20,w-190);while(occupied.some(p=>Math.abs(p.x-lx)<180&&Math.abs(p.y-ly)<38))ly+=38;occupied.push({x:lx,y:ly});
   c.strokeStyle='#86a17c66';c.beginPath();c.moveTo(x+5,y);c.lineTo(lx-4,ly);c.stroke();c.textAlign='left';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#d4d6af';c.fillText(q.identified?q.name:q.label,lx,ly);c.font='12px IBM Plex Mono,monospace';c.fillStyle='#a2b69a';c.fillText(q.range?Math.round(q.confidence*100)+'% CONFIDENCE':'RANGE UNKNOWN',lx,ly+17);
  }
  c.fillStyle='#e2d19e';c.beginPath();c.moveTo(cx,cy-8);c.lineTo(cx-4,cy+5);c.lineTo(cx+4,cy+5);c.closePath();c.fill();
- if(!mini){const yy=h-82;c.strokeStyle='#46675b66';c.beginPath();c.moveTo(30,yy);c.lineTo(w-30,yy);c.stroke();c.fillStyle='#a0b49c';c.textAlign='left';c.font='12px IBM Plex Mono,monospace';c.fillText('HYDROPHONE ARRAY · RELATIVE BEARING',30,yy-12);c.beginPath();for(let x=30;x<w-30;x+=2){const noise=Math.sin(x*1.53+time*3)*Math.sin(x*.31+time*1.4)*3,signal=state.contacts.reduce((n,q)=>n+Math.exp(-(((x/w-relativeBearing(q.bearing,state.heading)/360)*80)**2))*13,0),y=yy+20+noise-signal;if(x===30)c.moveTo(x,y);else c.lineTo(x,y);}c.strokeStyle='#a5b678';c.stroke();}
+ if(layout.waveform){const yy=layout.waveY;c.strokeStyle='#46675b66';c.beginPath();c.moveTo(30,yy);c.lineTo(w-30,yy);c.stroke();c.fillStyle='#a0b49c';c.textAlign='left';c.font='12px IBM Plex Mono,monospace';c.fillText('HYDROPHONE ARRAY · RELATIVE BEARING',30,yy-12);c.beginPath();for(let x=30;x<w-30;x+=2){const noise=Math.sin(x*1.53+time*3)*Math.sin(x*.31+time*1.4)*3,signal=state.contacts.reduce((n,q)=>n+Math.exp(-(((x/w-relativeBearing(q.bearing,state.heading)/360)*80)**2))*13,0),y=yy+20+noise-signal;if(x===30)c.moveTo(x,y);else c.lineTo(x,y);}c.strokeStyle='#a5b678';c.stroke();}
 }
 function drawChart(){
  const {ctx:c,w,h}=canvasContext('tactical'),p=chartTransform(chart,w,h,state),{scale:k,cx,cy}=p,sx=x=>cx+x*k,sy=y=>cy-y*k;
  c.fillStyle='#142a2d';c.fillRect(0,0,w,h);
- const cell=clamp(200/chart.zoom,35,800),tl=chartWorldAt(chart,0,0,w,h,state),br=chartWorldAt(chart,w,h,w,h,state),startX=Math.floor(tl.x/cell)*cell,startY=Math.floor(br.y/cell)*cell,nx=Math.ceil((br.x-startX)/cell)+1,ny=Math.ceil((tl.y-startY)/cell)+1,depths=new Float32Array((nx+1)*(ny+1));
+ const cell=clamp(200/chart.zoom,2,800),tl=chartWorldAt(chart,0,0,w,h,state),br=chartWorldAt(chart,w,h,w,h,state),startX=Math.floor(tl.x/cell)*cell,startY=Math.floor(br.y/cell)*cell,nx=Math.ceil((br.x-startX)/cell)+1,ny=Math.ceil((tl.y-startY)/cell)+1,depths=new Float32Array((nx+1)*(ny+1));
  for(let ix=0;ix<=nx;ix++)for(let iy=0;iy<=ny;iy++)depths[ix*(ny+1)+iy]=bottom(startX+ix*cell,startY+iy*cell);
  const at=(x,y)=>depths[x*(ny+1)+y];
  for(let ix=0;ix<nx;ix++)for(let iy=0;iy<ny;iy++){const d=at(ix,iy);if(d<0)c.fillStyle='#536750';else if(d<60)c.fillStyle='#385957';else if(d<120)c.fillStyle='#264849';else if(d<180)c.fillStyle='#1b373b';else continue;c.fillRect(sx(startX+ix*cell),sy(startY+(iy+1)*cell),cell*k+1,cell*k+1);}
@@ -228,17 +250,19 @@ function drawChart(){
   for(let i=0;i<4;i++){const a=corners[i],b=corners[(i+1)%4];if((a.d<level)!==(b.d<level)){const t=(level-a.d)/(b.d-a.d);hits.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});}}
   if(hits.length>=2){c.moveTo(sx(hits[0].x),sy(hits[0].y));c.lineTo(sx(hits[1].x),sy(hits[1].y));}
  }c.stroke();}
- c.strokeStyle='#759a8133';c.lineWidth=.6;const grid=chart.zoom<.6?5000:1000;
+ c.strokeStyle='#759a8133';c.lineWidth=.6;const grid=chart.zoom<.6?5000:chart.zoom<6?1000:chart.zoom<24?250:chart.zoom<80?100:25;
  for(let x=Math.floor(tl.x/grid)*grid;x<br.x;x+=grid){c.beginPath();c.moveTo(sx(x),0);c.lineTo(sx(x),h);c.stroke();}for(let y=Math.floor(br.y/grid)*grid;y<tl.y;y+=grid){c.beginPath();c.moveTo(0,sy(y));c.lineTo(w,sy(y));c.stroke();}
  c.textAlign='center';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#b9c5a4';c.fillText('GREYBANK ISLAND',sx(-3800),sy(4000));c.fillStyle='#9ab29f';c.font='12px IBM Plex Mono,monospace';c.fillText('REEF · 65–110 M',sx(1900),sy(700));
  c.strokeStyle='#90bb9f';c.setLineDash([3,4]);c.beginPath();c.arc(sx(state.home.x),sy(state.home.y),400*k,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#bdd5af';c.font='14px IBM Plex Mono,monospace';c.fillText('EXTRACTION · SURFACE',sx(state.home.x),sy(state.home.y)+400*k+23);
  if(state.site){const site=state.site;c.strokeStyle='#e5c389';c.beginPath();c.arc(sx(site.x),sy(site.y),Math.max(7,75*k),0,Math.PI*2);c.stroke();c.fillStyle='#efcf98';c.font='14px IBM Plex Mono,monospace';c.textAlign='left';c.fillText(site.name,sx(site.x)+12,sy(site.y)-12);c.font='12px IBM Plex Mono,monospace';c.fillText('MISSION SITE · '+Math.round(site.depth)+' M',sx(site.x)+12,sy(site.y)+8);}
  if(['remote','return'].includes(state.drone.mode)){c.strokeStyle='#81dfcc';c.setLineDash([3,3]);c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.drone.x),sy(state.drone.y));c.stroke();c.setLineDash([]);c.fillStyle='#81dfcc';c.fillRect(sx(state.drone.x)-3,sy(state.drone.y)-3,6,6);}
- for(const q of state.contacts){c.strokeStyle=q.id===selected?'#d6bd86':'#acb997';c.globalAlpha=clamp(1-q.age/240,.2,.8);c.setLineDash([4,5]);if(q.range){const uncertainty=(1-q.confidence)*1500+100;c.beginPath();c.ellipse(sx(q.x),sy(q.y),uncertainty*k,uncertainty*k*.65,-rad(q.bearing),0,Math.PI*2);c.stroke();c.fillStyle='#d6d3a7';c.fillRect(sx(q.x)-2,sy(q.y)-2,4,4);c.textAlign='left';c.font='14px IBM Plex Mono,monospace';c.fillText((q.identified?q.name:q.label)+' ?',sx(q.x)+10,sy(q.y)-10);}else{c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.x+Math.sin(rad(q.bearing))*6500),sy(state.y+Math.cos(rad(q.bearing))*6500));c.stroke();}c.setLineDash([]);c.globalAlpha=1;}
+ for(const q of state.contacts){c.strokeStyle=q.id===selected?'#dfc99b':'#acb997';c.globalAlpha=clamp(1-q.age/900,.25,.9);c.setLineDash([4,5]);const e=estimateAt(q,state.time);if(q.range&&e){c.beginPath();c.ellipse(sx(e.x),sy(e.y),Math.min(30000,e.major)*k,Math.min(30000,e.minor)*k,rad(e.angle)-Math.PI/2,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#ded8af';c.fillRect(sx(e.x)-2,sy(e.y)-2,4,4);if(q.fix){c.beginPath();c.moveTo(sx(e.x),sy(e.y));c.lineTo(sx(e.x+q.fix.vx*60),sy(e.y+q.fix.vy*60));c.stroke();}c.textAlign='left';c.font='12px IBM Plex Mono,monospace';c.fillText(q.label+(q.identified?' · '+q.name:''),sx(e.x)+9,sy(e.y)-9);c.font='11px IBM Plex Mono,monospace';c.fillText(e.hasFix?Math.round(e.age)+' s OLD':'ESTIMATE',sx(e.x)+9,sy(e.y)+8);}else{c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.x+Math.sin(rad(q.bearing))*6500),sy(state.y+Math.cos(rad(q.bearing))*6500));c.stroke();}c.setLineDash([]);c.globalAlpha=1;}
+ drawReconArea(c,sx,sy,k);
+
  if(state.route){c.setLineDash([4,5]);c.strokeStyle='#d7bd82';c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.route.x),sy(state.route.y));c.stroke();c.setLineDash([]);c.beginPath();c.arc(sx(state.route.x),sy(state.route.y),6,0,Math.PI*2);c.stroke();}
  c.save();c.translate(sx(state.x),sy(state.y));c.rotate(rad(state.heading));c.fillStyle='#e5d3a4';c.beginPath();c.moveTo(0,-11);c.lineTo(6,8);c.lineTo(0,5);c.lineTo(-6,8);c.closePath();c.fill();c.restore();c.fillStyle='#ced9c1';c.textAlign='left';c.font='12px IBM Plex Mono,monospace';c.fillText('YOU · '+Math.round(state.depth)+' M',sx(state.x)+15,sy(state.y)+22);
  c.strokeStyle='#b3c6a6';c.beginPath();c.moveTo(w-55,95);c.lineTo(w-55,132);c.stroke();c.fillStyle='#b3c6a6';c.textAlign='center';c.font='14px IBM Plex Mono,monospace';c.fillText('N',w-55,87);c.fillText('▲',w-55,106);
- c.font='12px IBM Plex Mono,monospace';c.textAlign='right';c.fillText((grid/1000)+' KM GRID',w-25,h-116);
+ c.font='12px IBM Plex Mono,monospace';c.textAlign='right';c.fillText((grid<1000?grid+' M':(grid/1000)+' KM')+' GRID',w-25,h-116);
 }
 
 function drawScope(){
@@ -251,7 +275,7 @@ function drawScope(){
  for(const q of focused){const d=delta(q.bearing,look);const x=clamp(cx+Math.tan(rad(d))/Math.tan(rad(19/zoom))*cx,105,w-105);c.fillStyle='#d8d9b5';c.font='14px IBM Plex Mono,monospace';c.fillText(q.name.toUpperCase(),x,h*.56);c.fillStyle='#bdc7b0';c.font='12px IBM Plex Mono,monospace';c.fillText((q.range/1000).toFixed(1)+' KM · '+(q.military?'MILITARY':'NEUTRAL'),x,h*.56+19);}
 }
 function drawGun(){const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);const x=w/2,y=h/2;c.strokeStyle='#e3d4ab';c.lineWidth=1;c.beginPath();c.arc(x,y,11,0,Math.PI*2);c.moveTo(x-50,y);c.lineTo(x-15,y);c.moveTo(x+15,y);c.lineTo(x+50,y);c.moveTo(x,y-35);c.lineTo(x,y-15);c.moveTo(x,y+15);c.lineTo(x,y+35);c.stroke();}
-function showResult(){if(resultShown)return;resultShown=true;persist();const win=state.status==='won';$('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';$('result-body').textContent=win?(state.operation?(state.mission==='survey'?state.operation.find:`${state.operation.rescued} survivors brought home. ${state.operation.dead} lost before recovery. The rescue crew is safely aboard.`):'The intelligence is aboard. The crew is safe. Somewhere out there, the convoy sails on.'):state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.':'Your boat could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';$('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span>`;$('result-dialog').showModal();}
+function showResult(){if(resultShown)return;resultShown=true;if(state.status==='lost'){lossStartedAt=performance.now();document.body.classList.add('loss');$('loss-layer').classList.remove('hidden');sound.loss(state);}persist();const win=state.status==='won';$('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';$('result-body').textContent=win?(state.operation?(state.mission==='survey'?state.operation.find:`${state.operation.rescued} survivors brought home. ${state.operation.dead} lost before recovery. The rescue crew is safely aboard.`):'The intelligence is aboard. The crew is safe. Somewhere out there, the convoy sails on.'):state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.':'Your boat could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';$('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span>`;$('result-dialog').showModal();}
 function frame(now){
  const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
  if(canIssue(state,ctx)){
@@ -268,7 +292,83 @@ function frame(now){
  if(String(feedActive(state,view))!==$('world').dataset.online)updateUI();
  const r=vp.getBoundingClientRect();
  if(scene&&feedActive(state,view)){scene.resize(r.width,r.height);scene.render(state,view,zoom,renderClock);}
- if(view==='scope'&&feedActive(state,'scope'))drawScope();if(view==='gun'&&feedActive(state,'gun'))drawGun();if(view==='sonar')drawSonar('tactical',false,renderClock);if(view==='chart')drawChart();drawSonar('mini-sonar',true,renderClock);
+ if(view==='scope'&&feedActive(state,'scope'))drawScope();if(view==='gun'&&feedActive(state,'gun'))drawGun();if(view==='sonar')drawSonar('tactical',false,renderClock);if(view==='chart')drawChart();drawSonar('mini-sonar',true,renderClock);captureEvidence();
  if(now-lastUI>100){updateUI();sound.update();lastUI=now;}if(now-lastSave>8000&&!ctx.modal&&!paused){persist();lastSave=now;}requestAnimationFrame(frame);
 }
+function openDrawer(next){drawer=next;document.body.dataset.drawer=next;$('drawer-backdrop').classList.remove('hidden');all('[data-panel]').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.panel===next)));}
+function renderSound(){
+ const on=sound.on;$('sound').innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 4 5 9H2v6h3l6 5Z"/>${on?'<path d="M15 8a6 6 0 0 1 0 8m3-12a11 11 0 0 1 0 16"/>':'<path d="m16 9 6 6m0-6-6 6"/>'}</svg><span>${on?'ON':'OFF'}</span>`;$('sound').setAttribute('aria-label',on?'Disable sound':'Enable sound');$('sound').setAttribute('aria-pressed',String(on));
+}
+function launchSelected(){
+ const target=state.contacts.find(c=>c.id===selected);if(!target)return;
+ if(state.depth>100){toast('Rise to 100 m or less to fire.');return;}if(target.identified&&!target.military){toast('Identified neutral. Firing is withheld.');return;}
+ if(fire(state,selected)){sound.tone('fire');setRate(1);toast('Torpedo running. Its own sonar will arm and acquire a return.');closeDrawer();}
+}
+function changeZoom(factor){if(!canIssue(state,context())||!feedActive(state,view))return;zoom=clamp(zoom*factor,1,opticalZoomLimit(view));zooms[view]=zoom;updateUI();}
+function responsiveTools(){
+ const compact=matchMedia('(max-width:1100px)').matches,host=compact?$('station-actions'):$('viewport');
+ for(const id of ['scope-tools','scope-alignment','chart-tools','drone-tools','gun-tools','zoom-tools'])if($(id).parentElement!==host)host.appendChild($(id));
+}
+function openOrder(axis){
+ if(!['heading','depth','speed'].includes(axis))return;closeDrawer();orderAxis=axis;const v=helmFor(state,view),range=$(axis);
+ $('order-title').textContent=(view==='drone'?'ROV ':'BOAT ')+axis.toUpperCase()+' ORDER';for(const id of ['order-number','order-slider']){const input=$(id);input.min=range.min;input.max=range.max;input.step=range.step;input.value=v['target'+axis[0].toUpperCase()+axis.slice(1)];}
+ $('order-sheet').classList.remove('hidden');updateUI();
+}
+function beginReconArea(){
+ if(!canIssue(state,context()))return;closeDrawer();setView('chart');if(!['idle','complete','failed'].includes(state.recon.phase)){reconPlacement=false;openDrawer('recon');updateUI();return;}reconPlacement=true;chart.zoom=Math.min(chart.zoom,1);toast('Tap the chart to center a 10 km reconnaissance square. Drag still pans.');updateUI();
+}
+function initializeExtras(){
+ renderSound();responsiveTools();window.addEventListener('resize',()=>{held.clear();drag=null;responsiveTools();updateUI();});
+ all('[data-close-drawer]').forEach(b=>b.onclick=closeDrawer);all('[data-order]').forEach(b=>b.onclick=()=>openOrder(b.dataset.order));$('close-order').onclick=()=>{orderAxis=null;$('order-sheet').classList.add('hidden');};
+ for(const id of ['order-number','order-slider'])bindCommand(id,'input',e=>{if(orderAxis)order(orderAxis,Number(e.target.value));},pilotEnabled);
+ bindCommand('mobile-speed','input',e=>order('speed',Number(e.target.value)),pilotEnabled);
+ bindCommand('mobile-ping','click',doPing,()=>state.pingCooldown===0&&state.systems.sonar>25);
+ bindCommand('mobile-decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker away. Turn and go quiet.');}},()=>state.decoys>0);
+ bindCommand('mobile-repair','click',()=>{state.repair=120;toast('Damage control assigned.');});
+ bindCommand('monitor-recall','click',()=>recallDrone(state),()=>state.drone.mode==='remote');$('monitor-boat').onclick=()=>setView('chart');
+ bindCommand('zoom-in','click',()=>changeZoom(1.3),()=>feedActive(state,view)&&zoom<opticalZoomLimit(view));bindCommand('zoom-out','click',()=>changeZoom(1/1.3),()=>feedActive(state,view)&&zoom>1);$('zoom-readout').onclick=()=>changeZoom(1);
+ bindCommand('recon-place','click',beginReconArea);$('show-recon-chart').onclick=()=>{closeDrawer();setView('chart');if(!chart.reconArea&&!state.recon.area)beginReconArea();};
+ bindCommand('request-recon','click',()=>{if(requestRecon(state,chart.reconArea)){setRate(1);toast('Recon task queued. Radio uplink needs 15 m or less; reception holds below 30 m.');persist();}},()=>!!chart.reconArea&&reconStatus(state).canRequest);
+ $('close-photo').onclick=()=>$('photo-dialog').close();$('photo-gallery').onclick=e=>{const button=e.target.closest('[data-photo]');if(!button)return;const photo=photoArchive(state).find(p=>String(p.id)===button.dataset.photo);if(!photo)return;$('photo-full').src=photo.image;$('photo-title').textContent=photo.caption;$('photo-meta').textContent=photoMetadata(photo);$('photo-dialog').showModal();updateUI();sound.update();};
+ for(let i=0;i<36;i++){const bubble=document.createElement('i');bubble.style.setProperty('--x',((i*61.803)%100)+'%');bubble.style.setProperty('--size',(7+i%8*4)+'px');bubble.style.setProperty('--duration',(5+i%7*.7)+'s');bubble.style.setProperty('--delay',(-i%13*.47)+'s');$('loss-bubbles').appendChild(bubble);}
+}
+function photoMetadata(p){const time=Math.floor(p.takenAt/60)+'m '+Math.floor(p.takenAt%60)+'s';return(p.source==='scope'?'PERISCOPE':p.source==='drone'?'ROV CAMERA':'ORBITAL RECON')+' · CAPTURE '+time+(Number.isFinite(p.receivedAt)?' · RECEIVED '+Math.floor(p.receivedAt/60)+'m '+Math.floor(p.receivedAt%60)+'s':'')+(p.source==='satellite'?' · '+Math.round(p.coverage*100)+'% COVERAGE'+(p.night?' · LIGHTS ONLY':''):' · '+deg(p.bearing||0)+'° · '+Math.round(p.depth||0)+' m');}
+function updateGallery(){
+ const archive=photoArchive(state),key=archive.map(p=>p.id).join(',');if(key===photoKey)return;photoKey=key;
+ reconcileKeyedChildren($('photo-gallery'),[...archive].reverse(),p=>p.id,()=>{const button=document.createElement('button');button.className='photo-card';button.appendChild(document.createElement('img'));button.appendChild(document.createElement('strong'));button.appendChild(document.createElement('small'));return button;},(button,p)=>{button.dataset.photo=p.id;button.children[0].src=p.image;button.children[0].alt=p.caption;button.children[0].loading='lazy';button.children[1].textContent=p.caption;button.children[2].textContent=photoMetadata(p);});
+}
+function updateExtras(s,env,v){
+ document.body.dataset.station=view;$('pause').dataset.short=paused?'Resume':'Pause';
+ const compact=matchMedia('(max-width:1100px)').matches,ds=droneStatus(s),rov=view==='drone',below=getSoundings(s,rov&&feedActive(s,'drone')).belowKeel;
+ $('sonar-tools').classList.toggle('hidden',!compact||view!=='sonar');$('mobile-ping').textContent=s.pingCooldown>0?'PING · '+Math.ceil(s.pingCooldown)+' s':'ACTIVE PING';
+ $('mobile-boat-resources').textContent=`FUEL ${Math.round(s.fuel)}% · BATTERY ${Math.round(s.battery)}% · OXYGEN ${Math.round(s.oxygen)}%`;
+ const warn=(value,limit)=>value<limit?'danger':'';
+ $('mobile-vitals').innerHTML=rov?`<span>ROV <b class="${warn(s.drone.battery,15)}">${Math.round(s.drone.battery)}%</b></span><span>Hull <b>${Math.round(s.drone.hull)}</b></span><span>Link <b>${Math.round(ds.distance)}/100m</b></span><span class="${warn(below,10)}">Bottom ${Math.round(below)}m</span>`:`<span>H <b class="${warn(s.hull,45)}">${Math.round(s.hull)}</b></span><span>Bat <b class="${warn(s.battery,20)}">${Math.round(s.battery)}</b></span><span>O₂ <b class="${warn(s.oxygen,20)}">${Math.round(s.oxygen)}</b></span><span class="${warn(below,10)}">Keel ${Math.round(below)}m</span><b class="${s.alert>40?'danger':''}">${s.alert>60?'HUNTED':s.alert>30?'CAUTION':'QUIET'}</b>`;
+ $('drone-monitor').classList.toggle('hidden',!ds.deployed||compact&&rov&&s.drone.mode==='remote'&&!ds.warning);$('drone-monitor').classList.toggle('danger',ds.outrunning);$('drone-monitor').classList.toggle('caution',!!ds.warning&&!ds.outrunning);
+ $('drone-monitor-text').textContent=ds.warning||`ROV ${s.drone.mode==='return'?'RETURNING':'DEPLOYED'} · ${Math.round(ds.distance)} / 100 m · ${Math.round(s.drone.battery)}% CHARGE`;
+ const fields={heading:[$('mobile-heading-actual'),$('mobile-heading-requested')],depth:[$('mobile-depth-actual'),$('mobile-depth-requested')],speed:[$('mobile-speed-actual'),$('mobile-speed-requested')]};for(const [axis,elements] of Object.entries(fields)){const cap=axis[0].toUpperCase()+axis.slice(1),unit=axis==='heading'?'°':axis==='depth'?' m':' kn',format=n=>axis==='heading'?deg(n):axis==='depth'?Math.round(n):n.toFixed(1);elements[0].textContent=format(v[axis])+unit;elements[1].textContent='REQ '+format(v['target'+cap])+unit;}
+ const ms=$('mobile-speed');ms.min=rov?-3:-4;ms.max=rov?10:17;ms.value=v.targetSpeed;ms.dataset.actual=v.speed;ms.dataset.requested=v.targetSpeed;ms.setAttribute('aria-valuetext',`Actual ${v.speed.toFixed(1)}; requested ${v.targetSpeed.toFixed(1)} knots`);$('mobile-speed-track').querySelector('.mobile-speed-rail').style.setProperty('--actual',clamp((v.speed-Number(ms.min))/(Number(ms.max)-Number(ms.min))*100,0,100)+'%');
+ if(orderAxis){const cap=orderAxis[0].toUpperCase()+orderAxis.slice(1),requested=v['target'+cap];for(const id of ['order-number','order-slider'])if(document.activeElement!==$(id))$(id).value=requested;$('order-actual').textContent='ACTUAL '+v[orderAxis].toFixed(1)+' · REQUESTED '+requested.toFixed(1);}
+ const rs=reconStatus(s);$('recon-title').textContent=rs.title.toUpperCase();$('recon-detail').textContent=rs.detail+(reconPlacement?' Tap the chart to place the square.':!chart.reconArea?' Select a search square first.':'')+(rs.cooldownRemaining>0&&['complete','idle'].includes(rs.phase)?' Next task in '+Math.ceil(rs.cooldownRemaining)+' s.':'');$('recon-link').textContent=rs.linkLabel+(rs.phase==='idle'?'':' · '+Math.round(rs.progress*100)+'%');$('recon-progress').style.width=rs.progress*100+'%';$('recon-progress').parentElement.setAttribute('aria-valuenow',String(Math.round(rs.progress*100)));$('recon-panel').classList.toggle('loading',!['idle','complete','failed'].includes(rs.phase));$('recon-panel').dataset.phase=rs.phase;
+ $('photo-gallery').classList.toggle('hidden',view!=='photos'||!photoArchive(s).length);$('photo-empty').classList.toggle('hidden',view!=='photos'||!!photoArchive(s).length);updateGallery();
+ if(view==='tower')$('view-subtitle').textContent=feedActive(s,'tower')?'BINOCULARS · '+zoom.toFixed(1)+'× · DRAG TO LOOK AROUND':'SURFACE TO GO TOPSIDE';
+ if(view==='photos'){$('view-message').classList.add('hidden');$('scope-overlay').style.display='none';}
+ if(s.status==='lost'){const e=lossPresentation(s,(performance.now()-lossStartedAt)/1000,view);$('loss-layer').classList.toggle('hidden',!e.active);}
+}
+function drawReconArea(c,sx,sy,k){
+ const area=reconAreaForDisplay(state.recon,chart.reconArea);if(!area){if(reconPlacement){c.fillStyle='#e4cd9c';c.font='13px IBM Plex Mono,monospace';c.textAlign='left';c.fillText('TAP TO PLACE 10 KM RECON SQUARE',12,78);}return;}
+ const rs=reconStatus(state),active=!['idle','complete','failed'].includes(rs.phase);c.save();c.setLineDash(active?[9,5]:[5,7]);c.strokeStyle=rs.phase==='complete'?'#9ccea2':'#e2be7e';c.lineWidth=1.5;c.strokeRect(sx(area.x-area.size/2),sy(area.y+area.size/2),area.size*k,area.size*k);c.setLineDash([]);c.fillStyle='#d4cb9d';c.font='12px IBM Plex Mono,monospace';c.textAlign='left';c.fillText('RECON · '+(reconPlacement?'TAP TO MOVE':rs.phase.toUpperCase())+(active?' '+Math.round(rs.progress*100)+'%':''),12,78);if(active){c.beginPath();c.arc(20,96,5,state.time*3,state.time*3+Math.PI*1.4);c.stroke();}c.restore();
+}
+let reconCaptureAttempt=0;
+function expose(p){
+ try{if(!scene)throw new Error('Camera unavailable');const r=vp.getBoundingClientRect();scene.resize(r.width,r.height);scene.render(state,p.source,zoom,state.time);const photo=recordExposure(state,p,()=>captureOptics(scene));if(photo){persist();photoKey='';toast('Photograph archived in Photos.');}else toast('Camera image unavailable. Exposure was not archived.');}catch(error){console.warn('Camera capture unavailable',error);toast('Camera capture failed. Try another exposure.');}
+}
+function captureEvidence(){
+ const r=state.recon;if(!scene||r.phase!=='complete'||!r.packet||state.reconArchivedSequence>=r.sequence||performance.now()<reconCaptureAttempt)return;
+ const existing=photoArchive(state).some(p=>p.reconId===r.packet.id&&p.seed===state.patrol.seed&&p.takenAt===r.packet.capturedAt);if(existing){state.reconArchivedSequence=r.sequence;return;}
+ reconCaptureAttempt=performance.now()+5000;
+ try{const image=captureSatellite(scene,state,r.packet);if(image){recordPhoto(state,{source:'satellite',image,takenAt:r.packet.capturedAt,receivedAt:r.packet.receivedAt,caption:'CLASSIFIED · '+(r.packet.night?'Night lights':'Surface reconnaissance'),night:r.packet.night,coverage:r.packet.coverage,area:r.packet.area,reconId:r.packet.id,seed:state.patrol.seed,mission:state.mission});state.reconArchivedSequence=r.sequence;persist();photoKey='';toast('Reconnaissance image archived in Photos.');}}catch(error){console.warn('Reconnaissance camera unavailable',error);toast('Image rendering unavailable. The timestamped contact report is still on the chart.');}
+}
+
+initializeExtras();
 setView(scene?'scope':'sonar');updateUI();if(saved)$('resume').classList.remove('hidden');$('briefing').showModal();requestAnimationFrame(frame);

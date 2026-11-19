@@ -49,7 +49,7 @@ test('flooding exceeding pumps adds water, reduces buoyancy and can sink the boa
  const s=createGame();s.ships=[];s.speed=s.targetSpeed=0;s.depth=s.targetDepth=90;s.flood=20;for(let t=0;t<5&&s.status==='patrol';t++)step(s,60);assert.equal(s.status,'lost');assert.ok(s.water>12);assert.ok(s.events.some(e=>e.text.includes('FLOODING ALARM')));
 });
 test('periscope loss is permanent; tower blanks as soon as the boat dives',()=>{
- const s=createGame();damageSystem(s,'periscope',100);assert.equal(s.scope,false);assert.equal(feedActive(s,'scope'),false);s.depth=0;assert.equal(feedActive(s,'tower'),true);s.depth=1;assert.equal(feedActive(s,'tower'),false);s.repair=120;step(s,30);assert.equal(s.systems.periscope,0);
+ const s=createGame();damageSystem(s,'periscope',100);assert.equal(s.scope,false);assert.equal(feedActive(s,'scope'),false);s.depth=0;assert.equal(feedActive(s,'tower'),true);s.depth=1.001;assert.equal(feedActive(s,'tower'),false);s.repair=120;step(s,30);assert.equal(s.systems.periscope,0);
 });
 test('a surface hull collision damages the boat and shears its mast',()=>{
  const s=createGame();s.depth=s.targetDepth=12;s.speed=s.targetSpeed=0;s.ships=[{...s.ships[2],x:s.x,y:s.y,heading:0,speed:15,alert:100}];step(s,.25);assert.ok(s.hull<100);assert.equal(s.systems.periscope,0);

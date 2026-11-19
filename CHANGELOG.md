@@ -1,5 +1,19 @@
 # Changes
 
+## 0.6.0
+
+- Replace the phone layout with a fixed helm, vertical speed slider, compact status, exact-order sheets and station actions below the scene. Keep a visible Sound OFF/ON label, resource access and touch sonar ping.
+- Preserve contact buttons and gun target options across telemetry updates, fixing missed selections. Assign stable contact codes and share surfaced eligibility across gun and tower/status views.
+- Clear casualty scenery between mission types, fixing a renderer exception that froze a patrol started after rescue or survey.
+- Route ROV recall through a deterministic hull-clearance path, including a surfaced moving boat, without bypassing collisions. Attach and animate its cable and show global deployment, range and condition-aware outrun warnings.
+- Replace pitched flower-like blades with compact gray helical screw geometry and refine period-inspired stern planes and rudders.
+- Increase chart zoom to 128×, scope magnification to 24× and binoculars to 12×. Add sea-driven optical sway and keep sonar labels readable in short viewports.
+- Add screen cracks, a red wash, rising bubbles and mute-respecting implosion audio on loss.
+- Add the approved fictional 1972 classified orbital prototype: 10 km chart tasking, overpass warmup, two exposures, weather/night limits, depth-limited staged transmission and a long cooldown.
+- Keep timestamped surface fixes, measured velocity, growing uncertainty and firing bearings independent of the live target position. Freeze camera pixels at the shutter even when immediately switching stations. Archive bounded real scene photographs and frozen monochrome recon plates across patrols/reloads.
+
+Validation: the canonical Nix gate passes 179 tests, syntax checks and the static build. Regression tests were observed failing before their fixes. Independent vehicle acceptance covers 96 recovery scenarios. Browser evidence and device/audio limitations are recorded in PLAN.md.
+
 ## 0.5.0
 
 - Set patrols in 1972, with a researched tapered hull, compact dark propeller, sail planes and period-style cabled television ROV. Retain fictional DU explosive gun ammunition by design.
