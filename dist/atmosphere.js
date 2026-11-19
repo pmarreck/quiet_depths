@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {hash01} from './environment.js';
+import {chargeAltitude} from './combat.js';
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const skyFragment=`
 varying vec3 vPos;uniform float time;uniform float daylight;uniform float cloud;uniform float twilight;uniform float flash;uniform vec3 sunDir;uniform sampler2D cloudNoise;
@@ -46,7 +47,7 @@ export class Atmosphere{
   this.blastLight.intensity=0;let flash=0;const liveCharges=new Set();
   this.shellVisuals.forEach((group,i)=>{const p=s.shells[i];group.visible=!!p;if(!p)return;const f=clamp(1-p.delay/p.total,0,1);group.position.set(p.fromX+(p.x-p.fromX)*f,12*(1-f)+Math.sin(f*Math.PI)*80,-p.fromY-(p.y-p.fromY)*f);group.userData.shell.visible=p.delay>0;group.userData.splash.visible=p.delay<=0;if(p.delay<=0){const age=-p.delay;group.position.y=2;group.userData.splash.scale.set(1+age*.9,1+age*.6,1+age*.9);group.userData.splash.material.opacity=Math.max(0,.7*(1-age/3));}});
   for(const charge of s.blasts){liveCharges.add(charge.id);let group=this.charges.get(charge.id);if(!group){group=new T.Group();const can=new T.Mesh(new T.CylinderGeometry(.55,.55,1.6,10),new T.MeshStandardMaterial({color:0x58625b,roughness:.7}));group.add(can);const bubble=new T.Mesh(new T.SphereGeometry(1,18,12),new T.MeshBasicMaterial({color:0xa5cddd,transparent:true,opacity:.5,wireframe:true}));group.add(bubble);group.userData.can=can;group.userData.bubble=bubble;this.charges.set(charge.id,group);this.scene.add(group);}
-   const depth=charge.exploded?charge.depth:charge.depth*(1-clamp(charge.delay/charge.totalDelay,0,1));group.position.set(charge.x,-depth,-charge.y);const d=group.position.distanceTo(camera.position);group.visible=underwater&&d<500;group.userData.can.visible=!charge.exploded;group.userData.bubble.visible=charge.exploded;
+   const altitude=chargeAltitude(charge);group.position.set(charge.x,altitude,-charge.y);const d=group.position.distanceTo(camera.position);group.visible=(underwater?altitude<=1:altitude>=-2)&&d<(underwater?500:3000);group.userData.can.visible=!charge.exploded;group.userData.bubble.visible=charge.exploded;
    if(charge.exploded){group.userData.bubble.scale.setScalar(2+charge.age*13);group.userData.bubble.material.opacity=Math.max(0,.65*(1-charge.age/5));const strength=Math.exp(-charge.age*8)/(1+d/120);if(strength>flash){flash=strength;this.blastLight.position.copy(group.position);this.blastLight.intensity=4000*strength;}}
   }
   for(const [id,group] of this.charges)if(!liveCharges.has(id)){this.remove(group);this.charges.delete(id);}

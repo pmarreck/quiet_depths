@@ -65,3 +65,26 @@ Earlier deferred design choices, some addressed below: campaign progression, var
 Rules evidence: automated rescue runs use normal waypoint, heading, speed and depth controls, then complete only after assessment, survivor transfer and rescue-team recovery. Conservation checks cover both rescue types across 16 seeds each, including empty casualties. Capsule distances are compared against Three.js nearest-segment geometry across headings and pitches. No subjective audio audition is included in this update’s final browser checks; those sessions stay muted.
 
 Final browser evidence: a rescue returned 13 survivors, and a separate empty casualty completed assessment and team recovery. A paused drone snapshot shows 3 aboard / 5 awaiting transfer, a diver swimming beside the wreck, seabed life and a fish in the live rendered scene. The drone operated at 104 m with an 18 m link and onboard condition readouts. A storm snapshot shows an actual lightning channel from the conning tower; three delayed thunder receipts accumulated with Sound OFF. Daylight tower inspection showed the hull below the bridge, and requesting a dive blanked the feed with the surface-only message. No browser errors or warnings were logged in these checks. The final Nix gate passes 74 checks and builds the complete static output. Difficulty, subjective sound quality and historical calibration remain playtesting work.
+
+## 1972 combat, replay and public release
+
+- [x] Write failing patrol/model tests and independent combat acceptance tests before implementation.
+- [x] Research period hull, cabled television ROV and attack aircraft; retain the explicitly fictional DU ammunition exception.
+- [x] Add a compact hull-colored propeller and a tapered hull with sail planes.
+- [x] Randomize all six mission types and preserve seed/requirements through saves.
+- [x] Add periscope bow reference, center-on-bow and turn-to-view orders.
+- [x] Carry torpedoes in every mission and add independent acoustic steering, depth tracking and surface wakes.
+- [x] Add finite deck-gun rounds, swept projectile hits, tracers, waterline flooding and aircraft targets.
+- [x] Add island air-support preparation, runway takeoff, physical travel, last-report search, strafing and delayed ordnance.
+- [x] Add aircraft engine attenuation and falling-bomb rendering; derive cavitation from the actual propeller radius.
+- [x] Add mobile drawers, chart zoom buttons and shared held touch/keyboard input with cancellation.
+- [x] Pass the canonical Nix build with 98 tests and JavaScript syntax checks.
+- [x] Verify gun gating/ammunition, revised hull, touch layout and air-support warning in the browser; verify aircraft travel/combat through independent rule checks.
+- [ ] Publish the exact tested source to the public repository and Nix-gated GitHub Pages.
+- [ ] Update the private staging Site and package a portable source/build archive.
+
+TDD evidence: the first combat/patrol gate failed before the combat, hull-design and held-input modules existed. Independent combat tests cover swept aim/elevation, flooding, seeker choices, aircraft launch/travel, deep quiet evasion, damage and save continuity. Three later regressions failed before the aircraft sound, bomb altitude and shared propeller-radius corrections. The original geometry, rescue, environment, pause and save checks remain required.
+
+Browser checks so far: at 393 x 852, the interface has no horizontal overflow and six 44-pixel touch helm targets. Holding Faster changes requested speed while actual speed follows; releasing stops the held state. Pausing clears held inputs and disables all touch orders. Dragging the scope changes its relative bearing; Turn Boat to View changes the requested heading while preserving the sight bearing as the boat turns. Selecting the identified military contact and launching reduced stock from six to five; the status progressed to SONAR TRACK. The aircraft warning counted down rather than spawning an attacker on detection. Audio stayed OFF and no audio context opened. Hardware iPhone/Safari and subjective audio quality remain unverified.
+
+Final local QA: the ROV viewed the tapered hull, sail planes and compact matching propeller at a 46 m link. Its inspection light was increased after the first view was too dark. Surface gun input reduced ammunition from 240 to 237, while a submerged gun view was blank and inert. The final mobile pass confirmed 14 px touch-button text, 44 px targets, 12 px secondary readouts, a working collapsible ALIGN menu, drawer dismissal and no horizontal overflow. Only the focused silhouette receives a scope label. A browser-discovered missing menu element was reproduced by a new mechanically discovered HTML/control check, which failed before correction. The final gate passes 98 tests. The current browser document has no error/warning logs after that fix; earlier error logs are retained in the browser session history. No claim is made of an on-device Safari test, subjective audio audition, or a visually observed complete aircraft attack pass in this QA session.

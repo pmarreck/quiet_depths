@@ -34,6 +34,10 @@ export function engineSound(ship,listener){
  const gain=ship.hull<=0||distance>limit?0:base*(.2+speed/9)/(1+(distance/scale)**(under?1.25:1.6));
  return{distance,gain:Math.min(.36,gain),pan:spatialPan(ship,listener),cutoff:Math.max(110,1800/(1+distance/1000+(listener.depth||0)/180)),frequency:(ship.kind==='escort'?47:ship.kind==='fishing'?68:ship.kind==='sub'?25:34)+speed*2.2,bladeRate:1.4+speed*.28};
 }
+export function aircraftSound(plane,listener){
+ const depth=Math.max(0,listener.depth||0),under=depth>1,distance=Math.hypot(plane.x-listener.x,plane.y-listener.y,(plane.altitude||0)+depth);
+ return{distance,gain:plane.hull<=0||distance>6000?0:.28/(1+(distance/500)**1.5)*(under?.35*Math.exp(-depth/90):1),pan:spatialPan(plane,listener),cutoff:under?Math.max(90,700/(1+depth/25)):2200,frequency:68+(plane.speed||0)*.35,bladeRate:12};
+}
 export function emitSound(s,data){
  const source={id:s.soundSequence++,time:s.time,power:1,heard:false,...data};s.acoustics.push(source);return source;
 }

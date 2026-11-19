@@ -11,7 +11,7 @@ export const WEATHER=Object.freeze({
 export const TIMES=Object.freeze({dawn:{name:'Dawn',hour:6},day:{name:'Day',hour:12},dusk:{name:'Dusk',hour:18},night:{name:'Night',hour:22}});
 export function hash01(seed,n=0){let x=(seed+Math.imul(n+1,0x9e3779b9))|0;x=Math.imul(x^(x>>>16),0x21f0aaad);x=Math.imul(x^(x>>>15),0x735a2d97);return((x^(x>>>15))>>>0)/4294967296;}
 export function makeEnvironment(seed=19830604,options={}){
- return{startHour:TIMES[options.timeOfDay]?.hour??18,startWeather:WEATHER[options.weather]?options.weather:'clear',changing:options.changing!==false,seed:seed>>>0};
+ return{startHour:options.timeOfDay==='random'?Object.values(TIMES)[Math.floor(hash01(seed,750)*4)].hour:TIMES[options.timeOfDay]?.hour??18,startWeather:options.weather==='random'?Object.keys(WEATHER)[Math.floor(hash01(seed,751)*4)]:WEATHER[options.weather]?options.weather:'clear',changing:options.changing!==false,seed:seed>>>0};
 }
 export function environmentAt(s){
  const cfg=s.environment||makeEnvironment(),time=s.time||0,ids=Object.keys(WEATHER),slot=Math.floor(time/300);

@@ -1,7 +1,7 @@
 import {clamp,rad,bearing,delta,distance,separation,rand,log,bottom,capsuleContact,propellerState} from './mechanics.js';
 import {propagationTime,emitSound} from './acoustics.js';
 export const DRONE_LIMITS=Object.freeze({deploySpeed:3,depth:280,range:100,speed:10,returnSpeed:10});
-export const SYSTEM_NAMES=Object.freeze({engine:'ENGINE',propeller:'PROPELLER',oxygen:'AIR / SCRUBBERS',ballast:'BALLAST',planes:'DIVE PLANES',rudder:'RUDDER',sonar:'SONAR',periscope:'PERISCOPE',crew:'REPAIR CREW'});
+export const SYSTEM_NAMES=Object.freeze({engine:'ENGINE',propeller:'PROPELLER',oxygen:'AIR / SCRUBBERS',ballast:'BALLAST',planes:'DIVE PLANES',rudder:'RUDDER',sonar:'SONAR',periscope:'PERISCOPE',deckgun:'DECK GUN',crew:'REPAIR CREW'});
 export const freshSystems=()=>Object.fromEntries(Object.keys(SYSTEM_NAMES).map(k=>[k,100]));
 export const freshMotion=()=>({verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
 export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:''});
@@ -30,7 +30,7 @@ export function damageSystem(s,key,amount){
 export function hurt(s,amount,text,subsystem=null){
  if(amount<=0||s.status!=='patrol')return;
  s.hull=clamp(s.hull-amount,0,100);s.flood=clamp(s.flood+amount*.11,0,25);s.shock=2;log(s,text,'damage');
- const keys=['engine','propeller','oxygen','ballast','planes','rudder','sonar','crew'];
+ const keys=['engine','propeller','oxygen','ballast','planes','rudder','sonar','deckgun','crew'];
  if(amount>=2||subsystem)damageSystem(s,subsystem||keys[Math.floor(rand(s)*keys.length)],amount*(1.2+rand(s)));
  if(amount>24&&s.torps>0&&rand(s)<.035){s.torps--;s.hull=Math.max(0,s.hull-32);s.flood+=4;emitSound(s,{type:'detonation',x:s.x,y:s.y,depth:s.depth,power:1.5});log(s,'Torpedo room fire. A stored warhead detonated.','damage');}
  if(s.hull<=0){s.status='lost';log(s,'Pressure hull lost. All stations, abandon ship.','damage');}
@@ -59,7 +59,7 @@ export function updateBoat(s,dt){
  s.pitch+=clamp(clamp(-s.verticalSpeed*.09,-.12,.12)-s.pitch,-dt*.05,dt*.05);
  s.x+=Math.sin(rad(s.heading))*s.speed*.514444*dt;s.y+=Math.cos(rad(s.heading))*s.speed*.514444*dt;
  const prop=propellerState(s.speed,s.depth,s.systems.propeller);s.propAngle=(s.propAngle+prop.rpm*Math.PI/30*dt)%(2*Math.PI);s.cavitation=prop.cavitation;s.propRpm=prop.rpm;
- s.noise=clamp((diesel?65:8)+s.speed*s.speed*.39+(s.flood>0?12:0)+s.cavitation*23-(s.silent?7:0),2,100);
+ s.noise=clamp(Math.max((diesel?65:8)+s.speed*s.speed*.39+(s.flood>0?12:0)+s.cavitation*23-(s.silent?7:0),s.time<(s.gunLoudUntil||0)?80:0),2,100);
  if(diesel){s.fuel=clamp(s.fuel-dt*.015,0,100);s.battery=clamp(s.battery+dt*.12,0,100);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}
  else{s.battery=clamp(s.battery-dt*(.009+s.speed*s.speed*.0007),0,100);s.oxygen=clamp(s.oxygen-dt*(.024+(100-s.systems.oxygen)*.001),0,100);}
  if(s.depth<2)s.oxygen=clamp(s.oxygen+dt*.45,0,100);

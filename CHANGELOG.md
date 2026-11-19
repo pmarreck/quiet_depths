@@ -1,5 +1,18 @@
 # Changes
 
+## 0.5.0
+
+- Set patrols in 1972, with a researched tapered hull, compact dark propeller, sail planes and period-style cabled television ROV. Retain fictional DU explosive gun ammunition by design.
+- Randomize mission layouts, extraction, target names and requirements with replayable seeds and random starting conditions. Carry six torpedoes in every mission.
+- Add explicit periscope/bow bearing, center-on-bow and turn-boat-to-sight orders.
+- Add physically traveling gun rounds, finite ammunition, tracers, aimable aircraft, waterline flooding and gradual sinking.
+- Give torpedoes independent acoustic steering, depth tracking, ambiguous acquisition and shallow surface wakes.
+- Add delayed island air support, runway takeoff, travel, last-known-position searches, strafing, falling/sinking bombs and spatial engine sound.
+- Add a mobile layout, mission/weapons drawers, held touch helm/fire controls and chart zoom buttons. Preserve muted startup.
+- Publish through a GitHub Pages workflow gated by the canonical Nix test/build entry point.
+
+Validation: tests were introduced before the implementation, including independently authored combat acceptance tests. The Nix gate covers 98 tests, JavaScript syntax and the static build. Browser observations and remaining device limitations are recorded in PLAN.md.
+
 ## 0.4.0
 
 - Add solid drone/hull/wreck collisions, a 100 m three-dimensional control radius, deeper launch limits, finite drone battery, 10% warning, permanent mission loss, onboard charging and repairs, and functional drone damage.

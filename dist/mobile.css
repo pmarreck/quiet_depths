@@ -1,0 +1,67 @@
+/* Shared pointer controls, safe areas and drawers for compact/touch screens. */
+@media(max-width:1100px){
+ html,body{min-width:0;min-height:100%;height:auto;overflow:auto;overscroll-behavior:none}
+ button{touch-action:manipulation}
+ .topbar{height:74px;min-height:74px;padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));gap:8px;flex-wrap:nowrap}
+ .brand{font-size:14px;letter-spacing:1px;gap:7px}.brand-mark{font-size:30px}.brand small{font-size:10px;letter-spacing:0}
+ .top-coords{display:none}.top-actions{gap:7px;margin:0;width:auto}.top-actions button{min-height:44px;font-size:13px;letter-spacing:0;padding:5px}
+ .top-actions #sound span{display:none}.top-actions #guide{font-size:0}.top-actions #guide span{font-size:16px}
+ .top-actions .pause-button{font-size:12px;min-width:100px;height:44px;padding:5px}
+ .console{display:block;height:max(588px,calc(100dvh - 122px - env(safe-area-inset-bottom)));min-height:0}
+ .main-panel{height:100%;min-height:0;display:flex;flex-direction:column;min-width:0}
+ .stations{height:44px;min-height:44px;grid-template-columns:repeat(6,minmax(0,1fr))}
+ .stations button{font-size:0;padding:0 2px;min-width:0;letter-spacing:0}.stations button span{display:none}.stations button:after{content:attr(data-short);font:14px var(--mono)}
+ .stations button.active:after{content:attr(data-short);height:auto;background:none;position:static}.stations button.active{box-shadow:inset 0 -2px var(--gold)}
+ .mobile-panels{height:34px;min-height:34px;display:grid;grid-template-columns:1fr 1fr;background:#14252b}
+ .mobile-panels button{font:12px var(--mono);color:#b5c8b6;border-bottom:1px solid #46564e;border-right:1px solid #46564e}
+ .viewport{flex:1;min-height:160px;touch-action:none}
+ .view-top{top:13px;left:13px;right:13px;font-size:12px}.view-top small{font-size:11px;max-width:100%;line-height:1.5}.view-tag{display:none}
+ .compass{top:65px;left:10%;right:10%;font-size:12px}.look-heading{top:88px;font-size:12px}
+ .bow-readout{top:110px;left:12px;right:12px;max-width:calc(100% - 24px);padding:5px 7px;font-size:11px;line-height:1.5}
+ .scope-tools{left:12px;right:12px;bottom:38px;gap:6px;justify-content:space-between;flex-wrap:nowrap}.scope-tools .glass-button{max-width:none;min-height:40px;padding:8px 9px;font-size:12px}
+ .scope-alignment{left:12px;right:12px;bottom:86px;gap:6px}.scope-alignment button{font-size:11px;padding:8px;min-height:36px;flex:1}
+ .view-bottom{bottom:10px;left:12px;right:12px;font-size:10px}.view-bottom #view-range{display:none}
+ .station-strip{height:28px;min-height:28px;padding:0 12px;font-size:11px;gap:8px}#weather{display:block;font-size:10px}#sim-time{font-size:10px}
+ .soundings-strip{height:44px;min-height:44px;padding:6px 12px;gap:12px}.soundings-strip>div>span{font-size:9px}.soundings-strip strong{font-size:18px}.soundings-advice{font-size:10px}.soundings-advice small{display:none}
+ .soundings-strip>div{gap:0}.soundings-strip>div>span{font-size:10px;line-height:12px}.soundings-strip strong{line-height:20px}.soundings-strip .soundings-advice span{font-size:11px}
+ .helm-caption{height:22px;min-height:22px;padding:0 12px;font-size:10px}.helm-caption>span{font-size:9px}
+ .helm{height:126px;min-height:126px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .helm-group:not(.propulsion){height:126px;padding:8px 10px;border-right:1px solid var(--line);min-width:0}
+ .helm-group.propulsion{display:none}.control-label{font-size:11px;margin-bottom:5px;letter-spacing:.4px}.control-label span{display:none}
+ .big-value{height:32px;gap:6px}.big-value b{font-size:23px}.big-value>span{display:none}.big-value button{min-height:30px;width:25px;font-size:20px}
+ .dual-range{margin:3px 0 0;height:20px}.helm-group input{margin:0;width:100%}.ordered{font-size:11px;line-height:1.5;white-space:normal}.depth-presets{display:none}
+ .touch-pad{display:grid;height:94px;min-height:94px;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:44px 44px;gap:4px;padding:2px 8px;background:#102127}
+ .touch-pad button{min-height:44px;border:1px solid #5c776e;color:#d3deca;background:#1a3035;font:12px var(--mono);user-select:none;-webkit-user-select:none;touch-action:none;border-radius:3px}
+ .touch-pad button.held{background:#b8c7a8;color:#102127}.touch-pad button:disabled{opacity:.35}
+ .touch-aux{display:grid;height:36px;min-height:36px;grid-template-columns:1fr 1.4fr 1fr;padding:2px 8px;gap:4px;background:#102127}
+ .touch-aux button{border:1px solid #456359;font:11px var(--mono);color:#bcd2c0}.touch-aux button.active{color:var(--gold);border-color:var(--gold)}
+ .left-panel,.right-panel{display:none;position:fixed;z-index:40;inset:154px 10px calc(55px + env(safe-area-inset-bottom));height:auto;min-height:0;width:auto;overflow:auto;box-shadow:0 8px 70px #000c;border:1px solid #687e6c;background:#11232a;scrollbar-width:thin;overscroll-behavior:contain}
+ #drawer-backdrop{top:152px}
+ body[data-drawer=mission] .left-panel,body[data-drawer=contacts] .right-panel{display:flex;flex-direction:column}
+ .left-panel>section,.right-panel>section{flex-shrink:0}.left-panel .mission-block{padding:18px}.mission-block h1{font-size:36px}
+ .right-panel>.panel-label{display:flex;min-height:44px;height:44px;grid-column:auto}.right-panel .mini-sonar{height:180px;min-height:180px;grid-column:auto;grid-row:auto;margin:10px}.mini-sonar canvas{height:160px}
+ .right-panel .contacts-panel{height:auto;min-height:160px;max-height:320px;overflow:auto;grid-column:auto;grid-row:auto;border:0}.right-panel .weapons,.right-panel .resources{grid-column:auto;border-left:0}
+ .right-panel .weapons p{font-size:14px}.gun-control select{font-size:16px}.right-panel .resources{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.resource{font-size:12px}
+ .bottom-bar{height:calc(48px + env(safe-area-inset-bottom));min-height:48px;position:relative;padding:0 12px env(safe-area-inset-bottom);font-size:11px;background:#0b171d;z-index:25}
+ .bottom-bar>div:first-child>span:not(#alert-dot),#noise-value,#clearance,#save-status{display:none}.bottom-bar .footer-rule{display:none}.bottom-bar .time-controls{gap:5px}.time-controls button{min-width:42px;min-height:42px;font-size:13px;padding:6px}
+ #briefing{width:min(96vw,650px);max-height:94dvh}.briefing-art{display:none}.briefing-content{padding:30px 20px}.briefing-content h2{font-size:36px}.intro{font-size:16px}.mission-option b{font-size:14px}.mission-option small{font-size:12px}#mission-picker{max-height:320px}
+ #help-dialog{padding:25px 20px;max-height:92dvh}.guide-grid{grid-template-columns:1fr}
+ .drone-instruments{top:113px;left:auto;right:12px;padding:8px 10px;gap:4px;max-width:210px;font-size:10px}.drone-instruments b{font-size:12px}.drone-tools{left:12px;right:12px;bottom:38px;gap:5px}.drone-tools button{padding:8px;font-size:11px;min-height:36px}.drone-tools>span{font-size:9px}
+ .chart-tools{left:12px;right:12px;bottom:38px;gap:4px}.chart-tools button{font-size:10px;padding:7px;min-height:36px}.chart-tools #chart-zoom-in,.chart-tools #chart-zoom-out{font-size:20px;min-width:36px}
+ .gun-tools{left:12px;right:12px;bottom:35px;gap:5px}.gun-tools button{font-size:11px;padding:9px;min-height:44px}.gun-tools>span{font-size:11px}
+ .lightning-cue,.air-warning{left:12px;right:auto;top:158px;max-width:210px;font-size:10px;padding:7px 9px}.air-warning{top:112px;left:auto;right:12px;max-width:160px}
+ .paused .viewport:after{font-size:11px;max-width:90%;bottom:9px;padding:8px 10px}
+ #toast{bottom:calc(54px + env(safe-area-inset-bottom));font-size:12px;max-width:95vw;width:max-content;padding:10px 14px;z-index:60}
+ .scope-alignment{top:10px;right:12px;left:auto;bottom:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;z-index:5}
+ .scope-alignment>button{display:none;flex:none;min-height:40px;background:#10272fe8}
+ .scope-alignment #scope-align-toggle{display:block;min-width:74px}
+ .scope-alignment.open>button{display:block}
+ /* Keep orders readable on a phone; secondary readouts stay at least 12 px. */
+ .mobile-panels button,.control-label,.touch-pad button,.touch-aux button{font-size:14px}
+ .brand small,.view-top small,.compass,.look-heading,.bow-readout,.view-bottom,.station-strip,#weather,#sim-time,.helm-caption,.helm-caption>span,.ordered,.drone-instruments,.drone-tools>span,.lightning-cue,.air-warning{font-size:12px}
+ .view-top,.scope-tools .glass-button,.scope-alignment button,.gun-tools button,.drone-tools button{font-size:14px}
+ .gun-tools>span,.chart-tools button{font-size:12px}
+ .soundings-strip{height:48px;min-height:48px}.soundings-strip>div>span{font-size:12px;line-height:14px}.soundings-strip .soundings-advice span{font-size:12px}
+ .touch-aux{height:44px;min-height:44px}
+ .helm,.helm-group:not(.propulsion){height:134px;min-height:134px}
+}

@@ -14,8 +14,8 @@ test('inspection drone can deploy at 180 m, but not while the submarine is fast'
 });
 test('drone cannot travel through the pressure hull',()=>{
  const s=createGame();s.scope=false;s.heading=s.targetHeading=0;s.depth=s.targetDepth=60;s.speed=s.targetSpeed=0;deployDrone(s);
- Object.assign(s.drone,{x:7,y:0,depth:60,targetDepth:60,heading:270,targetHeading:270,speed:10,targetSpeed:10});
- step(s,2);assert.ok(s.drone.x>=5.6,'solid hull must stop the crossing');assert.ok(s.drone.hull<100,'impact must damage the drone');
+ Object.assign(s.drone,{x:s.x+7,y:s.y,depth:60,targetDepth:60,heading:270,targetHeading:270,speed:10,targetSpeed:10});
+ step(s,2);assert.ok(s.drone.x-s.x>=5.6,'solid hull must stop the crossing');assert.ok(s.drone.hull<100,'impact must damage the drone');
 });
 test('link loss at more than 100 meters is permanent for this patrol',()=>{
  const s=createGame();s.speed=s.targetSpeed=0;deployDrone(s);s.drone.x=s.x+101;s.drone.y=s.y;s.drone.depth=s.depth;

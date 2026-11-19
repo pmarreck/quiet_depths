@@ -1,3 +1,4 @@
+import {SUB_DESIGN} from './hull-design.js';
 // Simulation coordinates: x east, y north, depth down. SI units except knots/degrees.
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const rad=d=>d*Math.PI/180;
@@ -24,7 +25,7 @@ export function capsuleContact(point,body,halfLength=27.5,radius=5,pointRadius=.
 // Local cavitation number, following MIT 2.611 Cavitation Notes. Blade loading
 // (critical sigma=1.25), RPM gearing and bubble density are fictional tuning.
 export function propellerState(speed,depth,health=100){
- const rpm=speed*13*(.45+.55*health/100),radius=2.7,omega=rpm*Math.PI/30;
+ const rpm=speed*13*(.45+.55*health/100),radius=SUB_DESIGN.propellerRadius,omega=rpm*Math.PI/30;
  const q=.5*1025*((speed*.514444)**2+(omega*radius)**2);
  const sigma=q>0?(101325+1025*9.81*Math.max(0,depth-radius)-2300)/q:Infinity;
  return {rpm,sigma,cavitation:q>0?clamp((1.25-sigma)/1.25,0,1):0};

@@ -1,0 +1,31 @@
+.stations{grid-template-columns:repeat(6,minmax(0,1fr))}
+.stations:has([data-view=scope].hidden){grid-template-columns:repeat(5,minmax(0,1fr))}
+.stations button{font-size:12px}
+.bow-readout{position:absolute;top:142px;left:22px;right:22px;font:13px/1.7 var(--mono);color:#e0d7b8;text-shadow:0 1px 4px #000;background:#0b2029b8;padding:7px 10px;width:max-content;max-width:calc(100% - 44px);pointer-events:none}
+.scope-alignment{position:absolute;left:22px;right:22px;bottom:126px;display:flex;gap:9px;flex-wrap:wrap}
+.scope-alignment button{font:12px var(--mono);color:#d9d7b4;border:1px solid #a3b79b77;background:#132c2dbb;padding:10px}
+.air-warning{position:absolute;right:20px;top:192px;max-width:260px;padding:10px 13px;background:#34271fda;border:1px solid #dca17c99;color:#f4cca8;font:12px/1.6 var(--mono);pointer-events:none}
+.gun-tools{position:absolute;left:22px;right:22px;bottom:60px;display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.gun-tools>span{width:100%;font:12px var(--mono);color:#decba6}
+#gun-trigger{touch-action:none;user-select:none;-webkit-user-select:none;min-height:44px}
+#gun-trigger.held{background:#d49c5a;color:#0c1b22}
+.gun-control{border-top:1px solid var(--line);padding-top:18px;margin-top:18px}
+.gun-control p{font:14px/1.7 var(--sans);color:#9fb8b3}
+.gun-control label{font:12px var(--mono);color:var(--gold)}
+.gun-control select{width:100%;background:#0c1e24;color:#ddd8bf;border:1px solid #617971;padding:11px 9px;margin:9px 0;font:14px var(--mono);min-height:44px}
+#open-gun{width:100%;padding:12px;border:1px solid #81937b;font:14px var(--mono)}
+.torpedo-status{font:12px/1.8 var(--mono);color:#adcdb8}
+.patrol-code{display:grid;gap:8px;color:var(--gold);font:12px var(--mono);margin:18px 0}
+.patrol-code input{width:100%;min-height:44px;background:#0b1b22;border:1px solid #55716a;color:#e5e0cc;padding:10px;font-size:16px}
+.mobile-panels,.touch-pad,.touch-aux{display:none}
+#drawer-backdrop{position:fixed;inset:74px 0 48px;background:#0008;z-index:39}
+.chart-tools{flex-wrap:wrap}
+.chart-tools button{min-height:40px}
+#chart-zoom-in,#chart-zoom-out{font-size:22px;min-width:40px}
+.lightning-cue{top:200px}
+@media(min-width:1101px){#drawer-backdrop{display:none!important}}
+
+.helm .ordered>span{display:block}
+.weapon-instructions{font:14px/1.7 var(--sans);color:#a7bdb6}
+
+#scope-align-toggle{display:none}

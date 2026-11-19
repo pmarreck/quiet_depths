@@ -4,7 +4,7 @@ export const wrapHeading=n=>((n%360)+360)%360;
 export const relativeBearing=(absolute,heading)=>wrapHeading(absolute-heading);
 export const scopeBearing=s=>wrapHeading(s.heading+s.scopeAngle);
 export const canIssue=(s,context)=>s.status==='patrol'&&!context.paused&&!context.modal;
-export const feedActive=(s,view)=>view==='scope'?s.scope&&s.depth<=15&&s.systems?.periscope!==0:view==='tower'?s.depth<=.05:view==='drone'?['remote','return'].includes(s.drone.mode):false;
+export const feedActive=(s,view)=>view==='scope'?s.scope&&s.depth<=15&&s.systems?.periscope!==0:['tower','gun'].includes(view)?s.depth<=.05:view==='drone'?['remote','return'].includes(s.drone.mode):false;
 export const helmFor=(s,view)=>view==='drone'?s.drone:s;
 
 export function setHelmOrder(s,context,axis,value){
@@ -12,12 +12,18 @@ export function setHelmOrder(s,context,axis,value){
  const drone=context.view==='drone',v=helmFor(s,context.view);
  if(drone&&v.mode!=='remote')return false;
  switch(axis){
-  case 'heading':v.targetHeading=wrapHeading(value);if(!drone)s.route=null;break;
+  case 'heading':v.targetHeading=wrapHeading(value);if(!drone){s.route=null;s.scopeSteerBearing=null;}break;
   case 'depth':v.targetDepth=clamp(value,0,280);break;
   case 'speed':v.targetSpeed=clamp(value,drone?-3:-4,drone?10:17);if(!drone&&v.targetSpeed>3)s.silent=false;break;
   default:return false;
  }
  return true;
+}
+export function alignScope(s,context,mode){
+ if(!canIssue(s,context)||!feedActive(s,'scope'))return false;
+ if(mode==='center'){s.scopeAngle=0;s.scopeSteerBearing=null;return true;}
+ if(mode==='helm-to-scope'){s.scopeSteerBearing=scopeBearing(s);s.targetHeading=s.scopeSteerBearing;s.route=null;return true;}
+ return false;
 }
 
 export function applyHelmKeys(s,context,keys,dt){

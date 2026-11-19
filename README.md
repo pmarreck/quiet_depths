@@ -1,6 +1,8 @@
 # Quiet Depths
 
-A browser submarine game about incomplete information and calculated exposure. A fictional diesel-electric boat in 1968, six mission types, and no omniscient enemy map.
+A browser submarine game about incomplete information and calculated exposure. A fictional diesel-electric boat in 1972, six randomized mission types, and no omniscient enemy map.
+
+[Play Quiet Depths](https://pmarreck.github.io/quiet_depths/). Sound starts OFF. Desktop keyboard/mouse and mobile touch controls are included; WebGL is needed for the ocean views. No account or installation is required.
 
 ## Build and run
 
@@ -11,13 +13,13 @@ Nix is the canonical build. The complete verification entry point is `./test`, w
 nix develop --command node scripts/serve.mjs
 ```
 
-For development preview, copy the Nix build output into `dist/` first (`mkdir -p dist && cp -r result/. dist/`). The preview listens on `http://127.0.0.1:4173`. Any static web server can serve the built output. There are no runtime services or package installation steps.
+For development preview, copy the Nix build output into `dist/` first (`mkdir -p dist && chmod -R u+w dist && cp -rL result/. dist/`). The preview listens on `http://127.0.0.1:4173`. Any static web server can serve the built output. There are no runtime services or package installation steps.
 
 ## Play
 
 Choose reconnaissance, interception, passive surveillance, undersea rescue, surface rescue, or wreck survey. Photograph silhouettes, intercept a military freighter, or quietly collect traffic intelligence. Complete the task, return to the chart's extraction circle, and surface to 1 meter or less for pickup. The patrol window is 30 simulated minutes. Use 5× and 20× for transit; new contacts and attacks return time to 1×. Esc pauses; progress autosaves in this browser's local storage.
 
-- **1–5**: periscope, sonar, chart, drone, conning tower.
+- **1–6**: periscope, sonar, chart, drone, conning tower, deck gun.
 - **P**: raise/lower scope at 15 meters or less. Drag to pan; scroll to zoom.
 - **F**: photograph a merchant within five degrees of the reticle. Separate silhouettes require separate framing.
 - **G**: active sonar. Range information also exposes you.
@@ -37,7 +39,7 @@ Diesel runs above 14 meters, charging air and battery but making noise. Electric
 
 ## Weather, soundings and sound
 
-New patrols let you select dawn, day, dusk or night, plus clear, cloudy, rain or storm conditions. Changing weather fronts are optional. The environmental sky clock completes a day in 48 simulated minutes, independently of the patrol's elapsed-time counter. Fronts change every five simulated minutes and blend over 75 seconds. Night and storms reduce optical identification and the distance at which escorts can spot an unlit submarine. Running lights remain visible farther than dark hull silhouettes. Heavy weather masks some near-surface passive sound; deeper water reduces that masking.
+New patrols randomize starting position, heading, convoy layout, target name, mission requirements, casualty location and extraction. Random time/weather is the default; you can select dawn, day, dusk or night, plus clear, cloudy, rain or storm conditions. Enter an optional numeric patrol seed to replay a layout with the same conditions. Changing weather fronts are optional. The environmental sky clock completes a day in 48 simulated minutes, independently of the patrol's elapsed-time counter. Fronts change every five simulated minutes and blend over 75 seconds. Night and storms reduce optical identification and the distance at which escorts can spot an unlit submarine. Running lights remain visible farther than dark hull silhouettes. Heavy weather masks some near-surface passive sound; deeper water reduces that masking.
 
 The renderer and simulation share the same wave components and weather parameters. Storms increase wave height, speed, ship motion, rain and occasional periscope wash. Daylight, cloud cover, sun/moon direction, stars, running lights and lightning respond to the environmental state. The seafloor strip shows total water depth and space beneath the submarine's keel, five meters below its pressure-depth reference. Pitch increases the boat’s vertical hull extent. The drone uses its own position and a 0.7-meter collision radius. Shallow clearance is highlighted.
 
@@ -65,9 +67,25 @@ The detailed boat has a five-blade rotating propeller, shaft, forward/aft planes
 
 Lightning bolts have branched geometry, a short display hold so time compression does not skip them, and a bearing/range cue for off-screen flashes. Thunder still follows the located emission and moving-listener travel calculation. Low-frequency traffic carries farther underwater than in air in the game’s attenuation model. Sound starts OFF on every page load and requires an explicit click to open the audio device. Audio routing can be checked without playing sound in the browser; subjective mix quality remains a playtesting task.
 
+## Weapons, air support and touch controls
+
+Every patrol carries six acoustic torpedoes. Select a contact in Contacts/Weapons, check its identity and bearing, then launch. After a four-second run-out, the torpedo uses its own sonar returns to turn and adjust depth. A loud alternative can divert it. Shallow-running torpedoes leave foam at the water surface; their acoustic search is audible when Sound is enabled.
+
+Fully surface to use the gun station. Drag horizontally and vertically to aim, or select a visually identified target and use AIM AT TARGET. Hold FIRE or J. The 240-round supply is finite, and every fifth round is a tracer. Aim at a ship's waterline to open flooding; repeated hits disable propulsion and sinking continues after firing stops. Aircraft can also be hit. Diving blanks the sight and prevents firing.
+
+Detected military traffic can radio Greybank island. Aircraft prepare for 45–59 simulated seconds, take off from the modeled runway and physically fly to the last report. They search, strafe visible surfaced boats and drop delayed ordnance. Diving and moving quietly breaks visual tracking, but does not erase the last reported position. Aircraft engines attenuate with distance and become muffled below the surface.
+
+On a phone, station tabs sit above the view. Mission/Boat and Contacts/Weapons open drawers; tap outside to close. Hold Port/Starboard, Faster/Slower and Rise/Dive to change requested orders. These support simultaneous fingers, and release/cancellation stops input. The three sliders show actual and requested values. Use ALIGN in the periscope view to center on the bow or turn the boat to the sight bearing. Drag optics to look or aim; drag the chart to pan, tap to plot, and use its +/− buttons to zoom. The mobile controls share the same pause and vehicle limits as the keyboard. The responsive layout is checked in a browser; hardware iPhone/Safari validation remains playtesting work.
+
+GitHub Actions runs the complete Nix build and tests before uploading the resulting static output to GitHub Pages. A failing build cannot deploy. Pull requests run the same build without publication.
+
+## Historical design choices
+
+The compact dark propeller, tapered single-screw hull and sail planes draw on the [Barbel design described by NHHC](https://www.history.navy.mil/research/histories/ship-histories/danfs/b/barbel-ii.html). This is a fictional hybrid, not a Barbel replica. Television-equipped cabled underwater vehicles existed in the [1960s CURV program](https://navalunderseamuseum.org/wp-content/uploads/2026/02/NUM_2019_013_010_NOSCvehicleHistory_OCR.pdf), and [A-1 attack aircraft remained in service in 1972](https://www.nationalmuseum.af.mil/Visit/Museum-Exhibits/Fact-Sheets/Display/Article/3215320/douglas-a-1h-skyraider-the-proud-american/). The game uses a retained dual-purpose deck gun, simplified acoustic seekers, manual optics and diesel/electric propulsion. DU explosive deck-gun ammunition is an explicitly fictional exception to the 1972 setting. Sensors, weapon ranges, aircraft performance, repairs and resources are tuned for play, not real operations.
+
 ## Prototype boundaries
 
-Single-player, procedural waves and terrain, approximate acoustic detection, simplified repairs, and synthesized audio. No crew interior or nuclear propulsion. The freely controlled inspection ROV is a deliberate historical liberty. Passive contacts reveal bearings; visual observations and active pings store aging position estimates. The chart never renders live hostile positions. It shows your submarine symbol for navigation; an underwater exterior boat view is available through the drone. The surfaced conning tower lets you look down at your deck.
+Single-player, procedural waves and terrain, approximate acoustic detection, simplified repairs, and synthesized audio. No crew interior or nuclear propulsion. The battery camera ROV uses a fictional 100-meter control cable and a period-style television feed. Passive contacts reveal bearings; visual observations and active pings store aging position estimates. The chart never renders live hostile positions. It shows your submarine symbol for navigation; an underwater exterior boat view is available through the drone. The surfaced conning tower lets you look down at your deck.
 
 The simulation is independent of rendering, runs in bounded substeps, and saves its random seed and environmental state. The tests include time-step batching invariance, state serialization round trips, optics/detection effects, wave amplitude, acoustics and control guards. These checks cover rules, not game balance or historical accuracy. Browser playtesting is still needed to tune difficulty and pacing.
 
