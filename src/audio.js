@@ -1,6 +1,8 @@
 import {environmentAt} from './environment.js';
 import {engineSound,aircraftSound,perceivedSound} from './acoustics.js';
 
+const ownFrequency=s=>31+Math.abs(s.speed)*2;
+
 export class SoundSystem{
  constructor(getState,getContext,onStatus=()=>{}){this.getState=getState;this.getContext=getContext;this.onStatus=onStatus;this.on=false;this.ctx=null;this.voices=new Map();this.played=new Set();this.lastState=null;this.tailUntil=0;this.effects=0;this.effectVoices=new Set();this.lastReceipt=null;}
  init(){
@@ -10,12 +12,14 @@ export class SoundSystem{
   this.noise=c.createBuffer(1,c.sampleRate*4,c.sampleRate);const a=this.noise.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1;
   const ambience=(type,frequency)=>{const source=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain();source.buffer=this.noise;source.loop=true;filter.type=type;filter.frequency.value=frequency;gain.gain.value=0;source.connect(filter).connect(gain).connect(this.master);source.start();return{source,filter,gain};};
   this.sea=ambience('lowpass',220);this.rain=ambience('bandpass',2400);this.rain.filter.Q.value=.4;
-  this.own=c.createOscillator();this.own.frequency.value=38;this.ownGain=c.createGain();this.ownGain.gain.value=0;this.own.connect(this.ownGain).connect(this.master);this.own.start();
+  this.own=c.createOscillator();this.own.frequency.value=ownFrequency(this.getState());this.ownGain=c.createGain();this.ownGain.gain.value=0;this.own.connect(this.ownGain).connect(this.master);this.own.start();
  }
  toggle(){this.init();if(!this.ctx)return false;this.on=!this.on;this.ctx.resume();this.played=new Set((this.getState().acoustics||[]).filter(e=>e.heard).map(e=>e.id));this.update();return this.on;}
- makeVoice(ship){
+ makeVoice(ship,pitch){
   const c=this.ctx,osc=c.createOscillator(),gain=c.createGain(),filter=c.createBiquadFilter(),pan=c.createStereoPanner(),pulse=c.createOscillator(),pulseGain=c.createGain();
-  osc.type=ship.kind==='sub'?'sine':'sawtooth';gain.gain.value=0;filter.type='lowpass';filter.Q.value=.5;pulse.frequency.value=2;pulseGain.gain.value=.002;pulse.connect(pulseGain).connect(gain.gain);osc.connect(filter).connect(gain).connect(pan).connect(this.master);osc.start();pulse.start();return{osc,gain,filter,pan,pulse,pulseGain};
+  osc.type=ship.kind==='sub'?'sine':'sawtooth';osc.frequency.value=pitch.frequency;
+  gain.gain.value=0;filter.type='lowpass';filter.Q.value=.5;filter.frequency.value=pitch.cutoff;pan.pan.value=pitch.pan*.9;
+  pulse.frequency.value=pitch.bladeRate;pulseGain.gain.value=0;pulse.connect(pulseGain).connect(gain.gain);osc.connect(filter).connect(gain).connect(pan).connect(this.master);osc.start();pulse.start();return{osc,gain,filter,pan,pulse,pulseGain};
  }
  tone(type){
   if(!this.on||!this.ctx||this.getContext().paused||this.getContext().modal)return;
@@ -47,9 +51,9 @@ export class SoundSystem{
   const wet=s.depth<=2?1:.18*Math.exp(-s.depth/200),running=this.on&&active;
   this.sea.filter.frequency.setTargetAtTime(120+e.wind*6,t,.5);this.sea.gain.gain.setTargetAtTime(running?(.03+e.waveScale*.035)*wet:0,t,.3);
   this.rain.filter.frequency.setTargetAtTime(s.depth>2?330:2400,t,.3);this.rain.gain.gain.setTargetAtTime(running?e.rain*.11*wet:0,t,.3);
-  this.own.frequency.setTargetAtTime(31+Math.abs(s.speed)*2,t,.4);this.ownGain.gain.setTargetAtTime(running?(s.engine==='diesel'?.1:.03):0,t,.25);
+  this.own.frequency.setTargetAtTime(ownFrequency(s),t,.4);this.ownGain.gain.setTargetAtTime(running?(s.engine==='diesel'?.1:.03):0,t,.25);
   let audible=0;
-  const liveVoices=new Set();for(const ship of [...s.ships,...s.aircraft]){liveVoices.add(ship.id);let voice=this.voices.get(ship.id);if(!voice){voice=this.makeVoice(ship);this.voices.set(ship.id,voice);}const p=ship.altitude!==undefined?aircraftSound(ship,s):engineSound(ship,s),target=running?p.gain:0;if(target>.001)audible++;
+  const liveVoices=new Set();for(const ship of [...s.ships,...s.aircraft]){liveVoices.add(ship.id);const p=ship.altitude!==undefined?aircraftSound(ship,s):engineSound(ship,s);let voice=this.voices.get(ship.id);if(!voice){voice=this.makeVoice(ship,p);this.voices.set(ship.id,voice);}const target=running?p.gain:0;if(target>.001)audible++;
    voice.gain.gain.setTargetAtTime(target,t,.2);voice.pulseGain.gain.setTargetAtTime(target*.18,t,.2);voice.osc.frequency.setTargetAtTime(p.frequency,t,.3);voice.pulse.frequency.setTargetAtTime(p.bladeRate,t,.3);voice.filter.frequency.setTargetAtTime(p.cutoff,t,.25);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.15);
   }
   for(const [id,voice]of this.voices)if(!liveVoices.has(id)){voice.osc.stop();voice.pulse.stop();voice.gain.disconnect();voice.pan.disconnect();this.voices.delete(id);}
