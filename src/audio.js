@@ -1,5 +1,6 @@
 import {environmentAt} from './environment.js';
 import {engineSound,aircraftSound,perceivedSound} from './acoustics.js';
+import {CrewAmbience} from './crew-ambience.js';
 
 const ownFrequency=s=>31+Math.abs(s.speed)*2;
 
@@ -13,6 +14,7 @@ export class SoundSystem{
   const ambience=(type,frequency)=>{const source=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain();source.buffer=this.noise;source.loop=true;filter.type=type;filter.frequency.value=frequency;gain.gain.value=0;source.connect(filter).connect(gain).connect(this.master);source.start();return{source,filter,gain};};
   this.sea=ambience('lowpass',220);this.rain=ambience('bandpass',2400);this.rain.filter.Q.value=.4;
   this.own=c.createOscillator();this.own.frequency.value=ownFrequency(this.getState());this.ownGain=c.createGain();this.ownGain.gain.value=0;this.own.connect(this.ownGain).connect(this.master);this.own.start();
+  this.crew=new CrewAmbience(c,this.master);
  }
  toggle(){this.init();if(!this.ctx)return false;this.on=!this.on;this.ctx.resume();this.played=new Set((this.getState().acoustics||[]).filter(e=>e.heard).map(e=>e.id));this.update();return this.on;}
  makeVoice(ship,pitch){
@@ -49,6 +51,7 @@ export class SoundSystem{
   const tail=s.status!=='patrol'&&t<this.tailUntil&&!context.paused;
   this.master.gain.setTargetAtTime(this.on&&(active||tail)?.55:0,t,.12);
   const wet=s.depth<=2?1:.18*Math.exp(-s.depth/200),running=this.on&&active;
+  this.crew.update(s,e,running);
   this.sea.filter.frequency.setTargetAtTime(120+e.wind*6,t,.5);this.sea.gain.gain.setTargetAtTime(running?(.03+e.waveScale*.035)*wet:0,t,.3);
   this.rain.filter.frequency.setTargetAtTime(s.depth>2?330:2400,t,.3);this.rain.gain.gain.setTargetAtTime(running?e.rain*.11*wet:0,t,.3);
   this.own.frequency.setTargetAtTime(ownFrequency(s),t,.4);this.ownGain.gain.setTargetAtTime(running?(s.engine==='diesel'?.1:.03):0,t,.25);

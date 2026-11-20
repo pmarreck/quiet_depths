@@ -13,8 +13,8 @@ export class CombatScene{
   for(let i=0;i<3;i++)mesh(base,new T.BoxGeometry(24,13,30),mat(0x686d59),[55,ground+6,-100+i*45]);base.position.set(-3200,0,-3400);base.rotation.y=-rad(45);this.root.add(base);
  }
  plane(){
-  const g=new T.Group(),olive=mat(0x4c5c50),grey=mat(0x919b98);const body=mesh(g,new T.SphereGeometry(1,16,10),olive);body.scale.set(.85,.95,5.5);
-  mesh(g,new T.BoxGeometry(15.5,.22,2.6),grey,[0,-.1,-.4]);mesh(g,new T.BoxGeometry(5.2,.18,1.5),olive,[0,.3,4]);
+  const g=new T.Group(),olive=mat(0x4c5c50),gray=mat(0x919b98);const body=mesh(g,new T.SphereGeometry(1,16,10),olive);body.scale.set(.85,.95,5.5);
+  mesh(g,new T.BoxGeometry(15.5,.22,2.6),gray,[0,-.1,-.4]);mesh(g,new T.BoxGeometry(5.2,.18,1.5),olive,[0,.3,4]);
   const tail=mesh(g,new T.BoxGeometry(.18,2.5,2),olive,[0,1,4.2]);tail.rotation.x=.15;
   const canopy=mesh(g,new T.SphereGeometry(1,12,8),new T.MeshStandardMaterial({color:0x69928e,roughness:.25,metalness:.5}),[0,.95,-1]);canopy.scale.set(.65,.65,1.3);
   const prop=new T.Group();prop.position.z=-5.7;mesh(prop,new T.SphereGeometry(.28,8,6),olive);for(let i=0;i<4;i++){const blade=mesh(prop,new T.BoxGeometry(.17,2.8,.08),mat(0x152123));blade.rotation.z=i*Math.PI/2;}g.add(prop);g.userData.prop=prop;
@@ -26,19 +26,58 @@ export class CombatScene{
   for(const side of [-1,1])mesh(g,new T.BoxGeometry(1,.08,.7),mat(0x253b3d),[side*.45,0,2.1]);
   const positions=new T.Float32BufferAttribute(new Float32Array(80*3),3),geometry=new T.BufferGeometry();geometry.setAttribute('position',positions);
   const wake=new T.Points(geometry,new T.PointsMaterial({map:this.glow,size:4,color:0xe3f0e8,transparent:true,opacity:.8,depthWrite:false}));this.root.add(wake);
-  const ring=mesh(g,new T.SphereGeometry(1,16,8),new T.MeshBasicMaterial({color:0x84c8b9,transparent:true,opacity:.1,wireframe:true,depthWrite:false}));g.userData={wake,ring};return g;
+  const bubblesGeometry=new T.BufferGeometry();bubblesGeometry.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(240*3),3));
+  const bubbles=new T.Points(bubblesGeometry,new T.PointsMaterial({map:this.glow,size:.9,color:0xc5edee,transparent:true,opacity:.62,depthWrite:false}));this.root.add(bubbles);
+  const ring=mesh(g,new T.SphereGeometry(1,16,8),new T.MeshBasicMaterial({color:0x84c8b9,transparent:true,opacity:.1,wireframe:true,depthWrite:false}));g.userData={wake,bubbles,ring};return g;
  }
  dispose(group){group.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});group.parent?.remove(group);}
+ removeTorpedo(group){this.dispose(group.userData.wake);this.dispose(group.userData.bubbles);this.dispose(group);}
+ updateTrail(group,path,time,e){
+  const {wake,bubbles}=group.userData;
+  const foamPositions=wake.geometry.attributes.position,bubblePositions=bubbles.geometry.attributes.position;
+  let foam=0,under=0;
+  for(const point of path){
+   const age=Math.max(0,time-point.time);
+   if(age>23)continue;
+   const surface=surfaceHeight(point.x,point.y,time,e);
+   if(point.depth<=9)foamPositions.setXYZ(foam++,point.x,surface+.12,-point.y);
+   if(age>12)continue;
+   for(let i=0;i<3;i++){
+    const phase=point.time*8+i*2.0,altitude=-point.depth+age*(.45+i*.13);
+    if(altitude>=surface)continue;
+    bubblePositions.setXYZ(under++,point.x+Math.sin(phase+age)*(.3+age*.2),altitude,-point.y+Math.cos(phase+age)*(.3+age*.2));
+   }
+  }
+  for(const [points,count] of [[wake,foam],[bubbles,under]]){
+   points.geometry.attributes.position.needsUpdate=true;points.geometry.setDrawRange(0,count);points.geometry.computeBoundingSphere();
+  }
+ }
  update(s,e){
-  if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values()){this.dispose(p.userData.wake);this.dispose(p);}this.planes.clear();this.torpedoes.clear();this.lastState=s;}
+  if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values())this.removeTorpedo(p);this.planes.clear();this.torpedoes.clear();this.lastState=s;}
   const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane();this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.prop.rotation.z=s.time*40;g.userData.bombs.visible=!p.bombDropped;g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
   const torpIds=new Set();for(const p of s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.y=-rad(p.heading);
    const ring=g.userData.ring;ring.visible=p.age>=4&&p.pingAge<.7;ring.scale.setScalar(1+p.pingAge*45);ring.material.opacity=Math.max(0,.24*(1-p.pingAge/.7));
-   const wake=g.userData.wake,positions=wake.geometry.attributes.position,path=p.path.filter(v=>v.depth<=10);path.forEach((v,i)=>positions.setXYZ(i,v.x,surfaceHeight(v.x,v.y,s.time,e)+.12,-v.y));positions.needsUpdate=true;wake.geometry.setDrawRange(0,path.length);wake.geometry.computeBoundingSphere();
+   g.userData.path=p.path;this.updateTrail(g,p.path,s.time,e);
   }
-  for(const [id,g]of this.torpedoes)if(!torpIds.has(id)){this.dispose(g.userData.wake);this.dispose(g);this.torpedoes.delete(id);}
+  for(const [id,g]of this.torpedoes)if(!torpIds.has(id)){
+   g.visible=false;g.userData.retiredAt??=s.time;
+   const fade=Math.max(0,1-(s.time-g.userData.retiredAt)/10);
+   if(!fade){this.removeTorpedo(g);this.torpedoes.delete(id);continue;}
+   g.userData.wake.material.opacity=.8*fade;g.userData.bubbles.material.opacity=.62*fade;
+   this.updateTrail(g,g.userData.path,s.time,e);
+  }
   let n=0;const positions=this.tracerGeometry.attributes.position;for(const r of s.gunRounds){if(!r.tracer||!r.previous||n>=192)continue;positions.setXYZ(n*2,r.previous.x,r.previous.altitude,-r.previous.y);positions.setXYZ(n*2+1,r.x,r.altitude,-r.y);n++;}positions.needsUpdate=true;this.tracerGeometry.setDrawRange(0,n*2);this.tracerGeometry.computeBoundingSphere();
-  this.effects.forEach((g,i)=>{const p=s.impacts[i];g.visible=!!p;if(!p)return;const age=s.time-p.time;g.position.set(p.x,p.altitude,-p.y);g.userData.splash.visible=p.kind==='splash';g.userData.flash.visible=p.kind!=='splash';g.userData.splash.scale.set(1+age,1+age*.5,1+age);g.userData.splash.material.opacity=Math.max(0,.8*(1-age/3));g.userData.flash.material.opacity=Math.max(0,1-age/.6);});
+  this.effects.forEach((g,i)=>{
+   const p=s.impacts[i];g.visible=!!p;if(!p)return;
+   const age=s.time-p.time,torpedo=p.kind==='torpedo',surfaceBlast=torpedo&&p.altitude>-15;
+   g.position.set(p.x,surfaceBlast?1:p.altitude,-p.y);
+   g.userData.splash.visible=p.kind==='splash'||surfaceBlast;g.userData.flash.visible=p.kind!=='splash';
+   const scale=surfaceBlast?6:1;
+   g.userData.splash.scale.set(scale*(1+age),scale*(1+age*.5),scale*(1+age));
+   g.userData.splash.material.opacity=Math.max(0,.8*(1-age/3));
+   const flash=torpedo?22+age*12:6;
+   g.userData.flash.scale.set(flash,flash,1);g.userData.flash.material.opacity=Math.max(0,1-age/(torpedo?1.1:.6));
+  });
  }
 }

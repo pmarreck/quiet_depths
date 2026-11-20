@@ -7,6 +7,7 @@ export const freshSystems=()=>Object.fromEntries(Object.keys(SYSTEM_NAMES).map(k
 export const freshMotion=()=>({verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
 export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:'',returnStage:0,returnClearance:8,returnHoldSide:18,returnHoldForward:0});
 export function droneDeployReason(s){
+ if(s.difficulty?.drone===false)return 'The ROV is disabled for this patrol.';
  const d=s.drone;if(d.mode==='lost')return d.lostReason||'Drone lost for this patrol.';
  if(d.mode!=='stowed')return 'Drone is already outside.';
  if(Math.abs(s.speed)>DRONE_LIMITS.deploySpeed)return 'Slow to 3 knots or less before launching.';
@@ -51,6 +52,7 @@ export function damageSystem(s,key,amount){
 }
 export function hurt(s,amount,text,subsystem=null){
  if(amount<=0||s.status!=='patrol')return;
+ amount*=2**-(s.difficulty?.damage??0);
  s.hull=clamp(s.hull-amount,0,100);s.flood=clamp(s.flood+amount*.11,0,25);s.shock=2;log(s,text,'damage');
  const keys=['engine','propeller','oxygen','ballast','planes','rudder','sonar','deckgun','crew'];
  if(amount>=2||subsystem)damageSystem(s,subsystem||keys[Math.floor(rand(s)*keys.length)],amount*(1.2+rand(s)));
@@ -59,6 +61,7 @@ export function hurt(s,amount,text,subsystem=null){
 }
 export function damageDrone(s,amount,reason){
  const d=s.drone;if(!['remote','return'].includes(d.mode)||amount<=0)return;
+ amount*=2**-(s.difficulty?.damage??0);
  d.hull=clamp(d.hull-amount,0,100);d.mobility=clamp(d.mobility-amount*.8,0,100);d.buoyancy=clamp(d.buoyancy-amount*.7,0,100);d.camera=clamp(d.camera-amount*.95,0,100);
  log(s,'Drone impact: '+reason+' Integrity '+Math.ceil(d.hull)+'%.','damage');
  if(d.hull<=0)loseDrone(s,'Drone destroyed.');

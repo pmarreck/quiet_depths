@@ -1,10 +1,12 @@
 # Quiet Depths
 
-A browser submarine game about incomplete information and calculated exposure. A fictional diesel-electric boat in 1972, seven randomized mission types, and no omniscient enemy map.
+A browser submarine game about incomplete information and calculated exposure. Take a fictional diesel-electric boat on eight randomized mission types in 1972.
 
 [Play Quiet Depths](https://pmarreck.github.io/quiet_depths/). Sound starts OFF. Desktop keyboard/mouse and mobile touch controls are included; WebGL is needed for the ocean views. No account or installation is required.
 
 <img src="docs/screenshots/mobile-v6.jpg" width="280" alt="Phone layout showing the periscope, compact status and fixed helm with a vertical speed slider">
+
+Choose **Install game** in the briefing for mobile installation. In Safari, use **Share → Add to Home Screen** and enable **Open as Web App**. The installed game works offline after its first complete online load.
 
 ## Build and run
 
@@ -22,7 +24,11 @@ The built site's `build-provenance.json` records the release version and, for a 
 
 ## Play
 
-Choose reconnaissance, interception, Seek and Destroy, passive surveillance, undersea rescue, surface rescue, or wreck survey. In Seek and Destroy, use the last reported bearing and your sensors to find an escorted convoy. Sink all three military transports. Neutral fishing boats may be nearby. Complete the task, return to the chart's extraction circle, and surface to 1 meter or less for pickup. The patrol window is 30 simulated minutes. Use 5× and 20× for transit; new contacts and attacks return time to 1×. Esc pauses. Progress autosaves in this browser's local storage.
+Choose reconnaissance, interception, either Seek and Destroy patrol, passive surveillance, undersea rescue, surface rescue, or wreck survey. **Seek and Destroy: Convoy** requires sinking three military transports. **Seek and Destroy: Sub** can put two enemy submarines in the area. Survive by surfacing at extraction, even if you withdraw without sinking either boat. Submarine kills earn a commendation, and sinking two in one patrol earns a separate commendation. Your service record shows lifetime totals. The patrol window is 30 simulated minutes. Use 5× and 20× for transit. New contacts and attacks return time to 1×. Progress autosaves in this browser’s local storage.
+
+**Difficulty and realism** in the briefing controls damage advantage, detectability, ping detection, how much depth helps, and how long enemies pursue. You can also choose whether to allow enemy air support, classified satellite photographs, or the ROV. Exact enemy locations and the external orbit view are optional. Turn on the orbit camera there, then press V or choose **Orbit** during the patrol. Drag to circle the boat and use the wheel or +/− to zoom. The patrol continues in the camera. Use its **Pause** control to hold time, and leave with **Exit view** or Esc. Customize keyboard shortcuts or restore their defaults in **Settings**.
+
+Enemy hunters steer and aim from their last detection. A change of course or depth can make their search pass you by, and distant shots have a wider spread. The three acoustic noisemakers can draw a hunter away. The post-patrol debrief shows what exposed the boat, where the enemy searched, and which shell and depth-charge attacks missed.
 
 - **1–7**: periscope, sonar, chart, drone, conning tower, deck gun, photos.
 - **P**: raise/lower scope at 15 meters or less. Drag to pan; scroll to zoom.
@@ -55,6 +61,8 @@ Acoustic travel uses approximate constant speeds of 340 m/s in air and 1500 m/s 
 Depth charges have a location, fuse depth and sinking interval. On detonation they emit an underwater pressure front. Nearby damage and sound occur when that front reaches the submarine. The drone can see sinking canisters and expanding underwater blast bubbles. Explosions get quieter and more filtered with distance; their propagation is distinct from air-origin thunder. The audio is procedural, with bounded effect voices and a master compressor.
 
 This is a game approximation: no temperature/salinity profiles, full lightning-channel acoustics, sea-interface wave refraction, multipath echoes or calibrated sound-pressure levels. Unit checks compare the interface-path solver against an independent exhaustive search and verify attenuation, moving-listener arrival, charge timing and save round trips. The browser checks verify rendering and WebAudio scheduling/graph activity; subjective mix quality still needs listening-based playtesting.
+
+With sound on, the boat has occasional mess chatter and clinks after 07:00, noon, and 18:00 on the patrol clock. Original synthesized music plays occasionally from 19:00 to 23:00. Crew reactions and the onboard mix are quieter during silent running or detection. The game bundles synthesized speech and plays it locally.
 
 ## Rescue, survey and vehicle consequences
 

@@ -3,7 +3,8 @@ import {hash01} from './environment.js';
 export const MISSIONS=[
  {id:'recon',name:'A quiet observation',type:'RECONNAISSANCE',desc:'Photograph the briefed number of different merchant ships through your periscope. Leave the escort wondering if you were ever there.',short:'Photograph the merchant convoy',minutes:'8–12 MIN',torps:6},
  {id:'intercept',name:'The long way home',type:'INTERCEPTION',desc:'Intercept the briefed military freighter. Confirm her silhouette before firing. The fishing boats are neutral.',short:'Identify and sink the military freighter',minutes:'10–15 MIN',torps:6},
- {id:'seek-and-destroy',name:'Break the convoy',type:'SEEK AND DESTROY',desc:'Find the escorted convoy and sink all three military transports. Fishing boats are neutral. Surface at extraction when the convoy is down.',short:'Find and sink three military transports',minutes:'12–18 MIN',torps:6},
+ {id:'seek-and-destroy',name:'Seek and Destroy: Convoy',type:'SEEK AND DESTROY',desc:'Find the escorted convoy and sink all three military transports. Fishing boats are neutral. Surface at extraction when the convoy is down.',short:'Find and sink three military transports',minutes:'12–18 MIN',torps:6},
+ {id:'seek-and-destroy-sub',name:'Seek and Destroy: Sub',type:'SUBMARINE HUNT',desc:'Find the hostile submarine. A second boat may be in the area. Sink what you can and surface at extraction to survive the patrol.',short:'Hunt enemy submarines or withdraw to extraction',minutes:'10–18 MIN',torps:6},
  {id:'shadow',name:'Just passing through',type:'SURVEILLANCE',desc:'Quietly track the convoy inside 4 km. Defensive torpedoes are aboard if the patrol turns hostile. Bring the traffic intelligence home.',short:'Quietly track the convoy',minutes:'8–12 MIN',torps:6},
  {id:'undersea-rescue',name:'Someone is still knocking',type:'UNDERSEA RESCUE',desc:'A disabled submarine lies on the reef shelf. Hold 30–75 m from her at rescue depth, below 0.6 knots, while divers assess and recover survivors. Hostile patrols may still be nearby.',short:'Hold at the wreck; recover survivors',minutes:'8–14 MIN',torps:6},
  {id:'surface-rescue',name:'A light in the swell',type:'SURFACE RESCUE',desc:'A damaged research vessel is sinking. Surface and hold 30–85 m away, below 0.6 knots. Rescue launches bring survivors aboard. Enemy gunfire or ramming may force you to move.',short:'Surface beside the casualty; hold position',minutes:'7–12 MIN',torps:6},
@@ -18,6 +19,7 @@ function sunkTransports(s){
 
 export function validMissionTargets(s){
  if(s.mission==='intercept')return s.ships.some(ship=>ship.id==='cobalt');
+ if(s.mission==='seek-and-destroy-sub')return s.ships.some(ship=>ship.id==='echo'&&ship.kind==='sub'&&ship.military===true);
  if(s.mission!=='seek-and-destroy')return true;
  const valid=convoyTransportIds.every(id=>{
   const matches=s.ships.filter(ship=>ship.id===id);
@@ -79,14 +81,18 @@ export function updateOperation(s,dt){
  return o.completed;
 }
 export function objectiveState(s){
+ if(s.mission==='seek-and-destroy-sub')return {label:'HUNT OR WITHDRAW',text:'Surface at extraction to survive the patrol',progress:String(s.ships.filter(ship=>ship.kind==='sub'&&ship.military&&ship.playerDamaged&&ship.hull===0).length)+' SUNK',advice:''};
  if(s.mission==='seek-and-destroy')return {label:'SINK THE CONVOY',text:'Find and sink the military transports',progress:`${sunkTransports(s)}/${convoyTransportIds.length}`,advice:''};
  if(s.operation){const o=s.operation,c=operationConditions(s);
-  if(s.mission==='survey')return {label:'SURVEY THE WRECK',text:`${Math.floor(o.scan)}/45 s scan · ${o.photoAngles.length}/3 camera angles`,progress:o.photoAngles.length+'/3',advice:o.find||'Scan within 100 m at 0.5–3 kn, or take drone photos from three sides.'};
+  if(s.mission==='survey'){
+   if(s.difficulty?.drone===false)return {label:'SURVEY THE WRECK',text:`${Math.floor(o.scan)}/45 s scan`,progress:Math.floor(o.scan)+'/45',advice:o.find||'Scan within 100 m at 0.5–3 kn.'};
+   return {label:'SURVEY THE WRECK',text:`${Math.floor(o.scan)}/45 s scan · ${o.photoAngles.length}/3 camera angles`,progress:o.photoAngles.length+'/3',advice:o.find||'Scan within 100 m at 0.5–3 kn, or take drone photos from three sides.'};
+  }
   return {label:s.site.kind==='surface'?'RECOVER SURVIVORS':'DIVER RESCUE',text:`${o.rescued} aboard · ${o.known?o.remaining:'?'} awaiting rescue`,progress:o.rescued+'/'+(o.known?o.rescued+o.remaining:'?'),advice:o.completed?`${o.rescued} survivors and the rescue team aboard. Surface at extraction.`:c.holding?(o.known?'Hold position. Transfers every 9 seconds.':'Hold position. Rescue team assessing the casualty…'):`Hold 30–${s.site.kind==='surface'?85:75} m away · depth ${c.depth.toFixed(0)} m ±${s.site.kind==='surface'?1:5} · ≤0.6 kn`};
  }
  return {label:s.mission==='recon'?'PHOTOGRAPH THE CONVOY':s.mission==='intercept'?'INTERCEPT '+(s.ships.find(v=>v.id==='cobalt')?.name||'MILITARY FREIGHTER').toUpperCase():'LISTEN WITHOUT BEING SEEN',text:s.mission==='recon'?`Photograph ${s.patrol.photoGoal} different merchant ships`:s.mission==='shadow'?`Track quietly for ${s.patrol.trackGoal} seconds`:MISSIONS.find(m=>m.id===s.mission).short,progress:s.mission==='recon'?s.photos.length+'/'+s.patrol.photoGoal:s.mission==='shadow'?Math.min(s.patrol.trackGoal,Math.floor(s.trackTime))+'/'+s.patrol.trackGoal:'0/1',advice:''};
 }
-const completionRules={recon:s=>s.photos.length>=s.patrol.photoGoal,intercept:s=>s.ships.find(v=>v.id==='cobalt')?.hull===0,'seek-and-destroy':s=>sunkTransports(s)===convoyTransportIds.length,shadow:s=>s.trackTime>=s.patrol.trackGoal,'undersea-rescue':updateOperation,'surface-rescue':updateOperation,survey:updateOperation};
+const completionRules={recon:s=>s.photos.length>=s.patrol.photoGoal,intercept:s=>s.ships.find(v=>v.id==='cobalt')?.hull===0,'seek-and-destroy':s=>sunkTransports(s)===convoyTransportIds.length,'seek-and-destroy-sub':()=>true,shadow:s=>s.trackTime>=s.patrol.trackGoal,'undersea-rescue':updateOperation,'surface-rescue':updateOperation,survey:updateOperation};
 if(MISSIONS.length!==Object.keys(completionRules).length||MISSIONS.some(m=>!Object.hasOwn(completionRules,m.id)))throw new Error('Every mission must have an explicit completion rule.');
 export const objectiveComplete=(s,dt)=>completionRules[s.mission](s,dt);
 export function randomizePatrol(s,seed){
@@ -110,8 +116,18 @@ export function randomizePatrol(s,seed){
  s.ships.push({id:'alder',name:['Alder','Seaforth','Larch'][Math.floor(h(81)*3)],kind:'merchant',military:false,x:convoy.x+400+h(82)*500,y:convoy.y+450+h(83)*300,heading,speed,hull:100,alert:0,attack:0,flood:0,disabled:false,sinkDepth:0});
  setupOperation(s,seed);
  s.events=s.events.filter(e=>!e.text.startsWith('Helm steady.'));
+ if(s.mission==='seek-and-destroy-sub'){
+  s.ships=s.ships.filter(ship=>ship.kind==='fishing'||ship.id==='echo');
+  const primary=s.ships.find(ship=>ship.id==='echo');
+  Object.assign(primary,{depth:55+h(86)*40,heading:188+h(88)*60});
+  if(h(89)<.36)s.ships.push({...primary,id:'echo-two',x:primary.x+700+h(90)*1200,y:primary.y+400+h(91)*1100,depth:45+h(92)*45,heading:150+h(93)*105});
+  s.phase='extract';
+  log(s,`Patrol ${seed}. An enemy submarine was reported in this sector. Engage or withdraw. Surface at extraction to survive.`);
+  return;
+ }
  if(hunting){
   for(const ship of s.ships)if(convoyTransportIds.includes(ship.id))ship.military=true;
+  if(h(87)>=.4)s.ships=s.ships.filter(ship=>ship.id!=='echo');
   const lastBearing=(Math.round(bearing(start,convoy)/45)*45)%360;
   log(s,`Patrol ${seed}. Last report put the convoy around bearing ${String(lastBearing).padStart(3,'0')}°. Listen for the transports and escort.`);
   return;

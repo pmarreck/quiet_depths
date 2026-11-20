@@ -29,6 +29,19 @@ export function estimateAt(contact,time){
  const major=2.448*Math.hypot(fix.positionSigma,fix.velocitySigma*age,maneuver),minor=2.448*Math.hypot(fix.positionSigma,fix.velocitySigma*age*(speed>.1?.6:1),maneuver);
  return{x:fix.x+fix.vx*age,y:fix.y+fix.vy*age,major,minor,angle:speed>.01?(Math.atan2(fix.vx,fix.vy)*180/Math.PI+360)%360:contact.bearing||0,age,hasFix:true};
 }
+
+export function chartContacts(s){
+ if(!s.difficulty?.omniscientChart)return s.contacts;
+ const hostile=new Set(s.ships.filter(ship=>ship.military).map(ship=>ship.id));
+ const observed=s.contacts.filter(contact=>!hostile.has(contact.id));
+ const exact=s.ships.filter(ship=>ship.military&&ship.hull>0).map(ship=>({
+  id:ship.id,label:'LIVE',name:ship.name,identified:true,kind:ship.kind,age:0,range:1,exact:true,
+  x:ship.x,y:ship.y,depthEstimate:ship.kind==='sub'?ship.depth:undefined,
+  fix:{time:s.time,x:ship.x,y:ship.y,vx:Math.sin(ship.heading*Math.PI/180)*ship.speed*.514444,
+   vy:Math.cos(ship.heading*Math.PI/180)*ship.speed*.514444,positionSigma:0,velocitySigma:0,maneuverSigma:0}
+ }));
+ return [...observed,...exact];
+}
 export function applyReconPacket(s,packet){
  if(!s||!['time','x','y'].every(k=>finite(s[k]))||!packet||!Array.isArray(packet.tracks)||packet.tracks.length>256||!finite(packet.capturedAt)||!finite(packet.receivedAt)||packet.receivedAt>s.time||packet.capturedAt>packet.receivedAt)return false;
  const observations=[],ids=new Set();

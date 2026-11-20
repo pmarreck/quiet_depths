@@ -1,0 +1,15 @@
+{
+  "id": "./",
+  "name": "Quiet Depths",
+  "short_name": "Quiet Depths",
+  "description": "A 1972 submarine patrol game",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1419",
+  "theme_color": "#0b1419",
+  "icons": [
+    {"src": "icons/quiet-depths-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/quiet-depths-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

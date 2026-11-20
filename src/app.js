@@ -13,15 +13,24 @@ import {reconcileKeyedChildren,contactRow,updateContactRow,sonarLayout} from './
 import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js';
 import {captureOptics,captureSatellite} from './photo-capture.js';
 import {requestRecon,reconStatus,reconAreaForDisplay} from './recon.js';
-import {estimateAt} from './track-estimates.js';
+import {chartContacts,estimateAt} from './track-estimates.js';
 import {lossPresentation} from './loss.js';
 import {persistPatrol} from './persistence.js';
+import {difficultyControls,patrolDifficulty} from './difficulty.js';
+import {allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
+import {patrolKills,serviceRecord} from './service-record.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
 let orderAxis=null,reconPlacement=false,photoKey='',lossStartedAt=0;const zooms={scope:1,tower:1,gun:1};let library=[];
+let difficulty=patrolDifficulty();
+try{difficulty=patrolDifficulty(JSON.parse(localStorage.getItem('quiet-depths-difficulty-v1')));}catch{}
+let previousView='scope';
+const orbit={yaw:.8,pitch:.22,distance:62};
+let bindings=shortcutBindings(),remapping=null;
+try{bindings=shortcutBindings(JSON.parse(localStorage.getItem('quiet-depths-shortcuts-v1')));}catch{}
 try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
 state.photoArchive=library;
 try{saved=restore(localStorage.getItem('quiet-depths-v1'));}catch{}
@@ -29,7 +38,7 @@ let scene=null;
 try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',e);toast('WebGL unavailable. Sonar and chart are available.');view='sonar';}
 const held=new HeldInput(),keys=held.keys,commandControls=[];let drawer=null;
 const context=()=>({view,paused,modal:!!document.querySelector('dialog[open]')});
-const pilotEnabled=()=>view!=='drone'||state.drone.mode==='remote';
+const pilotEnabled=()=>view!=='orbit'&&(view!=='drone'||state.drone.mode==='remote');
 const sound=new SoundSystem(()=>state,context,status=>{
  const el=$('sound');el.dataset.audioContext=status.context;el.dataset.engineSources=status.engines;el.dataset.effects=status.effects;
  if(status.last){el.dataset.lastAcoustic=status.last.type;el.dataset.lastDelay=status.last.delay.toFixed(3);el.dataset.lastGain=(status.last.currentGain??status.last.gain).toFixed(4);el.dataset.lastCutoff=(status.last.currentCutoff??status.last.cutoff).toFixed(0);}else{for(const key of ['lastAcoustic','lastDelay','lastGain','lastCutoff'])delete el.dataset[key];}
@@ -38,28 +47,50 @@ function toast(text){$('toast').textContent=text;$('toast').classList.add('show'
 function persist(){if(!patrolStarted)return;try{persistPatrol(localStorage,state,patrolStarted);library=photoArchive(state);$('save-status').textContent='PATROL SAVED';setTimeout(()=>$('save-status').textContent='LOCAL AUTOSAVE',1400);}catch{$('save-status').textContent='SAVING UNAVAILABLE';}}
 function bindCommand(element,event,action,enabled=()=>true){
  const el=typeof element==='string'?$(element):element;commandControls.push({el,enabled});el.dataset.command='true';
- el.addEventListener(event,e=>{if(!canIssue(state,context())||!enabled())return;action(e);updateUI();});
+ el.addEventListener(event,e=>{if(view==='orbit'||!canIssue(state,context())||!enabled())return;action(e);updateUI();});
 }
 function order(axis,value){return setHelmOrder(state,context(),axis,value);}
 function closeDrawer(){drawer=null;document.body.removeAttribute('data-drawer');$('drawer-backdrop').classList.add('hidden');all('[data-panel]').forEach(b=>b.setAttribute('aria-expanded','false'));}
 function setRate(r){rate=r;all('[data-time]').forEach(b=>b.classList.toggle('active',+b.dataset.time===r));$('mobile-time').textContent=r+'×';$('mobile-time').setAttribute('aria-label','Time compression '+r+' times');}
-function setPaused(p){paused=p;held.clear();drag=null;document.body.classList.toggle('paused',p);$('pause').textContent=p?'RESUME · ESC':'PAUSE · ESC';$('pause').setAttribute('aria-label',p?'Resume patrol':'Pause patrol');updateUI();sound.update();persist();}
-function setView(v){zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();}
+function setPaused(p){paused=p;held.clear();drag=null;document.body.classList.toggle('paused',p);$('pause').setAttribute('aria-label',p?'Resume patrol':'Pause patrol');updateUI();sound.update();persist();}
+function setView(v){if(v==='drone'&&!state.difficulty.drone)return;zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;document.body.classList.toggle('orbiting',v==='orbit');held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();}
+function changeOrbit(){
+ if(view==='orbit'){setView(previousView);$('open-orbit').focus();return;}
+ if(!scene||!state.difficulty.orbitCamera||context().modal||!patrolStarted)return;
+ previousView=view;setView('orbit');$('orbit-exit').focus();
+}
+function zoomOrbit(factor){orbit.distance=clamp(orbit.distance*factor,37,120);}
 function updateMissionBriefing(id){
  const mission=MISSIONS.find(m=>m.id===id);
  if(!mission)return;
  document.querySelector('.briefing-tip p').innerHTML=esc(mission.desc)+' <strong>Esc pauses everything.</strong>';
 }
-function openBriefing(){held.clear();persist();$('briefing').showModal();$('resume').classList.toggle('hidden',!saved&&state.time===0);sound.update();}
+function renderServiceRecord(){
+ try{const record=serviceRecord(localStorage);$('service-record').textContent=`${record.ships} ships sunk · ${record.submarines} submarines sunk · ${record.doubleHunts} two-submarine patrols`;}catch{}
+}
+function openBriefing(){held.clear();persist();renderServiceRecord();$('briefing').showModal();$('resume').classList.toggle('hidden',!saved&&state.time===0);sound.update();}
 function start(mission=null){
  if(!$('briefing').open)return;
  patrolStarted=true;
- if(mission===null)state=saved||state;else{const seedText=$('patrol-seed').value.trim(),seed=seedText?Number(seedText)>>>0:crypto.getRandomValues(new Uint32Array(1))[0];state=createGame(mission,seed,{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked});selected=null;}
+ if(mission===null)state=saved||state;else{const seedText=$('patrol-seed').value.trim(),seed=seedText?Number(seedText)>>>0:crypto.getRandomValues(new Uint32Array(1))[0];state=createGame(mission,seed,{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked,difficulty});selected=null;}
+ state.patrolId??=Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
  chart={x:state.x,y:state.y,zoom:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
 }
 $('patrol-time').innerHTML='<option value="random">Random</option>'+Object.entries(TIMES).map(([id,t])=>`<option value="${id}" ${''}>${t.name}</option>`).join('');
 $('patrol-weather').innerHTML='<option value="random">Random</option>'+Object.entries(WEATHER).map(([id,w])=>`<option value="${id}">${w.name}</option>`).join('');
+$('difficulty-options').innerHTML=difficultyControls.map(control=>{
+ const value=difficulty[control.id];
+ if(typeof value==='boolean')return `<label>${control.label}<input type="checkbox" data-difficulty="${control.id}" ${value?'checked':''}></label>`;
+ return `<label>${control.label}<output>${value}</output><input type="range" data-difficulty="${control.id}" min="${control.min}" max="${control.max}" step="${control.step}" value="${value}"><small>${control.low} ↔ ${control.high}</small></label>`;
+}).join('');
+$('difficulty-options').addEventListener('input',event=>{
+ const input=event.target,id=input.dataset.difficulty;
+ if(!id)return;
+ difficulty=patrolDifficulty({...difficulty,[id]:input.type==='checkbox'?input.checked:Number(input.value)});
+ const output=input.closest('label').querySelector('output');if(output)output.value=difficulty[id];
+ try{localStorage.setItem('quiet-depths-difficulty-v1',JSON.stringify(difficulty));}catch{}
+});
 const missionPicker=globalThis.Elm.MissionPicker.init({
  node:$('mission-picker'),
  flags:{selected:state.mission,missions:MISSIONS.map(({id,name,type,minutes})=>({id,name,category:type,duration:minutes}))}
@@ -72,11 +103,13 @@ function dismissBriefing(){
  else if(saved)start();
  else requestPatrol();
 }
-$('start').onclick=requestPatrol;$('resume').onclick=()=>start();$('close-briefing').onclick=dismissBriefing;$('another-patrol').onclick=()=>{$('result-dialog').close();$('briefing').showModal();$('resume').classList.add('hidden');};
+$('start').onclick=requestPatrol;$('resume').onclick=()=>start();$('close-briefing').onclick=dismissBriefing;$('another-patrol').onclick=()=>{$('result-dialog').close();renderServiceRecord();$('briefing').showModal();$('resume').classList.add('hidden');};
 $('sound').onclick=()=>{sound.toggle();renderSound();};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{held.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
 all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI();}));
 $('briefing').addEventListener('cancel',e=>{e.preventDefault();dismissBriefing();});
 all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
+$('open-orbit').onclick=changeOrbit;$('orbit-exit').onclick=changeOrbit;$('orbit-pause').onclick=()=>setPaused(!paused);
+$('orbit-in').onclick=()=>zoomOrbit(1/1.2);$('orbit-out').onclick=()=>zoomOrbit(1.2);
 function scopeToggle(){if(!canIssue(state,context())||state.systems.periscope===0)return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}state.scope=!state.scope;if(!state.scope)scene?.clear();updateUI();}
 function takePhoto(){
  if(!canIssue(state,context())||state.photoCooldown>0)return;
@@ -117,13 +150,16 @@ $('center-chart').onclick=()=>{chart.follow=true;updateUI();};
  bindCommand('mobile-stop','click',()=>setHelmOrder(state,{...context(),view:'chart'},'speed',0));bindCommand('mobile-silent','click',()=>silent(true));bindCommand('mobile-engine','click',()=>{if(state.engine==='diesel'){state.engine='electric';return;}if(state.depth>14||state.fuel<=0){toast('Diesel needs air above 14 m and fuel.');return;}state.engine='diesel';state.silent=false;});
  all('[data-key]').forEach(button=>{button.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!canIssue(state,context())||button.dataset.key!=='KeyJ'&&!pilotEnabled())return;button.setPointerCapture(e.pointerId);held.press('touch:'+e.pointerId,button.dataset.key);applyHelmKeys(state,context(),new Set([button.dataset.key]),.12);button.classList.add('held');updateUI();});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,e=>{held.release('touch:'+e.pointerId);button.classList.remove('held');});});
 const vp=$('viewport');let drag=null;
+let shaking=false;
 vp.addEventListener('pointerdown',e=>{
+ if(drag)return;
  if(e.target.closest('button,input,select,.photo-card,.order-sheet'))return;
- if(view!=='chart'&&(!['scope','tower','gun'].includes(view)||!feedActive(state,view)||!canIssue(state,context())))return;
- e.preventDefault();drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};vp.setPointerCapture(e.pointerId);
+ if(!['chart','orbit'].includes(view)&&(!['scope','tower','gun'].includes(view)||!feedActive(state,view)||!canIssue(state,context())))return;
+ e.preventDefault();drag={pointer:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};vp.setPointerCapture(e.pointerId);
 });
 vp.addEventListener('pointermove',e=>{
- if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+ if(!drag||drag.pointer!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+ if(view==='orbit'){orbit.yaw=(orbit.yaw-dx*.008)%(2*Math.PI);orbit.pitch=clamp(orbit.pitch+dy*.008,-1.28,1.28);}
  if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>6)drag.moved=true;
  if(view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=wrapHeading(state.scopeAngle+dx*.16/zoom);}
  if(view==='tower'&&feedActive(state,'tower')&&canIssue(state,context())){state.towerAngle=wrapHeading(state.towerAngle+dx*.16/zoom);state.towerPitch=clamp(state.towerPitch-dy*.003/zoom,-1.45,.75);}
@@ -132,24 +168,55 @@ vp.addEventListener('pointermove',e=>{
  drag.x=e.clientX;drag.y=e.clientY;
 });
 vp.addEventListener('pointerup',e=>{
+ if(drag?.pointer!==e.pointerId)return;
  if(drag&&view==='chart'&&!drag.moved&&canIssue(state,context())){const r=vp.getBoundingClientRect(),point=chartWorldAt(chart,e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);if(reconPlacement){chart.reconArea={...point,size:10000};reconPlacement=false;openDrawer('recon');toast('10 km search square placed. Review conditions and request the pass.');}else{state.scopeSteerBearing=null;state.route=point;state.targetSpeed=Math.max(4,state.targetSpeed);state.silent=false;toast('Waypoint plotted. Holding requested depth.');}}
  drag=null;updateUI();
 });
-vp.addEventListener('pointercancel',()=>drag=null);
+vp.addEventListener('lostpointercapture',e=>{if(drag?.pointer===e.pointerId)drag=null;});
 vp.addEventListener('wheel',e=>{
+ if(view==='orbit'){e.preventDefault();zoomOrbit(Math.exp(e.deltaY*.001));return;}
  if(view==='chart'){e.preventDefault();const r=vp.getBoundingClientRect();zoomChart(chart,Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);updateUI();}
  else if(['scope','tower','gun'].includes(view)&&feedActive(state,view)&&canIssue(state,context())){e.preventDefault();zoom=clamp(zoom-e.deltaY*.002,1,opticalZoomLimit(view));updateUI();}
 },{passive:false});
+function saveShortcuts(){try{localStorage.setItem('quiet-depths-shortcuts-v1',JSON.stringify(bindings));}catch{}}
+function showShortcuts(){
+ $('shortcut-list').replaceChildren(...Object.entries(shortcutActions).map(([action,label])=>{
+  const button=document.createElement('button');button.type='button';button.dataset.shortcut=action;
+  const name=document.createElement('span'),key=document.createElement('kbd');name.textContent=label;key.textContent=keyLabel(bindings[action]);
+  button.append(name,key);return button;
+ }));
+}
+$('open-settings').onclick=()=>{held.clear();remapping=null;showShortcuts();$('settings-dialog').showModal();};
+$('close-settings').onclick=()=>$('settings-dialog').close();
+$('reset-shortcuts').onclick=()=>{remapping=null;bindings=shortcutBindings();saveShortcuts();showShortcuts();updateUI();$('shortcut-status').textContent='Default shortcuts restored.';};
+$('shortcut-list').onclick=event=>{const button=event.target.closest('[data-shortcut]');if(!button)return;remapping=button.dataset.shortcut;$('shortcut-status').textContent='Press a key for '+shortcutActions[remapping]+'.';};
+$('settings-dialog').addEventListener('keydown',event=>{
+ if(!remapping||event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.code==='Tab')return;
+ event.preventDefault();event.stopPropagation();
+ const key=event.code;if(!allowedShortcut(key)){$('shortcut-status').textContent='Choose a letter, number, arrow, Space, Esc, bracket, minus or equals.';return;}
+ const other=Object.keys(bindings).find(action=>action!==remapping&&bindings[action]===key);
+ if(other){$('shortcut-status').textContent=keyLabel(key)+' is already assigned to '+shortcutActions[other]+'.';return;}
+ const action=remapping;bindings[action]=key;remapping=null;saveShortcuts();showShortcuts();updateUI();
+ $('shortcut-list').querySelector(`[data-shortcut="${action}"]`).focus();
+ $('shortcut-status').textContent=shortcutActions[action]+' set to '+keyLabel(key)+'.';
+});
 const helmKeys=new Set(['KeyW','KeyA','KeyS','KeyD','Space','KeyC','KeyJ']);
 window.addEventListener('keydown',e=>{
  if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches('textarea,input:not([type="range"]),[contenteditable="true"]'))return;
  if(context().modal)return;
- if(e.code==='Escape'){e.preventDefault();if(!e.repeat)setPaused(!paused);return;}
+ const action=Object.keys(bindings).find(key=>bindings[key]===e.code);
+ if(view==='orbit'){
+  if(e.code==='Escape'||action==='KeyV'){e.preventDefault();if(!e.repeat)changeOrbit();}
+  else if(action==='Escape'){e.preventDefault();if(!e.repeat)setPaused(!paused);}
+  return;
+ }
+ if(action==='KeyV'){e.preventDefault();if(!e.repeat)changeOrbit();return;}
+ if(action==='Escape'){e.preventDefault();if(!e.repeat)setPaused(!paused);return;}
  const stations={Digit1:'scope',Digit2:'sonar',Digit3:'chart',Digit4:'drone',Digit5:'tower',Digit6:'gun',Digit7:'photos'};
- if(stations[e.code]){e.preventDefault();if(!e.repeat)setView(stations[e.code]);return;}
- if(helmKeys.has(e.code)){e.preventDefault();if(canIssue(state,context())&&pilotEnabled()){held.press('keyboard:'+e.code,e.code);if(!e.repeat){applyHelmKeys(state,context(),new Set([e.code]),.12);updateUI();}}return;}
+ if(stations[action]){e.preventDefault();if(!e.repeat)setView(stations[action]);return;}
+ if(helmKeys.has(action)){e.preventDefault();if(canIssue(state,context())&&pilotEnabled()){held.press('keyboard:'+e.code,action);if(!e.repeat){applyHelmKeys(state,context(),new Set([action]),.12);updateUI();}}return;}
  if(!canIssue(state,context())||e.repeat)return;
- ({KeyP:scopeToggle,KeyF:takePhoto,KeyG:doPing,KeyR:silent})[e.code]?.();
+ ({KeyP:scopeToggle,KeyF:takePhoto,KeyG:doPing,KeyR:silent})[action]?.();
 });
 window.addEventListener('keyup',e=>held.release('keyboard:'+e.code));
 window.addEventListener('blur',()=>{held.clear();if(!context().modal&&state.status==='patrol')setPaused(true);});
@@ -158,11 +225,21 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){held.clear
 function updateUI(){
  const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=extract&&distance(s,s.home)<400,objective=objectiveState(s);
  if(view==='scope'&&s.systems.periscope===0)view='tower';
+ $('open-orbit').classList.toggle('hidden',!s.difficulty.orbitCamera||!scene);
+ $('pause').textContent=(paused?'RESUME':'PAUSE')+' · '+keyLabel(bindings.Escape).toUpperCase();
+ $('pause').title='Pause or resume ['+keyLabel(bindings.Escape)+']';
+ $('open-orbit').title='Toggle external camera ['+keyLabel(bindings.KeyV)+']';
+ $('orbit-tools').hidden=view!=='orbit';$('orbit-pause').textContent=paused?'Resume':'Pause';
+ $('recon-place').classList.toggle('hidden',!s.difficulty.satellite);
+ document.querySelector('[data-view=drone]').classList.toggle('hidden',!s.difficulty.drone);
+ $('show-recon-chart').classList.toggle('hidden',!s.difficulty.satellite);
+ $('recon-panel').classList.toggle('hidden',!s.difficulty.satellite);
  $('mission-type').textContent=m.type;$('mission-name').innerHTML=esc(m.name).replace('observation','<br>observation.').replace('home','<br>home.').replace('through','<br>through.');
- $('mission-desc').textContent=extract?'Your work is done. Bring everyone home.':m.short;
- $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':extract?'RETURN TO EXTRACTION':objective.label;
- $('objective-text').textContent=pickup?'Request 0 m and wait until surfaced':extract?'Reach the green circle and surface':objective.text;
- $('progress').textContent=extract?'✓':objective.progress;
+ const survival=s.mission==='seek-and-destroy-sub',returning=extract&&!survival;
+ $('mission-desc').textContent=returning?'Your work is done. Bring everyone home.':m.short;
+ $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':returning?'RETURN TO EXTRACTION':objective.label;
+ $('objective-text').textContent=pickup?'Request 0 m and wait until surfaced':returning?'Reach the green circle and surface':objective.text;
+ $('progress').textContent=returning?'✓':objective.progress;
  $('operation-card').classList.toggle('hidden',!s.operation);$('operation-range').textContent=s.site?Math.round(distance(s,s.site))+' M':'';$('operation-advice').textContent=objective.advice;$('approach-site').textContent=s.mission==='survey'?'PLOT SURVEY APPROACH':'PLOT RESCUE APPROACH';
  document.querySelector('.top-coords b').textContent=String(s.patrol.seed);$('home-distance').textContent=(distance(s,s.home)/1000).toFixed(1)+' km · '+deg(bearing(s,s.home))+'°';
  $('hull-value').innerHTML=Math.round(s.hull)+'<span>%</span>';$('hull-bar').style.width=s.hull+'%';$('hull-bar').style.background=s.hull<45?'var(--red)':'var(--green)';
@@ -190,7 +267,8 @@ function updateUI(){
  const labels={photos:['PHOTOGRAPHIC EVIDENCE',photoArchive(s).length+' ARCHIVED EXPOSURES'],gun:['DECK GUN',active?`DU EXPLOSIVE · ${s.gun.ammo} ROUNDS · ${s.gun.elevation.toFixed(1)}° ELEVATION`:'SURFACE TO MAN THE GUN'],tower:['CONNING TOWER',active?'OPEN BRIDGE · DRAG VERTICALLY TO LOOK DOWN':'SURFACE TO GO TOPSIDE'],scope:['OPTICAL OBSERVATION',active?`PERISCOPE · ${scopeWashed(s,env)?'LENS AWASH':deg(s.scopeAngle)+'° RELATIVE'} · ${(6*zoom).toFixed(0)}×`:'OPTICS OFFLINE'],sonar:['ACOUSTIC OBSERVATION',`HEADING UP · ${deg(s.heading)}° TRUE · ESTIMATED CONTACTS`],chart:['NAVIGATION CHART',`NORTH UP · ${chart.zoom.toFixed(1)}× · ${chart.follow?'FOLLOWING BOAT':'FREE PAN'}`],drone:['REMOTE INSPECTION',`ROV ${s.drone.mode.toUpperCase()} · BATTERY ${Math.round(s.drone.battery)}%`]};
  const scopeTab=document.querySelector('[data-view=scope]'),droneTab=document.querySelector('[data-view=drone]');scopeTab.classList.toggle('hidden',s.systems.periscope===0);droneTab.classList.toggle('damaged',s.drone.mode==='lost');droneTab.innerHTML='<span>04</span> '+(s.drone.mode==='lost'?'DRONE LOST':'DRONE');
  all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-pressed',String(b.dataset.view===view));});
- $('view-label').textContent=labels[view][0];$('view-subtitle').textContent=labels[view][1];$('view-tag').textContent=optical?active?(paused?'FROZEN':'LIVE FEED'):'OFFLINE':view==='chart'?'SECTOR 07':'HEADING UP';
+ const [viewLabel,viewSubtitle]=labels[view]||['EXTERNAL ORBIT','DRAG TO ORBIT'];
+ $('view-label').textContent=viewLabel;$('view-subtitle').textContent=viewSubtitle;$('view-tag').textContent=optical?active?(paused?'FROZEN':'LIVE FEED'):'OFFLINE':view==='chart'?'SECTOR 07':'HEADING UP';
  $('look-heading').textContent=deg(absLook)+'° TRUE';all('.compass span').forEach((el,i)=>el.textContent=deg(absLook+(i-2)*(drone?15:7.5/zoom)));
  const world=$('world');if(!active&&world.dataset.online!=='false')scene?.clear();world.dataset.online=String(active);world.style.display=active?'block':'none';world.setAttribute('aria-hidden',String(!active));world.style.opacity='1';
  $('tactical').style.display=view==='sonar'||view==='chart'?'block':'none';$('scope-overlay').style.display=(view==='scope'||gun)&&active?'block':'none';$('scope-overlay').style.opacity='1';
@@ -215,7 +293,7 @@ function updateUI(){
  $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
  $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>G</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
- const contactModels=s.contacts.map(c=>{const e=estimateAt(c,s.time),range=c.range&&e?Math.hypot(e.x-s.x,e.y-s.y):0;return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):'UNCLASSIFIED')+' · '+(range?(range/1000).toFixed(1)+' KM':'RANGE ?'),bearing:deg(relativeBearing(c.bearing,s.heading))+'° R'};});
+ const contactModels=s.contacts.map(c=>{const e=estimateAt(c,s.time),range=c.range&&e?Math.hypot(e.x-s.x,e.y-s.y):0;return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED')+' · '+(range?(range/1000).toFixed(1)+' KM':'RANGE ?'),bearing:deg(relativeBearing(c.bearing,s.heading))+'° R'};});
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
 
  $('torp-count').textContent=String(s.torps).padStart(2,'0');$('tubes').innerHTML=Array.from({length:6},(_,i)=>`<i class="${i>=s.torps?'spent':''}"></i>`).join('');
@@ -274,7 +352,30 @@ function drawChart(){
  c.strokeStyle='#90bb9f';c.setLineDash([3,4]);c.beginPath();c.arc(sx(state.home.x),sy(state.home.y),400*k,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#bdd5af';c.font='14px IBM Plex Mono,monospace';c.fillText('EXTRACTION · SURFACE',sx(state.home.x),sy(state.home.y)+400*k+23);
  if(state.site){const site=state.site;c.strokeStyle='#e5c389';c.beginPath();c.arc(sx(site.x),sy(site.y),Math.max(7,75*k),0,Math.PI*2);c.stroke();c.fillStyle='#efcf98';c.font='14px IBM Plex Mono,monospace';c.textAlign='left';c.fillText(site.name,sx(site.x)+12,sy(site.y)-12);c.font='12px IBM Plex Mono,monospace';c.fillText('MISSION SITE · '+Math.round(site.depth)+' M',sx(site.x)+12,sy(site.y)+8);}
  if(['remote','return'].includes(state.drone.mode)){c.strokeStyle='#81dfcc';c.setLineDash([3,3]);c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.drone.x),sy(state.drone.y));c.stroke();c.setLineDash([]);c.fillStyle='#81dfcc';c.fillRect(sx(state.drone.x)-3,sy(state.drone.y)-3,6,6);}
- for(const q of state.contacts){c.strokeStyle=q.id===selected?'#dfc99b':'#acb997';c.globalAlpha=clamp(1-q.age/900,.25,.9);c.setLineDash([4,5]);const e=estimateAt(q,state.time);if(q.range&&e){c.beginPath();c.ellipse(sx(e.x),sy(e.y),Math.min(30000,e.major)*k,Math.min(30000,e.minor)*k,rad(e.angle)-Math.PI/2,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#ded8af';c.fillRect(sx(e.x)-2,sy(e.y)-2,4,4);if(q.fix){c.beginPath();c.moveTo(sx(e.x),sy(e.y));c.lineTo(sx(e.x+q.fix.vx*60),sy(e.y+q.fix.vy*60));c.stroke();}c.textAlign='left';c.font='12px IBM Plex Mono,monospace';c.fillText(q.label+(q.identified?' · '+q.name:''),sx(e.x)+9,sy(e.y)-9);c.font='11px IBM Plex Mono,monospace';c.fillText(e.hasFix?Math.round(e.age)+' s OLD':'ESTIMATE',sx(e.x)+9,sy(e.y)+8);}else{c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.x+Math.sin(rad(q.bearing))*6500),sy(state.y+Math.cos(rad(q.bearing))*6500));c.stroke();}c.setLineDash([]);c.globalAlpha=1;}
+ for(const q of chartContacts(state)){
+  const e=estimateAt(q,state.time),sub=q.kind==='sub';
+  c.strokeStyle=q.id===selected?'#dfc99b':sub?'#94ccdc':'#acb997';
+  c.globalAlpha=q.exact?1:clamp(1-q.age/900,.25,.9);
+  c.setLineDash(q.exact?[]:[4,5]);
+  c.beginPath();
+  if(q.range&&e){
+   if(!q.exact){c.ellipse(sx(e.x),sy(e.y),Math.min(30000,e.major)*k,Math.min(30000,e.minor)*k,rad(e.angle)-Math.PI/2,0,Math.PI*2);c.stroke();}
+   c.setLineDash([]);c.fillStyle=sub?'#b0ddec':'#ded8af';
+   if(sub){const x=sx(e.x),y=sy(e.y);c.beginPath();c.moveTo(x,y-5);c.lineTo(x+5,y);c.lineTo(x,y+5);c.lineTo(x-5,y);c.closePath();c.stroke();}
+   else c.fillRect(sx(e.x)-2,sy(e.y)-2,4,4);
+   if(q.fix){c.beginPath();c.moveTo(sx(e.x),sy(e.y));c.lineTo(sx(e.x+q.fix.vx*60),sy(e.y+q.fix.vy*60));c.stroke();}
+   c.textAlign='left';c.font='12px IBM Plex Mono,monospace';
+   c.fillText(q.label+(q.identified?' · '+q.name:sub?' · SUBMARINE':''),sx(e.x)+9,sy(e.y)-9);
+   c.font='11px IBM Plex Mono,monospace';
+   const age=q.exact?'LIVE':e.hasFix?Math.round(e.age)+' s OLD':'ESTIMATE';
+   const motion=q.fix&&(q.exact||q.courseEstimated)?deg(e.angle)+'° · '+(Math.hypot(q.fix.vx,q.fix.vy)/.514444).toFixed(1)+' KN':'COURSE / SPEED ?';
+   const depth=Number.isFinite(q.depthEstimate)?(q.exact?'':'~')+Math.round(q.depthEstimate)+' M':'DEPTH ?';
+   c.fillText(sub?(depth+' · '+motion+' · '+age):age,sx(e.x)+9,sy(e.y)+8);
+  }else{
+   c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.x+Math.sin(rad(q.bearing))*6500),sy(state.y+Math.cos(rad(q.bearing))*6500));c.stroke();
+  }
+  c.setLineDash([]);c.globalAlpha=1;
+ }
  drawReconArea(c,sx,sy,k);
 
  if(state.route){c.setLineDash([4,5]);c.strokeStyle='#d7bd82';c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.route.x),sy(state.route.y));c.stroke();c.setLineDash([]);c.beginPath();c.arc(sx(state.route.x),sy(state.route.y),6,0,Math.PI*2);c.stroke();}
@@ -295,6 +396,7 @@ function drawScope(){
 function drawGun(){const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);const x=w/2,y=h/2;c.strokeStyle='#e3d4ab';c.lineWidth=1;c.beginPath();c.arc(x,y,11,0,Math.PI*2);c.moveTo(x-50,y);c.lineTo(x-15,y);c.moveTo(x+15,y);c.lineTo(x+50,y);c.moveTo(x,y-35);c.lineTo(x,y-15);c.moveTo(x,y+15);c.lineTo(x,y+35);c.stroke();}
 function patrolVictory(s){
  if(s.mission==='seek-and-destroy')return 'All three military transports sank. The boat and crew made it home.';
+ if(s.mission==='seek-and-destroy-sub')return 'You reached extraction alive. The boat and crew made it home.';
  if(!s.operation)return 'The intelligence is aboard. The crew is safe. Somewhere out there, the convoy sails on.';
  if(s.mission==='survey')return s.operation.find;
  return `${s.operation.rescued} survivors brought home. ${s.operation.dead} lost before recovery. The rescue crew is safely aboard.`;
@@ -307,6 +409,13 @@ function showResult(){
  const win=state.status==='won';
  $('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';
  $('result-body').textContent=win?patrolVictory(state):state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.':'Your boat could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';
+ const kills=patrolKills(state),medals=$('patrol-medals');
+ medals.hidden=kills.submarines===0;
+ medals.textContent=kills.submarines>=2?'✦ Two-submarine patrol commendation':'✦ Submarine patrol commendation';
+ const debrief=$('patrol-debrief');debrief.hidden=!state.debrief.length;
+ $('debrief-entries').replaceChildren(...state.debrief.slice(-10).map(event=>{
+  const entry=document.createElement('li');entry.textContent=`${Math.floor(event.time/60)}m ${Math.floor(event.time%60)}s · ${event.text}`;return entry;
+ }));
  $('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span>`;
  $('result-dialog').showModal();
 }
@@ -324,8 +433,13 @@ function frame(now){
   sound.update(state,ctx);if(state.status!=='patrol')showResult();
  }
  if(String(feedActive(state,view))!==$('world').dataset.online)updateUI();
+ if(state.shock||shaking){
+  shaking=state.shock>0;
+  vp.style.setProperty('--shock-x',Math.sin(renderClock*27)*state.shock*2.3+'px');
+  vp.style.setProperty('--shock-y',Math.cos(renderClock*19)*state.shock*1.7+'px');
+ }
  const r=vp.getBoundingClientRect();
- if(scene&&feedActive(state,view)){scene.resize(r.width,r.height);scene.render(state,view,zoom,renderClock);}
+ if(scene&&feedActive(state,view)){scene.resize(r.width,r.height);scene.render(state,view,zoom,renderClock,orbit);}
  if(view==='scope'&&feedActive(state,'scope'))drawScope();if(view==='gun'&&feedActive(state,'gun'))drawGun();if(view==='sonar')drawSonar('tactical',false,renderClock);if(view==='chart')drawChart();drawSonar('mini-sonar',true,renderClock);captureEvidence();
  if(now-lastUI>100){updateUI();sound.update();lastUI=now;}if(now-lastSave>8000&&!ctx.modal&&!paused){persist();lastSave=now;}requestAnimationFrame(frame);
 }
@@ -349,6 +463,7 @@ function openOrder(axis){
  $('order-sheet').classList.remove('hidden');updateUI();
 }
 function beginReconArea(){
+ if(!state.difficulty.satellite)return;
  if(!canIssue(state,context()))return;closeDrawer();setView('chart');if(!['idle','complete','failed'].includes(state.recon.phase)){reconPlacement=false;openDrawer('recon');updateUI();return;}reconPlacement=true;chart.zoom=Math.min(chart.zoom,1);toast('Tap the chart to center a 10 km reconnaissance square. Drag still pans.');updateUI();
 }
 function initializeExtras(){
@@ -405,4 +520,4 @@ function captureEvidence(){
 }
 
 initializeExtras();
-setView(scene?'scope':'sonar');updateUI();if(saved)$('resume').classList.remove('hidden');$('briefing').showModal();requestAnimationFrame(frame);
+setView(scene?'scope':'sonar');updateUI();renderServiceRecord();if(saved)$('resume').classList.remove('hidden');$('briefing').showModal();requestAnimationFrame(frame);

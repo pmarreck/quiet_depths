@@ -4,7 +4,7 @@ import { extname, resolve, sep } from 'node:path';
 const output = process.argv[2];
 if (!output) throw new Error('A built site directory is required');
 const root = resolve(output);
-const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.ttf':'font/ttf', '.wasm':'application/wasm' };
+const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.wav':'audio/wav', '.ttf':'font/ttf', '.wasm':'application/wasm' };
 http.createServer(async (req,res) => {
   try {
     const { pathname } = new URL(req.url, 'http://localhost');

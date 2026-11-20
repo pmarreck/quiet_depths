@@ -1,7 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createGame,step,contact,fire,save,restore} from '../src/sim.js';
+import {createGame,step,contact,fire,save,restore,ping,hurt,deployDrone} from '../src/sim.js';
 import {fireDeckGun} from '../src/combat.js';
+import {chartContacts,estimateAt} from '../src/track-estimates.js';
+import {requestRecon} from '../src/recon.js';
+import {patrolKills,saveServiceRecord,serviceRecord} from '../src/service-record.js';
 
 // These acceptance cases derive from the combat contract. Geometry uses compass
 // bearings directly, independently of the production bearing/collision helpers.
@@ -243,4 +246,92 @@ test('combat state round-trips exactly and pause/modal input cannot advance live
   step(frozen,10,input);
   assert.equal(save(frozen),before,'simulation holds must include all new combat systems');
  }
+});
+
+function patrolWithHunter(kind,range,seed=31){
+ const s=ocean('recon',seed);
+ Object.assign(s.environment,{startHour:12,startWeather:'clear',changing:false});
+ s.ships=[vessel('hunter',0,-range,{kind,depth:kind==='sub'?80:0,alert:85,attack:0})];
+ return s;
+}
+
+test('an enemy submarine attacks the same predicted track after the quiet boat takes either of two unseen courses',()=>{
+ const s=patrolWithHunter('sub',700);
+ s.heading=s.targetHeading=90;
+ s.speed=s.targetSpeed=6;
+ s.ships[0].attack=10;
+ step(s,.25);
+ const snapshot=restore(save(s));
+ assert.deepEqual(snapshot,s);
+ const a=structuredClone(snapshot),b=structuredClone(snapshot);
+ for(const [boat,x,y] of [[a,-500,-200],[b,500,250]]){
+  Object.assign(boat,{x,y,depth:150,targetDepth:150,speed:0,targetSpeed:0,silent:true,scope:false});
+  boat.ships[0].attack=0;
+  step(boat,.25);
+ }
+ assert.ok(a.blasts.length&&b.blasts.length,'the hunter should still act on its recent report');
+ assert.deepEqual(a.blasts,b.blasts,'unobserved moves must not change the enemy’s aim point or fuse depth');
+ assert.equal(a.ships[0].heading,b.ships[0].heading);
+});
+
+test('escort gunfire has a wider spread at distance and can miss a stationary boat',()=>{
+ let closeMisses=0,farMisses=0;
+ for(let seed=1;seed<=48;seed++){
+  const near=patrolWithHunter('escort',400,seed),far=patrolWithHunter('escort',2400,seed);
+  step(near,.25);step(far,.25);
+  assert.equal(near.shells.length,1);
+  assert.equal(far.shells.length,1);
+  const miss=s=>separation(s,s.shells[0])>=65;
+  closeMisses+=Number(miss(near));
+  farMisses+=Number(miss(far));
+ }
+ assert.ok(farMisses>closeMisses+12,{closeMisses,farMisses});
+ assert.ok(farMisses>0&&farMisses<48,'distant shooting must sometimes miss and sometimes still threaten the boat');
+});
+
+test('difficulty settings survive reload and gate enemy support, equipment, ping detection and chart truth',()=>{
+ const s=patrolWithHunter('escort',600);
+ Object.assign(s.difficulty,{airSupport:false,satellite:false,drone:false,pingDetection:0,damage:1});
+ assert.ok(ping(s));assert.equal(s.ships[0].report,undefined);
+ const plotted=estimateAt(chartContacts(s)[0],s.time);
+ s.ships[0].x+=500;
+ assert.deepEqual(estimateAt(chartContacts(s)[0],s.time),plotted);
+ s.difficulty.omniscientChart=true;
+ assert.equal(estimateAt(chartContacts(s)[0],s.time).x,s.ships[0].x);
+ assert.equal(requestRecon(s,{x:0,y:0,size:10000}),false);
+ assert.equal(deployDrone(s),false);
+ hurt(s,10,'Fixture damage');assert.equal(s.hull,95);
+ step(s,.25);assert.equal(s.airSupport.status,'idle');
+ assert.deepEqual(restore(save(s)),s);
+});
+
+test('submarine patrols can contain a second boat and succeed on surfaced withdrawal with zero kills',()=>{
+ const submarineCounts=new Set(),convoyCounts=new Set();
+ for(let seed=1;seed<64;seed++){
+  const sub=createGame('seek-and-destroy-sub',seed),convoy=createGame('seek-and-destroy',seed);
+  submarineCounts.add(sub.ships.filter(ship=>ship.kind==='sub').length);
+  convoyCounts.add(convoy.ships.filter(ship=>ship.kind==='sub').length);
+  assert.deepEqual(restore(save(sub)),sub);
+ }
+ assert.deepEqual([...submarineCounts].sort(),[1,2]);assert.deepEqual([...convoyCounts].sort(),[0,1]);
+ const s=createGame('seek-and-destroy-sub',31);
+ Object.assign(s,{...s.home,depth:0,targetDepth:0,speed:0,targetSpeed:0});
+ step(s,.25);assert.equal(s.status,'won');assert.deepEqual(patrolKills(s),{ships:0,submarines:0});
+});
+
+test('submarine contacts carry estimates, a player torpedo can hit, and service totals are idempotent',()=>{
+ const s=patrolWithHunter('sub',600);
+ Object.assign(s,{depth:80,targetDepth:80,patrolId:'a'.repeat(32)});
+ Object.assign(s.ships[0],{x:0,y:550,attack:999,alert:0});
+ const target=contact(s,s.ships[0],'active');assert.equal(target.kind,'sub');
+ assert.ok(Number.isFinite(target.depthEstimate));assert.equal(target.courseEstimated,undefined);
+ assert.ok(fire(s,target.id));step(s,32);
+ assert.deepEqual(patrolKills(s),{ships:0,submarines:1});
+ const entries=new Map(),storage={get length(){return entries.size;},key:index=>Array.from(entries.keys())[index],getItem:key=>entries.get(key),setItem:(key,value)=>entries.set(key,value)};
+ saveServiceRecord(storage,s);saveServiceRecord(storage,restore(save(s)));
+ assert.deepEqual(serviceRecord(storage),{ships:0,submarines:1,doubleHunts:0});
+ s.ships.push({...s.ships[0],id:'second'});saveServiceRecord(storage,s);
+ assert.deepEqual(serviceRecord(storage),{ships:0,submarines:2,doubleHunts:1});
+ saveServiceRecord(storage,{...s,patrolId:'b'.repeat(32)});
+ assert.deepEqual(serviceRecord(storage),{ships:0,submarines:4,doubleHunts:2});
 });

@@ -8,6 +8,9 @@ import {freshCombat,launchTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
 import {designation,fixContact,estimateAt,applyReconPacket} from './track-estimates.js';
 import {photoArchive,validPhoto,PHOTO_BUDGET} from './photos.js';
+import {playerReport,pursueAndAttack,reportHunterState,updateHostileTrack,validReport} from './hostile-tracks.js';
+import {patrolDifficulty} from './difficulty.js';
+import {addDebrief,validDebrief} from './debrief.js';
 export {clamp,rad,bearing,delta,distance,bottom,log,MISSIONS,deployDrone,recallDrone,hurt};
 export function createGame(mission='recon',seed=19830604,options={}){
  const m=MISSIONS.find(m=>m.id===mission)||MISSIONS[0];
@@ -17,7 +20,7 @@ export function createGame(mission='recon',seed=19830604,options={}){
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
  {id:'tern',name:'Tern',kind:'fishing',military:false,x:-850,y:1350,heading:110,speed:3,hull:100,alert:0,attack:0},
  {id:'echo',name:'Unknown submarine',kind:'sub',military:true,x:3800,y:900,depth:75,heading:280,speed:4,hull:100,alert:0,attack:0}
- ]};s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
+ ]};s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
 }
 export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y),v.depth,drone?.7:5+27.5*Math.abs(Math.sin(s.pitch)));}
 export function isVisible(s,ship,look=null,env=environmentAt(s)){
@@ -32,17 +35,31 @@ export function contact(s,ship,method){
  if(method!=='passive'){
    c.range=d*(method==='visual'?.94+rand(s)*.12:.97+rand(s)*.06);c.x=s.x+Math.sin(rad(c.bearing))*c.range;c.y=s.y+Math.cos(rad(c.bearing))*c.range;c.confidence=method==='visual'?.9:.75;
    const existing=estimateAt(c,s.time),sigma=method==='visual'?Math.max(25,d*.045):Math.max(15,d*.03);
-   if(!c.fix||s.time-c.fix.time>=5&&existing.major>sigma*2.448)fixContact(c,{x:c.x,y:c.y,time:s.time,positionSigma:sigma,velocitySigma:1.5,maneuverSigma:.03,source:method});
+   if(!c.fix||s.time-c.fix.time>=5&&existing.major>sigma*2.448){
+    const measurement={x:c.x,y:c.y,time:s.time,positionSigma:sigma,velocitySigma:1.5,maneuverSigma:.03,source:method};
+    if(method==='active'&&ship.kind==='sub'){
+     c.kind='sub';c.depthEstimate=clamp(Math.round((ship.depth+(rand(s)-.5)*(12+d*.012))/10)*10,0,320);
+     if(c.fix){
+      const dt=s.time-c.fix.time,dx=(c.x-c.fix.x)/dt,dy=(c.y-c.fix.y)/dt,scale=Math.max(1,Math.hypot(dx,dy)/9);
+      measurement.vx=dx/scale;measurement.vy=dy/scale;c.courseEstimated=true;
+     }
+    }
+    fixContact(c,measurement);
+   }
    if(method==='visual'){c.identified=true;c.name=ship.name;c.kind=ship.kind;c.military=ship.military;}
  } else c.confidence=Math.max(.24,c.confidence);
  return c;
 }
 export function ping(s){
  if(s.pingCooldown>0||s.status!=='patrol'||s.systems.sonar<=25)return false;
- s.pingAge=0;s.pingCooldown=15;s.alert=clamp(s.alert+28,0,100);
+ s.pingAge=0;s.pingCooldown=15;
  for(const ship of s.ships)if(ship.hull>0&&distance(s,ship)<6000)contact(s,ship,'active');
- for(const ship of s.ships)if(ship.military&&distance(s,ship)<7500)ship.alert=Math.max(ship.alert,65);
- log(s,'Active ping. Ranges resolved. They heard that too.','warning');return true;
+ for(const ship of s.ships){
+  if(!ship.military||ship.hull<=0||ship.disabled)continue;
+  const chance=s.difficulty.pingDetection*clamp(1-distance(s,ship)/7500,0,1);
+  if(chance>0&&rand(s)<chance){ship.alert=Math.max(ship.alert,65);ship.report={...playerReport(s),reason:'an active sonar ping'};}
+ }
+ log(s,'Active ping. Ranges resolved. Nearby hunters may have heard it.','warning');return true;
 }
 export function photograph(s,look){
  if(s.photoCooldown>0)return false;
@@ -54,7 +71,13 @@ export function photograph(s,look){
 export function fire(s,id){
  return launchTorpedo(s,id);
 }
-export function decoy(s){if(s.decoys<=0)return false;s.decoys--;s.alert=Math.max(0,s.alert-35);for(const v of s.ships)v.alert=Math.max(0,v.alert-50);log(s,'Noisemaker away. Change course and go quiet.');return true;}
+export function decoy(s){
+ if(s.decoys<=0||s.status!=='patrol')return false;
+ s.decoys--;s.alert=Math.max(0,s.alert-35);
+ s.noisemaker={x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:0,time:s.time};
+ for(const v of s.ships)v.alert=Math.max(0,v.alert-50);
+ log(s,'Noisemaker away. Change course and go quiet.');return true;
+}
 export function step(s,dt,input={}){
  if(s.status!=='patrol'||dt<=0||input.paused||input.modal)return;
  // Fixed substeps make time compression obey the same collision and resource rules.
@@ -62,6 +85,7 @@ export function step(s,dt,input={}){
 }
 function tick(s,dt,input){
  s.time+=dt;s.pingAge+=dt;s.pingCooldown=Math.max(0,s.pingCooldown-dt);s.photoCooldown=Math.max(0,s.photoCooldown-dt);s.shock=Math.max(0,(s.shock||0)-dt);
+ if(s.noisemaker&&s.time-s.noisemaker.time>32)delete s.noisemaker;
  const env=environmentAt(s);
  if(s.time>=s.nextLightningAt){
   if(env.storm>.35){const angle=s.time<30?rad(s.heading+s.scopeAngle+(rand(s)-.5)*26):rand(s)*Math.PI*2,range=1800+rand(s)*4000,strike={id:s.soundSequence,time:s.time,x:s.x+Math.sin(angle)*range,y:s.y+Math.cos(angle)*range,height:1050+rand(s)*900,seed:Math.floor(rand(s)*1000000)};
@@ -81,16 +105,11 @@ function tick(s,dt,input){
    const d=distance(s,ship);
    if(s.systems.sonar>25&&(s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)*(1-env.storm*.25*Math.exp(-s.depth/80))*(.25+.75*s.systems.sonar/100)&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
    if(isVisible(s,ship,input.look??((s.heading+s.scopeAngle)%360),env))contact(s,ship,'visual');
-   if(!ship.disabled&&(ship.kind==='escort'||ship.kind==='sub')){
-     const exposure=s.depth<3?95:(s.scope&&s.depth<=15?23:0);
-     const sound=s.noise*(s.depth>100?.55:1);
-     const detection=clamp(1-d/env.subVisualRange,0,1)*exposure+clamp(1-d/5500,0,1)*sound*.7*(1-env.storm*.38*Math.exp(-s.depth/70));
-     ship.alert=clamp(ship.alert+dt*(detection*.06-.65),0,100);
-     if(ship.alert>42){ship.heading=(ship.heading+clamp(delta(bearing(ship,s),ship.heading),-dt*2.5,dt*2.5)+360)%360;ship.speed=ship.kind==='escort'?15:8;danger=Math.max(danger,ship.alert);}
-     if(ship.kind==='escort'&&ship.alert>55&&s.depth<=2&&d<2600){
-       ship.attack-=dt;if(ship.attack<=0){ship.attack=12;const shell={id:s.soundSequence++,x:s.x+(rand(s)-.5)*120,y:s.y+(rand(s)-.5)*120,depth:0,delay:1.5+d/550,fromX:ship.x,fromY:ship.y,total:1.5+d/550};s.shells.push(shell);emitSound(s,{type:'gunfire',x:ship.x,y:ship.y,altitude:12,power:1});log(s,'Escort firing. Shells incoming. Dive or return fire.','damage');}
-     }else if(ship.alert>55&&d<(ship.kind==='sub'?2300:420)){
-       ship.attack-=dt;if(ship.attack<=0){ship.attack=35;dropDepthCharge(s,{x:s.x+(rand(s)-.5)*180,y:s.y+(rand(s)-.5)*180,depth:s.depth,delay:Math.max(4,s.depth/4.5),kind:ship.kind==='sub'?'weapon':'charge'});log(s,ship.kind==='sub'?'Incoming hostile weapon. Evade!':'Depth charges in the water. Evade!','damage');}
+   if(ship.military&&!ship.disabled){
+     const track=updateHostileTrack(s,ship,env,dt);
+     if(ship.kind==='escort'||ship.kind==='sub'){
+      reportHunterState(s,ship,track);
+      if(track){pursueAndAttack(s,ship,track,dt,dropDepthCharge);danger=Math.max(danger,ship.alert);}
      }
    }
    if(ship.disabled)ship.speed=0;ship.x+=Math.sin(rad(ship.heading))*ship.speed*.514444*dt;ship.y+=Math.cos(rad(ship.heading))*ship.speed*.514444*dt;
@@ -103,9 +122,16 @@ function tick(s,dt,input){
  updateCombat(s,dt);
  for(const b of s.blasts){b.delay-=dt;if(b.delay<=0&&!b.exploded){b.exploded=true;b.explodedAt=s.time;emitSound(s,{type:'blast',x:b.x,y:b.y,depth:b.depth,power:1.2});}if(b.exploded)b.age=s.time-b.explodedAt;}
  s.blasts=s.blasts.filter(b=>b.age<5);
- for(const shell of s.shells){shell.delay-=dt;if(shell.delay<=0&&!shell.hit){shell.hit=true;emitSound(s,{type:'detonation',x:shell.x,y:shell.y,depth:0,power:.8});if(s.depth<7&&distance(s,shell)<65)hurt(s,Math.max(4,24*(1-distance(s,shell)/65)),'Shell impact near the hull.','engine');}}
+ for(const shell of s.shells){shell.delay-=dt;if(shell.delay<=0&&!shell.hit){shell.hit=true;emitSound(s,{type:'detonation',x:shell.x,y:shell.y,depth:0,power:.8});
+  const range=distance(s,shell),hit=s.depth<7&&range<65;
+  if(hit)hurt(s,Math.max(4,24*(1-range/65)),'Shell impact near the hull.','engine');
+  addDebrief(s,hit?'An escort shell struck close enough to damage the hull.':s.depth>=7?'You were below the surface shell’s damage zone when it arrived.':'An escort shell splashed wide of your boat.');
+ }}
  s.shells=s.shells.filter(p=>p.delay>-3);
- updateAcoustics(s,(source,d)=>{if(d<210)hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');else if(d<2500)log(s,'Depth charge detonation. That pattern missed.');});
+ updateAcoustics(s,(source,d)=>{
+  if(d<210){hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');addDebrief(s,'An underwater explosion was close enough to damage your boat.');}
+  else if(d<2500){log(s,'Depth charge detonation. That pattern missed.');addDebrief(s,'The boat was outside the depth-charge damage zone when it detonated.');}
+ });
  updateDrone(s,dt,diesel);
  if(s.mission==='shadow'&&s.noise<27&&s.depth>15&&s.ships.some(c=>c.kind==='merchant'&&c.hull>0&&distance(s,c)<4000))s.trackTime+=dt;
  const done=objectiveComplete(s,dt);
@@ -117,6 +143,10 @@ export function save(s){return JSON.stringify(s);}
 export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charge={id:s.soundSequence++,x,y,depth,delay,totalDelay:delay,age:0,exploded:false,kind};s.blasts.push(charge);return charge;}
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
+ s.difficulty=patrolDifficulty(s.difficulty);
+ s.debrief??=[];
+ if(!validDebrief(s.debrief,s.time)||s.patrolId!==undefined&&(typeof s.patrolId!=='string'||!/^[a-f0-9]{32}$/.test(s.patrolId)))return null;
+ if(s.noisemaker!==undefined&&!validReport(s.noisemaker,s.time))return null;
  // Migrate existing v1 patrols without discarding their progress or drone state.
  if(s.recon===undefined)s.recon=freshRecon();if(s.reconArchivedSequence===undefined)s.reconArchivedSequence=0;if(s.photoArchive===undefined)s.photoArchive=[];if(s.photoSequence===undefined)s.photoSequence=1;
  if(!validateReconState(s.recon)||!Array.isArray(s.photoArchive)||s.photoArchive.length>24||!Number.isSafeInteger(s.photoSequence)||s.photoSequence<1)return null;
@@ -141,7 +171,7 @@ export function restore(raw){try{
  if(!s.gun||!['ammo','cooldown','shots','angle','elevation'].every(k=>Number.isFinite(s.gun[k])))return null;
  if(!s.airSupport||!['idle','arming','airborne','spent'].includes(s.airSupport.status)||!s.airSupport.base||!['x','y'].every(k=>Number.isFinite(s.airSupport.base[k])))return null;
  for(const k of ['requestedAt','launchAt'])if(s.airSupport[k]!==null&&!Number.isFinite(s.airSupport[k]))return null;
- if(s.airSupport.lastKnown&&!['x','y','time'].every(k=>Number.isFinite(s.airSupport.lastKnown[k])))return null;
+ if(s.airSupport.lastKnown&&!validReport(s.airSupport.lastKnown,s.time,true))return null;
  for(const p of s.aircraft)if(!['x','y','altitude','heading','speed','hull'].every(k=>Number.isFinite(p[k]))||typeof p.id!=='string')return null;
  for(const p of s.gunRounds)if(!['id','x','y','altitude','vx','vy','vz','age'].every(k=>Number.isFinite(p[k]))||!['player','aircraft'].includes(p.owner)||typeof p.tracer!=='boolean')return null;
  for(const p of s.impacts)if(!['id','x','y','altitude','time'].every(k=>Number.isFinite(p[k])))return null;
@@ -154,8 +184,9 @@ export function restore(raw){try{
  for(const k of ['x','y','heading','depth','battery','speed','targetSpeed','targetDepth','targetHeading'])if(!Number.isFinite(s.drone[k]))return null;
  if(s.route&&(!Number.isFinite(s.route.x)||!Number.isFinite(s.route.y)))return null;
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
+ if(s.ships.some(ship=>ship.report!==undefined&&!validReport(ship.report,s.time)))return null;
  if(!validMissionTargets(s))return null;
- for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k])))return null;
+ for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k]))||c.depthEstimate!==undefined&&!Number.isFinite(c.depthEstimate)||c.courseEstimated!==undefined&&typeof c.courseEstimated!=='boolean')return null;
  if(s.drone.returnStage<0||s.drone.returnStage>3||!Number.isInteger(s.drone.returnStage))return null;
  for(const c of s.contacts){if(c.fix&&!fixContact({},c.fix))return null;const old=/^Sierra (\d+)$/.exec(c.label);if(old)c.label=designation(Number(old[1]));}
  for(const e of s.events)if(!e||typeof e.text!=='string'||typeof e.kind!=='string'||!Number.isFinite(e.t))return null;

@@ -15,7 +15,7 @@ const seedOf=s=>s.patrol?.seed??s.environment?.seed??1;
 function weatherBlocks(s){return environmentAt(s).storm>.5;}
 function validArea(area){return area&&finite(area.x)&&finite(area.y)&&Math.abs(area.x)<=20000&&Math.abs(area.y)<=20000&&area.size===RECON_LIMITS.footprint;}
 export function requestRecon(s,area){
- if(!s||s.status!=='patrol'||!finite(s.time)||s.time<0||!s.recon||!validArea(area)||s.time<s.recon.cooldownUntil||!['idle','complete','failed'].includes(s.recon.phase)||weatherBlocks(s))return false;
+ if(!s||s.difficulty?.satellite===false||s.status!=='patrol'||!finite(s.time)||s.time<0||!s.recon||!validArea(area)||s.time<s.recon.cooldownUntil||!['idle','complete','failed'].includes(s.recon.phase)||weatherBlocks(s))return false;
  const sequence=s.recon.sequence+1;Object.assign(s.recon,freshRecon(),{phase:'queued',area:{x:area.x,y:area.y,size:area.size},requestedAt:s.time,cooldownUntil:s.time+RECON_LIMITS.cooldown,sequence});return true;
 }
 const codeOf=id=>{let value=0;for(const c of id)value=(Math.imul(value,31)+c.charCodeAt(0))|0;return value;};
