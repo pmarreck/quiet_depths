@@ -108,4 +108,10 @@ Single-player, procedural waves and terrain, approximate acoustic detection, sim
 
 The simulation is independent of rendering, runs in bounded substeps, and saves its random seed and environmental state. The tests include time-step batching invariance, state serialization round trips, optics/detection effects, wave amplitude, acoustics and control guards. These checks cover rules, not game balance or historical accuracy. Browser playtesting is still needed to tune difficulty and pacing.
 
-Three.js 0.170.0 is vendored under its MIT license. DM Sans, IBM Plex Mono, and Libre Caslon Display are vendored under their included SIL Open Font Licenses. The built game makes no external requests. No accounts, tracking, multiplayer, or backend.
+The built game makes no external requests. No accounts, tracking, multiplayer, or backend.
+
+## License
+
+Quiet Depths’ original code and assets are available under the [PolyForm Noncommercial License 1.0.0](LICENSE). To release a commercial game using this work, obtain a separate license from the copyright holder.
+
+Third-party components retain their own licenses. Three.js 0.170.0 is vendored under the MIT license. DM Sans, IBM Plex Mono, and Libre Caslon Display are vendored under their included SIL Open Font Licenses. The site build includes the Elm package licenses.

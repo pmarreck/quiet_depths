@@ -2,6 +2,7 @@
   "name": "quiet-depths",
   "version": "0.6.0",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "scripts": { "test": "./test", "build": "./build", "dev": "./run" }
 }

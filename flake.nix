@@ -53,6 +53,7 @@
         installPhase = ''
           runHook preInstall
           node scripts/build.mjs "$out"
+          install -m 0644 LICENSE "$out/LICENSE"
           cp mission-picker.js "$out/mission-picker.js"
           ${installElmLicenses}
           printf '%s\n' ${nixpkgs.lib.escapeShellArg (builtins.toJSON buildProvenance)} > "$out/build-provenance.json"
