@@ -1,6 +1,6 @@
 # Quiet Depths
 
-A browser submarine game about incomplete information and calculated exposure. A fictional diesel-electric boat in 1972, six randomized mission types, and no omniscient enemy map.
+A browser submarine game about incomplete information and calculated exposure. A fictional diesel-electric boat in 1972, seven randomized mission types, and no omniscient enemy map.
 
 [Play Quiet Depths](https://pmarreck.github.io/quiet_depths/). Sound starts OFF. Desktop keyboard/mouse and mobile touch controls are included; WebGL is needed for the ocean views. No account or installation is required.
 
@@ -16,13 +16,13 @@ Nix is required to build and test the static site. Enable flakes. The pinned too
 ./run    # Build and preview at http://127.0.0.1:4173
 ```
 
-The build runs the full Node test suite and JavaScript syntax checks. Preview serves the Nix output directly. Any static web server can serve it. The tracked `dist/` is the snapshot used by the existing staging Site.
+The build compiles the Elm mission picker and runs the full Node test suite and JavaScript syntax checks. Preview serves the Nix output directly. Any static web server can serve it. The tracked `dist/` is the snapshot used by the existing staging Site.
 
 The built site's `build-provenance.json` records the release version and, for a clean Git build through `./build` or `./test` with complete `yolo` history, the `rN-abcdef` revision, full commit hash, and primary-branch base. Dirty builds, shallow clones, source exports, and direct `nix build` calls report when a revision is unavailable. GitHub Pages verifies the artifact commit against the workflow checkout before publication.
 
 ## Play
 
-Choose reconnaissance, interception, passive surveillance, undersea rescue, surface rescue, or wreck survey. Photograph silhouettes, intercept a military freighter, or quietly collect traffic intelligence. Complete the task, return to the chart's extraction circle, and surface to 1 meter or less for pickup. The patrol window is 30 simulated minutes. Use 5× and 20× for transit; new contacts and attacks return time to 1×. Esc pauses; progress autosaves in this browser's local storage.
+Choose reconnaissance, interception, Seek and Destroy, passive surveillance, undersea rescue, surface rescue, or wreck survey. In Seek and Destroy, use the last reported bearing and your sensors to find an escorted convoy. Sink all three military transports. Neutral fishing boats may be nearby. Complete the task, return to the chart's extraction circle, and surface to 1 meter or less for pickup. The patrol window is 30 simulated minutes. Use 5× and 20× for transit; new contacts and attacks return time to 1×. Esc pauses. Progress autosaves in this browser's local storage.
 
 - **1–7**: periscope, sonar, chart, drone, conning tower, deck gun, photos.
 - **P**: raise/lower scope at 15 meters or less. Drag to pan; scroll to zoom.

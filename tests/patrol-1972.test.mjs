@@ -1,7 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {createGame,step,MISSIONS,save,restore,bottom} from '../src/sim.js';
+import {createGame,step,MISSIONS,save,restore,bottom,contact,fire} from '../src/sim.js';
+import {objectiveState} from '../src/missions.js';
 import * as controls from '../src/controls.js';
 import * as THREE from '../vendor/three.module.js';
 import * as acoustics from '../src/acoustics.js';
@@ -48,6 +49,51 @@ test('every mission gets reproducible but varied locations, traffic and extracti
 });
 test('briefed mission parameters vary and persist without rerolling a loaded patrol',()=>{
  const goals=new Set();for(let seed=1;seed<=20;seed++){const s=createGame('recon',seed);assert.equal(s.patrol.seed,seed);assert.ok(s.patrol.photoGoal>=2);assert.ok(s.ships.filter(v=>v.kind==='merchant').length>=s.patrol.photoGoal);goals.add(s.patrol.photoGoal);assert.deepEqual(restore(save(s)),s);}assert.ok(goals.size>1);
+});
+test('Seek and Destroy briefs an undiscovered convoy of three military transports',()=>{
+ assert.ok(MISSIONS.some(m=>m.id==='seek-and-destroy'&&m.type==='SEEK AND DESTROY'));
+ for(const seed of [1,19,31,32768]){
+  const s=createGame('seek-and-destroy',seed);
+  const transports=s.ships.filter(v=>v.kind==='merchant');
+  assert.equal(transports.length,3);
+  assert.ok(transports.every(v=>v.military&&v.hull>0));
+  assert.ok(s.ships.some(v=>v.kind==='escort'&&v.military));
+  assert.ok(s.ships.some(v=>v.kind==='fishing'&&!v.military));
+  assert.deepEqual(s.contacts,[]);
+  assert.equal(objectiveState(s).progress,'0/3');
+  assert.equal(createGame('intercept',seed).ships.filter(v=>v.kind==='merchant'&&v.military).length,1);
+ }
+});
+test('Seek and Destroy preserves partial progress and requires the last transport and surfaced pickup',()=>{
+ const s=createGame('seek-and-destroy',31,{timeOfDay:'day',weather:'clear',changing:false});
+ assert.equal(s.mission,'seek-and-destroy');
+ const [first,second,last]=s.ships.filter(v=>v.kind==='merchant');
+ first.hull=second.hull=0;
+ for(const ship of s.ships.filter(v=>v.kind==='escort'||v.kind==='sub'))ship.hull=0;
+ Object.assign(last,{disabled:true,x:s.x,y:s.y+400,heading:0,speed:0});
+ Object.assign(s,{speed:0,targetSpeed:0});
+ step(s,.25);
+ assert.equal(s.phase,'objective');
+ assert.equal(objectiveState(s).progress,'2/3');
+ const resumed=restore(save(s));
+ assert.deepEqual(resumed,s);
+ assert.equal(restore(save({...s,phase:'extract'})),null);
+ const incomplete=structuredClone(s);
+ incomplete.ships.splice(incomplete.ships.indexOf(incomplete.ships.find(v=>v.id===last.id)),1);
+ assert.equal(restore(save(incomplete)),null);
+
+ contact(resumed,resumed.ships.find(v=>v.id===last.id),'active');
+ assert.ok(fire(resumed,last.id));
+ step(resumed,30);
+ assert.equal(objectiveState(resumed).progress,'3/3');
+ assert.equal(resumed.phase,'extract');
+ assert.equal(resumed.status,'patrol');
+ Object.assign(resumed,{...resumed.home,depth:10,targetDepth:10});
+ step(resumed,.25);
+ assert.equal(resumed.status,'patrol');
+ Object.assign(resumed,{depth:0,targetDepth:0});
+ step(resumed,.25);
+ assert.equal(resumed.status,'won');
 });
 test('scope bow alignment is explicit, wraps correctly and preserves the boat’s actual heading',()=>{
  assert.equal(typeof controls.alignScope,'function');

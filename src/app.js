@@ -19,7 +19,7 @@ import {persistPatrol} from './persistence.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
-let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,missionChoice='recon',last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0;
+let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
 let orderAxis=null,reconPlacement=false,photoKey='',lossStartedAt=0;const zooms={scope:1,tower:1,gun:1};let library=[];
 try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
@@ -45,22 +45,37 @@ function closeDrawer(){drawer=null;document.body.removeAttribute('data-drawer');
 function setRate(r){rate=r;all('[data-time]').forEach(b=>b.classList.toggle('active',+b.dataset.time===r));$('mobile-time').textContent=r+'×';$('mobile-time').setAttribute('aria-label','Time compression '+r+' times');}
 function setPaused(p){paused=p;held.clear();drag=null;document.body.classList.toggle('paused',p);$('pause').textContent=p?'RESUME · ESC':'PAUSE · ESC';$('pause').setAttribute('aria-label',p?'Resume patrol':'Pause patrol');updateUI();sound.update();persist();}
 function setView(v){zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();}
-function chooseMission(id){missionChoice=id;all('.mission-option').forEach(b=>b.classList.toggle('active',b.dataset.mission===id));document.querySelector('.briefing-tip p').innerHTML=esc(MISSIONS.find(m=>m.id===id).desc)+' <strong>Esc pauses everything.</strong>';}
+function updateMissionBriefing(id){
+ const mission=MISSIONS.find(m=>m.id===id);
+ if(!mission)return;
+ document.querySelector('.briefing-tip p').innerHTML=esc(mission.desc)+' <strong>Esc pauses everything.</strong>';
+}
 function openBriefing(){held.clear();persist();$('briefing').showModal();$('resume').classList.toggle('hidden',!saved&&state.time===0);sound.update();}
-function start(resuming=false){
+function start(mission=null){
+ if(!$('briefing').open)return;
  patrolStarted=true;
- if(resuming)state=saved||state;else{const seedText=$('patrol-seed').value.trim(),seed=seedText?Number(seedText)>>>0:crypto.getRandomValues(new Uint32Array(1))[0];state=createGame(missionChoice,seed,{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked});selected=null;}
+ if(mission===null)state=saved||state;else{const seedText=$('patrol-seed').value.trim(),seed=seedText?Number(seedText)>>>0:crypto.getRandomValues(new Uint32Array(1))[0];state=createGame(mission,seed,{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked});selected=null;}
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
  chart={x:state.x,y:state.y,zoom:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
 }
 $('patrol-time').innerHTML='<option value="random">Random</option>'+Object.entries(TIMES).map(([id,t])=>`<option value="${id}" ${''}>${t.name}</option>`).join('');
 $('patrol-weather').innerHTML='<option value="random">Random</option>'+Object.entries(WEATHER).map(([id,w])=>`<option value="${id}">${w.name}</option>`).join('');
-$('mission-picker').innerHTML=MISSIONS.map(m=>`<button class="mission-option ${m.id==='recon'?'active':''}" data-mission="${m.id}"><span></span><div><b>${m.name}</b><small>${m.type}</small></div><span>${m.minutes}</span></button>`).join('');
-$('mission-picker').addEventListener('click',e=>{const b=e.target.closest('[data-mission]');if(b)chooseMission(b.dataset.mission);});
-$('start').onclick=()=>start(false);$('resume').onclick=()=>start(true);$('close-briefing').onclick=()=>{if(!patrolStarted){start(!!saved);return;}$('briefing').close();updateUI();};$('another-patrol').onclick=()=>{$('result-dialog').close();$('briefing').showModal();$('resume').classList.add('hidden');};
+const missionPicker=globalThis.Elm.MissionPicker.init({
+ node:$('mission-picker'),
+ flags:{selected:state.mission,missions:MISSIONS.map(({id,name,type,minutes})=>({id,name,category:type,duration:minutes}))}
+});
+missionPicker.ports.missionSelected.subscribe(updateMissionBriefing);
+missionPicker.ports.patrolRequested.subscribe(start);
+function requestPatrol(){missionPicker.ports.beginPatrol.send(null);}
+function dismissBriefing(){
+ if(patrolStarted){$('briefing').close();updateUI();}
+ else if(saved)start();
+ else requestPatrol();
+}
+$('start').onclick=requestPatrol;$('resume').onclick=()=>start();$('close-briefing').onclick=dismissBriefing;$('another-patrol').onclick=()=>{$('result-dialog').close();$('briefing').showModal();$('resume').classList.add('hidden');};
 $('sound').onclick=()=>{sound.toggle();renderSound();};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{held.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
 all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI();}));
-$('briefing').addEventListener('cancel',e=>{e.preventDefault();if(!patrolStarted)start(!!saved);else{$('briefing').close();updateUI();}});
+$('briefing').addEventListener('cancel',e=>{e.preventDefault();dismissBriefing();});
 all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
 function scopeToggle(){if(!canIssue(state,context())||state.systems.periscope===0)return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}state.scope=!state.scope;if(!state.scope)scene?.clear();updateUI();}
 function takePhoto(){
@@ -278,7 +293,23 @@ function drawScope(){
  for(const q of focused){const d=delta(q.bearing,look);const x=clamp(cx+Math.tan(rad(d))/Math.tan(rad(19/zoom))*cx,105,w-105);c.fillStyle='#d8d9b5';c.font='14px IBM Plex Mono,monospace';c.fillText(q.name.toUpperCase(),x,h*.56);c.fillStyle='#bdc7b0';c.font='12px IBM Plex Mono,monospace';c.fillText((q.range/1000).toFixed(1)+' KM · '+(q.military?'MILITARY':'NEUTRAL'),x,h*.56+19);}
 }
 function drawGun(){const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);const x=w/2,y=h/2;c.strokeStyle='#e3d4ab';c.lineWidth=1;c.beginPath();c.arc(x,y,11,0,Math.PI*2);c.moveTo(x-50,y);c.lineTo(x-15,y);c.moveTo(x+15,y);c.lineTo(x+50,y);c.moveTo(x,y-35);c.lineTo(x,y-15);c.moveTo(x,y+15);c.lineTo(x,y+35);c.stroke();}
-function showResult(){if(resultShown)return;resultShown=true;if(state.status==='lost'){lossStartedAt=performance.now();document.body.classList.add('loss');$('loss-layer').classList.remove('hidden');sound.loss(state);}persist();const win=state.status==='won';$('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';$('result-body').textContent=win?(state.operation?(state.mission==='survey'?state.operation.find:`${state.operation.rescued} survivors brought home. ${state.operation.dead} lost before recovery. The rescue crew is safely aboard.`):'The intelligence is aboard. The crew is safe. Somewhere out there, the convoy sails on.'):state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.':'Your boat could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';$('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span>`;$('result-dialog').showModal();}
+function patrolVictory(s){
+ if(s.mission==='seek-and-destroy')return 'All three military transports sank. The boat and crew made it home.';
+ if(!s.operation)return 'The intelligence is aboard. The crew is safe. Somewhere out there, the convoy sails on.';
+ if(s.mission==='survey')return s.operation.find;
+ return `${s.operation.rescued} survivors brought home. ${s.operation.dead} lost before recovery. The rescue crew is safely aboard.`;
+}
+function showResult(){
+ if(resultShown)return;
+ resultShown=true;
+ if(state.status==='lost'){lossStartedAt=performance.now();document.body.classList.add('loss');$('loss-layer').classList.remove('hidden');sound.loss(state);}
+ persist();
+ const win=state.status==='won';
+ $('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';
+ $('result-body').textContent=win?patrolVictory(state):state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.':'Your boat could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';
+ $('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span>`;
+ $('result-dialog').showModal();
+}
 function frame(now){
  const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
  if(canIssue(state,ctx)){

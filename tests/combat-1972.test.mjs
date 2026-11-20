@@ -32,8 +32,8 @@ function liveTorpedo(s){
  return s.projectiles[0];
 }
 
-test('all six mission families start with torpedoes and explicit combat state',()=>{
- for(const mission of ['recon','shadow','intercept','survey','undersea-rescue','surface-rescue']){
+test('all mission families start with torpedoes and explicit combat state',()=>{
+ for(const mission of ['recon','shadow','intercept','seek-and-destroy','survey','undersea-rescue','surface-rescue']){
   const s=createGame(mission,13);
   assert.ok(Number.isInteger(s.torps)&&s.torps>0,mission);
   assert.ok(Number.isInteger(s.gun.ammo)&&s.gun.ammo>0,mission);

@@ -2,7 +2,7 @@
 import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from './environment.js';
 import {emitSound,updateAcoustics} from './acoustics.js';
 import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
-import {MISSIONS,randomizePatrol,objectiveComplete} from './missions.js';
+import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets} from './missions.js';
 import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone,shipCollision,siteCollision} from './systems.js';
 import {freshCombat,launchTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
@@ -154,7 +154,7 @@ export function restore(raw){try{
  for(const k of ['x','y','heading','depth','battery','speed','targetSpeed','targetDepth','targetHeading'])if(!Number.isFinite(s.drone[k]))return null;
  if(s.route&&(!Number.isFinite(s.route.x)||!Number.isFinite(s.route.y)))return null;
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
- if(s.mission==='intercept'&&!s.ships.some(c=>c.id==='cobalt'))return null;
+ if(!validMissionTargets(s))return null;
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k])))return null;
  if(s.drone.returnStage<0||s.drone.returnStage>3||!Number.isInteger(s.drone.returnStage))return null;
  for(const c of s.contacts){if(c.fix&&!fixContact({},c.fix))return null;const old=/^Sierra (\d+)$/.exec(c.label);if(old)c.label=designation(Number(old[1]));}
