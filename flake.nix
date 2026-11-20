@@ -73,6 +73,7 @@
     in {
       default = pkgs.lib.makeOverridable build { };
     });
+    checks = each (system: { site = self.packages.${system}.default; });
     devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
       default = pkgs.mkShell { packages = [ pkgs.nodejs pkgs.elmPackages.elm ]; };
     });
