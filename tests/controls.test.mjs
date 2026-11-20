@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three.module.js';
 import {createGame,step,deployDrone,save,restore,bearing} from '../src/sim.js';
-import {relativeBearing,scopeBearing,feedActive,setHelmOrder,applyHelmKeys,cameraEuler,chartTransform,chartWorldAt,panChart,zoomChart} from '../src/controls.js';
+import {relativeBearing,scopeBearing,feedActive,setHelmOrder,applyHelmKeys,steerDrone,droneCameraPitch,cameraEuler,chartTransform,chartWorldAt,panChart,zoomChart} from '../src/controls.js';
 const live={view:'scope',paused:false,modal:false};
 test('submarine keyboard orders change requests, never teleport actual controls',()=>{
  const s=createGame(),before={heading:s.heading,depth:s.depth,speed:s.speed};
@@ -24,6 +24,41 @@ test('inactive optics and drone cannot provide feeds; drone helm cannot change t
  const ctx={...live,view:'drone'};assert.equal(setHelmOrder(s,ctx,'heading',90),false);s.speed=s.targetSpeed=0;assert.ok(deployDrone(s));assert.equal(feedActive(s,'drone'),true);
  const h=s.heading,v=s.speed,d=s.depth;applyHelmKeys(s,ctx,new Set(['KeyW','KeyD','KeyC']),.2);assert.equal(s.heading,h);assert.equal(s.speed,v);assert.equal(s.depth,d);assert.ok(s.drone.targetSpeed>0);assert.notEqual(s.drone.targetHeading,s.drone.heading);assert.ok(s.drone.targetDepth>s.drone.depth);
  const heading=s.drone.heading;step(s,.25);assert.ok(Math.abs(relativeBearing(s.drone.heading,heading))<=3.01);assert.notEqual(s.drone.speed,s.drone.targetSpeed);
+});
+test('dragging the ROV feed steers only the ROV and keeps its separate speed order',()=>{
+ const s=createGame();
+ s.speed=s.targetSpeed=0;
+ assert.ok(deployDrone(s));
+ const context={...live,view:'drone'},d=s.drone;
+ d.heading=d.targetHeading=358;
+ const boatOrders=[s.targetHeading,s.targetDepth,s.targetSpeed],startDepth=d.depth;
+ assert.equal(setHelmOrder(s,context,'speed',2.5),true);
+ steerDrone(s,context,50,40);
+ assert.ok(d.targetHeading<90,'a right drag turns starboard through north');
+ assert.ok(d.targetDepth>startDepth,'a down drag requests a dive');
+ assert.deepEqual([d.heading,d.depth,d.speed],[358,startDepth,0]);
+ assert.equal(d.targetSpeed,2.5);
+ steerDrone(s,context,-50,-40);
+ assert.ok(Math.abs(d.targetHeading-358)<1e-9);
+ assert.ok(Math.abs(d.targetDepth-startDepth)<1e-9);
+ steerDrone(s,context,0,-99999);
+ assert.equal(d.targetDepth,0);
+ assert.deepEqual([s.targetHeading,s.targetDepth,s.targetSpeed],boatOrders);
+ for(const blocked of [live,{...context,paused:true},{...context,modal:true}]){
+  const before=save(s);
+  steerDrone(s,blocked,40,40);
+  assert.equal(save(s),before);
+ }
+ d.mode='return';
+ const before=save(s);
+ steerDrone(s,context,40,40);
+ assert.equal(save(s),before);
+});
+test('the ROV feed tilts in the direction of vertical movement and levels out when stopped',()=>{
+ const level=droneCameraPitch(0);
+ assert.ok(droneCameraPitch(1)<level);
+ assert.ok(droneCameraPitch(-1)>0);
+ assert.ok(Math.abs(droneCameraPitch(5))<Math.PI/4);
 });
 test('periscope bearing follows the hull while preserving its relative angle',()=>{
  const s=createGame();s.scopeAngle=155;const a=scopeBearing(s);s.heading=(s.heading+37)%360;assert.equal(relativeBearing(scopeBearing(s),a),37);assert.equal(s.scopeAngle,155);

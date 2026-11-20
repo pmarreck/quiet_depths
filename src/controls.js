@@ -38,6 +38,15 @@ export function applyHelmKeys(s,context,keys,dt){
  if(depth)setHelmOrder(s,context,'depth',v.targetDepth+depth*12*dt);
 }
 
+export function steerDrone(s,context,dx,dy){
+ if(context.view!=='drone')return;
+ const d=s.drone;
+ if(dx)setHelmOrder(s,context,'heading',d.targetHeading+dx*.4);
+ if(dy)setHelmOrder(s,context,'depth',d.targetDepth+dy*.12);
+}
+
+export const droneCameraPitch=verticalSpeed=>-rad(18)*clamp(verticalSpeed,-1,1);
+
 // Explicit yaw/pitch/roll order preserves a world-up horizon through all azimuths.
 // Never modify a single XYZ Euler component after lookAt's quaternion conversion.
 export const cameraEuler=(heading,pitch=0,roll=0)=>({x:pitch,y:-rad(wrapHeading(heading)),z:roll,order:'YXZ'});

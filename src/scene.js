@@ -1,6 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
-import {feedActive,scopeBearing,cameraEuler} from './controls.js';
+import {feedActive,scopeBearing,cameraEuler,droneCameraPitch} from './controls.js';
 import {environmentAt,SEA_SAMPLE_GLSL,surfaceHeight,scopeEyeHeight,scopeWashed,opticalSway,hash01} from './environment.js';
 import {Atmosphere} from './atmosphere.js';
 import {UnderseaLife} from './undersea.js';
@@ -8,6 +8,7 @@ import {createSubmarine} from './submarine-model.js';
 import {SUB_DESIGN as D} from './hull-design.js';
 import {CombatScene} from './combat-scene.js';
 import {tetherPoints} from './tether.js';
+const ROV_LAMP_INTENSITY=1100;
 const waterVertex=`
 uniform float time;uniform vec2 origin;uniform float waveScale;uniform float waveSpeed;
 varying vec3 vWorld;
@@ -43,14 +44,14 @@ export class OceanScene{
      ray += vec2(sin(ray.y * 0.7 + causticTime), sin(ray.x * 0.85 - causticTime)) * 0.55;
      float ridges = abs(sin(ray.x + causticTime * 0.43) + sin(ray.y - causticTime * 0.27));
      float caustic = (1.0 - smoothstep(0.015, 0.27, ridges)) * causticStrength * step(causticPoint.y, 0.0);
-     totalEmissiveRadiance += vec3(0.27, 0.59, 0.63) * caustic;`);
+     totalEmissiveRadiance += vec3(0.09, 0.22, 0.24) * caustic;`);
    };
   });
   this.life=new UnderseaLife(this.scene,()=>this.makeSub(),ship=>this.makeShip(ship));
   this.combat=new CombatScene(this.scene,this.glowTexture());const cableGeo=new T.BufferGeometry();cableGeo.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(48*3),3));this.cable=new T.Line(cableGeo,new T.LineBasicMaterial({color:0x879183,transparent:true,opacity:.8}));this.scene.add(this.cable);
   const bubbles=new T.BufferGeometry();bubbles.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(256*3),3));this.bubbleUniforms={strength:{value:0}};
   this.bubbles=new T.Points(bubbles,new T.ShaderMaterial({transparent:true,depthWrite:false,uniforms:this.bubbleUniforms,vertexShader:'uniform float strength;void main(){vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp(160.*strength/-p.z,1.,8.);gl_Position=projectionMatrix*p;}',fragmentShader:'uniform float strength;void main(){float r=length(gl_PointCoord-.5)*2.;if(r>1.)discard;gl_FragColor=vec4(.72,.9,.96,(1.-r)*strength*.7);}'}));this.own.add(this.bubbles);
-  this.light=new T.SpotLight(0xd5e5ea,3200,240,Math.PI/3,.8,1.3);this.scene.add(this.light,this.light.target);
+  this.light=new T.SpotLight(0xd5e5ea,ROV_LAMP_INTENSITY,240,Math.PI/3,.8,2);this.scene.add(this.light,this.light.target);
   const particles=new T.BufferGeometry(),pts=[];for(let i=0;i<800;i++)pts.push((Math.random()-.5)*600,(Math.random()-.5)*220,(Math.random()-.5)*600);particles.setAttribute('position',new T.Float32BufferAttribute(pts,3));this.particles=new T.Points(particles,new T.PointsMaterial({size:.4,color:0x9fc6b2,transparent:true,opacity:.35}));this.scene.add(this.particles);
   const drifting=new T.BufferGeometry();drifting.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(72*3),3));
   this.driftingBubbles=new T.Points(drifting,new T.PointsMaterial({map:this.glowTexture(),size:.55,color:0xc2eaf4,transparent:true,opacity:.55,depthWrite:false}));
@@ -85,6 +86,8 @@ export class OceanScene{
    this.camera.position.set(x,elevation,-y);this.camera.lookAt(s.x,-s.depth,-s.y);this.camera.fov=56;
    this.light.position.copy(this.camera.position);this.light.target.position.set(s.x,-s.depth,-s.y);this.particles.position.copy(this.camera.position);
   }
+  // Keep the virtual orbit light readable as the camera moves away from the hull.
+  this.light.intensity=orbiting?2.8*orbit.distance**2:ROV_LAMP_INTENSITY;
   const underwater=orbiting?this.camera.position.y<surfaceHeight(this.camera.position.x,-this.camera.position.z,time,e):drone?s.drone.depth>1.5:tower||gun?false:scopeWashed(s,e);
   this.caustics.causticTime.value=time*(.7+e.waveScale*.2);
   this.caustics.causticStrength.value=underwater?.34*e.daylight*(1-e.cloud*.85)*Math.exp(-s.depth/37):0;
@@ -104,7 +107,15 @@ export class OceanScene{
 
   const sway=opticalSway(s,view,time);this.sun.color.setHex(underwater?0xbad8dd:0xffd6a0);this.hemi.color.setHex(underwater?0xc1d6dc:0xd4d9c8);
   let pose;
-  if(drone){const d=s.drone,a=rad(d.heading);this.camera.position.set(d.x,d.depth<.5?.8:-d.depth,-d.y);pose=cameraEuler(d.heading,-Math.atan2(3,100),0);this.light.position.copy(this.camera.position);this.light.target.position.set(d.x+Math.sin(a)*100,-d.depth-5,-d.y-Math.cos(a)*100);this.particles.position.copy(this.camera.position);this.camera.fov=65;}
+  if(drone){
+   const d=s.drone,a=rad(d.heading),pitch=droneCameraPitch(d.verticalSpeed),reach=100*Math.cos(pitch);
+   this.camera.position.set(d.x,d.depth<.5?.8:-d.depth,-d.y);
+   pose=cameraEuler(d.heading,pitch);
+   this.light.position.copy(this.camera.position);
+   this.light.target.position.set(d.x+Math.sin(a)*reach,this.camera.position.y+100*Math.sin(pitch),-d.y-Math.cos(a)*reach);
+   this.particles.position.copy(this.camera.position);
+   this.camera.fov=65;
+  }
   else if(gun){const a=rad(s.heading);this.camera.position.set(s.x+Math.sin(a)*16,6-s.depth,-s.y-Math.cos(a)*16);pose=cameraEuler(s.heading+s.gun.angle,rad(s.gun.elevation),0);this.camera.fov=55/zoom;}
   else if(tower){const a=rad(s.heading);this.camera.position.set(s.x+Math.sin(a)*5+Math.cos(a)*3.2,12.9-s.depth+surfaceHeight(s.x,s.y,time,e)*.3,-s.y-Math.cos(a)*5+Math.sin(a)*3.2);pose=cameraEuler(s.heading+s.towerAngle+sway.yaw*180/Math.PI,s.towerPitch+sway.pitch,sway.roll);this.camera.fov=65/zoom;}
   else if(!orbiting){this.camera.position.set(s.x,scopeEyeHeight(s,e),-s.y);pose=cameraEuler(scopeBearing(s)+sway.yaw*180/Math.PI,Math.atan2(-3+Math.sin(time*.3)*1.5,1000)+sway.pitch,sway.roll);this.camera.fov=38/zoom;}

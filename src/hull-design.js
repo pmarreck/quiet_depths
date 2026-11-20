@@ -1,6 +1,6 @@
 // Fictional 1972 patrol boat. Form references: USS Barbel/Blueback, NHHC.
 // The retained dual-purpose gun and compact CURV-style launch are game refits.
-const hullColor=0x27383c;
+const hullColor=0x24282b;
 export const SUB_DESIGN=Object.freeze({
  year:1972,hullColor,propellerColor:hullColor,hullRadius:5,propellerRadius:1.9,propellerPitch:2.4,
  propellerZ:34.2,propellerBlades:5,shaftRadius:.28,

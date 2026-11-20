@@ -7,7 +7,7 @@ import {fireDeckGun,aimGunAt,firingBearing} from './combat.js';
 import {HeldInput} from './input.js';
 import {SoundSystem} from './audio.js';
 import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
-import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,applyHelmKeys,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
+import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,applyHelmKeys,steerDrone,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,sonarLayout} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js';
@@ -39,6 +39,7 @@ try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',
 const held=new HeldInput(),keys=held.keys,commandControls=[];let drawer=null;
 const context=()=>({view,paused,modal:!!document.querySelector('dialog[open]')});
 const pilotEnabled=()=>view!=='orbit'&&(view!=='drone'||state.drone.mode==='remote');
+const compactLayout=matchMedia('(max-width:1100px)');
 const sound=new SoundSystem(()=>state,context,status=>{
  const el=$('sound');el.dataset.audioContext=status.context;el.dataset.engineSources=status.engines;el.dataset.effects=status.effects;
  if(status.last){el.dataset.lastAcoustic=status.last.type;el.dataset.lastDelay=status.last.delay.toFixed(3);el.dataset.lastGain=(status.last.currentGain??status.last.gain).toFixed(4);el.dataset.lastCutoff=(status.last.currentCutoff??status.last.cutoff).toFixed(0);}else{for(const key of ['lastAcoustic','lastDelay','lastGain','lastCutoff'])delete el.dataset[key];}
@@ -137,7 +138,7 @@ bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Nois
 bindCommand('fire','click',launchSelected,()=>!!state.contacts.find(c=>c.id===selected)&&state.torps>0&&state.depth<=100);
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
-bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');toast('Drone helm: W/S speed, A/D heading, Space/C depth.');}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
+bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');if(!compactLayout.matches)toast('Drone helm: W/S speed, A/D heading, Space/C depth.');}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
 bindCommand('drone-photo','click',takePhoto,()=>feedActive(state,'drone')&&state.photoCooldown===0);
 bindCommand('approach-site','click',()=>{const p=operationApproach(state);if(!p)return;state.route={x:p.x,y:p.y,radius:p.radius};state.targetDepth=p.depth;state.targetSpeed=3;state.silent=false;toast('Approach plotted. Boat will stop beside the site. Watch clearance.');},()=>!!state.site);
 bindCommand('hold-position','click',()=>{state.route=null;state.targetSpeed=0;state.targetDepth=state.site?operationApproach(state).depth:state.depth;toast('All stop. Ballast and planes holding ordered depth.');});
@@ -154,13 +155,19 @@ let shaking=false;
 vp.addEventListener('pointerdown',e=>{
  if(drag)return;
  if(e.target.closest('button,input,select,.photo-card,.order-sheet'))return;
- if(!['chart','orbit'].includes(view)&&(!['scope','tower','gun'].includes(view)||!feedActive(state,view)||!canIssue(state,context())))return;
+ if(view==='drone'){
+  if(!scene||!pilotEnabled()||!canIssue(state,context())||(!compactLayout.matches&&e.pointerType!=='touch'))return;
+ }else if(!['chart','orbit'].includes(view)&&(!['scope','tower','gun'].includes(view)||!feedActive(state,view)||!canIssue(state,context())))return;
  e.preventDefault();drag={pointer:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};vp.setPointerCapture(e.pointerId);
 });
 vp.addEventListener('pointermove',e=>{
- if(!drag||drag.pointer!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
- if(view==='orbit'){orbit.yaw=(orbit.yaw-dx*.008)%(2*Math.PI);orbit.pitch=clamp(orbit.pitch+dy*.008,-1.28,1.28);}
+ if(!drag||drag.pointer!==e.pointerId)return;
+ const dx=e.clientX-drag.x,dy=e.clientY-drag.y,wasMoved=drag.moved;
  if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>6)drag.moved=true;
+ if(view==='drone'&&drag.moved){
+  steerDrone(state,context(),e.clientX-(wasMoved?drag.x:drag.startX),e.clientY-(wasMoved?drag.y:drag.startY));
+ }
+ if(view==='orbit'){orbit.yaw=(orbit.yaw-dx*.008)%(2*Math.PI);orbit.pitch=clamp(orbit.pitch+dy*.008,-1.28,1.28);}
  if(view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=wrapHeading(state.scopeAngle+dx*.16/zoom);}
  if(view==='tower'&&feedActive(state,'tower')&&canIssue(state,context())){state.towerAngle=wrapHeading(state.towerAngle+dx*.16/zoom);state.towerPitch=clamp(state.towerPitch-dy*.003/zoom,-1.45,.75);}
  if(view==='gun'&&feedActive(state,'gun')&&canIssue(state,context())){state.gun.angle=wrapHeading(state.gun.angle+dx*.12/zoom);state.gun.elevation=clamp(state.gun.elevation-dy*.12/zoom,-15,85);}
@@ -172,7 +179,7 @@ vp.addEventListener('pointerup',e=>{
  if(drag&&view==='chart'&&!drag.moved&&canIssue(state,context())){const r=vp.getBoundingClientRect(),point=chartWorldAt(chart,e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);if(reconPlacement){chart.reconArea={...point,size:10000};reconPlacement=false;openDrawer('recon');toast('10 km search square placed. Review conditions and request the pass.');}else{state.scopeSteerBearing=null;state.route=point;state.targetSpeed=Math.max(4,state.targetSpeed);state.silent=false;toast('Waypoint plotted. Holding requested depth.');}}
  drag=null;updateUI();
 });
-vp.addEventListener('lostpointercapture',e=>{if(drag?.pointer===e.pointerId)drag=null;});
+for(const event of ['pointercancel','lostpointercapture'])vp.addEventListener(event,e=>{if(drag?.pointer===e.pointerId)drag=null;});
 vp.addEventListener('wheel',e=>{
  if(view==='orbit'){e.preventDefault();zoomOrbit(Math.exp(e.deltaY*.001));return;}
  if(view==='chart'){e.preventDefault();const r=vp.getBoundingClientRect();zoomChart(chart,Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);updateUI();}
@@ -455,7 +462,7 @@ function launchSelected(){
 }
 function changeZoom(factor){if(!canIssue(state,context())||!feedActive(state,view))return;zoom=clamp(zoom*factor,1,opticalZoomLimit(view));zooms[view]=zoom;updateUI();}
 function responsiveTools(){
- const compact=matchMedia('(max-width:1100px)').matches,host=compact?$('station-actions'):$('viewport');
+ const host=compactLayout.matches?$('station-actions'):$('viewport');
  for(const id of ['scope-tools','scope-alignment','chart-tools','drone-tools','gun-tools','zoom-tools'])if($(id).parentElement!==host)host.appendChild($(id));
 }
 function openOrder(axis){
@@ -489,7 +496,10 @@ function updateGallery(){
 }
 function updateExtras(s,env,v){
  document.body.dataset.station=view;$('pause').dataset.short=paused?'Resume':'Pause';
- const compact=matchMedia('(max-width:1100px)').matches,ds=droneStatus(s),rov=view==='drone',below=getSoundings(s,rov&&feedActive(s,'drone')).belowKeel;
+ const compact=compactLayout.matches,ds=droneStatus(s),rov=view==='drone',below=getSoundings(s,rov&&feedActive(s,'drone')).belowKeel;
+ const rovTouch=rov&&compact&&!!scene;
+ document.body.classList.toggle('rov-touch-helm',rovTouch);
+ $('rov-steering-hint').hidden=!(rovTouch&&s.drone.mode==='remote');
  $('sonar-tools').classList.toggle('hidden',!compact||view!=='sonar');$('mobile-ping').textContent=s.pingCooldown>0?'PING · '+Math.ceil(s.pingCooldown)+' s':'ACTIVE PING';
  $('mobile-boat-resources').textContent=`FUEL ${Math.round(s.fuel)}% · BATTERY ${Math.round(s.battery)}% · OXYGEN ${Math.round(s.oxygen)}%`;
  const warn=(value,limit)=>value<limit?'danger':'';
@@ -498,6 +508,8 @@ function updateExtras(s,env,v){
  $('drone-monitor-text').textContent=ds.warning||`ROV ${s.drone.mode==='return'?'RETURNING':'DEPLOYED'} · ${Math.round(ds.distance)} / 100 m · ${Math.round(s.drone.battery)}% CHARGE`;
  const fields={heading:[$('mobile-heading-actual'),$('mobile-heading-requested')],depth:[$('mobile-depth-actual'),$('mobile-depth-requested')],speed:[$('mobile-speed-actual'),$('mobile-speed-requested')]};for(const [axis,elements] of Object.entries(fields)){const cap=axis[0].toUpperCase()+axis.slice(1),unit=axis==='heading'?'°':axis==='depth'?' m':' kn',format=n=>axis==='heading'?deg(n):axis==='depth'?Math.round(n):n.toFixed(1);elements[0].textContent=format(v[axis])+unit;elements[1].textContent='REQ '+format(v['target'+cap])+unit;}
  const ms=$('mobile-speed');ms.min=rov?-3:-4;ms.max=rov?10:17;ms.value=v.targetSpeed;ms.dataset.actual=v.speed;ms.dataset.requested=v.targetSpeed;ms.setAttribute('aria-valuetext',`Actual ${v.speed.toFixed(1)}; requested ${v.targetSpeed.toFixed(1)} knots`);$('mobile-speed-track').querySelector('.mobile-speed-rail').style.setProperty('--actual',clamp((v.speed-Number(ms.min))/(Number(ms.max)-Number(ms.min))*100,0,100)+'%');
+ ms.setAttribute('aria-label',rov?'Requested ROV speed':'Requested submarine speed');
+ ms.setAttribute('aria-orientation',rovTouch?'horizontal':'vertical');
  if(orderAxis){const cap=orderAxis[0].toUpperCase()+orderAxis.slice(1),requested=v['target'+cap];for(const id of ['order-number','order-slider'])if(document.activeElement!==$(id))$(id).value=requested;$('order-actual').textContent='ACTUAL '+v[orderAxis].toFixed(1)+' · REQUESTED '+requested.toFixed(1);}
  const rs=reconStatus(s);$('recon-title').textContent=rs.title.toUpperCase();$('recon-detail').textContent=rs.detail+(reconPlacement?' Tap the chart to place the square.':!chart.reconArea?' Select a search square first.':'')+(rs.cooldownRemaining>0&&['complete','idle'].includes(rs.phase)?' Next task in '+Math.ceil(rs.cooldownRemaining)+' s.':'');$('recon-link').textContent=rs.linkLabel+(rs.phase==='idle'?'':' · '+Math.round(rs.progress*100)+'%');$('recon-progress').style.width=rs.progress*100+'%';$('recon-progress').parentElement.setAttribute('aria-valuenow',String(Math.round(rs.progress*100)));$('recon-panel').classList.toggle('loading',!['idle','complete','failed'].includes(rs.phase));$('recon-panel').dataset.phase=rs.phase;
  $('photo-gallery').classList.toggle('hidden',view!=='photos'||!photoArchive(s).length);$('photo-empty').classList.toggle('hidden',view!=='photos'||!!photoArchive(s).length);updateGallery();

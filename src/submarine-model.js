@@ -7,7 +7,8 @@ function screwBlade(T){
  for(let face=0;face<2;face++)for(let i=0;i<=rows;i++)for(let j=0;j<=columns;j++){
   const t=i/rows,u=j/columns,cross=u*2-1,r=.36+(D.propellerRadius-.38)*t,skew=.28*t*t,chord=.12+.7*Math.sin(Math.PI*(.12+.88*t))**.7,offset=cross*chord/2,pitch=Math.atan(D.propellerPitch/(2*Math.PI*r));
   const tangent=offset*Math.cos(pitch),thickness=(.009+.035*(1-t)*Math.sqrt(Math.max(0,1-cross*cross)))*(face?-1:1),camber=.025*(1-cross*cross)*Math.sin(t*Math.PI);
-  positions.push(r*Math.cos(skew)-tangent*Math.sin(skew),r*Math.sin(skew)+tangent*Math.cos(skew),offset*Math.sin(pitch)+thickness+camber);
+  // Ahead RPM is positive, so the blade must sweep water toward the stern (+Z).
+  positions.push(r*Math.cos(skew)-tangent*Math.sin(skew),r*Math.sin(skew)+tangent*Math.cos(skew),-offset*Math.sin(pitch)+thickness+camber);
  }
  const layer=(rows+1)*(columns+1),at=(face,i,j)=>face*layer+i*(columns+1)+j;
  for(let face=0;face<2;face++)for(let i=0;i<rows;i++)for(let j=0;j<columns;j++){
@@ -31,7 +32,7 @@ function foil(T,span,chord,thickness,vertical=false){
 }
 // Three is injected so the same mesh can be checked without a browser/WebGL.
 export function createSubmarine(T){
- const root=new T.Group(),bodyMat=new T.MeshStandardMaterial({color:D.hullColor,roughness:.78,metalness:.05}),trim=new T.MeshStandardMaterial({color:0x18272c,roughness:.8,metalness:.05});
+ const root=new T.Group(),bodyMat=new T.MeshStandardMaterial({color:D.hullColor,roughness:.92}),trim=new T.MeshStandardMaterial({color:0x181b1e,roughness:.92});
  const box=(parent,size,pos,mat=bodyMat)=>{const m=new T.Mesh(new T.BoxGeometry(...size),mat);m.position.set(...pos);parent.add(m);return m;};
  const hull=new T.Mesh(new T.LatheGeometry(D.stations.map(p=>new T.Vector2(p.radius,p.z)),48),bodyMat);hull.geometry.rotateX(Math.PI/2);root.add(hull);root.userData.hull=hull;
  box(root,[3.8,.3,34],[0,4.9,-1],trim);

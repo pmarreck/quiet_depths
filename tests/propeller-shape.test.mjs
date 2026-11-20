@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three.module.js';
 import {createSubmarine} from '../src/submarine-model.js';
 import {createGame} from '../src/sim.js';
+import {propellerState} from '../src/mechanics.js';
 
 test('the screw blades twist around an axial disc without a flower-like forward lean',()=>{
  const model=createSubmarine(THREE),prop=model.userData.prop;model.updateMatrixWorld(true);
@@ -18,6 +19,27 @@ test('the screw blades twist around an axial disc without a flower-like forward 
   const mean=values=>values.reduce((a,b)=>a+b,0)/values.length;
   assert.ok(Math.abs(mean(inner)-mean(outer))<.12,'radial blade centerline stays in the screw disc, rather than leaning forward');
   const zSpan=Math.max(...outer)-Math.min(...outer);assert.ok(zSpan>.08,'the blade tip has actual screw pitch, rather than a flat petal');
+ }
+});
+
+test('ahead and astern shaft rotation pitch the blades to push water opposite travel',()=>{
+ const model=createSubmarine(THREE),prop=model.userData.prop;
+ const blade=prop.children.find(o=>o.geometry.type==='BufferGeometry');
+ const positions=blade.geometry.attributes.position;
+ const chord=[];
+ for(let i=0;i<positions.count;i++){
+  const x=positions.getX(i),y=positions.getY(i),radius=Math.hypot(x,y);
+  if(radius>.93&&radius<.99)chord.push({angle:Math.atan2(y,x),z:positions.getZ(i)});
+ }
+ chord.sort((a,b)=>a.angle-b.angle);
+ const leading=chord.at(-1),trailing=chord[0];
+ assert.ok(leading.angle-trailing.angle>.5,'sample spans a mid-blade chord');
+ const axialPitch=(leading.z-trailing.z)/(leading.angle-trailing.angle);
+ // At a fixed angle, spinning the blade sweeps through its chord in the
+ // opposite direction. The bow is at negative Z in the rendered model.
+ for(const speed of [-3,4]){
+  const axialSweep=-propellerState(speed,12).rpm*axialPitch;
+  assert.equal(Math.sign(axialSweep),Math.sign(speed));
  }
 });
 
