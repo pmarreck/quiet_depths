@@ -1,14 +1,19 @@
 // Fictional combat tuning. Positions are meters; gun aim is compass/elevation.
 import {clamp,rad,bearing,delta,distance,log,rand,bottom} from './mechanics.js';
-import {hash01,environmentAt} from './environment.js';
+import {hash01,environmentAt,boatHeave} from './environment.js';
 import {emitSound} from './acoustics.js';
 import {hurt} from './systems.js';
-import {isSurfaced} from './vehicle-status.js';
+import {isSurfaced,boatPoint} from './vehicle-status.js';
 import {estimateAt} from './track-estimates.js';
 import {playerReport,projectedReport,scatterAim} from './hostile-tracks.js';
+import {SUB_DESIGN as D} from './hull-design.js';
+import {addDebrief} from './debrief.js';
 
 export const freshCombat=()=>({gun:{ammo:240,cooldown:0,shots:0,angle:0,elevation:0},gunRounds:[],impacts:[],aircraft:[],airSupport:{status:'idle',requestedAt:null,launchAt:null,base:{x:-3200,y:3400},lastKnown:null},weaponSequence:1,gunLoudUntil:0});
 const wrap=n=>(n%360+360)%360;
+const TORPEDO_SPEED=24,TORPEDO_LIFE=180,ARMING_TIME=4,MAX_PITCH=Math.PI/4;
+const SURFACE_RUN_DEPTH=3;
+export const ENEMY_DECOY_SUPPLY=2;
 export function chargeAltitude(charge){
  if(charge.exploded)return -charge.depth;
  const elapsed=clamp(charge.totalDelay-charge.delay,0,charge.totalDelay),air=charge.airTime||0;
@@ -16,13 +21,33 @@ export function chargeAltitude(charge){
  return -charge.depth*clamp((elapsed-air)/Math.max(.001,charge.totalDelay-air),0,1)||0;
 }
 export function firingBearing(s,contact){const estimate=contact.fix?estimateAt(contact,s.time):null;return estimate?bearing(s,estimate):contact.bearing;}
+function torpedoOrders(s,id,heading,depth){
+ return {orderedHeading:heading,orderedDepth:depth,pitch:0,tubeSide:0,searchAge:0,
+  searchDirection:hash01(s.patrol.seed,id+673)<.5?-1:1,decoysChecked:[],decoyTarget:null,diverted:false};
+}
 export function launchTorpedo(s,id){
  const c=s.contacts.find(v=>v.id===id);
- if(!c||s.torps<=0||s.status!=='patrol'||s.depth>100)return false;
+ if(!c||c.identified&&!c.military||s.torps<=0||s.status!=='patrol'||s.depth>100)return false;
+ const tubeSide=s.torps%2?1:-1;
  s.torps--;s.alert=clamp(s.alert+20,0,100);
- const depth=c.kind==='sub'?s.depth:Math.min(6,s.depth);
- const heading=firingBearing(s,c);s.projectiles.push({id:s.weaponSequence++,x:s.x,y:s.y,depth,heading,age:0,intended:id,lock:null,pingAge:99,path:[{x:s.x,y:s.y,depth,time:s.time}]});
+ const origin=boatPoint(s,{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
+ origin.depth-=boatHeave(s);
+ const heading=firingBearing(s,c),shotId=s.weaponSequence++,depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
+ s.projectiles.push({id:shotId,...origin,age:0,intended:id,lock:null,pingAge:99,
+  ...torpedoOrders(s,shotId,heading,depth),heading:s.heading,pitch:s.pitch,tubeSide,path:[{...origin,time:s.time}]});
  log(s,`Tube away. Bearing ${Math.round(heading)}. Seeker arms after its run-out.`,'warning');return true;
+}
+export function restoreTorpedo(s,p){
+ if(!p||!['x','y','heading','age'].every(k=>Number.isFinite(p[k])))return false;
+ if(p.id===undefined)p.id=s.weaponSequence++;
+ const depth=p.depth??Math.min(s.depth,6);
+ for(const [k,v] of Object.entries({intended:p.lock??null,lock:null,depth,pingAge:99,path:[{x:p.x,y:p.y,depth,time:s.time}],
+  ...torpedoOrders(s,p.id,p.heading,depth)}))if(p[k]===undefined)p[k]=v;
+ return ['id','depth','pingAge','orderedHeading','orderedDepth','pitch','searchAge'].every(k=>Number.isFinite(p[k]))&&
+  [-1,1].includes(p.searchDirection)&&[-1,0,1].includes(p.tubeSide)&&typeof p.diverted==='boolean'&&
+  Array.isArray(p.decoysChecked)&&p.decoysChecked.every(id=>typeof id==='string')&&
+  (p.decoyTarget===null||['x','y','depth','expiresAt'].every(k=>Number.isFinite(p.decoyTarget[k])))&&
+  Array.isArray(p.path)&&p.path.every(v=>['x','y','depth','time'].every(k=>Number.isFinite(v[k])));
 }
 export function fireDeckGun(s,aim){
  if(s.status!=='patrol'||!isSurfaced(s)||s.gun.ammo<=0||s.gun.cooldown>0||(s.systems.deckgun??100)<=10||!Number.isFinite(aim.bearing)||!Number.isFinite(aim.elevation))return false;
@@ -40,7 +65,7 @@ export function aimGunAt(s,point){
 }
 function shipHit(from,to,ship){
  const a=rad(ship.heading),sn=Math.sin(a),cs=Math.cos(a),scale=ship.kind==='fishing'?.38:ship.kind==='escort'?.78:ship.kind==='sub'?.5:1;
- const local=p=>[(p.x-ship.x)*cs-(p.y-ship.y)*sn,(p.x-ship.x)*sn+(p.y-ship.y)*cs,p.altitude+(ship.sinkDepth||0)];
+ const local=p=>[(p.x-ship.x)*cs-(p.y-ship.y)*sn,(p.x-ship.x)*sn+(p.y-ship.y)*cs,p.altitude+(ship.sinkDepth||0)+(ship.kind==='sub'?ship.depth??65:0)];
  const p=local(from),q=local(to),bounds=[[-14*scale,14*scale],[-65*scale,65*scale],[-7,ship.kind==='sub'?7:23*scale]];let enter=0,leave=1;
  for(let i=0;i<3;i++){const v=q[i]-p[i];if(Math.abs(v)<1e-10){if(p[i]<bounds[i][0]||p[i]>bounds[i][1])return null;continue;}let a=(bounds[i][0]-p[i])/v,b=(bounds[i][1]-p[i])/v;if(a>b)[a,b]=[b,a];enter=Math.max(enter,a);leave=Math.min(leave,b);if(enter>leave)return null;}
  return enter>=0&&enter<=1?enter:null;
@@ -75,26 +100,98 @@ function shipDamage(s,dt){
   if(v.hull<=0){if(v.sunkAt===undefined){v.sunkAt=s.time;log(s,`${v.name} is sinking.`,'success');}v.sinkDepth=Math.min(80,v.sinkDepth+dt*.8);v.speed=0;}
  }
 }
-function updateTorpedoes(s,dt){
- for(const p of s.projectiles){p.age+=dt;p.pingAge+=dt;let best=null,score=0;
-  if(p.age>=4){if(p.pingAge>=2.4){p.pingAge=0;emitSound(s,{type:'seeker',x:p.x,y:p.y,depth:p.depth,power:.24});}
-   for(const ship of s.ships){if(ship.hull<=0)continue;const d=distance(p,ship);if(d>1800||Math.abs(delta(bearing(p,ship),p.heading))>40)continue;
-    const loud=ship.noise??(ship.kind==='merchant'?75:ship.kind==='escort'?65:ship.kind==='sub'?28:40)+Math.abs(ship.speed)*3,preference=ship.id===p.intended?2.5:1,value=loud*preference/(d+80);
-    if(value>score){best=ship;score=value;}}
-   p.lock=best?.id??null;
-   if(best){p.heading=wrap(p.heading+clamp(delta(bearing(p,best),p.heading),-dt*10,dt*10));const depth=best.kind==='sub'?(best.depth||65):4;p.depth+=clamp(depth-p.depth,-dt*1.5,dt*1.5);}
-  }
-  p.x+=Math.sin(rad(p.heading))*24*dt;p.y+=Math.cos(rad(p.heading))*24*dt;
-  if(!p.path.length||s.time-p.path.at(-1).time>=.5)p.path.push({x:p.x,y:p.y,depth:p.depth,time:s.time});p.path=p.path.filter(v=>s.time-v.time<40).slice(-80);
-  for(const ship of s.ships){const depth=ship.kind==='sub'?ship.depth||65:4;if(ship.hull>0&&Math.hypot(distance(p,ship),depth-p.depth)<55){
-   ship.playerDamaged=true;ship.hull=Math.max(0,ship.hull-100*2**(s.difficulty?.damage??0));p.age=999;
-   emitSound(s,{type:'detonation',x:ship.x,y:ship.y,depth,power:1});
-   s.impacts.push({id:p.id,x:ship.x,y:ship.y,altitude:-depth,time:s.time,kind:'torpedo'});
-   log(s,ship.military?`Heavy detonation. ${ship.name} ${ship.hull===0?'is sinking.':'was struck.'}`:`Neutral vessel hit: ${ship.name}. Patrol compromised.`,ship.military?'success':'damage');
-   if(!ship.military)s.status='compromised';break;
-  }}
+const targetRunDepth=ship=>ship.kind==='sub'?ship.depth??65:SURFACE_RUN_DEPTH;
+function seekerReturn(s,p){
+ let best=null,score=0;
+ for(const ship of s.ships){
+  if(ship.hull<=0)continue;
+  const d=Math.hypot(distance(p,ship),targetRunDepth(ship)-p.depth);
+  if(d>1800||Math.abs(delta(bearing(p,ship),p.heading))>40)continue;
+  const loud=ship.noise??(ship.kind==='merchant'?75:ship.kind==='escort'?65:ship.kind==='sub'?28:40)+Math.abs(ship.speed)*3;
+  const preference=ship.id===p.intended&&!p.diverted?2.5:1,value=loud*preference/(d+80);
+  if(value>score){best=ship;score=value;}
  }
- s.projectiles=s.projectiles.filter(p=>p.age<180);
+ return best;
+}
+function releaseEnemyDecoy(s,p,ship){
+ if(!ship||ship.kind!=='sub'||!ship.military||p.decoysChecked.includes(ship.id))return;
+ const depth=targetRunDepth(ship);
+ if(Math.hypot(distance(p,ship),depth-p.depth)>220)return;
+ const remaining=ship.torpedoDecoys??ENEMY_DECOY_SUPPLY;
+ if(remaining===0)return;
+ ship.torpedoDecoys=remaining-1;
+ p.decoysChecked.push(ship.id);
+ if(rand(s)>=.25)return;
+ // Drop the decoy short of the boat and to one side of the incoming shot.
+ const a=rad(bearing(p,ship)),side=p.searchDirection;
+ p.decoyTarget={x:ship.x-Math.sin(a)*60+Math.cos(a)*24*side,y:ship.y-Math.cos(a)*60-Math.sin(a)*24*side,
+  depth,expiresAt:s.time+18};
+}
+function torpedoCourse(s,p,dt){
+ if(p.age<=.55&&p.tubeSide!==0)return{heading:p.heading,depth:p.depth-Math.tan(p.pitch)*32};
+ if(p.age<ARMING_TIME)return{heading:p.orderedHeading,depth:p.orderedDepth};
+ if(p.pingAge>=2.4){
+  p.pingAge=0;
+  emitSound(s,{type:'seeker',x:p.x,y:p.y,depth:p.depth,power:.24});
+ }
+ if(p.decoyTarget&&s.time>=p.decoyTarget.expiresAt)p.decoyTarget=null;
+ const best=p.decoyTarget?null:seekerReturn(s,p);
+ releaseEnemyDecoy(s,p,best);
+ p.lock=p.decoyTarget?null:best?.id??null;
+ const target=p.decoyTarget??best;
+ if(target){
+  p.searchAge=0;
+  if(p.lock)p.orderedDepth=targetRunDepth(best);
+  return{heading:bearing(p,target),depth:target===best?targetRunDepth(best):target.depth};
+ }
+ p.searchAge+=dt;
+ const turnRate=8/(1+p.searchAge/24);
+ return{heading:p.heading+p.searchDirection*turnRate*dt,depth:p.orderedDepth};
+}
+function torpedoStrike(s,p,from){
+ const to={x:p.x,y:p.y,altitude:-p.depth};
+ let hit=null,fraction=Infinity;
+ for(const ship of s.ships){
+  if(ship.hull<=0)continue;
+  const t=shipHit(from,to,ship);
+  if(t!==null&&t<fraction){hit=ship;fraction=t;}
+ }
+ if(!hit)return;
+ p.x=from.x+(p.x-from.x)*fraction;p.y=from.y+(p.y-from.y)*fraction;
+ p.depth=-from.altitude+(p.depth+from.altitude)*fraction;p.age=TORPEDO_LIFE;
+ hit.playerDamaged=true;hit.hull=Math.max(0,hit.hull-100*2**(s.difficulty?.damage??0));
+ emitSound(s,{type:'detonation',x:p.x,y:p.y,depth:p.depth,power:1});
+ s.impacts.push({id:p.id,x:p.x,y:p.y,altitude:-p.depth,time:s.time,kind:'torpedo'});
+ if(hit.military){
+  log(s,`Heavy detonation. ${hit.name} ${hit.hull===0?'is sinking.':'was struck.'}`,'success');
+ }else if(p.diverted&&p.lock===hit.id&&p.intended!==hit.id){
+  const text=`A decoy diverted your torpedo before it acquired and struck the neutral ${hit.name}.`;
+  log(s,text,'damage');addDebrief(s,text);
+ }else{
+  s.status='compromised';log(s,`Neutral vessel hit: ${hit.name}. Patrol compromised.`,'damage');
+ }
+}
+function updateTorpedoes(s,dt){
+ for(const p of s.projectiles){
+  p.age+=dt;p.pingAge+=dt;
+  if(p.age>=TORPEDO_LIFE)continue;
+  const from={x:p.x,y:p.y,altitude:-p.depth},course=torpedoCourse(s,p,dt),travel=TORPEDO_SPEED*dt;
+  p.heading=wrap(p.heading+clamp(delta(course.heading,p.heading),-dt*10,dt*10));
+  const drop=course.depth-p.depth,pitch=clamp(Math.atan2(-drop,32),-MAX_PITCH,MAX_PITCH);
+  const dz=Math.sign(drop)*Math.min(Math.abs(drop),travel*Math.abs(Math.sin(pitch)));
+  const horizontal=Math.sqrt(travel**2-dz**2);
+  p.pitch=Math.atan2(-dz,horizontal);p.depth+=dz;
+  p.x+=Math.sin(rad(p.heading))*horizontal;p.y+=Math.cos(rad(p.heading))*horizontal;
+  const decoy=p.decoyTarget;
+  if(decoy&&sphereHit(from,{x:p.x,y:p.y,altitude:-p.depth},{x:decoy.x,y:decoy.y,altitude:-decoy.depth},12)!==null){
+   p.decoyTarget=null;p.diverted=true;p.orderedDepth=p.depth;
+   addDebrief(s,'A torpedo followed a submarine decoy, passed it, then resumed its search.');
+  }
+  if(p.age>=ARMING_TIME)torpedoStrike(s,p,from);
+  if(!p.path.length||s.time-p.path.at(-1).time>=.24||p.age>=TORPEDO_LIFE)p.path.push({x:p.x,y:p.y,depth:p.depth,time:s.time});
+  p.path=p.path.filter(v=>s.time-v.time<40).slice(-80);
+ }
+ s.projectiles=s.projectiles.filter(p=>p.age<TORPEDO_LIFE);
 }
 function requestSupport(s){
  if(s.difficulty?.airSupport===false)return;

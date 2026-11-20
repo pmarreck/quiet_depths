@@ -46,6 +46,10 @@ export function steerDrone(s,context,dx,dy){
 }
 
 export const droneCameraPitch=verticalSpeed=>-rad(18)*clamp(verticalSpeed,-1,1);
+export const orbitDrag=(orbit,dx,dy)=>{
+ orbit.yaw=(orbit.yaw+dx*.008)%(2*Math.PI);
+ orbit.pitch=clamp(orbit.pitch+dy*.008,-1.28,1.28);
+};
 
 // Explicit yaw/pitch/roll order preserves a world-up horizon through all azimuths.
 // Never modify a single XYZ Euler component after lookAt's quaternion conversion.

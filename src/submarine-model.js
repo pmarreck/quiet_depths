@@ -1,4 +1,10 @@
 import {SUB_DESIGN as D} from './hull-design.js';
+// Sample the screw below half a blade spacing per render to avoid apparent
+// reverse rotation when frames are slow or simulation time is compressed.
+export function renderedScrewAngle(angle,rpm,elapsed){
+ const limit=.8*Math.PI/D.propellerBlades,step=rpm*Math.PI/30*Math.max(0,elapsed);
+ return (angle+Math.max(-limit,Math.min(limit,step)))%(2*Math.PI);
+}
 // Five fixed-pitch blades, as documented for Blueback by OMSI's National
 // Register nomination. The painted finish is a deliberate game choice. This
 // helical surface is an approximation, not an exact hydrodynamic blade design.
@@ -36,7 +42,14 @@ export function createSubmarine(T){
  const box=(parent,size,pos,mat=bodyMat)=>{const m=new T.Mesh(new T.BoxGeometry(...size),mat);m.position.set(...pos);parent.add(m);return m;};
  const hull=new T.Mesh(new T.LatheGeometry(D.stations.map(p=>new T.Vector2(p.radius,p.z)),48),bodyMat);hull.geometry.rotateX(Math.PI/2);root.add(hull);root.userData.hull=hull;
  box(root,[3.8,.3,34],[0,4.9,-1],trim);
- const sail=new T.Mesh(new T.CapsuleGeometry(2.1,7,5,16),bodyMat);sail.scale.set(1,1,2.5);sail.position.set(0,7,-5);root.add(sail);box(root,[6.4,.18,12.5],[0,11.5,-5],trim);
+ const sail=new T.Mesh(new T.CapsuleGeometry(2.1,7,7,24),bodyMat);sail.scale.set(1,1,2.5);sail.position.set(0,D.bridgeRoof-5.6,D.bridgeZ);root.add(sail);
+ const steel=new T.MeshStandardMaterial({color:0x8d9a9d,roughness:.65,metalness:.25});
+ const bridgeHatch=new T.Mesh(new T.CircleGeometry(.41,24),trim);bridgeHatch.rotation.x=-Math.PI/2;bridgeHatch.position.set(0,D.bridgeRoof+.01,D.bridgeZ);root.add(bridgeHatch);
+ const rail=new T.Mesh(new T.TorusGeometry(D.bridgeRailRadius,.027,8,32),steel);rail.rotation.x=Math.PI/2;rail.position.set(0,D.bridgeRoof+.94,D.bridgeZ);root.add(rail);
+ for(let i=0;i<4;i++){
+  const angle=(i+.5)*Math.PI/2,x=Math.cos(angle)*D.bridgeRailRadius,z=D.bridgeZ+Math.sin(angle)*D.bridgeRailRadius;
+  box(root,[.038,1.02,.038],[x,D.bridgeRoof+.43,z],steel);
+ }
  const mast=new T.Group();box(mast,[.16,6,.16],[0,14,-7],trim);box(mast,[.4,.3,.2],[.12,17,-7],trim);root.add(mast);root.userData.mast=mast;
  box(root,[.18,4,.18],[1,13,-2],trim);box(root,[.12,3,.12],[-1,12,-4],trim);
  for(const [key,y,z,span,chord] of [['foreplanes',7,-5,5.4,2.7],['aftplanes',0,27,4.8,3.3]]){
@@ -49,6 +62,13 @@ export function createSubmarine(T){
  const shaft=new T.Mesh(new T.CylinderGeometry(D.shaftRadius,D.shaftRadius,3.2,12),bodyMat);shaft.rotation.x=Math.PI/2;shaft.position.z=32.8;root.add(shaft);
  const prop=new T.Group();prop.position.z=D.propellerZ;const hub=new T.Mesh(new T.SphereGeometry(.38,12,8),bodyMat);hub.scale.z=1.6;prop.add(hub);
  const bladeGeometry=screwBlade(T);for(let i=0;i<D.propellerBlades;i++){const blade=new T.Mesh(bladeGeometry,bodyMat);blade.rotation.z=i*2*Math.PI/D.propellerBlades;prop.add(blade);}root.add(prop);root.userData.prop=prop;
+ root.userData.tubes=[-1,1].map(side=>{
+  const z=-D.tubeForward,x=side*D.tubeSide,y=-D.tubeDown;
+  const port=new T.Mesh(new T.CircleGeometry(.36,24),trim);port.rotation.y=Math.PI;port.position.set(x,y,z);root.add(port);
+  const hinge=new T.Group();hinge.position.set(x+side*.34,y,z-.05);
+  const cover=new T.Mesh(new T.CircleGeometry(.35,24),bodyMat);cover.rotation.y=Math.PI;cover.position.x=-side*.34;hinge.add(cover);root.add(hinge);
+  return hinge;
+ });
  const tetherHatch=new T.Mesh(new T.CircleGeometry(.48,20),trim);tetherHatch.position.set(4.65,-2,0);tetherHatch.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),new T.Vector3(4.65,-2,0).normalize());root.add(tetherHatch);root.userData.tetherHatch=tetherHatch;
  // Exposed dual-purpose mount retained on this fictional experimental refit.
  const turret=new T.Group();turret.position.set(0,5.15,-16);const pedestal=new T.Mesh(new T.CylinderGeometry(.7,.9,.8,12),trim);pedestal.position.y=.4;turret.add(pedestal);

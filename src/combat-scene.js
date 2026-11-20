@@ -40,7 +40,8 @@ export class CombatScene{
    const age=Math.max(0,time-point.time);
    if(age>23)continue;
    const surface=surfaceHeight(point.x,point.y,time,e);
-   if(point.depth<=9)foamPositions.setXYZ(foam++,point.x,surface+.12,-point.y);
+   const belowSurface=surface+point.depth;
+   if(belowSurface>=0&&belowSurface<=5)foamPositions.setXYZ(foam++,point.x,surface+.12,-point.y);
    if(age>12)continue;
    for(let i=0;i<3;i++){
     const phase=point.time*8+i*2.0,altitude=-point.depth+age*(.45+i*.13);
@@ -56,7 +57,7 @@ export class CombatScene{
   if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values())this.removeTorpedo(p);this.planes.clear();this.torpedoes.clear();this.lastState=s;}
   const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane();this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.prop.rotation.z=s.time*40;g.userData.bombs.visible=!p.bombDropped;g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
-  const torpIds=new Set();for(const p of s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.y=-rad(p.heading);
+  const torpIds=new Set();for(const p of s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.set(p.pitch,-rad(p.heading),0,'YXZ');
    const ring=g.userData.ring;ring.visible=p.age>=4&&p.pingAge<.7;ring.scale.setScalar(1+p.pingAge*45);ring.material.opacity=Math.max(0,.24*(1-p.pingAge/.7));
    g.userData.path=p.path;this.updateTrail(g,p.path,s.time,e);
   }

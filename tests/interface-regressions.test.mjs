@@ -18,8 +18,24 @@ test('a torpedo uses the aged observed track from the current boat position with
  const s=createGame('recon',1972);Object.assign(s,{x:1000,y:2000,time:120,depth:12});
  const contact={id:'satellite-track',bearing:0,x:0,y:0,fix:{x:4000,y:1000,time:20,vx:10,vy:10,positionSigma:0,velocitySigma:.2,maneuverSigma:.01}};
  s.contacts=[contact];s.ships=[{id:contact.id,x:-99999,y:-99999,kind:'merchant'}];
- assert.equal(launchTorpedo(s,contact.id),true);assert.ok(Math.abs(s.projectiles.at(-1).heading-90)<1e-8);
- const passive={...createGame(),contacts:[{id:'bearing-only',bearing:237}],ships:[]};assert.equal(launchTorpedo(passive,'bearing-only'),true);assert.equal(passive.projectiles.at(-1).heading,237);
+ assert.equal(launchTorpedo(s,contact.id),true);assert.ok(Math.abs(s.projectiles.at(-1).orderedHeading-90)<1e-8);
+ assert.equal(s.projectiles.at(-1).heading,s.heading,'a shot exits straight through the bow tube');
+ const passive={...createGame(),contacts:[{id:'bearing-only',bearing:237}],ships:[]};assert.equal(launchTorpedo(passive,'bearing-only'),true);assert.equal(passive.projectiles.at(-1).orderedHeading,237);
+});
+
+test('closing the sonar range magnifies fixed contacts while leaving bearing-only spokes in place',()=>{
+ assert.deepEqual(uiGeometry.SONAR_RANGES,[1500,3000,6000]);
+ const radius=uiGeometry.sonarRangeFraction;
+ assert.equal(radius(750,1500),.5);assert.equal(radius(750,3000),.25);
+ assert.equal(radius(3100,3000),null);
+ assert.equal(radius(0,1500),radius(0,6000));
+});
+
+test('dragging right in orbit increases yaw, dragging up lowers the viewing angle',()=>{
+ const orbit={yaw:0,pitch:0};
+ controls.orbitDrag(orbit,50,-10);
+ assert.ok(orbit.yaw>0);
+ assert.ok(orbit.pitch<0);
 });
 
 test('heavy seas increase bounded optical motion while a paused observation stays repeatable',()=>{

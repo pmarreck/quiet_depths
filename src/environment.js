@@ -46,3 +46,6 @@ export function opticalSway(s,view,time=s.time){
  return{pitch:clamp(along*(tower?.16:.065)+Math.sin(time*.57)*.0015*scale,-.045,.045),roll:clamp(across*(tower?.2:.07)+Math.sin(time*.63)*.002*scale,-.045,.045),yaw:Math.sin(time*.39)*.002*scale};
 }
 export function soundings(waterDepth,referenceDepth,keelOffset=5){return{waterDepth,referenceDepth,belowKeel:waterDepth-referenceDepth-keelOffset,keelOffset};}
+export function boatHeave(s,e=environmentAt(s),time=s.time){
+ return surfaceHeight(s.x,s.y,time,e)*.36*Math.exp(-Math.max(0,s.depth)/2);
+}

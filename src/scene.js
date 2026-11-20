@@ -1,10 +1,10 @@
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
 import {feedActive,scopeBearing,cameraEuler,droneCameraPitch} from './controls.js';
-import {environmentAt,SEA_SAMPLE_GLSL,surfaceHeight,scopeEyeHeight,scopeWashed,opticalSway,hash01} from './environment.js';
+import {environmentAt,SEA_SAMPLE_GLSL,surfaceHeight,scopeEyeHeight,scopeWashed,opticalSway,hash01,boatHeave} from './environment.js';
 import {Atmosphere} from './atmosphere.js';
 import {UnderseaLife} from './undersea.js';
-import {createSubmarine} from './submarine-model.js';
+import {createSubmarine,renderedScrewAngle} from './submarine-model.js';
 import {SUB_DESIGN as D} from './hull-design.js';
 import {CombatScene} from './combat-scene.js';
 import {tetherPoints} from './tether.js';
@@ -80,11 +80,14 @@ export class OceanScene{
  render(s,view,zoom,time,orbit){
   if(!feedActive(s,view)){this.clear();return;}
   const orbiting=view==='orbit',e=environmentAt(s),drone=view==='drone',tower=view==='tower',gun=view==='gun',listener=drone?s.drone:s;
+  const heave=boatHeave(s,e,time),hullY=heave-s.depth;
+  const motionDt=this.motionState===s?time-this.motionTime:0;
+  this.motionState=s;this.motionTime=time;
   if(orbiting){
    const offset=orbit.distance*Math.cos(orbit.pitch),x=s.x+offset*Math.sin(orbit.yaw),y=s.y+offset*Math.cos(orbit.yaw);
-   const elevation=Math.max(-bottom(x,y)+1,-s.depth+orbit.distance*Math.sin(orbit.pitch));
-   this.camera.position.set(x,elevation,-y);this.camera.lookAt(s.x,-s.depth,-s.y);this.camera.fov=56;
-   this.light.position.copy(this.camera.position);this.light.target.position.set(s.x,-s.depth,-s.y);this.particles.position.copy(this.camera.position);
+   const elevation=Math.max(-bottom(x,y)+1,hullY+orbit.distance*Math.sin(orbit.pitch));
+   this.camera.position.set(x,elevation,-y);this.camera.lookAt(s.x,hullY,-s.y);this.camera.fov=56;
+   this.light.position.copy(this.camera.position);this.light.target.position.set(s.x,hullY,-s.y);this.particles.position.copy(this.camera.position);
   }
   // Keep the virtual orbit light readable as the camera moves away from the hull.
   this.light.intensity=orbiting?2.8*orbit.distance**2:ROV_LAMP_INTENSITY;
@@ -97,13 +100,19 @@ export class OceanScene{
   this.renderer.setClearColor(fog);this.scene.fog.color.copy(fog);this.scene.fog.density=underwater?.009:1.1/e.opticalRange;this.hemi.intensity=(underwater?.18+.45*e.daylight:.15+1.8*e.daylight)+e.flash*(underwater?.2:2);this.sun.intensity=e.daylight*(1-e.cloud*.7)*(underwater?.2:2.7);this.sun.position.set(e.sunDirection.x*5000,e.sunDirection.y*5000,e.sunDirection.z*5000);this.moon.position.copy(this.sun.position).multiplyScalar(-1);this.moon.intensity=(1-e.daylight)*(1-e.cloud*.85)*.28;this.particles.visible=underwater;this.light.visible=underwater;
   const liveShipIds=new Set(s.ships.map(v=>v.id));for(const [id,mesh] of this.ships)if(!liveShipIds.has(id)){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});this.ships.delete(id);}
   for(const ship of s.ships){let mesh=this.ships.get(ship.id);if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}const d=Math.hypot(listener.x-ship.x,listener.y-ship.y);mesh.visible=(ship.hull>0||ship.sunkAt!==undefined&&(ship.sinkDepth||0)<50)&&(drone||ship.kind!=='sub');if(mesh.userData.body){mesh.userData.body.visible=d<(underwater?350:e.opticalRange);mesh.userData.lights.visible=!underwater&&e.daylight<.85&&d<e.lightRange;}mesh.position.set(ship.x,ship.kind==='sub'?-ship.depth:surfaceHeight(ship.x,ship.y,time,e)*.65-(ship.sinkDepth||0),-ship.y);mesh.rotation.y=-rad(ship.heading);mesh.rotation.z=Math.sin(time*.8+ship.x)*.012*e.waveScale+(ship.flood?Math.min(.35,ship.flood*.012):0);mesh.rotation.x=Math.sin(time*.55+ship.y)*.008*e.waveScale;if(mesh.userData.prop)mesh.userData.prop.rotation.z=time*ship.speed*.8;}
-  this.own.visible=drone||tower||gun||orbiting;this.own.position.set(s.x,-s.depth,-s.y);this.own.rotation.set(s.pitch,-rad(s.heading),0,'YXZ');
-  this.own.userData.foreplanes.rotation.x=-s.planes;this.own.userData.aftplanes.rotation.x=s.planes;this.own.userData.rudder.rotation.y=s.rudder*.5;this.own.userData.prop.rotation.z=s.propAngle;this.own.userData.mast.visible=s.systems.periscope>0;this.own.userData.gun.visible=!gun;this.own.userData.gun.rotation.y=-rad(s.gun.angle);this.own.userData.gunElevation.rotation.x=rad(s.gun.elevation);
+  this.own.visible=drone||tower||gun||orbiting;this.own.position.set(s.x,hullY,-s.y);this.own.rotation.set(s.pitch,-rad(s.heading),0,'YXZ');
+  const screw=this.own.userData.prop;
+  screw.rotation.z=renderedScrewAngle(screw.rotation.z,s.propRpm,motionDt);
+  this.own.userData.foreplanes.rotation.x=-s.planes;this.own.userData.aftplanes.rotation.x=s.planes;this.own.userData.rudder.rotation.y=s.rudder*.5;this.own.userData.mast.visible=s.systems.periscope>0;this.own.userData.gun.visible=!gun;this.own.userData.gun.rotation.y=-rad(s.gun.angle);this.own.userData.gunElevation.rotation.x=rad(s.gun.elevation);
+  for(const [i,tube] of this.own.userData.tubes.entries()){
+   const side=i*2-1,shot=s.projectiles.find(p=>p.tubeSide===side&&p.age<1.8);
+   tube.rotation.y=shot?-side*1.5*Math.min(1,(1.8-shot.age)*4):0;
+  }
   this.own.userData.rescueHatch.rotation.z=s.mission==='undersea-rescue'&&s.operation?.active?1.1:0;
   this.bubbles.visible=s.cavitation>.01;this.bubbleUniforms.strength.value=s.cavitation;
   if(this.bubbles.visible){const p=this.bubbles.geometry.attributes.position;for(let i=0;i<p.count;i++){const life=(time*2+i*.137)%1,angle=i*2.399+time*8,r=D.propellerRadius*(.55+Math.sin(i*7)*.15);p.setXYZ(i,Math.cos(angle)*r*(1+life*.2),Math.sin(angle)*r+life*.4,D.propellerZ+.2+life*(2+Math.abs(s.speed)*.3));}p.needsUpdate=true;}
   this.life.update(s,e);this.combat.update(s,e);
-  const cable=tetherPoints(s,time);this.cable.visible=!!cable.length;if(cable.length){const p=this.cable.geometry.attributes.position;cable.forEach((v,i)=>p.setXYZ(i,v.x,-v.depth,-v.y));p.needsUpdate=true;this.cable.geometry.setDrawRange(0,cable.length);this.cable.geometry.computeBoundingSphere();}
+  const cable=tetherPoints(s,time);this.cable.visible=!!cable.length;if(cable.length){const p=this.cable.geometry.attributes.position;cable.forEach((v,i)=>p.setXYZ(i,v.x,-v.depth+heave*(1-i/(cable.length-1)),-v.y));p.needsUpdate=true;this.cable.geometry.setDrawRange(0,cable.length);this.cable.geometry.computeBoundingSphere();}
 
   const sway=opticalSway(s,view,time);this.sun.color.setHex(underwater?0xbad8dd:0xffd6a0);this.hemi.color.setHex(underwater?0xc1d6dc:0xd4d9c8);
   let pose;
@@ -117,7 +126,12 @@ export class OceanScene{
    this.camera.fov=65;
   }
   else if(gun){const a=rad(s.heading);this.camera.position.set(s.x+Math.sin(a)*16,6-s.depth,-s.y-Math.cos(a)*16);pose=cameraEuler(s.heading+s.gun.angle,rad(s.gun.elevation),0);this.camera.fov=55/zoom;}
-  else if(tower){const a=rad(s.heading);this.camera.position.set(s.x+Math.sin(a)*5+Math.cos(a)*3.2,12.9-s.depth+surfaceHeight(s.x,s.y,time,e)*.3,-s.y-Math.cos(a)*5+Math.sin(a)*3.2);pose=cameraEuler(s.heading+s.towerAngle+sway.yaw*180/Math.PI,s.towerPitch+sway.pitch,sway.roll);this.camera.fov=65/zoom;}
+  else if(tower){
+   this.own.localToWorld(this.camera.position.set(0,D.bridgeEye,D.bridgeZ));
+   this.camera.rotation.set(s.towerPitch+sway.pitch,-rad(s.towerAngle)-sway.yaw,sway.roll,'YXZ');
+   this.camera.quaternion.premultiply(this.own.quaternion);
+   this.camera.fov=65/zoom;
+  }
   else if(!orbiting){this.camera.position.set(s.x,scopeEyeHeight(s,e),-s.y);pose=cameraEuler(scopeBearing(s)+sway.yaw*180/Math.PI,Math.atan2(-3+Math.sin(time*.3)*1.5,1000)+sway.pitch,sway.roll);this.camera.fov=38/zoom;}
   if(pose)this.camera.rotation.set(pose.x,pose.y,pose.z,pose.order);
   this.driftingBubbles.visible=underwater;

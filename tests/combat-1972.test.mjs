@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,step,contact,fire,save,restore,ping,hurt,deployDrone} from '../src/sim.js';
-import {fireDeckGun} from '../src/combat.js';
+import {fireDeckGun,updateCombat} from '../src/combat.js';
 import {chartContacts,estimateAt} from '../src/track-estimates.js';
 import {requestRecon} from '../src/recon.js';
 import {patrolKills,saveServiceRecord,serviceRecord} from '../src/service-record.js';
@@ -189,6 +189,78 @@ test('an armed torpedo can acquire an unplotted loud return after its intended t
  assert.ok(s.acoustics.some(e=>e.type==='seeker'));
 });
 
+test('torpedoes leave alternating bow tubes at boat depth and climb into a level surface run',()=>{
+ const s=ocean();s.depth=s.targetDepth=96;
+ const target=vessel('transport',0,900);s.ships=[target];
+ contact(s,target,'active');assert.ok(fire(s,target.id));assert.ok(fire(s,target.id));
+ const [port,starboard]=s.projectiles;
+ assert.ok(port.x<0&&starboard.x>0);
+ assert.ok(port.y>30&&starboard.y>30,'both launches begin at the bow');
+ assert.equal(port.depth,starboard.depth);
+ assert.ok(Math.abs(port.depth-s.depth)<1);
+ assert.deepEqual(port.path[0],{x:port.x,y:port.y,depth:port.depth,time:0});
+ step(s,15);
+ assert.ok(port.depth<=5&&port.depth>=2,'the surface run is submerged and shallow');
+ assert.equal(port.lock,target.id);
+ for(let i=1;i<port.path.length;i++){
+  const a=port.path[i-1],b=port.path[i];
+  assert.ok(Math.abs(a.depth-b.depth)<=separation(a,b)+1e-8,'climb never exceeds 45 degrees');
+  assert.ok(Math.hypot(separation(a,b),b.depth-a.depth)<=24*(b.time-a.time)+1e-8,'the climb respects the same speed limit');
+ }
+ advanceUntil(s,()=>target.hull===0,55);
+ assert.equal(target.hull,0);
+});
+
+test('a seeker without a return widens its turns, searches either way, and runs out of range',()=>{
+ const directions=new Set();
+ for(const seed of [31,33]){
+  const s=ocean('recon',seed);s.contacts=[{id:'missing',kind:'merchant',bearing:0}];
+  assert.ok(fire(s,'missing'));const p=s.projectiles[0],turn=[];
+  while(s.time<180&&s.projectiles.length){
+   const old=p.heading;s.time+=.25;updateCombat(s,.25);
+   if(p.searchAge>0&&s.projectiles.length)turn.push((p.heading-old+540)%360-180);
+  }
+  const sign=Math.sign(turn[0]);directions.add(sign);
+  assert.ok(turn.every(value=>Math.sign(value)===sign));
+  assert.ok(Math.abs(turn[0])>Math.abs(turn.at(-1)),'later arcs widen');
+  assert.equal(s.projectiles.length,0);assert.equal(s.time,180);
+ }
+ assert.equal(directions.size,2);
+});
+
+test('enemy submarine decoys are finite and a confirmed diversion prevents instant recall for a later neutral lock',()=>{
+ const s=ocean();s.depth=s.targetDepth=80;
+ const hunter=vessel('hunter',0,550,{kind:'sub',depth:80});
+ s.ships=[hunter];
+ contact(s,hunter,'active');assert.ok(fire(s,hunter.id));const shot=s.projectiles[0];
+ // This seed releases a decoy that the first shot follows and passes.
+ advanceUntil(s,()=>shot.diverted,24);
+ assert.equal(shot.diverted,true);assert.equal(hunter.torpedoDecoys,1);
+ assert.deepEqual(restore(save(s)).projectiles,[shot]);
+ const heading=radians(shot.heading);
+ const neutral=vessel('fishing boat',shot.x+Math.sin(heading)*160,shot.y+Math.cos(heading)*160,{kind:'fishing',military:false,heading:shot.heading});
+ s.ships=[neutral];
+ advanceUntil(s,()=>neutral.hull===0,20);
+ assert.equal(neutral.hull,0);assert.equal(s.status,'patrol');
+ assert.ok(s.debrief.some(entry=>entry.text.includes('struck the neutral')));
+ assert.deepEqual(patrolKills(s),{ships:0,submarines:0});
+ const clean=ocean();clean.ships=[vessel('neutral',0,400,{military:false})];
+ clean.contacts=[{id:'neutral',bearing:0,identified:true,military:false}];
+ assert.equal(fire(clean,'neutral'),false);
+ clean.contacts[0].identified=false;
+ assert.ok(fire(clean,'neutral'));
+ advanceUntil(clean,()=>clean.status!=='patrol',25);
+ assert.equal(clean.status,'compromised');
+
+ const supply=ocean();supply.ships=[vessel('hunter',0,175,{kind:'sub',depth:3})];
+ supply.contacts=[{id:'hunter',bearing:0,kind:'sub',depthEstimate:3}];
+ for(let i=0;i<3;i++){
+  assert.ok(fire(supply,'hunter'));supply.projectiles.at(-1).age=4;
+  supply.time+=.25;updateCombat(supply,.25);supply.projectiles=[];
+  assert.equal(supply.ships[0].torpedoDecoys,Math.max(0,1-i));
+ }
+});
+
 test('radio support prepares for at least 45 seconds then launches physically from its island base',()=>{
  const s=ocean();
  s.ships=[vessel('reporting-escort',800,0,{kind:'escort',alert:100})];
@@ -322,7 +394,7 @@ test('submarine patrols can contain a second boat and succeed on surfaced withdr
 test('submarine contacts carry estimates, a player torpedo can hit, and service totals are idempotent',()=>{
  const s=patrolWithHunter('sub',600);
  Object.assign(s,{depth:80,targetDepth:80,patrolId:'a'.repeat(32)});
- Object.assign(s.ships[0],{x:0,y:550,attack:999,alert:0});
+ Object.assign(s.ships[0],{x:0,y:550,attack:999,alert:0,torpedoDecoys:0});
  const target=contact(s,s.ships[0],'active');assert.equal(target.kind,'sub');
  assert.ok(Number.isFinite(target.depthEstimate));assert.equal(target.courseEstimated,undefined);
  assert.ok(fire(s,target.id));step(s,32);

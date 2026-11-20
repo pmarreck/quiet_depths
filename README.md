@@ -82,7 +82,9 @@ Lightning bolts have branched geometry, a short display hold so time compression
 
 ## Weapons, air support and touch controls
 
-Every patrol carries six acoustic torpedoes. Select a contact in Contacts/Weapons, check its identity and bearing, then launch. After a four-second run-out, the torpedo uses its own sonar returns to turn and adjust depth. A loud alternative can divert it. Shallow-running torpedoes leave foam at the water surface; their acoustic search is audible when Sound is enabled.
+Every patrol carries six acoustic torpedoes. Select a contact in Contacts/Weapons, check its identity and bearing, then launch. The torpedoes leave alternating bow tubes and trail bubbles. Shots against surface ships climb into a shallow, wake-producing run. After the four-second arming run, a torpedo uses its own sonar to steer and adjust depth. If it loses contact, it searches in widening turns until it reacquires or runs out of range. Enemy submarines carry two decoys, each with a 25% chance to divert a shot. If that diversion leads to a neutral strike, the incident goes in the debrief and the patrol continues.
+
+On Sonar, select 1.5, 3 or 6 km for the outer ring. The top of the plot is your bow. Dashed spokes show bearing without a range fix, and diamonds show estimated positions. Peaks on the hydrophone trace mark bearings around the boat. The trace runs from bow through starboard, stern and port before returning to bow. Active Ping can estimate range and alert nearby hunters.
 
 Fully surface to use the gun station. Drag horizontally and vertically to aim, or select a visually identified target and use AIM AT TARGET. Hold FIRE or J. The 240-round supply is finite, and every fifth round is a tracer. Aim at a ship's waterline to open flooding; repeated hits disable propulsion and sinking continues after firing stops. Aircraft can also be hit. Diving blanks the sight and prevents firing.
 

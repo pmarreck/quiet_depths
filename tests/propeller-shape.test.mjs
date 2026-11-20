@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three.module.js';
-import {createSubmarine} from '../src/submarine-model.js';
+import {createSubmarine,renderedScrewAngle} from '../src/submarine-model.js';
 import {createGame} from '../src/sim.js';
 import {propellerState} from '../src/mechanics.js';
 
@@ -41,6 +41,28 @@ test('ahead and astern shaft rotation pitch the blades to push water opposite tr
   const axialSweep=-propellerState(speed,12).rpm*axialPitch;
   assert.equal(Math.sign(axialSweep),Math.sign(speed));
  }
+});
+
+test('slow frames and time compression cannot visually reverse the screw',()=>{
+ const spacing=2*Math.PI/5;
+ for(const elapsed of [1/120,1/60,1/30,1/12,2]){
+  for(const speed of [-4,4,17]){
+   const rpm=propellerState(speed,12).rpm,angle=renderedScrewAngle(0,rpm,elapsed);
+   assert.equal(Math.sign(angle),Math.sign(speed));
+   assert.ok(Math.abs(angle)<spacing/2);
+  }
+ }
+ assert.equal(renderedScrewAngle(.4,160,0),.4);
+});
+
+test('the tower roof has a narrow circular safety rail clear of the bridge eye',()=>{
+ const model=createSubmarine(THREE);
+ const roofRail=model.children.find(o=>o.geometry?.type==='TorusGeometry'&&o.position.y>13);
+ assert.ok(roofRail,'a metal ring surrounds the bridge exit');
+ assert.ok(roofRail.geometry.parameters.radius*2>0.9&&roofRail.geometry.parameters.radius*2<1.25);
+ assert.ok(roofRail.geometry.parameters.tube<.04);
+ const boxes=model.children.filter(o=>o.geometry?.type==='BoxGeometry'&&o.position.y>11&&o.position.y<13);
+ assert.ok(boxes.every(o=>o.geometry.parameters.width<1),'no wide platform across the bridge roof');
 });
 
 test('the propeller shares a neutral hull finish and cross-shaped control surfaces remain ahead of it',()=>{
