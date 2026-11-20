@@ -1,11 +1,14 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
-const root = resolve('dist');
-const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.wasm':'application/wasm' };
+const output = process.argv[2];
+if (!output) throw new Error('A built site directory is required');
+const root = resolve(output);
+const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.ttf':'font/ttf', '.wasm':'application/wasm' };
 http.createServer(async (req,res) => {
   try {
-    const file = resolve(root, '.' + decodeURIComponent(new URL(req.url,'http://localhost').pathname === '/' ? '/index.html' : new URL(req.url,'http://localhost').pathname));
+    const { pathname } = new URL(req.url, 'http://localhost');
+    const file = resolve(root, '.' + decodeURIComponent(pathname === '/' ? '/index.html' : pathname));
     if (!file.startsWith(root + sep)) throw Error('Path');
     res.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
     res.setHeader('Cache-Control','no-store');

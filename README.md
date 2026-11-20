@@ -8,14 +8,17 @@ A browser submarine game about incomplete information and calculated exposure. A
 
 ## Build and run
 
-Nix is the canonical build. The complete verification entry point is `./test`, which runs `nix build`. The build runs the simulation tests and produces the static site. Nix flakes must be enabled. On Windows, run through a Nix-enabled WSL distribution.
+Nix is required to build and test the static site. Enable flakes. The pinned toolchain targets x86-64 and ARM64 Linux, including through WSL, and Apple silicon macOS. Any of those builds produces the same browser game.
 
 ```sh
-./test
-nix develop --command node scripts/serve.mjs
+./build  # Build the site with Nix and link it at result/
+./test   # Run the complete verification gate with build logs
+./run    # Build and preview at http://127.0.0.1:4173
 ```
 
-For development preview, copy the Nix build output into `dist/` first (`mkdir -p dist && chmod -R u+w dist && cp -rL result/. dist/`). The preview listens on `http://127.0.0.1:4173`. Any static web server can serve the built output. There are no runtime services or package installation steps.
+The build runs the full Node test suite and JavaScript syntax checks. Preview serves the Nix output directly. Any static web server can serve it. The tracked `dist/` is the snapshot used by the existing staging Site.
+
+The built site's `build-provenance.json` records the release version and, for a clean Git build through `./build` or `./test` with complete `yolo` history, the `rN-abcdef` revision, full commit hash, and primary-branch base. Dirty builds, shallow clones, source exports, and direct `nix build` calls report when a revision is unavailable. GitHub Pages verifies the artifact commit against the workflow checkout before publication.
 
 ## Play
 

@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+set -eu
+CDPATH= cd "$(dirname "$0")"
+
+# Nix builds source exports and dirty or shallow checkouts without a release ID.
+if ! git_prefix=$(git rev-parse --show-prefix 2>/dev/null) || [ -n "$git_prefix" ] ||
+   [ "$(git rev-parse --is-shallow-repository)" != false ] ||
+   [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  exec nix build "$@"
+fi
+
+primary_ref=refs/heads/yolo
+remote_ref=refs/remotes/origin/yolo
+# A tracking ref can contain a newer primary base than the local branch.
+if git show-ref --verify --quiet "$remote_ref" &&
+   { ! git show-ref --verify --quiet "$primary_ref" || git merge-base --is-ancestor "$primary_ref" "$remote_ref"; }; then
+  primary_ref=$remote_ref
+fi
+if ! git show-ref --verify --quiet "$primary_ref"; then
+  exec nix build "$@"
+fi
+
+commit=$(git rev-parse HEAD)
+primary_history=$(git rev-list --first-parent "$primary_ref")
+for base in $primary_history; do
+  if git merge-base --is-ancestor "$base" "$commit"; then
+    count=$(git rev-list --count "$base")
+    # Use the exact Git snapshot even if the working tree changes during evaluation.
+    exec nix build --impure --expr '
+      { commit, base, count }:
+      let
+        root = builtins.replaceStrings [ "%" "?" "#" " " ] [ "%25" "%3F" "%23" "%20" ] (toString ./.);
+        flake = builtins.getFlake "git+file://${root}?rev=${commit}";
+      in assert flake.rev == commit;
+        flake.packages.${builtins.currentSystem}.default.override {
+          firstParentBase = base;
+          baseCommitCount = builtins.fromJSON count;
+        }
+    ' --argstr commit "$commit" --argstr base "$base" --argstr count "$count" "$@"
+  fi
+done
+
+exec nix build "$@"

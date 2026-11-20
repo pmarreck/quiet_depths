@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -eu
+CDPATH= cd "$(dirname "$0")"
+
+site=$(./build --out-link result-preview --print-out-paths)
+exec nix develop --command node scripts/serve.mjs "$site"

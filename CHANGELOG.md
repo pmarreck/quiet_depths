@@ -13,7 +13,7 @@
 - Add the approved fictional 1972 classified orbital prototype: 10 km chart tasking, overpass warmup, two exposures, weather/night limits, depth-limited staged transmission and a long cooldown.
 - Keep timestamped surface fixes, measured velocity, growing uncertainty and firing bearings independent of the live target position. Freeze camera pixels at the shutter even when immediately switching stations. Archive bounded real scene photographs and frozen monochrome recon plates across patrols/reloads.
 
-Validation: the canonical Nix gate passes 181 tests, syntax checks and the static build. Regression tests were observed failing before their fixes. Independent vehicle acceptance covers 96 recovery scenarios. Browser evidence and device/audio limitations are recorded in PLAN.md.
+Validation: the canonical Nix gate passes 181 tests, syntax checks and the static build. Regression tests were observed failing before their fixes. Independent vehicle acceptance covers 96 recovery scenarios. Browser evidence and device/audio limitations are recorded in the [plan log](docs/PLAN_LOG.md).
 
 ## 0.5.0
 
@@ -26,7 +26,7 @@ Validation: the canonical Nix gate passes 181 tests, syntax checks and the stati
 - Add a mobile layout, mission/weapons drawers, held touch helm/fire controls and chart zoom buttons. Preserve muted startup.
 - Publish through a GitHub Pages workflow gated by the canonical Nix test/build entry point.
 
-Validation: tests were introduced before the implementation, including independently authored combat acceptance tests. The Nix gate covers 98 tests, JavaScript syntax and the static build. Browser observations and remaining device limitations are recorded in PLAN.md.
+Validation: tests were introduced before the implementation, including independently authored combat acceptance tests. The Nix gate covers 98 tests, JavaScript syntax and the static build. Browser observations and remaining device limitations are recorded in the [plan log](docs/PLAN_LOG.md).
 
 ## 0.4.0
 

@@ -18,17 +18,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: cachix/install-nix-action@v31.11.5
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
       - name: Run the complete Nix gate and build
         run: ./test
-      - name: Prepare tested static output
-        run: mkdir _site && cp -rL result/. _site/
+      - name: Verify and record build revision
+        run: |
+          revision=$(jq -er --arg commit "$GITHUB_SHA" \
+            'select(.status == "verified" and .commit == $commit) | .revision' \
+            result/build-provenance.json)
+          printf 'Quiet Depths build `%s`\n' "$revision" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: _site
+          path: result/
 
   deploy:
     if: github.event_name != 'pull_request'
