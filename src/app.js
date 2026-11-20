@@ -63,7 +63,7 @@ function zoomOrbit(factor){orbit.distance=clamp(orbit.distance*factor,37,120);}
 function updateMissionBriefing(id){
  const mission=MISSIONS.find(m=>m.id===id);
  if(!mission)return;
- document.querySelector('.briefing-tip p').innerHTML=esc(mission.desc)+' <strong>Esc pauses everything.</strong>';
+ document.querySelector('.briefing-tip p').innerHTML=esc(mission.desc)+' <strong>'+esc(keyLabel(bindings.Escape))+' pauses the patrol.</strong>';
 }
 function renderServiceRecord(){
  try{const record=serviceRecord(localStorage);$('service-record').textContent=`${record.ships} ships sunk · ${record.submarines} submarines sunk · ${record.doubleHunts} two-submarine patrols`;}catch{}
@@ -186,7 +186,8 @@ function showShortcuts(){
   button.append(name,key);return button;
  }));
 }
-$('open-settings').onclick=()=>{held.clear();remapping=null;showShortcuts();$('settings-dialog').showModal();};
+function openSettings(){held.clear();remapping=null;showShortcuts();$('settings-dialog').showModal();}
+$('open-settings').onclick=openSettings;$('briefing-settings').onclick=openSettings;
 $('close-settings').onclick=()=>$('settings-dialog').close();
 $('reset-shortcuts').onclick=()=>{remapping=null;bindings=shortcutBindings();saveShortcuts();showShortcuts();updateUI();$('shortcut-status').textContent='Default shortcuts restored.';};
 $('shortcut-list').onclick=event=>{const button=event.target.closest('[data-shortcut]');if(!button)return;remapping=button.dataset.shortcut;$('shortcut-status').textContent='Press a key for '+shortcutActions[remapping]+'.';};
@@ -278,7 +279,7 @@ function updateUI(){
  $('scope-tools').classList.toggle('hidden',view!=='scope');$('zoom-tools').classList.toggle('hidden',!['scope','tower','gun'].includes(view));$('zoom-readout').textContent=(view==='scope'?6*zoom:zoom).toFixed(zoom<2?1:0)+'×';$('scope-alignment').classList.toggle('hidden',view!=='scope');$('bow-readout').classList.toggle('hidden',view!=='scope'||!active);const rel=((s.scopeAngle+540)%360)-180;$('bow-readout').textContent=`BOW ${deg(s.heading)}° · VIEW ${deg(scopeBearing(s))}° · ${Math.abs(rel).toFixed(0)}° ${rel<0?'PORT':'STARBOARD'}${s.scopeSteerBearing!==null?' · BOAT TURNING TO VIEW':''}`;$('gun-tools').classList.toggle('hidden',!gun);$('gun-trigger').disabled=!canIssue(s,context())||!active||s.gun.ammo<=0||s.systems.deckgun<=10;$('gun-sight-status').textContent=`${s.gun.ammo} ROUNDS · ELEV ${s.gun.elevation.toFixed(1)}°`;$('air-warning').classList.toggle('hidden',!['arming','airborne'].includes(s.airSupport.status));$('air-warning').textContent=s.airSupport.status==='arming'?`AIR SUPPORT PREPARING · ${Math.ceil(s.airSupport.launchAt-s.time)}s`:'AIRCRAFT AIRBORNE · DIVE TO BREAK VISUAL CONTACT';$('drone-photo').textContent=s.mission==='survey'?'SURVEY PHOTO':'PHOTO';
  $('drone-instruments').classList.toggle('hidden',!drone||!active);$('drone-instruments').innerHTML=`<b>ROV ${s.drone.mode.toUpperCase()}</b><span>CHARGE ${Math.round(s.drone.battery)}% · HULL ${Math.round(s.drone.hull)}%</span><span>LINK ${Math.round(separation(s,s.drone))} / 100 M</span><span>MOBILITY ${Math.round(s.drone.mobility)}% · BUOYANCY ${Math.round(s.drone.buoyancy)}%</span>`;
  const strike=s.lightning.at(-1);$('lightning-cue').classList.toggle('hidden',!strike||s.time-strike.time>5||!optical||!active);$('lightning-cue').textContent=strike?`LIGHTNING · ${deg(bearing(s,strike))}° · ${(distance(s,strike)/1000).toFixed(1)} KM${sound.on?' · THUNDER TRAVELING':' · ENABLE SOUND FOR THUNDER'}`:'';$('chart-tools').classList.toggle('hidden',view!=='chart');$('drone-tools').classList.toggle('hidden',view!=='drone');
- $('scope-toggle').innerHTML=(s.scope?'LOWER SCOPE':'RAISE SCOPE')+' <kbd>P</kbd>';$('scope-toggle').dataset.short=s.scope?'Lower':'Raise';
+ $('scope-toggle').innerHTML=(s.scope?'LOWER SCOPE':'RAISE SCOPE')+' <kbd>'+esc(keyLabel(bindings.KeyP))+'</kbd>';$('scope-toggle').dataset.short=s.scope?'Lower':'Raise';
  $('view-hint').textContent=gun?'DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING':tower?'DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS':view==='scope'?(active?'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM':'NO OPTICAL SIGNAL'):view==='sonar'?'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL':view==='chart'?'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT':active?'CAMERA FIXED AHEAD · W/S SPEED · A/D HEADING':'NO DRONE SIGNAL';
  $('view-range').textContent=drone?(active?`HDG ${deg(v.heading)}° · ${v.speed.toFixed(1)} KN · ${v.depth.toFixed(0)} M`:''):view==='chart'?`ZOOM ${chart.zoom.toFixed(1)}×`:'VISIBILITY '+(env.opticalRange/1000).toFixed(1)+' KM';
  $('station-status').textContent=isSurfaced(s)?'SURFACED · EXPOSED':s.depth<=15?'PERISCOPE DEPTH':s.silent?'SILENT RUNNING':'SUBMERGED';
@@ -291,7 +292,7 @@ function updateUI(){
  $('below-label').textContent=droneSounding?'BELOW DRONE':'BELOW KEEL';$('below-keel').textContent=seabed.belowKeel.toFixed(0)+' m';$('water-depth').textContent=seabed.waterDepth>0?seabed.waterDepth.toFixed(0)+' m':'LAND';
  const warning=seabed.belowKeel<0?'BOTTOM CONTACT':seabed.belowKeel<10?'DANGER · RISE':seabed.belowKeel<30?'SHALLOW CLEARANCE':'CLEAR BELOW';if($('seabed-advice').textContent!==warning)$('seabed-advice').textContent=warning;
  $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
- $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>G</kbd>';
+ $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
  const contactModels=s.contacts.map(c=>{const e=estimateAt(c,s.time),range=c.range&&e?Math.hypot(e.x-s.x,e.y-s.y):0;return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED')+' · '+(range?(range/1000).toFixed(1)+' KM':'RANGE ?'),bearing:deg(relativeBearing(c.bearing,s.heading))+'° R'};});
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
