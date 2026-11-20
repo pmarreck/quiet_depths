@@ -52,7 +52,7 @@
         '';
         installPhase = ''
           runHook preInstall
-          node scripts/build.mjs "$out"
+          node scripts/build.mjs "$out" ${nixpkgs.lib.escapeShellArg (builtins.toJSON buildProvenance)}
           install -m 0644 LICENSE "$out/LICENSE"
           cp mission-picker.js "$out/mission-picker.js"
           ${installElmLicenses}
@@ -65,7 +65,6 @@
           espeak-ng -v en-us -s 167 -p 48 -w "$out/crew/leak-alt.wav" 'Water coming in! Check the bilge!'
           espeak-ng -v en-us+whisper -s 154 -p 38 -w "$out/crew/hit-quiet.wav" 'Holy shit.'
           espeak-ng -v en-gb+whisper -s 151 -p 39 -w "$out/crew/leak-quiet.wav" 'Taking on water.'
-          printf '%s\n' ${nixpkgs.lib.escapeShellArg (builtins.toJSON buildProvenance)} > "$out/build-provenance.json"
           node scripts/build-offline.mjs "$out"
           runHook postInstall
         '';
