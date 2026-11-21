@@ -1,6 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
-import {feedActive,scopeBearing,cameraEuler,droneCameraPitch} from './controls.js';
+import {feedActive,scopeBearing,cameraEuler,droneCameraPitch,orbitVerticalFov} from './controls.js';
 import {environmentAt,SEA_SAMPLE_GLSL,surfaceHeight,scopeEyeHeight,scopeWashed,opticalSway,hash01,boatHeave,waterColumnLight} from './environment.js';
 import {Atmosphere} from './atmosphere.js';
 import {UnderseaLife} from './undersea.js';
@@ -149,7 +149,8 @@ export class OceanScene{
   if(orbiting){
    const offset=orbit.distance*Math.cos(orbit.pitch),x=s.x+offset*Math.sin(orbit.yaw),y=s.y+offset*Math.cos(orbit.yaw);
    const elevation=Math.max(-bottom(x,y)+1,hullY+orbit.distance*Math.sin(orbit.pitch));
-   this.camera.position.set(x,elevation,-y);this.camera.lookAt(s.x,hullY,-s.y);this.camera.fov=56;
+   this.camera.position.set(x,elevation,-y);this.camera.lookAt(s.x,hullY,-s.y);
+   this.camera.fov=orbitVerticalFov(this.camera.aspect);
    this.light.position.copy(this.camera.position);this.light.target.position.set(s.x,hullY,-s.y);this.particles.position.copy(this.camera.position);
   }
   // Keep the virtual orbit light readable as the camera moves away from the hull.
@@ -225,7 +226,7 @@ export class OceanScene{
   this.own.userData.rescueHatch.rotation.z=s.mission==='undersea-rescue'&&s.operation?.active?1.1:0;
   this.bubbles.visible=s.cavitation>.01;this.bubbleUniforms.strength.value=s.cavitation;
   this.bubbleUniforms.clock.value=time;this.bubbleUniforms.trailLength.value=Math.abs(s.speed)*1.4;
-  this.life.update(s,e);this.combat.update(s,e);
+  this.life.update(s,e);this.combat.update(s,e,orbiting);
   const cable=tetherPoints(s,time);this.cable.visible=!!cable.length;if(cable.length){const p=this.cable.geometry.attributes.position;cable.forEach((v,i)=>p.setXYZ(i,v.x,-v.depth+heave*(1-i/(cable.length-1)),-v.y));p.needsUpdate=true;this.cable.geometry.setDrawRange(0,cable.length);this.cable.geometry.computeBoundingSphere();}
 
   this.driftingBubbles.visible=underwater;

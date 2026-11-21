@@ -8,7 +8,7 @@ import {fireDeckGun,aimGunAt,firingBearing} from './combat.js';
 import {HeldInput} from './input.js';
 import {SoundSystem} from './audio.js';
 import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
-import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,throttleDetent,applyHelmKeys,steerDrone,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
+import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js';
@@ -31,7 +31,7 @@ let difficulty=patrolDifficulty();
 try{difficulty=patrolDifficulty(JSON.parse(localStorage.getItem('quiet-depths-difficulty-v1')));}catch{}
 let previousView='scope';
 let sonarRange=SONAR_RANGES.at(-1);
-const orbit={yaw:.8,pitch:.22,distance:62};
+let orbit=null;
 let bindings=shortcutBindings(),remapping=null;
 try{bindings=shortcutBindings(JSON.parse(localStorage.getItem('quiet-depths-shortcuts-v1')));}catch{}
 try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
@@ -89,7 +89,8 @@ function setView(v){if(v==='drone'&&!state.difficulty.drone)return;zooms[view]=z
 function changeOrbit(){
  if(view==='orbit'){setView(previousView);$('open-orbit').focus();return;}
  if(!scene||!state.difficulty.orbitCamera||context().modal||!patrolStarted)return;
- previousView=view;setView('orbit');$('orbit-exit').focus();
+ orbit??=initialOrbit(state);
+ previousView=view;setView('orbit');$('orbit-pause').focus({preventScroll:true});
 }
 function zoomOrbit(factor){orbit.distance=clamp(orbit.distance*factor,37,120);}
 function updateMissionBriefing(id){
@@ -118,6 +119,7 @@ function openBriefing(){
 }
 function start(mission=null,snapshot=null){
  if(!$('briefing').open)return;
+ const previousPatrol=state;
  if(mission===null){
   const resumed=snapshot||resumablePatrol(saved,patrolStarted?state:null);
   if(!resumed)return;
@@ -133,6 +135,7 @@ function start(mission=null,snapshot=null){
   selected=null;
   newSeed();
  }
+ if(state!==previousPatrol)orbit=null;
  patrolStarted=true;
  state.patrolId??=Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');

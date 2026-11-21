@@ -3,6 +3,7 @@ import {rad,bottom} from './mechanics.js';
 import {surfaceHeight} from './environment.js';
 import {renderedScrewAngle,screwBlade} from './submarine-model.js';
 const TORPEDO_BLADES=3;
+const BUBBLE_OPACITY=.9;
 const mat=color=>new T.MeshStandardMaterial({color,roughness:.7,metalness:.2});
 const mesh=(parent,geometry,material,position=[0,0,0])=>{const m=new T.Mesh(geometry,material);m.position.set(...position);parent.add(m);return m;};
 export class CombatScene{
@@ -24,7 +25,7 @@ export class CombatScene{
   const fire=new T.Sprite(new T.SpriteMaterial({map:this.glow,color:0xff6c28,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));fire.scale.set(7,7,1);g.add(fire);g.userData.fire=fire;return g;
  }
  torpedo(){
-  const g=new T.Group(),body=mesh(g,new T.CapsuleGeometry(.28,4.6,4,12),mat(0x677b7a));body.rotation.x=Math.PI/2;
+  const g=new T.Group(),body=mesh(g,new T.CapsuleGeometry(.28,4.6,4,12),mat(0xaab9b6));body.rotation.x=Math.PI/2;
   for(const side of [-1,1])mesh(g,new T.BoxGeometry(1,.08,.7),mat(0x253b3d),[side*.45,0,2.1]);
   const metal=mat(0x9c9074),blade=screwBlade(T);
   const shaft=mesh(g,new T.CylinderGeometry(.075,.075,.44,10),metal,[0,0,2.65]);shaft.rotation.x=Math.PI/2;
@@ -37,7 +38,7 @@ export class CombatScene{
   const positions=new T.Float32BufferAttribute(new Float32Array(80*3),3),geometry=new T.BufferGeometry();geometry.setAttribute('position',positions);
   const wake=new T.Points(geometry,new T.PointsMaterial({map:this.glow,size:4,color:0xe3f0e8,transparent:true,opacity:.8,depthWrite:false}));this.root.add(wake);
   const bubblesGeometry=new T.BufferGeometry();bubblesGeometry.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(240*3),3));
-  const bubbles=new T.Points(bubblesGeometry,new T.PointsMaterial({map:this.glow,size:.9,color:0xc5edee,transparent:true,opacity:.62,depthWrite:false}));this.root.add(bubbles);
+  const bubbles=new T.Points(bubblesGeometry,new T.PointsMaterial({map:this.glow,size:2,color:0xd5f0ef,transparent:true,opacity:BUBBLE_OPACITY,depthWrite:false}));this.root.add(bubbles);
   const ring=mesh(g,new T.SphereGeometry(1,16,8),new T.MeshBasicMaterial({color:0x84c8b9,transparent:true,opacity:.1,wireframe:true,depthWrite:false}));g.userData={wake,bubbles,ring,screws};return g;
  }
  dispose(group){group.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});group.parent?.remove(group);}
@@ -46,7 +47,8 @@ export class CombatScene{
   const {wake,bubbles}=group.userData;
   const foamPositions=wake.geometry.attributes.position,bubblePositions=bubbles.geometry.attributes.position;
   let foam=0,under=0;
-  for(const point of path){
+  for(let n=0;n<path.length;n++){
+   const point=path[n],previous=path[n-1]??point;
    const age=Math.max(0,time-point.time);
    if(age>23)continue;
    const surface=surfaceHeight(point.x,point.y,time,e);
@@ -54,16 +56,19 @@ export class CombatScene{
    if(belowSurface>=0&&belowSurface<=5)foamPositions.setXYZ(foam++,point.x,surface+.12,-point.y);
    if(age>12)continue;
    for(let i=0;i<3;i++){
-    const phase=point.time*8+i*2.0,altitude=-point.depth+age*(.45+i*.13);
-    if(altitude>=surface)continue;
-    bubblePositions.setXYZ(under++,point.x+Math.sin(phase+age)*(.3+age*.2),altitude,-point.y+Math.cos(phase+age)*(.3+age*.2));
+    // Spread the bubbles along the recorded course, including around bends.
+    const fraction=i/3,x=point.x+(previous.x-point.x)*fraction,y=point.y+(previous.y-point.y)*fraction;
+    const bubbleAge=age+(point.time-previous.time)*fraction,phase=point.time*8+i*2;
+    const depth=point.depth+(previous.depth-point.depth)*fraction,altitude=-depth+bubbleAge*(.45+i*.13);
+    if(altitude>=surfaceHeight(x,y,time,e))continue;
+    bubblePositions.setXYZ(under++,x+Math.sin(phase+bubbleAge)*(.3+bubbleAge*.2),altitude,-y+Math.cos(phase+bubbleAge)*(.3+bubbleAge*.2));
    }
   }
   for(const [points,count] of [[wake,foam],[bubbles,under]]){
    points.geometry.attributes.position.needsUpdate=true;points.geometry.setDrawRange(0,count);points.geometry.computeBoundingSphere();
   }
  }
- update(s,e){
+ update(s,e,orbiting=false){
   if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values())this.removeTorpedo(p);this.planes.clear();this.torpedoes.clear();this.lastState=s;}
   const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane();this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.prop.rotation.z=s.time*40;g.userData.bombs.visible=!p.bombDropped;g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
@@ -71,14 +76,21 @@ export class CombatScene{
    const [front,rear]=g.userData.screws,elapsed=p.age-(g.userData.lastAge??p.age);
    front.rotation.z=renderedScrewAngle(front.rotation.z,720,elapsed,TORPEDO_BLADES);
    rear.rotation.z=Math.PI/TORPEDO_BLADES-front.rotation.z;g.userData.lastAge=p.age;
-   const ring=g.userData.ring;ring.visible=p.age>=4&&p.pingAge<.7;ring.scale.setScalar(1+p.pingAge*45);ring.material.opacity=Math.max(0,.24*(1-p.pingAge/.7));
+   const ring=g.userData.ring,pinging=p.age>=4&&p.pingAge<.7;
+   ring.visible=pinging||orbiting;
+   if(pinging){
+    ring.scale.setScalar(1+p.pingAge*45);ring.material.opacity=.24*(1-p.pingAge/.7);
+   }else if(orbiting){
+    const pulse=(p.age%1.5)/1.5;
+    ring.scale.setScalar(1.6+1.5*pulse);ring.material.opacity=.48-.32*pulse;
+   }
    g.userData.path=p.path;this.updateTrail(g,p.path,s.time,e);
   }
   for(const [id,g]of this.torpedoes)if(!torpIds.has(id)){
    g.visible=false;g.userData.retiredAt??=s.time;
    const fade=Math.max(0,1-(s.time-g.userData.retiredAt)/10);
    if(!fade){this.removeTorpedo(g);this.torpedoes.delete(id);continue;}
-   g.userData.wake.material.opacity=.8*fade;g.userData.bubbles.material.opacity=.62*fade;
+   g.userData.wake.material.opacity=.8*fade;g.userData.bubbles.material.opacity=BUBBLE_OPACITY*fade;
    this.updateTrail(g,g.userData.path,s.time,e);
   }
   let n=0;const positions=this.tracerGeometry.attributes.position;for(const r of s.gunRounds){if(!r.tracer||!r.previous||n>=192)continue;positions.setXYZ(n*2,r.previous.x,r.previous.altitude,-r.previous.y);positions.setXYZ(n*2+1,r.x,r.altitude,-r.y);n++;}positions.needsUpdate=true;this.tracerGeometry.setDrawRange(0,n*2);this.tracerGeometry.computeBoundingSphere();

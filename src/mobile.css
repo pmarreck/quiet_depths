@@ -123,6 +123,7 @@ body[data-station=drone] .viewport{touch-action:none}
 #shortcut-list button{display:flex;justify-content:space-between;text-align:left;padding:8px 10px;border:1px solid var(--line);min-height:38px}
 #orbit-tools{position:absolute;z-index:3;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:8px}
 #orbit-tools[hidden]{display:none}
+body.orbiting.paused .viewport::after{content:'PATROL PAUSED';left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));transform:none;padding:6px 10px;font-size:12px}
 #orbit-tools button{min-height:44px;min-width:44px;background:#14242de6;border:1px solid var(--line);padding:8px 12px}
 body.orbiting .viewport{position:fixed;inset:0;width:100vw;height:100dvh;z-index:90;touch-action:none}
 body.orbiting .viewport>:not(#world,#orbit-tools,#pressure-warning){visibility:hidden}

@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import * as THREE from '../vendor/three.module.js';
 import {createGame} from '../src/sim.js';
 import {environmentAt} from '../src/environment.js';
+import {initialOrbit,orbitVerticalFov} from '../src/controls.js';
 
 // Rebase imports only: the browser vendor directory is copied beside source
 // during the build. Exercise the unchanged renderer module under Node/Three.
@@ -15,6 +16,46 @@ async function browserModule(file){
 const {UnderseaLife}=await browserModule('undersea.js');
 const {CombatScene}=await browserModule('combat-scene.js');
 const {Atmosphere}=await browserModule('atmosphere.js');
+
+test('opening orbit frames the stern and the first seconds of an outgoing shot on phone and desktop',()=>{
+ for(const heading of [0,82,219,347])for(const aspect of [382/580,393/852,669/867,16/9]){
+  const boat={heading,depth:12},orbit=initialOrbit(boat);
+  const camera=new THREE.PerspectiveCamera(orbitVerticalFov(aspect),aspect,.5,23000);
+  const reach=orbit.distance*Math.cos(orbit.pitch);
+  camera.position.set(reach*Math.sin(orbit.yaw),-boat.depth+orbit.distance*Math.sin(orbit.pitch),-reach*Math.cos(orbit.yaw));
+  assert.ok(camera.position.y<0,'the submerged boat must be visible through water');
+  camera.lookAt(0,-boat.depth,0);camera.updateMatrixWorld();
+  const course=heading*Math.PI/180;
+  for(const forward of [-35,32,80]){
+   const screen=new THREE.Vector3(forward*Math.sin(course),-boat.depth,-forward*Math.cos(course)).project(camera);
+   assert.ok(Math.abs(screen.x)<.98&&Math.abs(screen.y)<.98&&Math.abs(screen.z)<1,'stern, bow and outbound shot must be within the frame');
+  }
+ }
+});
+
+test('submerged torpedo bubbles fill the gap between consecutive trail samples',()=>{
+ const combat=new CombatScene(new THREE.Scene(),null),s=createGame('recon',42);
+ s.time=2;
+ const path=[{x:0,y:0,depth:42,time:1.75},{x:6,y:0,depth:42,time:2}];
+ s.projectiles=[{id:1,x:6,y:0,depth:42,heading:90,pitch:0,age:2,pingAge:99,path}];
+ combat.update(s,environmentAt(s));
+ const trail=combat.torpedoes.get(1).userData.bubbles.geometry;
+ const x=Array.from({length:trail.drawRange.count},(_,i)=>trail.attributes.position.getX(i));
+ assert.ok(x.some(v=>v>1&&v<3)&&x.some(v=>v>3&&v<5),'the wake must cross the space between samples');
+});
+
+test('the orbit locator marks either side from launch and freezes with the shot',()=>{
+ const combat=new CombatScene(new THREE.Scene(),null),s=createGame('recon',42),env=environmentAt(s);
+ s.projectiles=['player','enemy'].map((owner,id)=>({id,owner,x:id*30,y:40,depth:20,heading:0,pitch:0,age:.6,pingAge:99,path:[]}));
+ combat.update(s,env,true);
+ for(const model of combat.torpedoes.values()){
+  const ring=model.userData.ring;assert.ok(ring.visible&&ring.material.depthTest);
+  const radius=ring.scale.x;assert.ok(radius>1&&radius<4);
+  combat.update(s,env,true);assert.equal(ring.scale.x,radius);
+ }
+ combat.update(s,env,false);
+ for(const model of combat.torpedoes.values())assert.equal(model.userData.ring.visible,false);
+});
 
 test('rain geometry is reproducible and a paused frame holds the lightning display clock',()=>{
  const make=()=>new Atmosphere(new THREE.Scene());

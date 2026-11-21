@@ -47,6 +47,10 @@ export function steerDrone(s,context,dx,dy){
 }
 
 export const droneCameraPitch=verticalSpeed=>-rad(18)*clamp(verticalSpeed,-1,1);
+// Look along the boat from its stern quarter, below the waterline even at periscope depth.
+export const initialOrbit=boat=>({yaw:rad(boat.heading+146),pitch:-.08,distance:72});
+// Keep at least 56 degrees of the scene in view on both axes.
+export const orbitVerticalFov=aspect=>2*Math.atan(Math.tan(rad(28))/Math.min(1,aspect))/rad(1);
 export const orbitDrag=(orbit,dx,dy)=>{
  orbit.yaw=(orbit.yaw+dx*.008)%(2*Math.PI);
  orbit.pitch=clamp(orbit.pitch+dy*.008,-1.28,1.28);
