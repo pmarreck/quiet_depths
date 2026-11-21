@@ -60,6 +60,12 @@ export class OceanScene{
  mat(color){return new T.MeshStandardMaterial({color,roughness:.86,metalness:.12});}
  box(g,size,pos,mat){const m=new T.Mesh(new T.BoxGeometry(...size),mat);m.position.set(...pos);g.add(m);return m;}
  glowTexture(){if(this.glow)return this.glow;const canvas=document.createElement('canvas');canvas.width=canvas.height=32;const c=canvas.getContext('2d'),gradient=c.createRadialGradient(16,16,0,16,16,16);gradient.addColorStop(0,'#ffffff');gradient.addColorStop(.12,'#ffffffe0');gradient.addColorStop(.4,'#ffffff44');gradient.addColorStop(1,'#ffffff00');c.fillStyle=gradient;c.fillRect(0,0,32,32);this.glow=new T.CanvasTexture(canvas);return this.glow;}
+ updateTubeDoors(model,shots,launcher){
+  for(const [i,tube] of model.userData.tubes.entries()){
+   const side=i*2-1,shot=shots.find(p=>p.tubeSide===side&&p.age<1.8&&(launcher===null?p.owner==='player':p.launcher===launcher));
+   tube.rotation.y=shot?-side*1.5*Math.min(1,(1.8-shot.age)*4):0;
+  }
+ }
  makeShip(ship){
   if(ship.kind==='sub')return this.makeSub();
   const root=new T.Group(),g=new T.Group(),lights=new T.Group(),small=ship.kind==='fishing',escort=ship.kind==='escort';const scale=small?.38:escort?.78:1;root.add(g,lights);root.userData.body=g;root.userData.lights=lights;
@@ -99,15 +105,14 @@ export class OceanScene{
   for(const k of ['waveScale','waveSpeed','daylight','cloud','twilight'])this.waterUniforms[k].value=e[k];this.waterUniforms.fogColor.value.copy(fog);this.waterUniforms.fogDensity.value=underwater?.009:1.1/e.opticalRange;this.waterUniforms.sunDir.value.set(e.sunDirection.x,e.sunDirection.y,e.sunDirection.z).normalize();
   this.renderer.setClearColor(fog);this.scene.fog.color.copy(fog);this.scene.fog.density=underwater?.009:1.1/e.opticalRange;this.hemi.intensity=(underwater?.18+.45*e.daylight:.15+1.8*e.daylight)+e.flash*(underwater?.2:2);this.sun.intensity=e.daylight*(1-e.cloud*.7)*(underwater?.2:2.7);this.sun.position.set(e.sunDirection.x*5000,e.sunDirection.y*5000,e.sunDirection.z*5000);this.moon.position.copy(this.sun.position).multiplyScalar(-1);this.moon.intensity=(1-e.daylight)*(1-e.cloud*.85)*.28;this.particles.visible=underwater;this.light.visible=underwater;
   const liveShipIds=new Set(s.ships.map(v=>v.id));for(const [id,mesh] of this.ships)if(!liveShipIds.has(id)){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});this.ships.delete(id);}
-  for(const ship of s.ships){let mesh=this.ships.get(ship.id);if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}const d=Math.hypot(listener.x-ship.x,listener.y-ship.y);mesh.visible=(ship.hull>0||ship.sunkAt!==undefined&&(ship.sinkDepth||0)<50)&&(drone||ship.kind!=='sub');if(mesh.userData.body){mesh.userData.body.visible=d<(underwater?350:e.opticalRange);mesh.userData.lights.visible=!underwater&&e.daylight<.85&&d<e.lightRange;}mesh.position.set(ship.x,ship.kind==='sub'?-ship.depth:surfaceHeight(ship.x,ship.y,time,e)*.65-(ship.sinkDepth||0),-ship.y);mesh.rotation.y=-rad(ship.heading);mesh.rotation.z=Math.sin(time*.8+ship.x)*.012*e.waveScale+(ship.flood?Math.min(.35,ship.flood*.012):0);mesh.rotation.x=Math.sin(time*.55+ship.y)*.008*e.waveScale;if(mesh.userData.prop)mesh.userData.prop.rotation.z=time*ship.speed*.8;}
+  for(const ship of s.ships){let mesh=this.ships.get(ship.id);if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}const d=Math.hypot(listener.x-ship.x,listener.y-ship.y);mesh.visible=(ship.hull>0||ship.sunkAt!==undefined&&(ship.sinkDepth||0)<50)&&(drone||orbiting||ship.kind!=='sub');if(mesh.userData.body){mesh.userData.body.visible=d<(underwater?350:e.opticalRange);mesh.userData.lights.visible=!underwater&&e.daylight<.85&&d<e.lightRange;}mesh.position.set(ship.x,ship.kind==='sub'?-ship.depth:surfaceHeight(ship.x,ship.y,time,e)*.65-(ship.sinkDepth||0),-ship.y);mesh.rotation.y=-rad(ship.heading);mesh.rotation.z=Math.sin(time*.8+ship.x)*.012*e.waveScale+(ship.flood?Math.min(.35,ship.flood*.012):0);mesh.rotation.x=Math.sin(time*.55+ship.y)*.008*e.waveScale;if(mesh.userData.prop)mesh.userData.prop.rotation.z=time*ship.speed*.8;
+   if(ship.kind==='sub')this.updateTubeDoors(mesh,s.projectiles,ship.id);
+  }
   this.own.visible=drone||tower||gun||orbiting;this.own.position.set(s.x,hullY,-s.y);this.own.rotation.set(s.pitch,-rad(s.heading),0,'YXZ');
   const screw=this.own.userData.prop;
   screw.rotation.z=renderedScrewAngle(screw.rotation.z,s.propRpm,motionDt);
   this.own.userData.foreplanes.rotation.x=-s.planes;this.own.userData.aftplanes.rotation.x=s.planes;this.own.userData.rudder.rotation.y=s.rudder*.5;this.own.userData.mast.visible=s.systems.periscope>0;this.own.userData.gun.visible=!gun;this.own.userData.gun.rotation.y=-rad(s.gun.angle);this.own.userData.gunElevation.rotation.x=rad(s.gun.elevation);
-  for(const [i,tube] of this.own.userData.tubes.entries()){
-   const side=i*2-1,shot=s.projectiles.find(p=>p.tubeSide===side&&p.age<1.8);
-   tube.rotation.y=shot?-side*1.5*Math.min(1,(1.8-shot.age)*4):0;
-  }
+  this.updateTubeDoors(this.own,s.projectiles,null);
   this.own.userData.rescueHatch.rotation.z=s.mission==='undersea-rescue'&&s.operation?.active?1.1:0;
   this.bubbles.visible=s.cavitation>.01;this.bubbleUniforms.strength.value=s.cavitation;
   if(this.bubbles.visible){const p=this.bubbles.geometry.attributes.position;for(let i=0;i<p.count;i++){const life=(time*2+i*.137)%1,angle=i*2.399+time*8,r=D.propellerRadius*(.55+Math.sin(i*7)*.15);p.setXYZ(i,Math.cos(angle)*r*(1+life*.2),Math.sin(angle)*r+life*.4,D.propellerZ+.2+life*(2+Math.abs(s.speed)*.3));}p.needsUpdate=true;}

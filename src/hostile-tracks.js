@@ -57,7 +57,7 @@ export function reportHunterState(s,ship,track){
  ship.tracking=status;
 }
 
-export function pursueAndAttack(s,ship,track,dt,dropCharge){
+export function pursueAndAttack(s,ship,track,dt,dropCharge,launchTorpedo){
  ship.patrolSpeed??=ship.speed;
  ship.heading=(ship.heading+clamp(delta(bearing(ship,track),ship.heading),-dt*2.5,dt*2.5)+360)%360;
  ship.speed=ship.kind==='escort'?15:8;
@@ -74,12 +74,15 @@ export function pursueAndAttack(s,ship,track,dt,dropCharge){
   s.shells.push({id:s.soundSequence++,...point,depth:0,delay,fromX:ship.x,fromY:ship.y,total:delay});
   emitSound(s,{type:'gunfire',x:ship.x,y:ship.y,altitude:12,power:1});
   log(s,'Escort firing. Shells incoming. Dive or return fire.','damage');
- }else{
-  const submarine=ship.kind==='sub',depth=clamp(track.depth+(rand(s)-.5)*(12+track.age*.35),0,220);
-  const delay=Math.max(4,depth/4.5),aim=projectedReport(ship.report,s.time,delay);
-  const point=scatterAim(s,aim,70+range*(submarine?.16:.48)+track.age*1.4);
+ }else if(ship.kind==='sub'){
   ship.attack=35;
-  dropCharge(s,{...point,depth,delay,kind:submarine?'weapon':'charge'});
-  log(s,submarine?'Incoming hostile weapon. Evade!':'Depth charges in the water. Evade!','damage');
+  launchTorpedo(s,ship,track);
+ }else{
+  const depth=clamp(track.depth+(rand(s)-.5)*(12+track.age*.35),0,220);
+  const delay=Math.max(4,depth/4.5),aim=projectedReport(ship.report,s.time,delay);
+  const point=scatterAim(s,aim,70+range*.48+track.age*1.4);
+  ship.attack=35;
+  dropCharge(s,{...point,depth,delay,kind:'charge'});
+  log(s,'Depth charges in the water. Evade!','damage');
  }
 }

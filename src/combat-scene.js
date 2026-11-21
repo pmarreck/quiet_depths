@@ -1,6 +1,8 @@
 import * as T from './vendor/three.module.js';
 import {rad,bottom} from './mechanics.js';
 import {surfaceHeight} from './environment.js';
+import {renderedScrewAngle,screwBlade} from './submarine-model.js';
+const TORPEDO_BLADES=3;
 const mat=color=>new T.MeshStandardMaterial({color,roughness:.7,metalness:.2});
 const mesh=(parent,geometry,material,position=[0,0,0])=>{const m=new T.Mesh(geometry,material);m.position.set(...position);parent.add(m);return m;};
 export class CombatScene{
@@ -24,11 +26,19 @@ export class CombatScene{
  torpedo(){
   const g=new T.Group(),body=mesh(g,new T.CapsuleGeometry(.28,4.6,4,12),mat(0x677b7a));body.rotation.x=Math.PI/2;
   for(const side of [-1,1])mesh(g,new T.BoxGeometry(1,.08,.7),mat(0x253b3d),[side*.45,0,2.1]);
+  const metal=mat(0x9c9074),blade=screwBlade(T);
+  const shaft=mesh(g,new T.CylinderGeometry(.075,.075,.44,10),metal,[0,0,2.65]);shaft.rotation.x=Math.PI/2;
+  const screws=[1,-1].map((hand,i)=>{
+   const rotor=new T.Group();rotor.position.z=2.61+i*.18;
+   rotor.scale.set(.17,.17,hand*.17);rotor.rotation.z=i*Math.PI/TORPEDO_BLADES;
+   for(let j=0;j<TORPEDO_BLADES;j++)mesh(rotor,blade,metal).rotation.z=j*2*Math.PI/TORPEDO_BLADES;
+   g.add(rotor);return rotor;
+  });
   const positions=new T.Float32BufferAttribute(new Float32Array(80*3),3),geometry=new T.BufferGeometry();geometry.setAttribute('position',positions);
   const wake=new T.Points(geometry,new T.PointsMaterial({map:this.glow,size:4,color:0xe3f0e8,transparent:true,opacity:.8,depthWrite:false}));this.root.add(wake);
   const bubblesGeometry=new T.BufferGeometry();bubblesGeometry.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(240*3),3));
   const bubbles=new T.Points(bubblesGeometry,new T.PointsMaterial({map:this.glow,size:.9,color:0xc5edee,transparent:true,opacity:.62,depthWrite:false}));this.root.add(bubbles);
-  const ring=mesh(g,new T.SphereGeometry(1,16,8),new T.MeshBasicMaterial({color:0x84c8b9,transparent:true,opacity:.1,wireframe:true,depthWrite:false}));g.userData={wake,bubbles,ring};return g;
+  const ring=mesh(g,new T.SphereGeometry(1,16,8),new T.MeshBasicMaterial({color:0x84c8b9,transparent:true,opacity:.1,wireframe:true,depthWrite:false}));g.userData={wake,bubbles,ring,screws};return g;
  }
  dispose(group){group.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});group.parent?.remove(group);}
  removeTorpedo(group){this.dispose(group.userData.wake);this.dispose(group.userData.bubbles);this.dispose(group);}
@@ -58,6 +68,9 @@ export class CombatScene{
   const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane();this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.prop.rotation.z=s.time*40;g.userData.bombs.visible=!p.bombDropped;g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
   const torpIds=new Set();for(const p of s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.set(p.pitch,-rad(p.heading),0,'YXZ');
+   const [front,rear]=g.userData.screws,elapsed=p.age-(g.userData.lastAge??p.age);
+   front.rotation.z=renderedScrewAngle(front.rotation.z,720,elapsed,TORPEDO_BLADES);
+   rear.rotation.z=Math.PI/TORPEDO_BLADES-front.rotation.z;g.userData.lastAge=p.age;
    const ring=g.userData.ring;ring.visible=p.age>=4&&p.pingAge<.7;ring.scale.setScalar(1+p.pingAge*45);ring.material.opacity=Math.max(0,.24*(1-p.pingAge/.7));
    g.userData.path=p.path;this.updateTrail(g,p.path,s.time,e);
   }

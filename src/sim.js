@@ -4,7 +4,7 @@ import {emitSound,updateAcoustics} from './acoustics.js';
 import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets} from './missions.js';
 import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone,shipCollision,siteCollision} from './systems.js';
-import {ENEMY_DECOY_SUPPLY,freshCombat,launchTorpedo,restoreTorpedo,updateCombat} from './combat.js';
+import {ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
 import {designation,fixContact,estimateAt,applyReconPacket} from './track-estimates.js';
 import {photoArchive,validPhoto,PHOTO_BUDGET} from './photos.js';
@@ -109,7 +109,7 @@ function tick(s,dt,input){
      const track=updateHostileTrack(s,ship,env,dt);
      if(ship.kind==='escort'||ship.kind==='sub'){
       reportHunterState(s,ship,track);
-      if(track){pursueAndAttack(s,ship,track,dt,dropDepthCharge);danger=Math.max(danger,ship.alert);}
+      if(track){pursueAndAttack(s,ship,track,dt,dropDepthCharge,launchHostileTorpedo);danger=Math.max(danger,ship.alert);}
      }
    }
    if(ship.disabled)ship.speed=0;ship.x+=Math.sin(rad(ship.heading))*ship.speed*.514444*dt;ship.y+=Math.cos(rad(ship.heading))*ship.speed*.514444*dt;
@@ -193,6 +193,10 @@ export function restore(raw){try{
  for(const e of s.events)if(!e||typeof e.text!=='string'||typeof e.kind!=='string'||!Number.isFinite(e.t))return null;
  if(!s.projectiles.every(p=>restoreTorpedo(s,p)))return null;
  for(const b of s.blasts){if(!['x','y','depth','delay','age'].every(k=>Number.isFinite(b[k])))return null;if(b.id===undefined)b.id=s.soundSequence++;if(b.totalDelay===undefined)b.totalDelay=Math.max(1,b.delay);if(b.exploded===undefined)b.exploded=b.age>0;if(b.exploded&&b.explodedAt===undefined)b.explodedAt=s.time-b.age;}
+ s.blasts=s.blasts.filter(b=>{
+  if(b.kind!=='weapon'||b.exploded)return true;
+  restoreIncomingRun(s,b);return false;
+ });
  for(const e of s.lightning)if(!['id','time','x','y','height','seed'].every(k=>Number.isFinite(e[k])))return null;
  for(const e of s.acoustics)if(!['id','time','x','y','power'].every(k=>Number.isFinite(e[k]))||!['thunder','blast','detonation','gunfire','seeker'].includes(e.type)||typeof e.heard!=='boolean')return null;
  return s;

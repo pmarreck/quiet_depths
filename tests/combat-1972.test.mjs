@@ -50,6 +50,62 @@ test('all mission families start with torpedoes and explicit combat state',()=>{
  }
 });
 
+test('an enemy tube launches a moving underwater object from the hunter, using its last report',()=>{
+ const s=ocean();s.depth=s.targetDepth=60;s.difficulty.airSupport=false;
+ const hunter=vessel('hunter',0,550,{kind:'sub',depth:60,heading:180,alert:95,attack:0,
+  report:{x:0,y:0,depth:60,heading:0,speed:0,time:0,reason:'an active sonar ping'}});
+ s.ships.push(hunter);step(s,.25);
+ const p=liveTorpedo(s);
+ assert.equal(p.owner,'enemy');assert.equal(p.launcher,hunter.id);assert.equal(s.blasts.length,0);
+ assert.ok(p.path[0].y>510&&p.path[0].y<525&&Math.abs(p.path[0].depth-60)<2);
+ assert.ok(p.y<p.path[0].y&&p.y>500);
+ assert.equal(s.torps,6);
+ const saved=restore(save(s));assert.deepEqual(saved,s);
+ step(saved,10,{paused:true});assert.deepEqual(saved,s);
+ // Move one player well away. Until collision, both shots must follow the
+ // launch information and travel the same path regardless of player position.
+ saved.x+=450;
+ for(let i=0;i<32;i++){
+  step(s,.25);step(saved,.25);assert.deepEqual(saved.projectiles[0],p);
+ }
+ assert.ok(p.path.length>8);
+ assert.ok(s.acoustics.some(sound=>sound.type==='seeker'));
+ saved.ships[0].attack=999;
+ step(saved,24);
+ assert.equal(saved.hull,100);assert.ok(saved.projectiles[0].searchAge>0);
+});
+
+test('incoming torpedoes strike only on intersection and hostile collateral leaves the patrol running',()=>{
+ const setup=()=>{
+  const s=ocean();s.depth=s.targetDepth=55;
+  const hunter=vessel('hunter',0,350,{kind:'sub',depth:55,heading:180,alert:95,attack:0,
+   report:{x:0,y:0,depth:55,heading:0,speed:0,time:0,reason:'an active sonar ping'}});
+  s.ships=[hunter];step(s,.25);return s;
+ };
+ for(const victim of ['player','neutral']){
+  const s=setup(),p=liveTorpedo(s);
+  if(victim==='neutral')s.ships.push(vessel('bystander',0,120,{kind:'sub',depth:55,military:false}));
+  else s.x=p.aim.x;
+  advanceUntil(s,()=>s.impacts.some(impact=>impact.id===p.id),20);
+  assert.equal(s.projectiles.length,0);assert.equal(s.impacts[0].kind,'torpedo');
+  assert.ok(Math.abs(s.impacts[0].altitude+55)<4);
+  if(victim==='player')assert.ok(s.hull<100);
+  else{assert.equal(s.ships[1].hull,0);assert.equal(s.hull,100);assert.equal(s.status,'patrol');assert.deepEqual(patrolKills(s),{ships:0,submarines:0});}
+ }
+});
+
+test('pre-update pending enemy attacks resume in the water while older player shots keep their ownership',()=>{
+ const s=ocean();s.ships=[vessel('target',0,850)];
+ contact(s,s.ships[0],'active');fire(s,'target');delete s.projectiles[0].owner;
+ s.blasts.push({id:9,x:20,y:30,depth:48,delay:6,age:0,exploded:false,kind:'weapon'});
+ const r=restore(save(s));
+ assert.ok(r);assert.equal(r.blasts.length,0);
+ assert.deepEqual(r.projectiles.map(p=>p.owner),['player','enemy']);
+ const incoming=r.projectiles[1];assert.equal(incoming.depth,48);assert.ok(separation(incoming,incoming.aim)>100);
+ assert.deepEqual(restore(save(r)),r);
+ const y=incoming.y;step(r,.25);assert.ok(incoming.y>y);
+});
+
 test('gun availability gates conserve ammunition and accepted shots cost exactly one round',()=>{
  for(const mutation of [s=>s.depth=s.targetDepth=1.001,s=>s.status='won',s=>s.gun.ammo=0]){
   const s=ocean();mutation(s);
@@ -341,8 +397,9 @@ test('an enemy submarine attacks the same predicted track after the quiet boat t
   boat.ships[0].attack=0;
   step(boat,.25);
  }
- assert.ok(a.blasts.length&&b.blasts.length,'the hunter should still act on its recent report');
- assert.deepEqual(a.blasts,b.blasts,'unobserved moves must not change the enemy’s aim point or fuse depth');
+ assert.equal(a.projectiles.length,1,'the hunter should still act on its recent report');
+ assert.equal(a.projectiles[0].owner,'enemy');
+ assert.deepEqual(a.projectiles,b.projectiles,'unobserved moves must not change the incoming shot’s course or ordered depth');
  assert.equal(a.ships[0].heading,b.ships[0].heading);
 });
 

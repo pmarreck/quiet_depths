@@ -1,14 +1,14 @@
 import {SUB_DESIGN as D} from './hull-design.js';
 // Sample the screw below half a blade spacing per render to avoid apparent
 // reverse rotation when frames are slow or simulation time is compressed.
-export function renderedScrewAngle(angle,rpm,elapsed){
- const limit=.8*Math.PI/D.propellerBlades,step=rpm*Math.PI/30*Math.max(0,elapsed);
+export function renderedScrewAngle(angle,rpm,elapsed,blades=D.propellerBlades){
+ const limit=.8*Math.PI/blades,step=rpm*Math.PI/30*Math.max(0,elapsed);
  return (angle+Math.max(-limit,Math.min(limit,step)))%(2*Math.PI);
 }
 // Five fixed-pitch blades, as documented for Blueback by OMSI's National
 // Register nomination. The painted finish is a deliberate game choice. This
 // helical surface is an approximation, not an exact hydrodynamic blade design.
-function screwBlade(T){
+export function screwBlade(T){
  const positions=[],indices=[],rows=14,columns=10;
  for(let face=0;face<2;face++)for(let i=0;i<=rows;i++)for(let j=0;j<=columns;j++){
   const t=i/rows,u=j/columns,cross=u*2-1,r=.36+(D.propellerRadius-.38)*t,skew=.28*t*t,chord=.12+.7*Math.sin(Math.PI*(.12+.88*t))**.7,offset=cross*chord/2,pitch=Math.atan(D.propellerPitch/(2*Math.PI*r));
