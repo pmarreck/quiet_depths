@@ -1,13 +1,14 @@
 /* Fixed phone helm: the scene gets the remaining height, never the control list. */
 @media(max-width:1100px){
  html,body{height:100%;min-height:0;min-width:0;margin:0;overflow:hidden;overscroll-behavior:none}
+ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
  button{touch-action:manipulation}
- .topbar{height:44px;min-height:44px;padding:0 max(8px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));gap:6px;flex-wrap:nowrap}
+ .topbar{height:44px;min-height:44px;padding:0 8px;gap:6px;flex-wrap:nowrap}
  .brand{font:500 13px var(--mono);letter-spacing:.5px;gap:5px;min-width:0;flex:1}.brand-mark{font-size:24px}.brand small,.top-coords{display:none}
  .top-actions{gap:3px;margin:0;width:auto}.top-actions button{min-height:44px;padding:0 5px;letter-spacing:0;font-size:12px}
  .top-actions #sound{min-width:59px;gap:4px}.top-actions #sound span{display:inline;font-size:12px}#sound svg{width:17px;height:17px}.top-actions #guide{font-size:0;min-width:32px}.top-actions #guide span{font-size:16px;margin:0}
  .top-actions .pause-button{font-size:0;min-width:58px;width:auto;height:36px;min-height:36px;padding:0 6px}.top-actions .pause-button:after{content:attr(data-short);font:12px var(--mono)}
- .console{display:block;height:calc(100dvh - 88px - env(safe-area-inset-bottom));min-height:0}
+ .console{display:block;height:calc(100dvh - 88px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:0}
  .main-panel{height:100%;min-height:0;display:flex;flex-direction:column;min-width:0}
  .stations{height:44px;min-height:44px;grid-template-columns:repeat(7,minmax(0,1fr))}.stations:has([data-view=scope].hidden){grid-template-columns:repeat(6,minmax(0,1fr))}
  .stations button{font-size:0;padding:0 1px;min-width:0;letter-spacing:0}.stations button span{display:none}.stations button:after{content:attr(data-short);font:12px var(--mono)}.stations button.active:after{content:attr(data-short);height:auto;background:none;position:static}.stations button.active{box-shadow:inset 0 -2px var(--gold)}
@@ -38,8 +39,8 @@
  .mobile-speed-track{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px 0;gap:2px;font:10px var(--mono);color:#9bb6a4}.mobile-speed-rail{position:relative;width:44px;height:84px;--actual:0%}
  #mobile-speed{position:absolute;inset:0 auto auto 0;appearance:slider-vertical;-webkit-appearance:slider-vertical;writing-mode:vertical-lr;direction:rtl;width:44px;height:84px;padding:0;margin:0;background:transparent;accent-color:var(--gold);touch-action:none;min-height:0}
  .mobile-speed-tick{position:absolute;left:0;bottom:var(--actual);width:13px;height:2px;background:var(--cream);box-shadow:0 0 0 1px #112229;pointer-events:none;z-index:2}
- .bottom-bar{height:calc(44px + env(safe-area-inset-bottom));min-height:44px;padding:0 0 env(safe-area-inset-bottom);position:relative;z-index:45;background:#0b181e}.bottom-bar>div:first-child,.bottom-bar>.time-controls{display:none}.bottom-bar>.mobile-footer-actions{display:grid;grid-template-columns:1fr 1.2fr 1fr .65fr;width:100%;height:44px}.mobile-footer-actions button{font:12px var(--mono);min-height:44px;border-right:1px solid #334b42}.mobile-footer-actions [aria-expanded=true]{background:#294238;color:var(--gold)}
- .left-panel,.right-panel{display:none;position:fixed;z-index:40;inset:auto 7px calc(210px + env(safe-area-inset-bottom));height:auto;min-height:0;width:auto;max-height:min(53dvh,420px);overflow:auto;box-shadow:0 -8px 50px #0009;border:1px solid #70816b;background:#10272e;scrollbar-width:thin;overscroll-behavior:contain}
+ .bottom-bar{align-items:flex-end;height:calc(44px + env(safe-area-inset-bottom));min-height:44px;padding:0 0 env(safe-area-inset-bottom);position:relative;z-index:45;background:#0b181e}.bottom-bar>div:first-child,.bottom-bar>.time-controls{display:none}.bottom-bar>.mobile-footer-actions{display:grid;grid-template-columns:1fr 1.2fr 1fr .65fr;width:100%;height:44px}.mobile-footer-actions button{font:12px var(--mono);min-height:44px;border-right:1px solid #334b42}.mobile-footer-actions [aria-expanded=true]{background:#294238;color:var(--gold)}
+ .left-panel,.right-panel{display:none;position:fixed;z-index:40;inset:auto max(7px,env(safe-area-inset-right)) calc(210px + env(safe-area-inset-bottom)) max(7px,env(safe-area-inset-left));height:auto;min-height:0;width:auto;max-height:min(53dvh,420px);overflow:auto;box-shadow:0 -8px 50px #0009;border:1px solid #70816b;background:#10272e;scrollbar-width:thin;overscroll-behavior:contain}
  body[data-drawer=mission] .left-panel,body[data-drawer=boat] .left-panel,body[data-drawer=contacts] .right-panel,body[data-drawer=recon] .right-panel{display:flex;flex-direction:column}
  .drawer-close{display:block;align-self:flex-end;min-height:36px;padding:0 12px;font:12px var(--mono);color:var(--gold);flex-shrink:0}.left-panel>.panel-label,.left-panel>.log-panel,.left-panel>.left-footer,.right-panel>.panel-label,.right-panel>.mini-sonar,.right-panel>.sonar-actions,.right-panel>.resources{display:none}
  body[data-drawer=mission] .boat-panel,body[data-drawer=mission] .drone-bay,body[data-drawer=mission] .mobile-boat-actions{display:none}body[data-drawer=boat] .mission-block,body[data-drawer=boat] .operation-card{display:none!important}
@@ -62,11 +63,11 @@
  .brand{font-size:11px;letter-spacing:0}.brand-mark{display:none}.top-actions #guide{min-width:26px}.top-actions button{padding:0 4px}#sound span{font-size:11px}.stations button:after{font-size:11px}.mobile-vitals{font-size:11px;gap:3px}.mobile-order b{font-size:18px}.mobile-order span{font-size:11px}.mobile-speed-axis{padding-right:1px;grid-template-columns:1fr 44px}.mobile-speed-axis .mobile-order b{font-size:16px}.station-actions button{font-size:11px;padding:0 4px}.station-actions #zoom-tools button{min-width:31px}
 }
 @media(max-width:1100px) and (orientation:landscape) and (max-height:540px){
- .topbar{height:36px;min-height:36px}.console{height:calc(100dvh - 72px - env(safe-area-inset-bottom))}.bottom-bar{height:calc(36px + env(safe-area-inset-bottom));min-height:36px}.mobile-footer-actions,.mobile-footer-actions button{height:36px;min-height:36px}
+ .topbar{height:36px;min-height:36px}.console{height:calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}.bottom-bar{height:calc(36px + env(safe-area-inset-bottom));min-height:36px}.mobile-footer-actions,.mobile-footer-actions button{height:36px;min-height:36px}
  .bottom-bar>.mobile-footer-actions{height:36px}
  .main-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:34px 26px auto minmax(0,1fr) 40px}.stations{grid-column:1/-1;grid-row:1;height:34px;min-height:34px}.mobile-vitals{grid-column:1/-1;grid-row:2;height:26px;min-height:26px}.drone-monitor{grid-column:1/-1;grid-row:3;min-height:24px}.viewport{grid-column:1;grid-row:4;min-height:80px}.station-actions{grid-column:1;grid-row:5;height:40px;min-height:40px}.station-actions button{min-height:40px}
  .mobile-fixed-helm{grid-column:2;grid-row:4/6;height:auto;min-height:0;grid-template-columns:1fr 84px;grid-template-rows:1fr 1fr}.mobile-speed-axis{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;padding:0}.mobile-order{min-height:48px;gap:0;padding:2px}.mobile-order b{font-size:17px}.mobile-step-pair,.mobile-step-pair button{height:36px;min-height:36px}.mobile-speed-track{flex:1}.mobile-speed-rail,#mobile-speed{height:90px}
- .left-panel,.right-panel{bottom:calc(77px + env(safe-area-inset-bottom));right:198px;max-height:calc(100dvh - 115px)}#drawer-backdrop{inset:70px 190px 76px 0}.view-top{top:5px}.view-top small,.bow-readout{display:none}.compass{top:30px}.look-heading{top:49px}.air-warning,.lightning-cue{top:65px}.photo-gallery{inset:34px 8px 8px}#toast{bottom:80px}
+ .left-panel,.right-panel{bottom:calc(77px + env(safe-area-inset-bottom));right:calc(198px + env(safe-area-inset-right));max-height:calc(100dvh - 115px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}#drawer-backdrop{inset:70px 190px 76px 0}.view-top{top:5px}.view-top small,.bow-readout{display:none}.compass{top:30px}.look-heading{top:49px}.air-warning,.lightning-cue{top:65px}.photo-gallery{inset:34px 8px 8px}#toast{bottom:80px}
 }
 
 body[data-station=drone] .viewport{touch-action:none}
