@@ -128,3 +128,23 @@ test('touch inputs support simultaneous steering and speed, release and cancella
  h.press('finger1','KeyW');h.press('finger2','KeyD');assert.deepEqual([...h.keys].sort(),['KeyD','KeyW']);h.release('finger1');assert.deepEqual([...h.keys],['KeyD']);h.clear();assert.equal(h.keys.size,0);
  h.press('keyboard','KeyW');h.press('finger','KeyW');h.release('keyboard');assert.ok(h.keys.has('KeyW'),'releasing one input must preserve another held input');h.release('finger');assert.equal(h.keys.size,0);
 });
+
+test('Home Screen, favicon and manifest icons resolve to PNGs of their declared sizes',async()=>{
+ const page=new URL('../src/index.html',import.meta.url);
+ const html=await readFile(page,'utf8');
+ const head=html.slice(0,html.indexOf('</head>'));
+ const links=Array.from(head.matchAll(/<link\b[^>]*>/g),([tag])=>
+  Object.fromEntries(Array.from(tag.matchAll(/([\w-]+)="([^"]*)"/g),([,key,value])=>[key,value])));
+ const touch=links.find(link=>link.rel==='apple-touch-icon'),favicon=links.find(link=>link.rel==='icon');
+ assert.equal(touch?.sizes,'180x180');
+ const manifestUrl=new URL(links.find(link=>link.rel==='manifest').href,page);
+ const manifest=JSON.parse(await readFile(manifestUrl,'utf8'));
+ assert.ok(manifest.icons.length>0);
+ const images=[[page,touch.href,touch.sizes],[page,favicon.href,favicon.sizes],
+  ...manifest.icons.map(icon=>[manifestUrl,icon.src,icon.sizes])];
+ for(const [base,path,size] of images){
+  const png=await readFile(new URL(path,base));
+  assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a',path);
+  assert.equal(png.readUInt32BE(16)+'x'+png.readUInt32BE(20),size,path);
+ }
+});
