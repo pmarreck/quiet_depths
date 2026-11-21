@@ -2,6 +2,7 @@ import {clamp,rad} from './sim.js';
 import {isSurfaced} from './vehicle-status.js';
 
 export const wrapHeading=n=>((n%360)+360)%360;
+export const throttleDetent=knots=>Math.abs(knots)<=.5?0:knots;
 export const relativeBearing=(absolute,heading)=>wrapHeading(absolute-heading);
 export const scopeBearing=s=>wrapHeading(s.heading+s.scopeAngle);
 export const canIssue=(s,context)=>s.status==='patrol'&&!context.paused&&!context.modal;

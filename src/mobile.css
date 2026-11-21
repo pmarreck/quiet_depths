@@ -26,7 +26,7 @@
  .viewport{flex:1;min-height:100px;touch-action:none;overflow:hidden}
  .view-top{top:9px;left:9px;right:9px;font-size:12px}.view-top small{font-size:11px;line-height:1.6;max-width:100%}.view-tag{display:none}
  .compass{top:53px;left:12%;right:12%;font-size:12px}.look-heading{top:77px;font-size:13px}.bow-readout{top:104px;left:9px;right:auto;padding:3px 6px;font:11px/1.5 var(--mono);max-width:calc(100% - 18px)}
- .view-bottom{display:none}.drone-instruments{display:none!important}.lightning-cue{top:103px;right:9px;left:auto;max-width:175px;padding:6px 8px;font:11px/1.5 var(--mono)}.air-warning{top:103px;right:9px;left:auto;max-width:180px;padding:6px 8px;font:11px/1.5 var(--mono)}
+ .view-bottom{display:none}.drone-instruments{display:none!important}
  .station-actions{position:relative;display:flex;align-items:stretch;justify-content:space-between;gap:2px;height:44px;min-height:44px;padding:0 5px;background:#12292e;border-top:1px solid #526453;border-bottom:1px solid #3c5148;z-index:25;flex-shrink:0}
  .station-actions>div{position:static;display:flex;align-items:center;gap:2px;min-width:0;flex-wrap:nowrap;margin:0;padding:0;background:none;border:0}
  .station-actions button{min-height:44px;padding:0 6px;font:12px var(--mono);white-space:nowrap;color:#d6dfc6;border:0;max-width:none;background:transparent}
@@ -72,9 +72,9 @@
 @media(max-width:1100px) and (orientation:landscape) and (max-height:540px){
  .topbar{height:36px;min-height:36px}.console{height:calc(100dvh - 94px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}.bottom-bar{height:calc(36px + env(safe-area-inset-bottom));min-height:36px}.mobile-footer-actions,.mobile-footer-actions button{height:36px;min-height:36px}
  .bottom-bar>.mobile-footer-actions{height:36px}
- .main-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:34px 26px auto minmax(0,1fr) 40px}.stations{grid-column:1/-1;grid-row:1;height:34px;min-height:34px}.mobile-vitals{grid-column:1/-1;grid-row:2;height:26px;min-height:26px}.drone-monitor{grid-column:1/-1;grid-row:3;min-height:24px}.viewport{grid-column:1;grid-row:4;min-height:80px}.station-actions{grid-column:1;grid-row:5;height:40px;min-height:40px}.station-actions button{min-height:40px}
+ .main-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:34px 26px auto minmax(0,1fr) 40px}.stations{grid-column:1/-1;grid-row:1;height:34px;min-height:34px}.mobile-vitals{grid-column:1/-1;grid-row:2;height:26px;min-height:26px}.station-notices{grid-column:1/-1;grid-row:3}.drone-monitor{min-height:24px}.viewport{grid-column:1;grid-row:4;min-height:80px}.station-actions{grid-column:1;grid-row:5;height:40px;min-height:40px}.station-actions button{min-height:40px}
  .mobile-fixed-helm{grid-column:2;grid-row:4/6;height:auto;min-height:0;grid-template-columns:1fr 84px;grid-template-rows:1fr 1fr}.mobile-speed-axis{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;padding:0}.mobile-order{min-height:48px;gap:0;padding:2px}.mobile-order b{font-size:17px}.mobile-step-pair,.mobile-step-pair button{height:36px;min-height:36px}.mobile-speed-track{flex:1}.mobile-speed-rail{height:90px}
- .left-panel,.right-panel{bottom:calc(77px + env(safe-area-inset-bottom));right:calc(198px + env(safe-area-inset-right));max-height:calc(100dvh - 115px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}#drawer-backdrop{inset:70px 190px 76px 0}.view-top{top:5px}.view-top small,.bow-readout{display:none}.compass{top:30px}.look-heading{top:49px}.air-warning,.lightning-cue{top:65px}.photo-gallery{inset:34px 8px 8px}#toast{bottom:80px}
+ .left-panel,.right-panel{bottom:calc(77px + env(safe-area-inset-bottom));right:calc(198px + env(safe-area-inset-right));max-height:calc(100dvh - 115px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}#drawer-backdrop{inset:70px 190px 76px 0}.view-top{top:5px}.view-top small,.bow-readout{display:none}.compass{top:30px}.look-heading{top:49px}.photo-gallery{inset:34px 8px 8px}#toast{bottom:80px}
 }
 
 body[data-station=drone] .viewport{touch-action:none}

@@ -361,6 +361,29 @@ test('diving prevents surface strafing while the aircraft retains only the last 
  assert.ok(deepBombing,'an attack may still drop finite-fuse ordnance near the last reported position');
 });
 
+test('an expired air search ends once, survives a reload, and its aircraft leave the map',()=>{
+ const s=ocean();s.depth=s.targetDepth=80;s.time=200;
+ s.airSupport.status='airborne';s.airSupport.launchAt=60;s.airSupport.lastKnown={x:0,y:0,time:0};
+ s.aircraft=[plane('patrol',s.airSupport.base.x+1200,s.airSupport.base.y,120,{speed:70,phase:'search'})];
+ step(s,.25);
+ assert.equal(s.airSupport.status,'spent');assert.equal(s.aircraft[0].phase,'return');
+ const resumed=restore(save(s));assert.ok(resumed);
+ step(resumed,30);
+ assert.equal(resumed.aircraft.length,0);assert.equal(resumed.airSupport.status,'spent');
+ assert.equal(resumed.events.filter(e=>e.text.includes('called off')).length,1);
+});
+
+test('the air search timeout follows pursuit persistence and the most recent report',()=>{
+ for(const pursuit of [.5,1,2]){
+  const s=ocean();s.depth=s.targetDepth=80;s.difficulty.pursuit=pursuit;
+  s.airSupport.status='airborne';s.airSupport.launchAt=10;s.airSupport.lastKnown={x:0,y:0,time:125};
+  s.aircraft=[plane('patrol',1000,2000,120,{speed:70,phase:'search'})];
+  s.time=125+100*pursuit-1;step(s,.25);
+  assert.equal(s.airSupport.status,'airborne');
+  step(s,1);assert.equal(s.airSupport.status,'spent');
+ }
+});
+
 test('combat state round-trips exactly and pause/modal input cannot advance live weapons',()=>{
  const s=ocean();s.ships=[vessel('intended',0,1400)];
  contact(s,s.ships[0],'active');assert.equal(fire(s,'intended'),true);

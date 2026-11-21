@@ -6,6 +6,8 @@ export function playerReport(s){
  return {x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:s.speed,time:s.time};
 }
 
+export const searchDuration=s=>100*(s.difficulty?.pursuit??1);
+
 export function projectedReport(report,time,lead=0){
  const age=Math.max(0,time-report.time),travel=(age+lead)*(report.speed??0)*.514444,course=rad(report.heading??0);
  return {...report,age,x:report.x+Math.sin(course)*travel,y:report.y+Math.cos(course)*travel};
@@ -39,7 +41,7 @@ export function updateHostileTrack(s,ship,env,dt){
   ship.report={...playerReport(s),reason};
  }
  if(!fooled)ship.alert=clamp(ship.alert+dt*((observed?(visual+acoustic)*sensitivity*.06:0)-.65/pursuit),0,100);
- if(!ship.report||s.time-ship.report.time>100*pursuit||ship.alert<=42)return null;
+ if(!ship.report||s.time-ship.report.time>searchDuration(s)||ship.alert<=42)return null;
  return projectedReport(ship.report,s.time);
 }
 

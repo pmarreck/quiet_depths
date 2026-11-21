@@ -13,7 +13,7 @@
 .damaged{color:#f18a7c!important}
 .drone-instruments{position:absolute;top:145px;right:22px;display:grid;gap:8px;padding:14px 16px;background:#081d23c9;border:1px solid #77958966;pointer-events:none;font:12px var(--mono);color:#bcdbc9;max-width:260px}
 .drone-instruments b{font-size:14px;color:#e2d19a}
-.lightning-cue{position:absolute;left:22px;top:150px;max-width:230px;background:#111f2ada;border:1px solid #a7bed173;color:#d5e7fa;padding:11px 13px;font:12px/1.7 var(--mono);pointer-events:none}
+
 .stations{grid-template-columns:repeat(5,minmax(0,1fr))}
 .stations:has([data-view=scope].hidden){grid-template-columns:repeat(4,minmax(0,1fr))}
 .stations button{font-size:12px;padding:0 6px;line-height:1.4;letter-spacing:.3px}
@@ -24,5 +24,5 @@
 .right-panel{overflow-y:auto;scrollbar-width:thin}
 .paused .viewport:after{top:auto;bottom:14px;font-size:14px;padding:9px 14px;transform:translateX(-50%)}
 .paused .view-bottom{visibility:hidden}
-@media(max-width:1100px){.stations button{font-size:11px}.stations button span{display:none}.drone-instruments{top:136px;font-size:11px;gap:5px;padding:10px}.lightning-cue{top:265px;left:22px;right:auto;font-size:11px;max-width:250px}.operation-card,.drone-bay{padding:16px}}
-@media(max-width:850px){.stations button{font-size:12px}.lightning-cue{top:145px}.drone-instruments{top:140px}}
+@media(max-width:1100px){.stations button{font-size:11px}.stations button span{display:none}.drone-instruments{top:136px;font-size:11px;gap:5px;padding:10px}.operation-card,.drone-bay{padding:16px}}
+@media(max-width:850px){.stations button{font-size:12px}.drone-instruments{top:140px}}

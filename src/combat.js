@@ -5,7 +5,7 @@ import {emitSound} from './acoustics.js';
 import {hurt} from './systems.js';
 import {isSurfaced,boatPoint} from './vehicle-status.js';
 import {estimateAt} from './track-estimates.js';
-import {playerReport,projectedReport,scatterAim} from './hostile-tracks.js';
+import {playerReport,projectedReport,scatterAim,searchDuration} from './hostile-tracks.js';
 import {SUB_DESIGN as D} from './hull-design.js';
 import {addDebrief} from './debrief.js';
 
@@ -242,7 +242,7 @@ function updateTorpedoes(s,dt){
  s.projectiles=s.projectiles.filter(p=>p.age<TORPEDO_LIFE);
 }
 function requestSupport(s){
- if(s.difficulty?.airSupport===false)return;
+ if(s.difficulty?.airSupport===false||s.airSupport.status==='spent')return;
  const support=s.airSupport;
  for(const v of s.ships){if(!v.military||v.hull<=0||v.alert<=55)continue;
   if(!v.report||v.report.reason==='noisemaker'||s.time-v.report.time>4||v.report.time<(support.lastKnown?.time??0))continue;
@@ -261,6 +261,13 @@ function updateAircraft(s,dt){
  const support=s.airSupport,e=environmentAt(s);
  for(const p of s.aircraft){p.previous={x:p.x,y:p.y,altitude:p.altitude};p.attack=Math.max(0,(p.attack||0)-dt);
   if(p.hull<=0){p.phase='down';p.altitude-=dt*45;p.bank=(p.bank||0)+dt*1.3;if(p.altitude<-10)p.phase='gone';continue;}
+  if(p.phase==='return'){
+   const home=support.base,remaining=distance(p,home),travel=p.speed*dt;
+   if(remaining<=Math.max(10,travel)){p.phase='gone';continue;}
+   p.heading=bearing(p,home);p.bank=0;
+   p.x+=(home.x-p.x)*travel/remaining;p.y+=(home.y-p.y)*travel/remaining;
+   continue;
+  }
   let report=support.lastKnown;
   if(report){const d=distance(p,s),sensitivity=s.difficulty?.detection??1,visible=s.depth<=2&&d<Math.min(2600,e.subVisualRange)*sensitivity||s.scope&&s.depth<=15&&d<400*sensitivity;
    if(visible){support.lastKnown=playerReport(s);report=support.lastKnown;}
@@ -283,6 +290,15 @@ function updateAircraft(s,dt){
   }
   p.x+=Math.sin(rad(p.heading))*p.speed*dt;p.y+=Math.cos(rad(p.heading))*p.speed*dt;
  }
- s.aircraft=s.aircraft.filter(p=>p.phase!=='gone');if(support.status==='airborne'&&!s.aircraft.some(p=>p.hull>0))support.status='spent';
+ s.aircraft=s.aircraft.filter(p=>p.phase!=='gone');
+ if(support.status!=='airborne')return;
+ const flying=s.aircraft.filter(p=>p.hull>0);
+ if(!flying.length){support.status='spent';return;}
+ const lastReport=Math.max(support.launchAt??0,support.lastKnown?.time??0);
+ if(s.time-lastReport>searchDuration(s)){
+  support.status='spent';
+  for(const plane of flying)plane.phase='return';
+  log(s,'Intercepted radio traffic. Air search called off.');
+ }
 }
 export function updateCombat(s,dt){s.gun.cooldown=Math.max(0,s.gun.cooldown-dt);requestSupport(s);updateAircraft(s,dt);updateTorpedoes(s,dt);updateRounds(s,dt);shipDamage(s,dt);}

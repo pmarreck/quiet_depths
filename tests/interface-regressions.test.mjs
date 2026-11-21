@@ -36,7 +36,41 @@ test('refreshing stable contact rows takes linear key reads',async()=>{
 test('sonar circles leave room for headers and bearing labels on short and tall screens',()=>{
  assert.equal(typeof uiGeometry.sonarLayout,'function');
  for(const [w,h] of [[320,242],[393,524],[662,221],[600,480],[800,650]]){
-  const p=uiGeometry.sonarLayout(w,h,false);assert.ok(p.radius>=40);assert.ok(p.cx-p.radius-20>=0&&p.cx+p.radius+20<=w);assert.ok(p.cy-p.radius-20>=55);assert.ok(p.cy+p.radius+20<=h);if(p.waveform)assert.ok(p.waveY>p.cy+p.radius+30);
+  const p=uiGeometry.sonarLayout(w,h,false);assert.ok(p.radius>=40);assert.ok(p.cx-p.radius-20>=0&&p.cx+p.radius+20<=w);assert.ok(p.cy-p.radius-20>=55);assert.ok(p.cy+p.radius+20<=h);
+ }
+});
+
+test('hydrophone peaks wrap across the bow and stay inside the trace',()=>{
+ const level=uiGeometry.hydrophoneStrength;
+ assert.equal(level([],90),0);
+ assert.equal(level([90],90),1);
+ assert.ok(level([90],0)<.01);
+ assert.equal(level([359],0),level([359],360));
+ assert.equal(level([90,90],90),1);
+});
+
+test('patrol notices reflect simultaneous current conditions and retire individually',()=>{
+ const s=createGame('recon',341);
+ Object.assign(s,{time:60,depth:270,alert:70,repair:5,flood:2,lightning:[{x:s.x,y:s.y+1000,time:57}]});
+ s.airSupport.status='arming';s.airSupport.launchAt=65;
+ const notices=()=>uiGeometry.patrolNotices(s,true,false),ids=()=>notices().map(n=>n.id);
+ assert.deepEqual(ids(),['pressure','flood','repair','detection','air','lightning']);
+ assert.equal(notices()[0].critical,true);assert.match(notices()[4].text,/5 s/);
+ s.airSupport.status='airborne';s.aircraft=[{hull:100,phase:'search'}];assert.equal(notices()[4].text,'Aircraft airborne');
+ s.aircraft[0].phase='return';s.time=63;assert.deepEqual(ids(),['pressure','flood','repair','detection']);
+ s.depth=30;s.alert=0;s.repair=0;s.flood=0;assert.deepEqual(ids(),[]);
+ s.status='lost';s.flood=2;assert.deepEqual(ids(),[]);
+});
+
+test('a slider stop detent preserves slow orders beyond half a knot and leaves actual motion alone',()=>{
+ const s=createGame('recon',4);s.drone.mode='remote';
+ for(const view of ['scope','drone']){
+  const vehicle=controls.helmFor(s,view);vehicle.speed=2;
+  for(const value of [-.6,-.5,-.1,0,.1,.5,.6]){
+   assert.ok(controls.setHelmOrder(s,{view},'speed',controls.throttleDetent(value)));
+   assert.equal(vehicle.targetSpeed,Math.abs(value)<=.5?0:value);assert.equal(vehicle.speed,2);
+  }
+  assert.ok(controls.setHelmOrder(s,{view},'speed',.1));assert.equal(vehicle.targetSpeed,.1);
  }
 });
 

@@ -1,12 +1,37 @@
-// Keep interactive row elements alive while telemetry changes underneath a press.
+import {bearing,delta,distance} from './mechanics.js';
+import {depthLimit,pressureLevel} from './pressure.js';
+
+export function patrolNotices(s,opticalActive,soundOn){
+ if(s.status!=='patrol')return [];
+ const notices=[],pressure=pressureLevel(s),support=s.airSupport;
+ if(pressure)notices.push({id:'pressure',text:(pressure===2?'Critical · implosion risk':'Pressure alarm')+' · Rise above '+depthLimit(s)+' m',critical:pressure===2});
+ if(s.flood>0)notices.push({id:'flood',text:'Taking on water'});
+ if(s.repair>0)notices.push({id:'repair',text:'Damage control working'});
+ if(s.alert>30)notices.push({id:'detection',text:s.alert>60?'Under pursuit':'Possible detection'});
+ if(s.difficulty?.airSupport!==false){
+  if(support.status==='arming')notices.push({id:'air',text:'Air support preparing · '+Math.max(0,Math.ceil(support.launchAt-s.time))+' s'});
+  if(support.status==='airborne'&&s.aircraft.some(p=>p.hull>0&&!['down','return','gone'].includes(p.phase)))notices.push({id:'air',text:'Aircraft airborne'});
+ }
+ const strike=s.lightning.at(-1);
+ if(opticalActive&&strike&&s.time-strike.time<=5){
+  const direction=String(Math.round(bearing(s,strike))%360).padStart(3,'0');
+  notices.push({id:'lightning',text:'Lightning · '+direction+'° · '+(distance(s,strike)/1000).toFixed(1)+' km'+(soundOn?' · Thunder traveling':' · Enable sound for thunder')});
+ }
+ return notices;
+}
+
 export function sonarLayout(width,height,mini=false){
- if(mini)return{cx:width/2,cy:height*.49,radius:Math.min(width*.35,height*.32),waveform:false};
- const waveform=height>=360,room=Math.max(0,height-55-40-(waveform?75:0));
- return{cx:width/2,cy:75+room/2,radius:Math.min(width*.31,room/2),waveform,waveY:height-35};
+ if(mini)return{cx:width/2,cy:height*.49,radius:Math.min(width*.35,height*.32)};
+ const top=height>=190?55:height>=140?32:18,room=Math.max(0,height-top-40);
+ return{cx:width/2,cy:(height+top)/2,radius:Math.min(width*.31,room/2)};
+}
+export function hydrophoneStrength(angles,bearing){
+ return Math.min(1,angles.reduce((total,a)=>total+Math.exp(-((delta(a,bearing)/4.5)**2)),0));
 }
 export const SONAR_RANGES=[1500,3000,6000];
 // A passive bearing stays on its lettered spoke when the range scale changes.
 export const sonarRangeFraction=(range,scale)=>range===0?.78:range<=scale?range/scale:null;
+// Keep interactive row elements alive while telemetry changes underneath a press.
 export function reconcileKeyedChildren(container,items,keyOf,create,update){
  const old=new Map([...container.children].map(node=>[node.dataset.rowKey,node])),keep=new Set();
  items.forEach((item,index)=>{const key=String(keyOf(item));let node=old.get(key);if(!node){node=create(item);node.dataset.rowKey=key;}update(node,item);keep.add(node);if(container.children[index]!==node)container.insertBefore(node,container.children[index]||null);});
