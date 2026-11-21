@@ -27,6 +27,7 @@ body.loss #result-dialog{border-color:#d79377;background:#28191cf5;box-shadow:0 
 #ticker-items{display:flex;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;align-items:center}
 #ticker-items::-webkit-scrollbar{display:none}
 #ticker-items span{flex:none;padding:5px 12px;white-space:nowrap}
+#ticker-items [data-row-key="course"]{box-sizing:border-box;max-width:100%;white-space:normal}
 #ticker-items span+span{border-left:1px solid #59604b}
 #ticker-items .critical{color:#ffac9f;font-weight:bold}
 #ticker-next{flex:none;min-width:36px;border-left:1px solid #59604b;color:inherit;font-size:18px}

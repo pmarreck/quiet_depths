@@ -30,8 +30,7 @@ export function alignScope(s,context,mode){
 }
 
 export function nudgeHelm(s,context,degrees){
- const vehicle=helmFor(s,context.view),astern=context.view!=='drone'&&vehicle.speed<0;
- return setHelmOrder(s,context,'heading',vehicle.targetHeading+(astern?-degrees:degrees));
+ return setHelmOrder(s,context,'heading',helmFor(s,context.view).targetHeading+degrees);
 }
 
 export function applyHelmKeys(s,context,keys,dt){

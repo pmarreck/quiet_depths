@@ -6,17 +6,34 @@ import {patrolNotices} from '../src/ui.js';
 import {disciplinaryFinding} from '../src/patrol-reports.js';
 import {floorSurface} from '../src/seafloor.js';
 import {crewPeriod,quietForSleep,CrewAmbience} from '../src/crew-ambience.js';
-import {nudgeHelm} from '../src/controls.js';
+import {nudgeHelm,setHelmOrder} from '../src/controls.js';
 
 const quiet=()=>{const s=createGame('recon',42);Object.assign(s,{x:0,y:0,speed:0,targetSpeed:0,depth:40,targetDepth:40,heading:0,targetHeading:0,scope:false,ships:[],contacts:[]});return s;};
 const text=s=>patrolNotices(s,false,false).map(n=>n.text);
 const target=(id,y,military=true)=>({id,name:id,kind:'sub',x:0,y,depth:40,heading:0,speed:0,hull:100,alert:0,attack:999,military});
-test('manual helm reverses astern, while an absolute course order retains its meaning',()=>{
- for(const sign of [-1,1]){
-  const s=quiet();s.speed=s.targetSpeed=3*sign;
-  nudgeHelm(s,{view:'scope'},30);step(s,4);
-  assert.equal(s.targetHeading,sign<0?330:30);assert.ok(s.rudder>0);
-  assert.ok(sign<0?s.heading>350:s.heading>0&&s.heading<10);
+test('port and starboard move the ordered heading the same way ahead and astern',()=>{
+ for(const speed of [-3,3])for(const turn of [-15,15]){
+  const s=quiet();s.speed=s.targetSpeed=speed;
+  nudgeHelm(s,{view:'scope'},turn);step(s,4);
+  assert.equal(s.targetHeading,turn<0?345:15);
+  assert.equal(Math.sign(s.rudder),Math.sign(speed)*Math.sign(turn));
+  assert.ok(turn<0?s.heading>350:s.heading>0&&s.heading<10);
+ }
+});
+
+test('a pending heading at all stop explains the delay until actual motion resumes',()=>{
+ const s=quiet(),ctx={view:'chart'},message='Course correction requires forward or reverse movement.';
+ assert.ok(!text(s).includes(message));
+ s.heading=359.9;setHelmOrder(s,ctx,'heading',.1);step(s,1);
+ assert.equal(s.heading,359.9);assert.ok(text(s).includes(message));
+ assert.ok(!patrolNotices(s,false,false,'drone').some(n=>n.text===message));
+ setHelmOrder(s,ctx,'heading',s.heading);assert.ok(!text(s).includes(message));
+ setHelmOrder(s,ctx,'heading',15);
+ for(const speed of [-3,3]){
+  s.speed=0;setHelmOrder(s,ctx,'speed',speed);assert.ok(text(s).includes(message));
+  step(s,.25);assert.ok(!text(s).includes(message));
+  setHelmOrder(s,ctx,'speed',0);assert.ok(!text(s).includes(message));
+  step(s,1);assert.ok(text(s).includes(message));
  }
 });
 

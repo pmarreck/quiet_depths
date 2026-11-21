@@ -1,7 +1,7 @@
 import {bearing,delta,distance} from './mechanics.js';
 import {depthLimit,pressureLevel} from './pressure.js';
 
-export function patrolNotices(s,opticalActive,soundOn){
+export function patrolNotices(s,opticalActive,soundOn,view){
  if(s.status!=='patrol')return [];
  const notices=[],pressure=pressureLevel(s),support=s.airSupport;
  if(pressure)notices.push({id:'pressure',text:(pressure===2?'Critical · implosion risk':'Pressure alarm')+' · Rise above '+depthLimit(s)+' m',critical:pressure===2});
@@ -11,6 +11,10 @@ export function patrolNotices(s,opticalActive,soundOn){
  if(s.difficulty?.airSupport!==false){
   if(support.status==='arming')notices.push({id:'air',text:'Air support preparing · '+Math.max(0,Math.ceil(support.launchAt-s.time))+' s'});
   if(support.status==='airborne'&&s.aircraft.some(p=>p.hull>0&&!['down','return','gone'].includes(p.phase)))notices.push({id:'air',text:'Aircraft airborne'});
+ }
+ // Half the helm's 0.1° input step keeps rounding residue from raising a notice.
+ if(view!=='drone'&&s.speed===0&&Math.abs(delta(s.targetHeading,s.heading))>=.05){
+  notices.push({id:'course',text:'Course correction requires forward or reverse movement.'});
  }
  const strike=s.lightning.at(-1);
  if(opticalActive&&strike&&s.time-strike.time<=5){
