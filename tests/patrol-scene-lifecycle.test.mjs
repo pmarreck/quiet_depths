@@ -75,3 +75,29 @@ test('fish stay outside the hull and sail as the boat crosses a school; whale an
  assert.ok(whale.userData.tail.rotation.x!==0&&whale.userData.tail.rotation.y===0);
  assert.ok(shark.userData.tail.rotation.y!==0&&shark.userData.tail.rotation.x===0);
 });
+
+test('octopus arms sit against the sloping triangles of the displayed seabed',async()=>{
+ const {FLOOR_WIDTH,FLOOR_SEGMENTS}=await import('../src/seafloor.js');
+ const geometry=new THREE.PlaneGeometry(FLOOR_WIDTH,FLOOR_WIDTH,FLOOR_SEGMENTS,FLOOR_SEGMENTS);
+ const p=geometry.attributes.position,{bottom}=await import('../src/mechanics.js');
+ for(let i=0;i<p.count;i++)p.setZ(i,-bottom(p.getX(i),p.getY(i)));
+ const floor=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
+ floor.rotation.x=-Math.PI/2;floor.updateMatrixWorld();
+ const life=new UnderseaLife(new THREE.Scene(),()=>new THREE.Group(),()=>new THREE.Group());
+ const ray=new THREE.Raycaster(),down=new THREE.Vector3(0,-1,0);
+ for(const mission of ['survey','recon']){
+  life.reset(createGame(mission,8234));life.root.updateMatrixWorld(true);
+  const octopuses=life.staticRoot.children.filter(child=>child.name==='Octopus');
+  assert.equal(octopuses.length,3);
+  for(const octopus of octopuses){
+   const arms=octopus.children.filter(child=>child.geometry.type==='TubeGeometry');
+   assert.equal(arms.length,8);
+   for(const arm of arms){
+    const tip=arm.localToWorld(arm.geometry.parameters.path.getPoint(1));
+    ray.set(new THREE.Vector3(tip.x,500,tip.z),down);
+    const hit=ray.intersectObject(floor)[0];assert.ok(hit);
+    assert.ok(Math.abs(tip.y-hit.point.y)<.20,'arm tip touches the rendered face within its tube thickness');
+   }
+  }
+ }
+});

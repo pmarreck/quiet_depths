@@ -2,8 +2,17 @@ import * as T from './vendor/three.module.js';
 import {createSwimmer} from './marine-life.js';
 import {bottom,rad,clamp,capsuleContact} from './mechanics.js';
 import {hash01,surfaceHeight} from './environment.js';
+import {floorSurface} from './seafloor.js';
 
 const material=(color)=>new T.MeshStandardMaterial({color,roughness:.72});
+const up=new T.Vector3(0,1,0),groundNormal=new T.Vector3();
+function ground(object,x,north,yaw=0,lift=0){
+ const {height,slopeX,slopeZ}=floorSurface(x,north);
+ groundNormal.set(-slopeX,1,-slopeZ).normalize();
+ object.position.set(x,height,-north).addScaledVector(groundNormal,lift);
+ object.quaternion.setFromUnitVectors(up,groundNormal);
+ object.rotateY(yaw);
+}
 function avoidBoat(position,boat,size){
  if(Math.abs(position.x-boat.x)>70||Math.abs(position.z+boat.y)>70)return;
  const clearance=25+size;
@@ -31,17 +40,28 @@ export class UnderseaLife{
   this.staticRoot=new T.Group();this.root.add(this.staticRoot);this.site=null;
  }
  reset(s){
-  for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
+  for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.isInstancedMesh)o.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
   this.site=null;this.lastTime=null;this.fishPositions=[];this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
   if(s.site){this.site=s.site.kind==='surface'?this.makeShip({kind:'fishing'}):this.makeSub();this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
    const rust=material(0x705343);this.site.traverse(o=>{if(o.isMesh){o.material=rust;}});
    if(s.site.kind==='wreck'){const mast=new T.Mesh(new T.CylinderGeometry(.4,.7,25,8),rust);mast.rotation.z=.5;mast.position.set(0,11,0);this.site.add(mast);const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}
   }
-  for(let i=0;i<35;i++){const angle=hash01(91,i)*Math.PI*2,r=45+hash01(92,i)*200,x=this.anchor.x+Math.sin(angle)*r,y=this.anchor.y+Math.cos(angle)*r,depth=bottom(x,y);
-   const rock=new T.Mesh(new T.DodecahedronGeometry(1,0),material(i%3?0x496561:0x7c7060));rock.scale.set(1+hash01(93,i)*4,1+hash01(94,i)*2,1+hash01(95,i)*4);rock.position.set(x,-depth+rock.scale.y*.4,-y);rock.rotation.y=angle;this.staticRoot.add(rock);
-   if(i%3===0){const kelp=new T.Group();for(let j=0;j<4;j++){const stem=new T.Mesh(new T.CylinderGeometry(.12,.3,7+j,5),material(0x426a4f));stem.position.set(j*.5,(7+j)/2,0);stem.rotation.z=(j-2)*.15;kelp.add(stem);}kelp.position.set(x+4,-depth,-y);this.staticRoot.add(kelp);}
+  const gravel=new T.InstancedMesh(new T.IcosahedronGeometry(1,0),material(0x73766a),140);
+  const sponges=new T.InstancedMesh(new T.CylinderGeometry(.34,.23,1,8,1,true),new T.MeshStandardMaterial({color:0xa77d60,roughness:1,side:T.DoubleSide}),35);
+  const piece=new T.Object3D(),seed=s.patrol.seed;
+  for(let i=0;i<35;i++){const angle=hash01(91,i)*Math.PI*2,r=12+hash01(92,i)*210,x=this.anchor.x+Math.sin(angle)*r,y=this.anchor.y+Math.cos(angle)*r;
+   const rock=new T.Mesh(new T.DodecahedronGeometry(1,0),material(i%3?0x496561:0x7c7060));rock.scale.set(1+hash01(93,i)*4,1+hash01(94,i)*2,1+hash01(95,i)*4);ground(rock,x,y,angle,rock.scale.y*.4);this.staticRoot.add(rock);
+   for(let j=0;j<4;j++){
+    const k=i*4+j,size=.25+hash01(seed,3*k)*.9;piece.scale.set(size*1.6,size*.65,size);
+    ground(piece,x+(hash01(seed,3*k+1)-.5)*18,y+(hash01(seed,3*k+2)-.5)*18,j*2.4,size*.2);
+    piece.updateMatrix();gravel.setMatrixAt(k,piece.matrix);
+   }
+   const h=.45+hash01(seed,i+600);piece.scale.set(1,h,1);
+   ground(piece,x+2.3*Math.cos(i),y+3.5,angle,h*.48);piece.updateMatrix();sponges.setMatrixAt(i,piece.matrix);
+   if(i%3===0){const kelp=new T.Group();for(let j=0;j<4;j++){const stem=new T.Mesh(new T.CylinderGeometry(.12,.3,7+j,5),material(0x426a4f));stem.position.set(j*.5,(7+j)/2,0);stem.rotation.z=(j-2)*.15;kelp.add(stem);}ground(kelp,x+4,y);this.staticRoot.add(kelp);}
   }
-  for(let i=0;i<3;i++){const oct=new T.Group(),m=material(0x9b657d);ellipsoid(oct,[.8,1.1,.8],[0,.6,0],m);for(let j=0;j<8;j++){const a=j*Math.PI/4,pts=[new T.Vector3(0,.3,0),new T.Vector3(Math.sin(a),.1,Math.cos(a)),new T.Vector3(Math.sin(a)*2,.15,Math.cos(a)*2)];oct.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),8,.13,4),m));}const x=this.anchor.x-25+i*28,y=this.anchor.y+25;oct.position.set(x,-bottom(x,y)+1,-y);this.staticRoot.add(oct);}
+  this.staticRoot.add(gravel,sponges);
+  for(let i=0;i<3;i++){const oct=new T.Group(),m=material(0x9b657d);ellipsoid(oct,[.8,1.1,.8],[0,.6,0],m);for(let j=0;j<8;j++){const a=j*Math.PI/4,pts=[new T.Vector3(0,.3,0),new T.Vector3(Math.sin(a),.1,Math.cos(a)),new T.Vector3(Math.sin(a)*2,.15,Math.cos(a)*2)];oct.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),8,.13,4),m));}const x=this.anchor.x-25+i*28,y=this.anchor.y+25;oct.name='Octopus';ground(oct,x,y,hash01(seed,i)*Math.PI*2,-.04);this.staticRoot.add(oct);}
  }
  update(s,env){
   if(this.lastState!==s)this.reset(s);const t=s.time,a=this.anchor,focusDepth=Math.min(80,bottom(a.x,a.y)-15);
