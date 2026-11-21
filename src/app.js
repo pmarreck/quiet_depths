@@ -24,7 +24,7 @@ import {patrolKills,serviceRecord} from './service-record.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
-let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0;
+let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
 let orderAxis=null,reconPlacement=false,photoKey='',lossStartedAt=0;const zooms={scope:1,tower:1,gun:1};let library=[];
 let difficulty=patrolDifficulty();
@@ -590,7 +590,7 @@ function frame(now){
  const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
  if(canIssue(state,ctx)){
   const previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
-  applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;step(state,realDt*rate);renderClock=state.time;
+  applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;step(state,realDt*rate);renderClock=state.time;presentationSeconds+=realDt;
   if(state.pressureAlarm>previousPressure)setRate(1);
   if((state.operation?.rescued||0)>priorRescued)sound.tone('photo');
   if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}
@@ -607,7 +607,7 @@ function frame(now){
   vp.style.setProperty('--shock-y',Math.cos(renderClock*19)*state.shock*1.7+'px');
  }
  const r=vp.getBoundingClientRect();
- if(scene&&feedActive(state,view)){scene.resize(r.width,r.height);scene.render(state,view,zoom,renderClock,orbit);}
+ if(scene&&feedActive(state,view)){scene.resize(r.width,r.height);scene.render(state,view,zoom,renderClock,orbit,presentationSeconds);}
  if(view==='scope'&&feedActive(state,'scope'))drawScope();if(view==='gun'&&feedActive(state,'gun'))drawGun();if(view==='sonar')drawSonar('tactical',false,renderClock);if(view==='chart')drawChart();drawSonar('mini-sonar',true,renderClock);captureEvidence();
  if(now-lastUI>100){updateUI();sound.update();lastUI=now;}if(now-lastSave>8000&&!ctx.modal&&!paused){persist();lastSave=now;}requestAnimationFrame(frame);
 }
@@ -688,7 +688,7 @@ function drawReconArea(c,sx,sy,k){
 }
 let reconCaptureAttempt=0;
 function expose(p){
- try{if(!scene)throw new Error('Camera unavailable');const r=vp.getBoundingClientRect();scene.resize(r.width,r.height);scene.render(state,p.source,zoom,state.time);const photo=recordExposure(state,p,()=>captureOptics(scene));if(photo){persist();photoKey='';toast('Photograph archived in Photos.');}else toast('Camera image unavailable. Exposure was not archived.');}catch(error){console.warn('Camera capture unavailable',error);toast('Camera capture failed. Try another exposure.');}
+ try{if(!scene)throw new Error('Camera unavailable');const r=vp.getBoundingClientRect();scene.resize(r.width,r.height);scene.render(state,p.source,zoom,state.time,undefined,presentationSeconds);const photo=recordExposure(state,p,()=>captureOptics(scene));if(photo){persist();photoKey='';toast('Photograph archived in Photos.');}else toast('Camera image unavailable. Exposure was not archived.');}catch(error){console.warn('Camera capture unavailable',error);toast('Camera capture failed. Try another exposure.');}
 }
 function captureEvidence(){
  const r=state.recon;if(!scene||r.phase!=='complete'||!r.packet||state.reconArchivedSequence>=r.sequence||performance.now()<reconCaptureAttempt)return;

@@ -14,6 +14,20 @@ async function browserModule(file){
 }
 const {UnderseaLife}=await browserModule('undersea.js');
 const {CombatScene}=await browserModule('combat-scene.js');
+const {Atmosphere}=await browserModule('atmosphere.js');
+
+test('rain geometry is reproducible and a paused frame holds the lightning display clock',()=>{
+ const make=()=>new Atmosphere(new THREE.Scene());
+ const a=make(),b=make(),s=createGame('survey',712,{weather:'rain'});
+ assert.deepEqual(a.rain.geometry.attributes.position.array,b.rain.geometry.attributes.position.array);
+ assert.deepEqual(a.rain.geometry.attributes.seed.array,b.rain.geometry.attributes.seed.array);
+ s.lightning=[{id:1,seed:9,x:0,y:0,height:800,time:0}];
+ const e=environmentAt(s),camera=new THREE.PerspectiveCamera();
+ const render=(o,now)=>o.update(s,e,camera,false,now);
+ assert.equal(render(a,10),render(b,30));
+ s.time=2;const next=render(a,10.125);
+ assert.equal(next,render(b,30.125));assert.equal(next,render(a,10.125));assert.ok(next>0&&next<1);
+});
 
 test('both sides have submerged torpedo meshes with counter-rotating screws and lingering trails',()=>{
  const combat=new CombatScene(new THREE.Scene(),null),s=createGame('recon',42),env=environmentAt(s);

@@ -19,10 +19,10 @@ function cloudTexture(){
 }
 export class Atmosphere{
  constructor(scene){
-  this.scene=scene;this.strikes=new Map();this.charges=new Map();this.seenStrikes=new Set();this.lastTime=0;this.lastWall=performance.now();this.lastState=null;
+  this.scene=scene;this.strikes=new Map();this.charges=new Map();this.seenStrikes=new Set();this.lastFrameTime=null;this.lastState=null;
   this.uniforms={time:{value:0},daylight:{value:1},cloud:{value:0},twilight:{value:0},flash:{value:0},sunDir:{value:new T.Vector3()},cloudNoise:{value:cloudTexture()}};
   this.sky=new T.Mesh(new T.SphereGeometry(20000,32,16),new T.ShaderMaterial({side:T.BackSide,depthWrite:false,uniforms:this.uniforms,vertexShader:'varying vec3 vPos;void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:skyFragment}));scene.add(this.sky);
-  const geometry=new T.BufferGeometry(),pos=[],seeds=[];for(let i=0;i<1000;i++){const x=(Math.random()-.5)*180,z=(Math.random()-.5)*180,seed=Math.random()*100;pos.push(x,0,z,x+.7,3.6,z);seeds.push(seed,seed);}geometry.setAttribute('position',new T.Float32BufferAttribute(pos,3));geometry.setAttribute('seed',new T.Float32BufferAttribute(seeds,1));
+  const geometry=new T.BufferGeometry(),pos=[],seeds=[];for(let i=0;i<1000;i++){const x=(hash01(901,i)-.5)*180,z=(hash01(902,i)-.5)*180,seed=hash01(903,i)*100;pos.push(x,0,z,x+.7,3.6,z);seeds.push(seed,seed);}geometry.setAttribute('position',new T.Float32BufferAttribute(pos,3));geometry.setAttribute('seed',new T.Float32BufferAttribute(seeds,1));
   this.rainUniforms={time:{value:0},speed:{value:30},opacity:{value:0},flash:{value:0}};
   this.rain=new T.LineSegments(geometry,new T.ShaderMaterial({transparent:true,depthWrite:false,uniforms:this.rainUniforms,vertexShader:'attribute float seed;uniform float time;uniform float speed;void main(){vec3 p=position;p.y+=mod(seed-time*speed,100.)-35.;p.x+=p.y*.23;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}',fragmentShader:'uniform float opacity;uniform float flash;void main(){gl_FragColor=vec4(vec3(.54,.65,.75)+flash*.25,opacity);}'}));scene.add(this.rain);
   this.blastLight=new T.PointLight(0xa0d9ff,0,250,1.6);scene.add(this.blastLight);
@@ -36,9 +36,9 @@ export class Atmosphere{
   group.position.set(strike.x,0,-strike.y);return group;
  }
  remove(group){group.traverse(o=>{o.geometry?.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.scene.remove(group);}
- update(s,e,camera,underwater){
-  if(this.lastState!==s){for(const group of this.strikes.values())this.remove(group);for(const group of this.charges.values())this.remove(group);this.strikes.clear();this.charges.clear();this.seenStrikes.clear();this.lastState=s;}
-  const wall=performance.now(),visualDt=s.time===this.lastTime?0:Math.min(.25,(wall-this.lastWall)/1000);this.lastTime=s.time;this.lastWall=wall;
+ update(s,e,camera,underwater,frameSeconds){
+  if(this.lastState!==s){for(const group of this.strikes.values())this.remove(group);for(const group of this.charges.values())this.remove(group);this.strikes.clear();this.charges.clear();this.seenStrikes.clear();this.lastFrameTime=null;this.lastState=s;}
+  const visualDt=clamp(frameSeconds-(this.lastFrameTime??frameSeconds),0,.25);this.lastFrameTime=frameSeconds;
   this.sky.visible=!underwater;this.sky.position.copy(camera.position);for(const k of ['daylight','cloud','twilight','flash'])this.uniforms[k].value=e[k];this.uniforms.time.value=s.time;this.uniforms.sunDir.value.set(e.sunDirection.x,e.sunDirection.y,e.sunDirection.z).normalize();
   this.rain.visible=!underwater&&e.rain>.02;this.rain.position.copy(camera.position);this.rainUniforms.time.value=s.time;this.rainUniforms.speed.value=25+e.wind*.35;this.rainUniforms.opacity.value=e.rain*(.18+.1*e.daylight);this.rainUniforms.flash.value=e.flash;
   const visible=new Set();let boltFlash=0;for(const strike of s.lightning){const age=s.time-strike.time;if(age<0||age>20)continue;let group=this.strikes.get(strike.id);if(!group){if(this.seenStrikes.has(strike.id))continue;group=this.bolt(strike);group.userData.age=0;this.seenStrikes.add(strike.id);this.strikes.set(strike.id,group);this.scene.add(group);}group.userData.age+=visualDt;const displayAge=group.userData.age;if(displayAge>1.4)continue;visible.add(strike.id);const pulse=clamp(Math.exp(-displayAge*6)+.85*Math.exp(-(((displayAge-.25)/.08)**2))+.55*Math.exp(-(((displayAge-.55)/.1)**2)),0,1);group.visible=!underwater;group.children.forEach((o,i)=>o.material.opacity=pulse*(i===0?.24:1));boltFlash=Math.max(boltFlash,pulse);}

@@ -109,7 +109,7 @@ export class OceanScene{
   }));
   this.bubbles.frustumCulled=false;this.own.add(this.bubbles);
   this.light=new T.SpotLight(0xd5e5ea,ROV_LAMP_INTENSITY,240,Math.PI/3,.8,2);this.scene.add(this.light,this.light.target);
-  const particles=new T.BufferGeometry(),pts=[];for(let i=0;i<800;i++)pts.push((Math.random()-.5)*600,(Math.random()-.5)*220,(Math.random()-.5)*600);particles.setAttribute('position',new T.Float32BufferAttribute(pts,3));this.particles=new T.Points(particles,new T.PointsMaterial({size:.4,color:0x9fc6b2,transparent:true,opacity:.35}));this.scene.add(this.particles);
+  const particles=new T.BufferGeometry(),pts=[];for(let i=0;i<800;i++)pts.push((hash01(904,i)-.5)*600,(hash01(905,i)-.5)*220,(hash01(906,i)-.5)*600);particles.setAttribute('position',new T.Float32BufferAttribute(pts,3));this.particles=new T.Points(particles,new T.PointsMaterial({size:.4,color:0x9fc6b2,transparent:true,opacity:.35}));this.scene.add(this.particles);
   const drifting=new T.BufferGeometry();drifting.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(72*3),3));
   this.driftingBubbles=new T.Points(drifting,new T.PointsMaterial({map:this.glowTexture(),size:.55,color:0xc2eaf4,transparent:true,opacity:.55,depthWrite:false}));
   this.driftingBubbles.frustumCulled=false;this.scene.add(this.driftingBubbles);
@@ -140,7 +140,7 @@ export class OceanScene{
  makeSub(){return createSubmarine(T);}
  resize(w,h){if(this.canvas.width!==Math.floor(w*this.renderer.getPixelRatio())||this.canvas.height!==Math.floor(h*this.renderer.getPixelRatio())){this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}}
  clear(){this.renderer.setClearColor(0x0a171b);this.renderer.clear();}
- render(s,view,zoom,time,orbit){
+ render(s,view,zoom,time,orbit,frameSeconds=time){
   if(!feedActive(s,view)){this.clear();return;}
   const orbiting=view==='orbit',e=environmentAt(s),drone=view==='drone',tower=view==='tower',gun=view==='gun',listener=drone?s.drone:s;
   const heave=boatHeave(s,e,time),hullY=heave-s.depth;
@@ -243,7 +243,7 @@ export class OceanScene{
    }
    positions.needsUpdate=true;this.driftingBubbles.geometry.setDrawRange(0,count);
   }
-  this.camera.updateProjectionMatrix();const blastFlash=this.atmosphere.update(s,e,this.camera,underwater);this.waterUniforms.flash.value=Math.max(blastFlash*.45,e.flash*(underwater?.05:.35));this.renderer.render(this.scene,this.camera);
+  this.camera.updateProjectionMatrix();const blastFlash=this.atmosphere.update(s,e,this.camera,underwater,frameSeconds);this.waterUniforms.flash.value=Math.max(blastFlash*.45,e.flash*(underwater?.05:.35));this.renderer.render(this.scene,this.camera);
   const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));this.boltVisible=[...this.atmosphere.strikes.values()].some(group=>group.visible&&group.children[1].material.opacity>.2&&frustum.intersectsObject(group.children[1]));
  }
 }
