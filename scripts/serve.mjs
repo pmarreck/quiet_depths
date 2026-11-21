@@ -12,7 +12,7 @@ if(process.argv[3]==='--about'){
   console.log(`Quiet Depths ${releaseVersion} | ${revision??'Build revision unavailable'} | Browser submarine game preview | PF=${os}-${arch}`);
   process.exit(0);
 }
-const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.wav':'audio/wav', '.ttf':'font/ttf', '.wasm':'application/wasm' };
+const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.jpg':'image/jpeg', '.wav':'audio/wav', '.ttf':'font/ttf', '.wasm':'application/wasm' };
 http.createServer(async (req,res) => {
   try {
     const { pathname } = new URL(req.url, 'http://localhost');
