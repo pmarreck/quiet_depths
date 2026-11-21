@@ -1,3 +1,4 @@
+import {report,hearWreck} from './patrol-reports.js';
 import {resolveTraffic} from './hull-contacts.js';
 // Units: meters, seconds, knots, degrees clockwise from north. No rendering here.
 import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from './environment.js';
@@ -5,7 +6,7 @@ import {emitSound,updateAcoustics} from './acoustics.js';
 import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets} from './missions.js';
 import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone} from './systems.js';
-import {ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
+import {MAX_RUN,ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
 import {designation,fixContact,estimateAt,applyReconPacket} from './track-estimates.js';
 import {photoArchive,validPhoto,PHOTO_BUDGET} from './photos.js';
@@ -84,6 +85,35 @@ export function step(s,dt,input={}){
  // Fixed substeps make time compression obey the same collision and resource rules.
  let left=Math.min(dt,60);while(left>0&&s.status==='patrol'){const t=Math.min(.25,left);tick(s,t,input);left-=t;}
 }
+function patrolSweep(s,ship){
+ if(ship.nextSweep===undefined||ship.disabled||s.time<ship.nextSweep)return;
+ ship.nextSweep=s.time+28+rand(s)*45;
+ const nearby=clamp(1-distance(ship,s)/4500,0,1);
+ if(rand(s)<s.difficulty.pingDetection*nearby&&s.systems.sonar>25){
+  emitSound(s,{type:'sweep',x:ship.x,y:ship.y,depth:ship.depth??0,power:.85,vessel:ship.id});
+ }
+ if(rand(s)<.25*nearby*s.difficulty.detection){
+  ship.report={...playerReport(s),reason:'a patrol sweep'};ship.alert=Math.max(55,ship.alert);
+ }
+}
+function patrolReceipt(s,source){
+ if(source.ownHit)report(s,'impact','Explosion heard. Possible torpedo hit.');
+ if(source.type==='sweep'&&s.systems.sonar>25){
+  // The receiver gets the bearing to the emission, without a range or identity.
+  const c=contact(s,{id:source.vessel,x:source.x,y:source.y},'passive');
+  if(c.lastSweep!==undefined&&s.time-c.lastSweep<120){
+   const size=900;
+   c.sweepArea={x:(Math.floor(source.x/size)+.5)*size,y:(Math.floor(source.y/size)+.5)*size,size,time:s.time};
+  }
+  c.lastSweep=s.time;
+  report(s,'sweep','Search ping heard · bearing '+String(Math.round(c.bearing)%360).padStart(3,'0')+'°');
+ }
+ if(source.type==='collapse'||source.type==='settling'){
+  if(source.type==='collapse')report(s,'collapse','Possible implosion heard');
+  else report(s,'settling','Heavy breakup heard. Probable wreck.');
+  if(s.systems.sonar>25)hearWreck(s,source);
+ }
+}
 function tick(s,dt,input){
  s.time+=dt;s.pingAge+=dt;s.pingCooldown=Math.max(0,s.pingCooldown-dt);s.photoCooldown=Math.max(0,s.photoCooldown-dt);s.shock=Math.max(0,(s.shock||0)-dt);
  if(s.noisemaker&&s.time-s.noisemaker.time>32)delete s.noisemaker;
@@ -106,6 +136,7 @@ function tick(s,dt,input){
    const d=distance(s,ship);
    if(s.systems.sonar>25&&(s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)*(1-env.storm*.25*Math.exp(-s.depth/80))*(.25+.75*s.systems.sonar/100)&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
    if(isVisible(s,ship,input.look??((s.heading+s.scopeAngle)%360),env))contact(s,ship,'visual');
+   if(s.mission==='sneaky-seamen')patrolSweep(s,ship);
    if(ship.military&&!ship.disabled){
      const track=updateHostileTrack(s,ship,env,dt);
      if(ship.kind==='escort'||ship.kind==='sub'){
@@ -133,11 +164,23 @@ function tick(s,dt,input){
  updateAcoustics(s,(source,d)=>{
   if(d<210){hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');addDebrief(s,'An underwater explosion was close enough to damage your boat.');}
   else if(d<2500){log(s,'Depth charge detonation. That pattern missed.');addDebrief(s,'The boat was outside the depth-charge damage zone when it detonated.');}
- });
+ },source=>patrolReceipt(s,source));
  updateDrone(s,dt,diesel);
+ if(input.observation){
+  const rov=input.observation==='drone',eye=rov?s.drone:s;
+  const optical=rov?s.drone.mode==='remote'&&s.drone.camera>25:input.observation==='scope'?s.scope&&s.depth<=15&&!scopeWashed(s,env):s.depth<=1;
+  if(optical)for(const v of s.ships){
+   if(v.hull>0||v.wreckMark?.observed)continue;
+   const depth=(v.kind==='sub'?v.depth:0)+(v.sinkDepth||0);
+   if((rov?Math.hypot(distance(eye,v),eye.depth-depth)<70:depth<5&&distance(s,v)<Math.min(1200,env.opticalRange))&&Math.abs(delta(bearing(eye,v),input.look??eye.heading))<25){
+    v.wreckMark={x:v.x,y:v.y,observed:true};report(s,'wreck','Wreck sighted. Position marked on chart.');
+   }
+  }
+ }
  if(s.mission==='shadow'&&s.noise<27&&s.depth>15&&s.ships.some(c=>c.kind==='merchant'&&c.hull>0&&distance(s,c)<4000))s.trackTime+=dt;
  const done=objectiveComplete(s,dt);
- if(s.status==='patrol'&&done&&s.phase==='objective'){s.phase='extract';log(s,'Objective complete. Return to extraction and surface for pickup.','success');}
+ if(s.mission==='sneaky-seamen'&&done&&s.status==='patrol'){s.status='won';log(s,'Gate B reached. Patrol corridor cleared.','success');}
+ if(s.status==='patrol'&&done&&s.phase==='objective'){s.phase='extract';if(!['intercept','seek-and-destroy'].includes(s.mission))log(s,'Objective complete. Return to extraction and surface for pickup.','success');}
  if(s.status==='patrol'&&s.phase==='extract'&&distance(s,s.home)<400&&s.depth<=1){s.status='won';log(s,'Patrol complete. Surfaced at pickup. Boat and crew home safely.','success');}
  if(s.time>1800&&s.status==='patrol'){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
 }
@@ -172,6 +215,7 @@ export function restore(raw){try{
  if(!s.environment||!WEATHER[s.environment.startWeather]||!Number.isFinite(s.environment.startHour)||!Number.isFinite(s.environment.seed)||typeof s.environment.changing!=='boolean')return null;
  if(!s.systems||Object.keys(freshSystems()).some(k=>!Number.isFinite(s.systems[k])||s.systems[k]<0||s.systems[k]>100))return null;
  if(!s.patrol||!['seed','photoGoal','trackGoal','variant'].every(k=>Number.isFinite(s.patrol[k]))||s.scopeSteerBearing!==null&&!Number.isFinite(s.scopeSteerBearing))return null;
+ if(s.runSetting<100||s.runSetting>MAX_RUN||!s.reports.every(r=>r&&typeof r.id==='string'&&typeof r.text==='string'&&Number.isFinite(r.time)&&r.time<=s.time))return null;
  if(!s.gun||!['ammo','cooldown','shots','angle','elevation'].every(k=>Number.isFinite(s.gun[k])))return null;
  if(!s.airSupport||!['idle','arming','airborne','spent'].includes(s.airSupport.status)||!s.airSupport.base||!['x','y'].every(k=>Number.isFinite(s.airSupport.base[k])))return null;
  for(const k of ['requestedAt','launchAt'])if(s.airSupport[k]!==null&&!Number.isFinite(s.airSupport[k]))return null;
@@ -189,12 +233,19 @@ export function restore(raw){try{
  for(const k of ['x','y','heading','depth','battery','speed','targetSpeed','targetDepth','targetHeading'])if(!Number.isFinite(s.drone[k]))return null;
  if(s.route&&(!Number.isFinite(s.route.x)||!Number.isFinite(s.route.y)))return null;
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
+ for(const v of s.ships){
+  for(const key of ['sinkDepth','sunkAt','nextCreak','nextSweep','neutralHitAt'])if(v[key]!==undefined&&(!Number.isFinite(v[key])||v[key]<0))return null;
+  if(v.wreckMark&&(!Number.isFinite(v.wreckMark.x)||!Number.isFinite(v.wreckMark.y)||typeof v.wreckMark.observed!=='boolean'))return null;
+ }
  if(s.ships.some(ship=>ship.report!==undefined&&!validReport(ship.report,s.time)))return null;
  if(s.ships.some(ship=>ship.torpedoDecoys!==undefined&&(!Number.isInteger(ship.torpedoDecoys)||ship.torpedoDecoys<0||ship.torpedoDecoys>ENEMY_DECOY_SUPPLY)))return null;
  if(!validMissionTargets(s))return null;
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k]))||c.depthEstimate!==undefined&&!Number.isFinite(c.depthEstimate)||c.courseEstimated!==undefined&&typeof c.courseEstimated!=='boolean')return null;
  if(s.drone.returnStage<0||s.drone.returnStage>3||!Number.isInteger(s.drone.returnStage))return null;
- for(const c of s.contacts){if(c.fix&&!fixContact({},c.fix))return null;const old=/^Sierra (\d+)$/.exec(c.label);if(old)c.label=designation(Number(old[1]));}
+ for(const c of s.contacts){
+  if(c.lastSweep!==undefined&&(!Number.isFinite(c.lastSweep)||c.lastSweep<0||c.lastSweep>s.time))return null;
+  if(c.sweepArea&&(!['x','y','time','size'].every(k=>Number.isFinite(c.sweepArea[k]))||c.sweepArea.size!==900||c.sweepArea.time>s.time))return null;
+  if(c.fix&&!fixContact({},c.fix))return null;const old=/^Sierra (\d+)$/.exec(c.label);if(old)c.label=designation(Number(old[1]));}
  for(const e of s.events)if(!e||typeof e.text!=='string'||typeof e.kind!=='string'||!Number.isFinite(e.t))return null;
  if(!s.projectiles.every(p=>restoreTorpedo(s,p)))return null;
  for(const b of s.blasts){if(!['x','y','depth','delay','age'].every(k=>Number.isFinite(b[k])))return null;if(b.id===undefined)b.id=s.soundSequence++;if(b.totalDelay===undefined)b.totalDelay=Math.max(1,b.delay);if(b.exploded===undefined)b.exploded=b.age>0;if(b.exploded&&b.explodedAt===undefined)b.explodedAt=s.time-b.age;}
@@ -203,6 +254,10 @@ export function restore(raw){try{
   restoreIncomingRun(s,b);return false;
  });
  for(const e of s.lightning)if(!['id','time','x','y','height','seed'].every(k=>Number.isFinite(e[k])))return null;
- for(const e of s.acoustics)if(!['id','time','x','y','power'].every(k=>Number.isFinite(e[k]))||!['thunder','blast','detonation','gunfire','seeker'].includes(e.type)||typeof e.heard!=='boolean')return null;
+ for(const e of s.acoustics){
+  if(!['id','time','x','y','power'].every(k=>Number.isFinite(e[k]))||!['thunder','blast','detonation','gunfire','seeker','creak','collapse','settling','sweep'].includes(e.type)||typeof e.heard!=='boolean')return null;
+  if(['sweep','collapse','settling'].includes(e.type)&&!s.ships.some(v=>v.id===e.vessel))return null;
+  if(e.ownHit!==undefined&&typeof e.ownHit!=='boolean')return null;
+ }
  return s;
 }catch{return null;}}

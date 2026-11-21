@@ -5,8 +5,16 @@ const melodies=[[55,58,60,62,65,62,60,58,55,53,55,58,57,55],
  [60,64,67,69,67,64,62,65,67,65,62,60,57,60]];
 
 export function crewPeriod(hour){
+ if(hour>=0&&hour<6)return 'sleep';
  if([7,12,18].some(meal=>hour>=meal&&hour<meal+.55))return 'meal';
  return hour>=19&&hour<23?'music':null;
+}
+
+export function quietForSleep(s){
+ if(s.silent||s.alert>30||s.shock>0||s.flood>0||s.pressureAlarm||s.time<(s.gunLoudUntil||0))return false;
+ if(s.projectiles.length||s.shells.length||s.gunRounds.length||s.blasts.length||s.impacts.length)return false;
+ if(s.airSupport.status==='arming'||s.airSupport.status==='airborne')return false;
+ return !s.ships.some(v=>v.military&&v.hull>0&&(v.tracking==='tracking'||v.tracking==='searching'||Math.hypot(v.x-s.x,v.y-s.y)<850));
 }
 
 export class CrewAmbience {
@@ -30,6 +38,32 @@ export class CrewAmbience {
   gain.gain.exponentialRampToValueAtTime(volume,when+.025);gain.gain.exponentialRampToValueAtTime(.0001,when+length);
   oscillator.connect(gain).connect(this.bus);oscillator.start(when);oscillator.stop(when+length+.04);
  }
+ stopSnore(){
+  if(!this.snore)return;
+  const {gain,source}=this.snore,t=this.context.currentTime;
+  gain.gain.setTargetAtTime(0,t,.025);source.stop(t+.12);this.snore=null;
+ }
+ playSnore(seed){
+  if(this.snore)return;
+  const c=this.context;
+  if(!this.snoreBuffer){
+   const rate=c.sampleRate,buf=c.createBuffer(1,Math.ceil(rate*2.6),rate),pcm=buf.getChannelData(0);
+   let phase=0,breath=0,noise=41;
+   for(let i=0;i<pcm.length;i++){
+    const t=i/rate,inhale=t<1.4,u=inhale?t/1.4:(t-1.4)/1.2,envelope=Math.sin(Math.PI*u)**2;
+    noise=(Math.imul(noise,1664525)+1013904223)>>>0;
+    breath=.88*breath+.12*(noise/2147483648-1);
+    phase+=2*Math.PI*(inhale?42+13*envelope:34)/rate;
+    pcm[i]=envelope*(inhale?.6: .2)*(breath*1.3+.18*Math.sin(phase*3)+.12*Math.sin(phase*6))*(.65+.35*Math.sin(phase));
+   }
+   this.snoreBuffer=buf;
+  }
+  const source=c.createBufferSource(),gain=c.createGain();source.buffer=this.snoreBuffer;
+  if(source.playbackRate)source.playbackRate.value=.9+.18*seed;
+  gain.gain.value=.45;source.connect(gain).connect(this.bus);
+  this.snore={gain,source};
+  source.onended=()=>{if(this.snore?.source===source)this.snore=null;source.disconnect();gain.disconnect();};source.start();
+ }
  playMusic(seed){
   const start=this.context.currentTime,melody=melodies[Math.floor(hash01(seed,144)*melodies.length)];
   melody.forEach((pitch,index)=>{
@@ -39,9 +73,10 @@ export class CrewAmbience {
   });
  }
  update(s,e,active){
-  if(this.state!==s){this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=0;}
+  if(this.state!==s){this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=0;}
   const now=this.context.currentTime,quiet=s.silent||s.alert>30;
-  const period=crewPeriod(e.hour);
+  const period=crewPeriod(e.hour),sleeping=active&&period==='sleep'&&quietForSleep(s);
+  if(!sleeping)this.stopSnore();
   this.bus.gain.setTargetAtTime(active?(quiet?.08:.7):0,now,.09);
   if(active){
    const alternative=hash01(s.patrol.seed,Math.floor(s.time*4)+1800)<.5;
@@ -53,6 +88,10 @@ export class CrewAmbience {
     const choice=hash01(s.patrol.seed,slot+1100);
     if(!quiet&&period==='meal'&&choice<.8){
      this.speak(choice<.4?'mess-a':'mess-b',.08);this.note(1840,now+.12,.19,.023);this.note(2700,now+.29,.15,.013);
+    }
+    if(sleeping&&choice<.12&&now>=this.nextSnore){
+     this.playSnore(choice/.12);
+     this.nextSnore=now+45; // Keep the cabin quiet even under time compression.
     }
     if(!quiet&&period==='music'&&choice<.37)this.playMusic(s.patrol.seed+slot);
    }

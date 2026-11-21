@@ -5,6 +5,7 @@ export const MISSIONS=[
  {id:'intercept',name:'The long way home',type:'INTERCEPTION',desc:'Intercept the briefed military freighter. Confirm her silhouette before firing. The fishing boats are neutral.',short:'Identify and sink the military freighter',minutes:'10–15 MIN',torps:6},
  {id:'seek-and-destroy',name:'Seek and Destroy: Convoy',type:'SEEK AND DESTROY',desc:'Find the escorted convoy and sink all three military transports. Fishing boats are neutral. Surface at extraction when the convoy is down.',short:'Find and sink three military transports',minutes:'12–18 MIN',torps:6},
  {id:'seek-and-destroy-sub',name:'Seek and Destroy: Sub',type:'SUBMARINE HUNT',desc:'Find the hostile submarine. A second boat may be in the area. Sink what you can and surface at extraction to survive the patrol.',short:'Hunt enemy submarines or withdraw to extraction',minutes:'10–18 MIN',torps:6},
+ {id:'sneaky-seamen',name:'Sneaky Seamen',type:'COVERT TRANSIT',desc:'Cross from Gate A to Gate B through a convoy patrol. At least one submarine is listening. Reach the far gate at any depth and bring your crew through alive.',short:'Cross the patrol area to Gate B',minutes:'10–18 MIN',torps:6},
  {id:'shadow',name:'Just passing through',type:'SURVEILLANCE',desc:'Quietly track the convoy inside 4 km. Defensive torpedoes are aboard if the patrol turns hostile. Bring the traffic intelligence home.',short:'Quietly track the convoy',minutes:'8–12 MIN',torps:6},
  {id:'undersea-rescue',name:'Someone is still knocking',type:'UNDERSEA RESCUE',desc:'A disabled submarine lies on the reef shelf. Hold 30–75 m from her at rescue depth, below 0.6 knots, while divers assess and recover survivors. Hostile patrols may still be nearby.',short:'Hold at the wreck; recover survivors',minutes:'8–14 MIN',torps:6},
  {id:'surface-rescue',name:'A light in the swell',type:'SURFACE RESCUE',desc:'A damaged research vessel is sinking. Surface and hold 30–85 m away, below 0.6 knots. Rescue launches bring survivors aboard. Enemy gunfire or ramming may force you to move.',short:'Surface beside the casualty; hold position',minutes:'7–12 MIN',torps:6},
@@ -34,6 +35,7 @@ function sunkTransports(s){
 }
 
 export function validMissionTargets(s){
+ if(s.mission==='sneaky-seamen')return s.departure&&Number.isFinite(s.departure.x)&&Number.isFinite(s.departure.y)&&s.ships.some(v=>v.kind==='sub'&&v.military)&&s.ships.some(v=>v.kind==='merchant');
  if(s.mission==='intercept')return s.ships.some(ship=>ship.id==='cobalt');
  if(s.mission==='seek-and-destroy-sub')return s.ships.some(ship=>ship.id==='echo'&&ship.kind==='sub'&&ship.military===true);
  if(s.mission!=='seek-and-destroy')return true;
@@ -109,8 +111,9 @@ export function updateOperation(s,dt){
  return o.completed;
 }
 export function objectiveState(s){
- if(s.mission==='seek-and-destroy-sub')return {label:'HUNT OR WITHDRAW',text:'Surface at extraction to survive the patrol',progress:String(s.ships.filter(ship=>ship.kind==='sub'&&ship.military&&ship.playerDamaged&&ship.hull===0).length)+' SUNK',advice:''};
- if(s.mission==='seek-and-destroy')return {label:'SINK THE CONVOY',text:'Find and sink the military transports',progress:`${sunkTransports(s)}/${convoyTransportIds.length}`,advice:''};
+ if(s.mission==='sneaky-seamen')return {label:'GATE A → GATE B',text:'Reach Gate B at any depth',progress:(distance(s,s.home)/1000).toFixed(1)+' km',advice:'The convoy is expecting you.'};
+ if(s.mission==='seek-and-destroy-sub')return {label:'HUNT OR WITHDRAW',text:'Surface at extraction to survive the patrol',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
+ if(s.mission==='seek-and-destroy')return {label:'SINK THE CONVOY',text:'Find and sink the military transports',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
  if(s.operation){const o=s.operation,c=operationConditions(s);
   if(s.mission==='survey'){
    if(s.difficulty?.drone===false)return {label:'SURVEY THE WRECK',text:`${Math.floor(o.scan)}/45 s scan`,progress:Math.floor(o.scan)+'/45',advice:o.find||'Scan within 100 m at 0.5–3 kn.'};
@@ -120,7 +123,7 @@ export function objectiveState(s){
  }
  return {label:s.mission==='recon'?'PHOTOGRAPH THE CONVOY':s.mission==='intercept'?'INTERCEPT '+(s.ships.find(v=>v.id==='cobalt')?.name||'MILITARY FREIGHTER').toUpperCase():'LISTEN WITHOUT BEING SEEN',text:s.mission==='recon'?`Photograph ${s.patrol.photoGoal} different merchant ships`:s.mission==='shadow'?`Track quietly for ${s.patrol.trackGoal} seconds`:MISSIONS.find(m=>m.id===s.mission).short,progress:s.mission==='recon'?s.photos.length+'/'+s.patrol.photoGoal:s.mission==='shadow'?Math.min(s.patrol.trackGoal,Math.floor(s.trackTime))+'/'+s.patrol.trackGoal:'0/1',advice:''};
 }
-const completionRules={recon:s=>s.photos.length>=s.patrol.photoGoal,intercept:s=>s.ships.find(v=>v.id==='cobalt')?.hull===0,'seek-and-destroy':s=>sunkTransports(s)===convoyTransportIds.length,'seek-and-destroy-sub':()=>true,shadow:s=>s.trackTime>=s.patrol.trackGoal,'undersea-rescue':updateOperation,'surface-rescue':updateOperation,survey:updateOperation};
+const completionRules={'sneaky-seamen':s=>distance(s,s.home)<=200,recon:s=>s.photos.length>=s.patrol.photoGoal,intercept:s=>s.ships.find(v=>v.id==='cobalt')?.hull===0,'seek-and-destroy':s=>sunkTransports(s)===convoyTransportIds.length,'seek-and-destroy-sub':()=>true,shadow:s=>s.trackTime>=s.patrol.trackGoal,'undersea-rescue':updateOperation,'surface-rescue':updateOperation,survey:updateOperation};
 if(MISSIONS.length!==Object.keys(completionRules).length||MISSIONS.some(m=>!Object.hasOwn(completionRules,m.id)))throw new Error('Every mission must have an explicit completion rule.');
 export const objectiveComplete=(s,dt)=>completionRules[s.mission](s,dt);
 export function randomizePatrol(s,seed){
@@ -151,6 +154,19 @@ export function randomizePatrol(s,seed){
   if(h(89)<.36)s.ships.push({...primary,id:'echo-two',x:primary.x+700+h(90)*1200,y:primary.y+400+h(91)*1100,depth:45+h(92)*45,heading:150+h(93)*105});
   s.phase='extract';
   log(s,`Patrol ${seed}. An enemy submarine was reported in this sector. Engage or withdraw. Surface at extraction to survive.`);
+  return;
+ }
+ if(s.mission==='sneaky-seamen'){
+  s.departure={...start};
+  const course=rad(30+h(920)*35),east=Math.sin(course),north=Math.cos(course),length=2700+h(921)*550;
+  s.home={x:start.x+east*length,y:start.y+north*length};
+  s.heading=s.targetHeading=bearing(start,s.home);
+  s.ships.forEach((v,i)=>{
+   const along=length*(.37+h(930+i)*.36),across=(h(940+i)-.5)*1100;
+   v.x=start.x+east*along+north*across;v.y=start.y+north*along-east*across;
+   if(v.kind==='escort'||v.kind==='sub')v.nextSweep=15+h(960+i)*35;
+  });
+  log(s,'Gate A passed. Cross the convoy patrol and reach Gate B. No attack or surfacing required.');
   return;
  }
  if(hunting){

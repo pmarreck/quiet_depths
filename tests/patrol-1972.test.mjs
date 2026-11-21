@@ -90,7 +90,7 @@ test('Seek and Destroy briefs an undiscovered convoy of three military transport
   assert.ok(s.ships.some(v=>v.kind==='escort'&&v.military));
   assert.ok(s.ships.some(v=>v.kind==='fishing'&&!v.military));
   assert.deepEqual(s.contacts,[]);
-  assert.equal(objectiveState(s).progress,'0/3');
+  assert.equal(objectiveState(s).progress,'0 WRECK SITES');
   assert.equal(createGame('intercept',seed).ships.filter(v=>v.kind==='merchant'&&v.military).length,1);
  }
 });
@@ -104,7 +104,8 @@ test('Seek and Destroy preserves partial progress and requires the last transpor
  Object.assign(s,{speed:0,targetSpeed:0});
  step(s,.25);
  assert.equal(s.phase,'objective');
- assert.equal(objectiveState(s).progress,'2/3');
+ assert.equal(s.ships.filter(v=>v.kind==='merchant'&&!v.hull).length,2);
+ assert.equal(objectiveState(s).progress,'0 WRECK SITES');
  const resumed=restore(save(s));
  assert.deepEqual(resumed,s);
  assert.equal(restore(save({...s,phase:'extract'})),null);
@@ -115,7 +116,8 @@ test('Seek and Destroy preserves partial progress and requires the last transpor
  contact(resumed,resumed.ships.find(v=>v.id===last.id),'active');
  assert.ok(fire(resumed,last.id));
  step(resumed,30);
- assert.equal(objectiveState(resumed).progress,'3/3');
+ assert.equal(resumed.ships.filter(v=>v.kind==='merchant'&&!v.hull).length,3);
+ assert.equal(objectiveState(resumed).progress,resumed.ships.filter(v=>v.wreckMark).length+' WRECK SITES');
  assert.equal(resumed.phase,'extract');
  assert.equal(resumed.status,'patrol');
  Object.assign(resumed,{...resumed.home,depth:10,targetDepth:10});

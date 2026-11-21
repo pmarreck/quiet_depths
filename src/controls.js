@@ -29,13 +29,18 @@ export function alignScope(s,context,mode){
  return false;
 }
 
+export function nudgeHelm(s,context,degrees){
+ const vehicle=helmFor(s,context.view),astern=context.view!=='drone'&&vehicle.speed<0;
+ return setHelmOrder(s,context,'heading',vehicle.targetHeading+(astern?-degrees:degrees));
+}
+
 export function applyHelmKeys(s,context,keys,dt){
  if(!canIssue(s,context))return;
  const v=helmFor(s,context.view),speed=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0),turn=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),depth=(keys.has('KeyC')?1:0)-(keys.has('Space')?1:0);
  // Orders change at a real-time rate. Time compression accelerates the vehicle,
  // not the keyboard. The simulation alone advances actual controls.
  if(speed)setHelmOrder(s,context,'speed',v.targetSpeed+speed*2*dt);
- if(turn)setHelmOrder(s,context,'heading',v.targetHeading+turn*20*dt);
+ if(turn)nudgeHelm(s,context,turn*20*dt);
  if(depth)setHelmOrder(s,context,'depth',v.targetDepth+depth*12*dt);
 }
 

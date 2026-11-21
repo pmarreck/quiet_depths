@@ -1,14 +1,15 @@
+import {disciplinaryFinding} from './patrol-reports.js';
 import {depthLimit,pressureLevel} from './pressure.js';
 import {createGame,step,bottom,bearing,delta,distance,rad,clamp,ping,photograph,fire,decoy,deployDrone,recallDrone,log,MISSIONS,restore,getSoundings} from './sim.js';
 import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
 import {objectiveState,operationApproach,operationConditions,startRescue,dronePhotograph,parsePatrolSeed,patrolSetup} from './missions.js';
 import {OceanScene} from './scene.js';
-import {fireDeckGun,aimGunAt,firingBearing} from './combat.js';
+import {MAX_RUN,fireDeckGun,aimGunAt,firingBearing} from './combat.js';
 import {HeldInput} from './input.js';
 import {SoundSystem} from './audio.js';
 import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
-import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
+import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js';
@@ -248,12 +249,14 @@ bindCommand('open-gun','click',()=>setView('gun'));
 bindCommand('aim-gun','click',()=>{const id=$('gun-target').value,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range){const e=estimateAt(c,state.time);aimGunAt(state,{x:e.x,y:e.y,vx:c.fix?.vx||0,vy:c.fix?.vy||0,altitude:2});}},()=>view==='gun'&&feedActive(state,'gun')&&!!$('gun-target').value);
 bindCommand('scope-toggle','click',scopeToggle);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0&&state.systems.sonar>25);bindCommand('silent','click',silent,()=>view!=='drone');
 for(const axis of ['heading','depth','speed'])bindOrderRange(axis,()=>axis);
-bindCommand('port','click',()=>order('heading',helmFor(state,view).targetHeading-15),pilotEnabled);bindCommand('starboard','click',()=>order('heading',helmFor(state,view).targetHeading+15),pilotEnabled);
+bindCommand('port','click',()=>nudgeHelm(state,context(),-15),pilotEnabled);bindCommand('starboard','click',()=>nudgeHelm(state,context(),15),pilotEnabled);
 all('[data-depth]').forEach(b=>bindCommand(b,'click',()=>order('depth',+b.dataset.depth),pilotEnabled));
 bindCommand('electric','click',()=>{state.engine='electric';log(state,'Electric motors engaged.');},()=>view!=='drone');
 bindCommand('diesel','click',()=>{if(state.depth>14){toast('Diesel needs air. Rise to 14 meters or less first.');return;}if(state.fuel<=0){toast('Diesel fuel exhausted.');return;}state.engine='diesel';state.silent=false;log(state,'Diesels engaged. Recharging, but loud.','warning');},()=>view!=='drone');
 bindCommand('repair','click',()=>{if(state.hull>=100&&state.flood===0&&state.water===0&&Object.values(state.systems).every(v=>v===100)){toast('No damage to repair.');return;}state.repair=120;log(state,'Damage control assigned. Sealing leaks, reinforcing pressure bulkheads and pumping the bilge.');toast('Damage control working for 2 minutes. Uses battery.');});
 bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}},()=>state.decoys>0);
+$('run-limit').max=MAX_RUN;
+bindCommand('run-limit','input',e=>{state.runSetting=clamp(e.target.valueAsNumber,100,MAX_RUN);});
 bindCommand('fire','click',launchSelected,()=>!!state.contacts.find(c=>c.id===selected)&&state.torps>0&&state.depth<=100);
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
@@ -266,7 +269,7 @@ bindCommand('start-rescue','click',()=>{
 bindCommand('hold-position','click',()=>{state.route=null;state.targetSpeed=0;state.targetDepth=state.site?operationApproach(state).depth:state.depth;toast('All stop. Ballast and planes holding ordered depth.');});
 bindCommand('recall-drone','click',()=>recallDrone(state),()=>state.drone.mode==='remote');
 bindCommand('clear-route','click',()=>{state.route=null;toast('Waypoint cleared. Holding ordered heading.');});
-bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast('Extraction plotted. Surface inside the pickup circle to finish.');});
+bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast(state.mission==='sneaky-seamen'?'Gate B plotted. Cross at any depth.':'Extraction plotted. Surface inside the pickup circle to finish.');});
 $('center-chart').onclick=()=>{chart.follow=true;updateUI();};
  for(const [id,factor] of [['chart-zoom-in',1.4],['chart-zoom-out',1/1.4]])$(id).onclick=()=>{const r=$('viewport').getBoundingClientRect();zoomChart(chart,factor,r.width/2,r.height/2,r.width,r.height,state);updateUI();};
  all('[data-panel]').forEach(b=>b.onclick=()=>{const next=b.dataset.panel;if(drawer===next){closeDrawer();return;}openDrawer(next);});$('drawer-backdrop').onclick=closeDrawer;
@@ -388,7 +391,7 @@ $('ticker-next').onclick=()=>{
  items.scrollLeft=items.scrollLeft+items.clientWidth<items.scrollWidth-1?items.scrollLeft+items.clientWidth:0;
 };
 function updateUI(){
- const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=extract&&distance(s,s.home)<400,objective=objectiveState(s);
+ const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=(extract||['intercept','seek-and-destroy'].includes(s.mission))&&distance(s,s.home)<400,objective=objectiveState(s);
  if(view==='scope'&&s.systems.periscope===0)view='tower';
  $('open-orbit').classList.toggle('hidden',!s.difficulty.orbitCamera||!scene);
  $('pause').textContent=(paused?'RESUME':'PAUSE')+' · '+keyLabel(bindings.Escape).toUpperCase();
@@ -400,7 +403,8 @@ function updateUI(){
  $('show-recon-chart').classList.toggle('hidden',!s.difficulty.satellite);
  $('recon-panel').classList.toggle('hidden',!s.difficulty.satellite);
  $('mission-type').textContent=m.type;$('mission-name').innerHTML=esc(m.name).replace('observation','<br>observation.').replace('home','<br>home.').replace('through','<br>through.');
- const survival=s.mission==='seek-and-destroy-sub',returning=extract&&!survival;
+ const returning=extract&&!['seek-and-destroy-sub','seek-and-destroy','intercept'].includes(s.mission);
+ $('plot-home').textContent=s.mission==='sneaky-seamen'?'PLOT GATE B':'PLOT EXTRACTION';
  $('mission-desc').textContent=returning?'Your work is done. Bring everyone home.':m.short;
  $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':returning?'RETURN TO EXTRACTION':objective.label;
  $('objective-text').textContent=pickup?'Request 0 m and wait until surfaced':returning?'Reach the green circle and surface':objective.text;
@@ -477,6 +481,7 @@ function updateUI(){
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
 
  $('torp-count').textContent=String(s.torps).padStart(2,'0');$('tubes').innerHTML=Array.from({length:6},(_,i)=>`<i class="${i>=s.torps?'spent':''}"></i>`).join('');
+ $('run-limit').value=s.runSetting;$('run-readout').textContent=(s.runSetting/1000).toFixed(2)+' km';
  const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(firingBearing(s,target))}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('torpedo-status').textContent=s.projectiles.filter(p=>p.owner==='player').map((p,i)=>`TORP ${i+1} · ${p.age<4?'ARMING':p.lock?'SONAR TRACK':'SEARCHING'} · ${deg(p.heading)}°`).join(' / ');$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='BOAT STOP';
  for(const id of ['battery','oxygen','fuel']){$(id+'-value').textContent=Math.round(s[id])+'%';$(id+'-bar').style.width=s[id]+'%';$(id+'-value').style.color=s[id]<20?'var(--red)':'';}
  $('alert-label').textContent=s.alert>60?'UNDER PURSUIT':s.alert>30?'POSSIBLE DETECTION':'UNDETECTED';$('alert-label').style.color=s.alert>30?'var(--red)':'var(--green)';$('alert-dot').style.background=s.alert>30?'var(--red)':'var(--green)';
@@ -545,11 +550,23 @@ function drawChart(){
  c.strokeStyle='#759a8133';c.lineWidth=.6;const grid=chart.zoom<.6?5000:chart.zoom<6?1000:chart.zoom<24?250:chart.zoom<80?100:25;
  for(let x=Math.floor(tl.x/grid)*grid;x<br.x;x+=grid){c.beginPath();c.moveTo(sx(x),0);c.lineTo(sx(x),h);c.stroke();}for(let y=Math.floor(br.y/grid)*grid;y<tl.y;y+=grid){c.beginPath();c.moveTo(0,sy(y));c.lineTo(w,sy(y));c.stroke();}
  c.textAlign='center';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#b9c5a4';c.fillText('GREYBANK ISLAND',sx(-3800),sy(4000));c.fillStyle='#9ab29f';c.font='12px IBM Plex Mono,monospace';c.fillText('REEF · 65–110 M',sx(1900),sy(700));
- c.strokeStyle='#90bb9f';c.setLineDash([3,4]);c.beginPath();c.arc(sx(state.home.x),sy(state.home.y),400*k,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#bdd5af';c.font='14px IBM Plex Mono,monospace';c.fillText('EXTRACTION · SURFACE',sx(state.home.x),sy(state.home.y)+400*k+23);
+ c.strokeStyle='#90bb9f';c.setLineDash([3,4]);c.beginPath();c.arc(sx(state.home.x),sy(state.home.y),(state.departure?200:400)*k,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#bdd5af';c.font='14px IBM Plex Mono,monospace';c.fillText(state.departure?'GATE B · ANY DEPTH':'EXTRACTION · SURFACE',sx(state.home.x),sy(state.home.y)+(state.departure?200:400)*k+23);
+ if(state.departure){const x=sx(state.departure.x),y=sy(state.departure.y);c.beginPath();c.arc(x,y,5,0,2*Math.PI);c.stroke();c.fillText('GATE A',x,y-9);}
+ for(const v of state.ships){
+  if(!v.wreckMark)continue;
+  const mark=v.wreckMark,x=sx(mark.x),y=sy(mark.y);
+  c.strokeStyle='#e6d7b7';c.lineWidth=2;c.beginPath();c.moveTo(x,y-7);c.lineTo(x,y+8);c.moveTo(x-5,y-2);c.lineTo(x+5,y-2);c.stroke();
+  c.textAlign='left';c.fillStyle='#e6d7b7';c.font='11px IBM Plex Mono,monospace';c.fillText(mark.observed?'WRECK':'PROBABLE WRECK',x+8,y+3);
+ }
+ c.lineWidth=1;
  if(state.site){const site=state.site;c.strokeStyle='#e5c389';c.beginPath();c.arc(sx(site.x),sy(site.y),Math.max(7,75*k),0,Math.PI*2);c.stroke();c.fillStyle='#efcf98';c.font='14px IBM Plex Mono,monospace';c.textAlign='left';c.fillText(site.name,sx(site.x)+12,sy(site.y)-12);c.font='12px IBM Plex Mono,monospace';c.fillText('MISSION SITE · '+Math.round(site.depth)+' M',sx(site.x)+12,sy(site.y)+8);}
  if(['remote','return'].includes(state.drone.mode)){c.strokeStyle='#81dfcc';c.setLineDash([3,3]);c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.drone.x),sy(state.drone.y));c.stroke();c.setLineDash([]);c.fillStyle='#81dfcc';c.fillRect(sx(state.drone.x)-3,sy(state.drone.y)-3,6,6);}
  for(const q of chartContacts(state)){
-  const e=estimateAt(q,state.time),sub=q.kind==='sub';
+  const e=estimateAt(q,state.time),sub=q.kind==='sub',area=q.sweepArea;
+  if(area&&!q.range&&state.time-area.time<90){
+   const half=area.size/2;c.fillStyle='#91adba21';c.fillRect(sx(area.x-half),sy(area.y+half),area.size*k,area.size*k);
+   c.fillStyle='#a9bfbd';c.textAlign='center';c.font='11px IBM Plex Mono,monospace';c.fillText('REPEATED PINGS · APPROX.',sx(area.x),sy(area.y));
+  }
   c.strokeStyle=q.id===selected?'#dfc99b':sub?'#94ccdc':'#acb997';
   c.globalAlpha=q.exact?1:clamp(1-q.age/900,.25,.9);
   c.setLineDash(q.exact?[]:[4,5]);
@@ -591,6 +608,8 @@ function drawScope(){
 }
 function drawGun(){const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);const x=w/2,y=h/2;c.strokeStyle='#e3d4ab';c.lineWidth=1;c.beginPath();c.arc(x,y,11,0,Math.PI*2);c.moveTo(x-50,y);c.lineTo(x-15,y);c.moveTo(x+15,y);c.lineTo(x+50,y);c.moveTo(x,y-35);c.lineTo(x,y-15);c.moveTo(x,y+15);c.lineTo(x,y+35);c.stroke();}
 function patrolVictory(s){
+ if(s.mission==='sneaky-seamen')return 'Gate B reached. You crossed the patrol area and brought your crew through alive.';
+ if(s.mission==='intercept')return 'The briefed freighter sank and your crew reached pickup.';
  if(s.mission==='seek-and-destroy')return 'All three military transports sank. The boat and crew made it home.';
  if(s.mission==='seek-and-destroy-sub')return 'You reached extraction alive. The boat and crew made it home.';
  if(!s.operation)return 'The intelligence is aboard. The crew is safe. Somewhere out there, the convoy sails on.';
@@ -608,23 +627,27 @@ function showResult(){
  const kills=patrolKills(state),medals=$('patrol-medals');
  medals.hidden=kills.submarines===0;
  medals.textContent=kills.submarines>=2?'✦ Two-submarine patrol commendation':'✦ Submarine patrol commendation';
- const debrief=$('patrol-debrief');debrief.hidden=!state.debrief.length;
- $('debrief-entries').replaceChildren(...state.debrief.slice(-10).map(event=>{
+ const finding=disciplinaryFinding(state),stamp=$('discipline-stamp');stamp.hidden=!finding;
+ if(finding){stamp.textContent=finding.title;stamp.style.setProperty('--stamp-angle',finding.angle+'deg');}
+ const entries=[...state.debrief];if(finding)entries.push({time:state.time,text:finding.title+'. '+finding.reason});
+ const debrief=$('patrol-debrief');debrief.hidden=!entries.length;
+ $('debrief-entries').replaceChildren(...entries.map(event=>{
   const entry=document.createElement('li');entry.textContent=`${Math.floor(event.time/60)}m ${Math.floor(event.time%60)}s · ${event.text}`;return entry;
  }));
- $('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span>`;
+ $('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span><span>SUNK<br>${kills.ships} ships · ${kills.submarines} subs</span>`;
  $('result-dialog').showModal();
 }
 function frame(now){
  const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
  if(canIssue(state,ctx)){
   const previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
-  applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;step(state,realDt*rate);renderClock=state.time;presentationSeconds+=realDt;
+  applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;const observation=['scope','gun','tower','drone'].includes(view)&&feedActive(state,view)?view:null;
+  step(state,realDt*rate,{observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
   if(state.pressureAlarm>previousPressure)setRate(1);
   if((state.operation?.rescued||0)>priorRescued)sound.tone('photo');
   if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}
   if(hadRoute&&!state.route){setRate(1);toast('Waypoint reached. All stop. Time compression disengaged.');}
-  if(wasOutsidePickup&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
+  if(wasOutsidePickup&&!['intercept','seek-and-destroy'].includes(state.mission)&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
   if(state.alert>40&&priorAlert<=40){setRate(1);toast('Possible detection. Time compression disengaged.');sound.tone('contact');}
   if(before!==state.events[0]){const e=state.events[0];if(e.kind==='contact'||e.kind==='damage'||e.text.startsWith('Drone link')||(state.alert>40&&rate>1))setRate(1);if(e.text.startsWith('Drone link')){toast(e.text);sound.tone('contact');}if(e.kind==='damage'&&!e.text.includes('Depth charge shock'))sound.tone(e.text.includes('in the water')?'contact':'damage');if(e.kind==='contact')sound.tone('contact');if(e.kind==='success'&&lastToast!==e.text){toast(e.text);lastToast=e.text;}}
   sound.update(state,ctx);if(state.status!=='patrol')showResult();

@@ -74,18 +74,29 @@ export function updateBoat(s,dt){
  const diesel=s.engine==='diesel'&&s.depth<=14&&s.fuel>0,available=diesel||s.engine==='electric'&&s.battery>0;
  const max=available?Math.min(s.silent?3:diesel?17:14,17*s.systems.engine/100,17*s.systems.propeller/100):0;
  s.speed+=clamp(clamp(s.targetSpeed,-Math.min(4,max),max)-s.speed,-dt*.35,dt*.35);
- const turn=delta(s.targetHeading,s.heading);s.rudder+=clamp(clamp(turn/25,-1,1)-s.rudder,-dt*1.8,dt*1.8);
- const turnRate=1.7*(.25+.75*Math.min(1,Math.abs(s.speed)/4))*s.systems.rudder/100;
- s.heading=(s.heading+clamp(turn,-dt*turnRate,dt*turnRate)+360)%360;
- const error=s.targetDepth-s.depth,v=s.verticalSpeed;
- const ballastOrder=clamp(error*.06-v*.9,-1,1),planesOrder=clamp(error*.07-v*1.8,-.45,.45)*Math.sign(s.speed);
- s.ballast+=clamp(ballastOrder-s.ballast,-dt*.16,dt*.16);
+ const turn=delta(s.targetHeading,s.heading),flow=Math.tanh(s.speed/5);
+ // An ordered course is absolute. The helmsman reverses the blade angle astern.
+ const helm=clamp(turn/8,-1,1)*Math.sign(s.speed);
+ s.rudder+=clamp(helm-s.rudder,-dt*1.8,dt*1.8);
+ const yaw=3*flow*s.rudder*s.systems.rudder/100*dt;
+ s.heading=(s.heading+(Math.sign(yaw)===Math.sign(turn)&&Math.abs(yaw)>Math.abs(turn)?turn:yaw)+360)%360;
+ const error=s.targetDepth-s.depth,v=s.verticalSpeed,throughWater=s.speed*.514444;
+ // A surface order retains positive buoyancy through the last few meters.
+ const demand=s.targetDepth===0&&s.depth>0?Math.min(-4,error):error;
+ const ballastOrder=clamp(demand*.16-v*.8,-1,1);
+ s.ballast+=clamp(ballastOrder-s.ballast,-dt*.24,dt*.24);
+ const planesOrder=clamp(error*.09-v*.65,-.55,.55)*Math.sign(s.speed);
  s.planes+=clamp(planesOrder-s.planes,-dt*.5,dt*.5);
- const acceleration=.6*s.ballast*s.systems.ballast/100+s.planes*(s.speed*.514444)**2*.035*Math.sign(s.speed)*s.systems.planes/100+s.water*.008-v*.85;
- s.verticalSpeed=clamp(v+acceleration*dt,-1.15,2.5);s.depth=clamp(s.depth+s.verticalSpeed*dt,0,330);
+ const authority=flow*flow*s.systems.planes/100;
+ const requestedPitch=-s.planes*authority*.54;
+ s.pitch+=clamp(requestedPitch-s.pitch,-dt*.065,dt*.065);
+ const buoyancy=s.ballast*.72*s.systems.ballast/100+s.water*.008;
+ const verticalFromPitch=-throughWater*Math.sin(s.pitch);
+ s.verticalSpeed=clamp(v+(buoyancy+(verticalFromPitch-v)*.8)*dt,-2.8,3.2);
+ s.depth=clamp(s.depth+s.verticalSpeed*dt,0,330);
  if(s.depth===0&&s.verticalSpeed<0)s.verticalSpeed=0;
- s.pitch+=clamp(clamp(-s.verticalSpeed*.09,-.12,.12)-s.pitch,-dt*.05,dt*.05);
- s.x+=Math.sin(rad(s.heading))*s.speed*.514444*dt;s.y+=Math.cos(rad(s.heading))*s.speed*.514444*dt;
+ const horizontal=throughWater*Math.cos(s.pitch);
+ s.x+=Math.sin(rad(s.heading))*horizontal*dt;s.y+=Math.cos(rad(s.heading))*horizontal*dt;
  const prop=propellerState(s.speed,s.depth,s.systems.propeller);s.propAngle=(s.propAngle+prop.rpm*Math.PI/30*dt)%(2*Math.PI);s.cavitation=prop.cavitation;s.propRpm=prop.rpm;
  s.noise=clamp(Math.max((diesel?65:8)+s.speed*s.speed*.39+(s.flood>0?12:0)+s.cavitation*23-(s.silent?7:0),s.time<(s.gunLoudUntil||0)?80:0),2,100);
  if(diesel){s.fuel=clamp(s.fuel-dt*.015,0,100);s.battery=clamp(s.battery+dt*.12,0,100);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}

@@ -1,3 +1,4 @@
+import {damageWreck} from './wrecks.js';
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
 import {feedActive,scopeBearing,cameraEuler,droneCameraPitch,orbitVerticalFov} from './controls.js';
@@ -127,7 +128,7 @@ export class OceanScene{
   if(ship.kind==='sub')return this.makeSub();
   const root=new T.Group(),g=new T.Group(),lights=new T.Group(),small=ship.kind==='fishing',escort=ship.kind==='escort';const scale=small?.38:escort?.78:1;root.add(g,lights);root.userData.body=g;root.userData.lights=lights;
   const hullMat=this.mat(escort?0x505f60:0x343b3b),deck=this.mat(0x737969),rust=this.mat(0x6b4633);
-  const hull=new T.Mesh(new T.CylinderGeometry(17,14,130,8,1),hullMat);hull.rotation.x=Math.PI/2;hull.scale.x=.8;hull.scale.z=.6;hull.position.y=3;g.add(hull);
+  const hull=new T.Mesh(new T.CylinderGeometry(17,14,130,12,14),hullMat);hull.rotation.x=Math.PI/2;hull.scale.x=.8;hull.scale.z=.6;hull.position.y=3;g.add(hull);root.userData.hull=hull;
   this.box(g,[24,6,103],[0,7,0],hullMat);this.box(g,[19,15,21],[0,17,36],deck);this.box(g,[16,5,15],[0,27,37],deck);this.box(g,[4,15,6],[0,29,25],rust);
   for(let i=0;i<4;i++)this.box(g,[18,8,16],[0,13,-36+i*19],i%2?rust:this.mat(0x6b6b53));
   this.box(g,[.8,36,.8],[0,28,-18],deck);this.box(g,[22,.6,.6],[0,38,-18],deck);this.box(g,[.6,24,.6],[0,36,39],deck);
@@ -216,7 +217,22 @@ export class OceanScene{
   this.moon.intensity=(1-e.daylight)*(1-e.cloud*.85)*(underwater?.025:.28);
   this.particles.visible=underwater;this.light.visible=underwater;
   const liveShipIds=new Set(s.ships.map(v=>v.id));for(const [id,mesh] of this.ships)if(!liveShipIds.has(id)){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});this.ships.delete(id);}
-  for(const ship of s.ships){let mesh=this.ships.get(ship.id);if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}const d=Math.hypot(listener.x-ship.x,listener.y-ship.y);mesh.visible=(ship.hull>0||ship.sunkAt!==undefined&&(ship.sinkDepth||0)<50)&&(drone||orbiting||ship.kind!=='sub');if(mesh.userData.body){mesh.userData.body.visible=d<(underwater?350:e.opticalRange);mesh.userData.lights.visible=!underwater&&e.daylight<.85&&d<e.lightRange;}mesh.position.set(ship.x,ship.kind==='sub'?-ship.depth:surfaceHeight(ship.x,ship.y,time,e)*.65-(ship.sinkDepth||0),-ship.y);mesh.rotation.y=-rad(ship.heading);mesh.rotation.z=Math.sin(time*.8+ship.x)*.012*e.waveScale+(ship.flood?Math.min(.35,ship.flood*.012):0);mesh.rotation.x=Math.sin(time*.55+ship.y)*.008*e.waveScale;if(mesh.userData.prop)mesh.userData.prop.rotation.z=time*ship.speed*.8;
+  for(const ship of s.ships){
+   const sub=ship.kind==='sub',sunk=ship.hull<=0;
+   let mesh=this.ships.get(ship.id);
+   if(mesh?.userData.wreck&&!sunk){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});mesh=null;}
+   if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}
+   if(sunk&&!mesh.userData.wreck)damageWreck(T,mesh,sub);
+   const d=Math.hypot(listener.x-ship.x,listener.y-ship.y),drop=ship.sinkDepth||0;
+   mesh.visible=(drone||orbiting||!sub)&&d<(underwater?350:e.opticalRange);
+   if(mesh.userData.lights)mesh.userData.lights.visible=!sunk&&!underwater&&e.daylight<.85&&d<e.lightRange;
+   if(!underwater&&!sunk&&!sub&&d<e.lightRange&&mesh.userData.body){mesh.visible=true;mesh.userData.body.visible=d<e.opticalRange;}
+   else if(mesh.userData.body)mesh.userData.body.visible=true;
+   mesh.position.set(ship.x,(sub?-ship.depth:sunk?0:surfaceHeight(ship.x,ship.y,time,e)*.65)-drop,-ship.y);
+   mesh.rotation.order='YXZ';mesh.rotation.y=-rad(ship.heading);
+   mesh.rotation.z=sunk?Math.min(1.38,.18+drop*.018):Math.sin(time*.8+ship.x)*.012*e.waveScale+Math.min(.35,(ship.flood||0)*.012);
+   mesh.rotation.x=sunk?.06:Math.sin(time*.55+ship.y)*.008*e.waveScale;
+   if(mesh.userData.prop)mesh.userData.prop.rotation.z=time*ship.speed*.8;
    if(ship.kind==='sub')this.updateTubeDoors(mesh,s.projectiles,ship.id);
   }
   const screw=this.own.userData.prop;

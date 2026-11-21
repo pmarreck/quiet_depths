@@ -1,3 +1,4 @@
+import {recordCivilianHit} from './patrol-reports.js';
 import {bottom,clamp,distance,rad,log} from './mechanics.js';
 import {boatPoint} from './vehicle-status.js';
 
@@ -38,7 +39,7 @@ export function hullContact(a,b){
  return deepest;
 }
 function weight(body,site){
- if(body===site&&body.kind!=='surface')return 0;
+ if(body.fixedWreck||body===site&&body.kind!=='surface')return 0;
  if(body.kind==='merchant')return .28;
  if(body.kind==='escort')return .55;
  return body.kind==='fishing'||body.kind==='surface'?1.6:1;
@@ -70,7 +71,10 @@ function resolvePair(s,a,b,hurt){
  const severity=clamp(2+closing*1.1,2,36);
  for(const body of [a,b]){
   if(body===s)hurt(s,severity,b===s.site?'Hull contact with the casualty.':'Hull collision with another vessel.','planes');
-  else body.hull=clamp((body.hull??100)-severity,0,100);
+  else{
+   const before=body.hull??100;body.hull=clamp(before-severity,0,100);
+   if(a===s&&body.military===false&&before>0&&body.hull===0)recordCivilianHit(s,body,'Your boat collided with the neutral '+body.name+' and sank her.');
+  }
   if(body!==s.site){body.speed*=.45;if(body.verticalSpeed)body.verticalSpeed*=.4;}
  }
 }
@@ -86,6 +90,10 @@ export function keelLimit(body){
 }
 export function resolveTraffic(s,hurt){
  const ships=s.ships.filter(v=>v.hull>0);
+ for(const wreck of s.ships){
+  if(wreck.hull>0||wreck.sunkAt===undefined||distance(s,wreck)>145)continue;
+  resolvePair(s,s,{...wreck,depth:(wreck.kind==='sub'?wreck.depth:0)+wreck.sinkDepth,fixedWreck:true},hurt);
+ }
  if(s.site)resolvePair(s,s,s.site,hurt);
  for(let i=0;i<ships.length;i++){
   const ship=ships[i];

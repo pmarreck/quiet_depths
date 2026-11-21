@@ -17,6 +17,7 @@ export function patrolNotices(s,opticalActive,soundOn){
   const direction=String(Math.round(bearing(s,strike))%360).padStart(3,'0');
   notices.push({id:'lightning',text:'Lightning · '+direction+'° · '+(distance(s,strike)/1000).toFixed(1)+' km'+(soundOn?' · Thunder traveling':' · Enable sound for thunder')});
  }
+ for(const r of s.reports??[])if(s.time-r.time<18)notices.push({id:r.id,text:r.text});
  return notices;
 }
 

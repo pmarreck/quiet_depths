@@ -14,6 +14,6 @@ export function persistPatrol(storage,state,started){
 
  let photosSaved=true,recordSaved=true;
  try{storage.setItem('quiet-depths-photos-v1',JSON.stringify(photoArchive(state)));}catch{photosSaved=false;}
- try{saveServiceRecord(storage,state);}catch{recordSaved=false;}
+ try{if(state.status!=='patrol')saveServiceRecord(storage,state);}catch{recordSaved=false;}
  return {photosSaved,recordSaved};
 }

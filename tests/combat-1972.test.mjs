@@ -305,8 +305,9 @@ test('enemy submarine decoys are finite and a confirmed diversion prevents insta
  assert.equal(fire(clean,'neutral'),false);
  clean.contacts[0].identified=false;
  assert.ok(fire(clean,'neutral'));
- advanceUntil(clean,()=>clean.status!=='patrol',25);
- assert.equal(clean.status,'compromised');
+ advanceUntil(clean,()=>clean.ships[0].hull===0,25);
+ assert.equal(clean.status,'patrol');assert.ok(Number.isFinite(clean.ships[0].neutralHitAt));
+ assert.ok(clean.debrief.some(entry=>entry.text.includes('struck the neutral')));
 
  const supply=ocean();supply.ships=[vessel('hunter',0,175,{kind:'sub',depth:3})];
  supply.contacts=[{id:'hunter',bearing:0,kind:'sub',depthEstimate:3}];

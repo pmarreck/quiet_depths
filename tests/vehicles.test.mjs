@@ -129,3 +129,14 @@ test('pressure warnings give time to rise; sustained excess springs leaks and in
  }
  assert.ok(moderateLeaks>40);assert.ok(outcomes[0]>0&&outcomes[1]>outcomes[0]+20,JSON.stringify(outcomes));
 });
+
+test('rudder needs flow, and changing ballast can surface the stopped boat without pitching it',()=>{
+ const make=speed=>{const s=createGame('recon',21);Object.assign(s,{ships:[],x:0,y:0,heading:0,targetHeading:90,speed,targetSpeed:speed,depth:55,targetDepth:55});return s;};
+ const stop=make(0),slow=make(2),fast=make(8),reverse=make(-2);
+ for(const s of [stop,slow,fast,reverse])step(s,6);
+ assert.equal(stop.heading,0);assert.ok(fast.heading>slow.heading&&slow.heading>0);
+ assert.ok(reverse.rudder<0&&reverse.heading>0,'reciprocal helm is required to reach an absolute heading astern');
+ stop.depth=5;stop.targetDepth=0;step(stop,20);assert.equal(stop.depth,0);assert.equal(stop.pitch,0);
+ for(const s of [slow,fast]){s.targetDepth=100;step(s,12);}
+ assert.ok(fast.depth>slow.depth&&fast.pitch<slow.pitch&&slow.pitch<0);
+});

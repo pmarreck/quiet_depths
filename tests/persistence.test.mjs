@@ -41,11 +41,12 @@ test('photo or service-record quota errors do not block saving or retiring the p
  for(const failedKey of ['quiet-depths-photos-v1','quiet-depths-service-record-v1:'+game.patrolId]){
   const store=storage(key=>key===failedKey);
   const expected={photosSaved:failedKey!=='quiet-depths-photos-v1',recordSaved:!failedKey.includes('service-record')};
-  assert.deepEqual(persistence.persistPatrol(store,game,true),expected);
+  assert.deepEqual(persistence.persistPatrol(store,game,true),{...expected,recordSaved:true});
   assert.equal(restore(store.getItem('quiet-depths-v1')).time,92);
   assert.equal(store.getItem('quiet-depths-photos-v1'),expected.photosSaved?'[]':'existing library');
-  assert.equal(store.getItem('quiet-depths-service-record-v1:'+game.patrolId),expected.recordSaved?'{"ships":1,"submarines":0}':null);
+  assert.equal(store.getItem('quiet-depths-service-record-v1:'+game.patrolId),null);
   assert.deepEqual(persistence.persistPatrol(store,{...game,status:'lost'},true),expected);
+  assert.equal(store.getItem('quiet-depths-service-record-v1:'+game.patrolId),expected.recordSaved?'{"ships":1,"submarines":0}':null);
   assert.equal(store.getItem('quiet-depths-v1'),null);
  }
 });

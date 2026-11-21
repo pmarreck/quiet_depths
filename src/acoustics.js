@@ -41,10 +41,11 @@ export function aircraftSound(plane,listener){
 export function emitSound(s,data){
  const source={id:s.soundSequence++,time:s.time,power:1,heard:false,...data};s.acoustics.push(source);return source;
 }
-export function updateAcoustics(s,onBlast){
+export function updateAcoustics(s,onBlast,onReceipt){
  for(const source of s.acoustics){
   if(source.heard||s.time-source.time<propagationTime(source,s))continue;
   source.heard=true;source.heardAt=s.time;source.perceived=perceivedSound(source,s);
+  if(source.perceived.gain>=.002)onReceipt?.(source);
   if(source.type==='blast')onBlast?.(source,source.perceived.distance);
  }
  // Retain enough history to resume without replaying old sounds; bound storage.
