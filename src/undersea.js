@@ -1,17 +1,18 @@
 import * as T from './vendor/three.module.js';
-import {bottom,rad,clamp} from './mechanics.js';
+import {createSwimmer} from './marine-life.js';
+import {bottom,rad,clamp,capsuleContact} from './mechanics.js';
 import {hash01,surfaceHeight} from './environment.js';
 
 const material=(color)=>new T.MeshStandardMaterial({color,roughness:.72});
-function ellipsoid(group,size,position,mat){const mesh=new T.Mesh(new T.SphereGeometry(1,12,8),mat);mesh.scale.set(...size);mesh.position.set(...position);group.add(mesh);return mesh;}
-function fin(group,points,mat){const shape=new T.Shape();shape.moveTo(...points[0]);for(const p of points.slice(1))shape.lineTo(...p);shape.closePath();const m=new T.Mesh(new T.ShapeGeometry(shape),mat);group.add(m);return m;}
-function swimmer(color=0x486f79,whale=false){
- const g=new T.Group(),m=material(color);ellipsoid(g,[whale?2.6:.7,whale?2.4:.6,whale?8:2.6],[0,0,0],m);
- const tail=new T.Group();tail.position.z=whale?7:2.5;g.add(tail);const blade=fin(tail,[[0,0],[-1.8,.8],[0,-.3],[1.8,.8]],m);blade.rotation.x=whale?Math.PI/2:0;
- const dorsal=fin(g,[[0,0],[0,1.6],[2,0]],m);dorsal.rotation.y=Math.PI/2;dorsal.position.set(0,.4,.2);
- for(const side of [-1,1]){const f=fin(g,[[0,0],[side*(whale?4:1.7),-.5],[0,-1.1]],m);f.rotation.x=Math.PI/2;f.position.set(0,-.2,-1);}
- g.userData.tail=tail;return g;
+function avoidBoat(position,boat,size){
+ if(Math.abs(position.x-boat.x)>70||Math.abs(position.z+boat.y)>70)return;
+ const clearance=25+size;
+ const hit=capsuleContact({x:position.x,y:-position.z,depth:-position.y},boat,28,16,clearance-16);
+ if(!hit)return;
+ const push=hit.penetration*hit.penetration/clearance;
+ position.x+=hit.nx*push;position.y-=hit.nd*push;position.z-=hit.ny*push;
 }
+function ellipsoid(group,size,position,mat){const mesh=new T.Mesh(new T.SphereGeometry(1,12,8),mat);mesh.scale.set(...size);mesh.position.set(...position);group.add(mesh);return mesh;}
 function diver(){
  const g=new T.Group(),suit=material(0x18292e),tank=material(0xd1b95e),skin=material(0xbd9b7d);
  ellipsoid(g,[.23,.24,.7],[0,0,0],suit);ellipsoid(g,[.2,.2,.22],[0,0,-.85],skin);ellipsoid(g,[.18,.2,.5],[0,.25,0],tank);
@@ -23,15 +24,15 @@ function diver(){
 export class UnderseaLife{
  constructor(scene,makeSub,makeShip){
   this.scene=scene;this.makeSub=makeSub;this.makeShip=makeShip;this.root=new T.Group();scene.add(this.root);this.lastState=null;
-  const fishGeo=new T.ConeGeometry(.5,2,5);fishGeo.rotateX(Math.PI/2);this.fish=new T.InstancedMesh(fishGeo,material(0x85b7b3),160);this.fish.instanceMatrix.setUsage(T.DynamicDrawUsage);this.root.add(this.fish);this.dummy=new T.Object3D();
-  this.animals=Array.from({length:4},(_,i)=>{const a=swimmer(i===3?0x4e6975:0x658e96,i===3);this.root.add(a);return a;});
+  const fishGeo=new T.ConeGeometry(.5,2,5);fishGeo.rotateX(-Math.PI/2);this.fish=new T.InstancedMesh(fishGeo,material(0x85b7b3),160);this.fish.instanceMatrix.setUsage(T.DynamicDrawUsage);this.root.add(this.fish);this.dummy=new T.Object3D();this.fish.frustumCulled=false;
+  this.animals=Array.from({length:4},(_,i)=>{const a=createSwimmer(T,i===3);this.root.add(a);return a;});
   this.divers=Array.from({length:3},()=>{const d=diver();this.root.add(d);return d;});
   this.launches=Array.from({length:2},()=>{const g=new T.Group();const boat=new T.Mesh(new T.CapsuleGeometry(1,4,4,8),material(0xb77942));boat.rotation.x=Math.PI/2;boat.scale.y=.5;g.add(boat);for(const x of [-.5,.5])ellipsoid(g,[.3,.7,.3],[x,1,0],material(0xd5b67e));this.root.add(g);return g;});
   this.staticRoot=new T.Group();this.root.add(this.staticRoot);this.site=null;
  }
  reset(s){
   for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
-  this.site=null;this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
+  this.site=null;this.lastTime=null;this.fishPositions=[];this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
   if(s.site){this.site=s.site.kind==='surface'?this.makeShip({kind:'fishing'}):this.makeSub();this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
    const rust=material(0x705343);this.site.traverse(o=>{if(o.isMesh){o.material=rust;}});
    if(s.site.kind==='wreck'){const mast=new T.Mesh(new T.CylinderGeometry(.4,.7,25,8),rust);mast.rotation.z=.5;mast.position.set(0,11,0);this.site.add(mast);const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}
@@ -44,10 +45,31 @@ export class UnderseaLife{
  }
  update(s,env){
   if(this.lastState!==s)this.reset(s);const t=s.time,a=this.anchor,focusDepth=Math.min(80,bottom(a.x,a.y)-15);
+  const elapsed=this.lastTime===null?0:Math.max(0,t-this.lastTime);this.lastTime=t;
   for(let i=0;i<160;i++){const school=Math.floor(i/20),seed=i%20,angle=t*.08+school*1.8,r=24+school*13,cx=a.x+Math.sin(angle)*r,cy=a.y+Math.cos(angle)*r;
-   this.dummy.position.set(cx+(hash01(42,i)-.5)*18+Math.sin(t+i)*.4,-focusDepth+school*4+(hash01(43,i)-.5)*5,-cy+(hash01(44,i)-.5)*17);this.dummy.rotation.set(0,-angle-Math.PI/2,Math.sin(t*3+seed)*.08);this.dummy.scale.set(.6,.7,1+hash01(45,i));this.dummy.updateMatrix();this.fish.setMatrixAt(i,this.dummy.matrix);}
+   this.dummy.position.set(cx+(hash01(42,i)-.5)*18+Math.sin(t+i)*.4,-focusDepth+school*4+(hash01(43,i)-.5)*5,-cy+(hash01(44,i)-.5)*17);const position=this.dummy.position,previous=this.fishPositions[i];
+   avoidBoat(position,s,1);
+   if(!previous){this.fishPositions[i]={x:position.x,y:position.y,z:position.z,yaw:-angle-Math.PI/2,pitch:0};}
+   else if(elapsed>0){
+    const dx=position.x-previous.x,dy=position.y-previous.y,dz=position.z-previous.z;
+    if(Math.hypot(dx,dy,dz)>.00001){previous.yaw=Math.atan2(-dx,-dz);previous.pitch=Math.atan2(dy,Math.hypot(dx,dz));}
+    Object.assign(previous,{x:position.x,y:position.y,z:position.z});
+   }
+   const track=this.fishPositions[i];this.dummy.rotation.set(track.pitch,track.yaw,Math.sin(t*3+seed)*.08,'YXZ');this.dummy.scale.set(.6,.7,1+hash01(45,i));this.dummy.updateMatrix();this.fish.setMatrixAt(i,this.dummy.matrix);}
   this.fish.instanceMatrix.needsUpdate=true;
-  this.animals.forEach((animal,i)=>{const angle=t*(i===3?.008:.025)+i*2,r=i===3?145:50+i*24;animal.position.set(a.x+Math.sin(angle)*r,-Math.min(50+i*9,bottom(a.x,a.y)-20),-a.y-Math.cos(angle)*r);animal.rotation.y=-angle-Math.PI/2;animal.userData.tail.rotation.y=Math.sin(t*(i===3?.8:2.2))*.3;});
+  this.animals.forEach((animal,i)=>{
+   const whale=i===3,rate=whale?.008:.025,r=whale?145:50+i*24;
+   const place=(position,time)=>{
+    const angle=time*rate+i*2;
+    position.set(a.x+Math.sin(angle)*r,-Math.min(50+i*9,bottom(a.x,a.y)-20),-a.y-Math.cos(angle)*r);
+    avoidBoat(position,s,whale?8:3);
+   };
+   place(animal.position,t);const ahead=this.dummy.position;place(ahead,t+.15);ahead.sub(animal.position);
+   animal.rotation.set(Math.atan2(ahead.y,Math.hypot(ahead.x,ahead.z)),Math.atan2(-ahead.x,-ahead.z),0,'YXZ');
+   if(whale)animal.userData.tail.rotation.x=Math.sin(t*.85)*.22;
+   else animal.userData.tail.rotation.y=Math.sin(t*2.2+i)*.33;
+  });
+  if(this.site)this.site.position.set(s.site.x,-s.site.depth,-s.site.y);
   if(this.site&&s.site.kind==='surface'){this.site.position.y=-s.site.depth+surfaceHeight(s.site.x,s.site.y,t,env)*.5;this.site.rotation.z=.15+s.time*.00015;}
   const rescue=s.operation&&s.mission!=='survey',active=rescue&&s.operation.active,under=s.mission==='undersea-rescue';
   this.divers.forEach((d,i)=>{d.visible=!!active&&under;if(!d.visible)return;const phase=((s.operation.assessment+i*3)%18)/18,f=phase<.5?phase*2:2-phase*2,arc=Math.sin(f*Math.PI)*2;

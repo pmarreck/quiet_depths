@@ -54,3 +54,24 @@ test('successive patrols replace their casualty scenery and keep updating when t
   assert.ok(life.fish.instanceMatrix.array.every(Number.isFinite));
  }
 });
+
+test('fish stay outside the hull and sail as the boat crosses a school; whale and shark tails beat on different axes',()=>{
+ const world=new THREE.Scene(),life=new UnderseaLife(world,()=>new THREE.Group(),()=>new THREE.Group());
+ const s=createGame('recon',21);Object.assign(s,{x:0,y:0,depth:75,heading:90});life.update(s,environmentAt(s));
+ const point=new THREE.Vector3(),rot=new THREE.Quaternion(),scale=new THREE.Vector3(),matrix=new THREE.Matrix4();
+ const line=new THREE.Line3(),nearest=new THREE.Vector3();let close=0;
+ for(let frame=1;frame<65;frame++){
+  s.time=frame*.2;s.x=20*Math.sin(s.time*.3);s.y=24;s.depth=78;
+  life.update(s,environmentAt(s));
+  line.start.set(s.x-27.5,-s.depth,-s.y);line.end.set(s.x+27.5,-s.depth,-s.y);
+  for(let i=0;i<life.fish.count;i++){
+   life.fish.getMatrixAt(i,matrix);matrix.decompose(point,rot,scale);
+   const clearance=point.distanceTo(line.closestPointToPoint(point,true,nearest));
+   assert.ok(clearance>17);if(clearance<22)close++;
+  }
+ }
+ assert.ok(close>100,'school repeatedly passes through the area occupied by the boat');
+ const whale=life.animals.find(a=>a.name==='Humpback whale'),shark=life.animals.find(a=>a.name==='Reef shark');
+ assert.ok(whale.userData.tail.rotation.x!==0&&whale.userData.tail.rotation.y===0);
+ assert.ok(shark.userData.tail.rotation.y!==0&&shark.userData.tail.rotation.x===0);
+});
