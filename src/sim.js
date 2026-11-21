@@ -1,9 +1,10 @@
+import {resolveTraffic} from './hull-contacts.js';
 // Units: meters, seconds, knots, degrees clockwise from north. No rendering here.
 import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from './environment.js';
 import {emitSound,updateAcoustics} from './acoustics.js';
 import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets} from './missions.js';
-import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone,shipCollision,siteCollision} from './systems.js';
+import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone} from './systems.js';
 import {ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
 import {designation,fixContact,estimateAt,applyReconPacket} from './track-estimates.js';
@@ -94,7 +95,7 @@ function tick(s,dt,input){
  }
  s.lightning=s.lightning.filter(e=>s.time-e.time<20);
  if(s.route){s.targetHeading=bearing(s,s.route);if(distance(s,s.route)<(s.route.radius||100)){s.route=null;s.targetSpeed=0;log(s,'Waypoint reached. All stop.');}}
- const diesel=updateBoat(s,dt);siteCollision(s);
+ const diesel=updateBoat(s,dt);if(s.status!=='patrol')return;
  if(s.scopeSteerBearing!==null){s.scopeAngle=(s.scopeSteerBearing-s.heading+360)%360;if(Math.abs(delta(s.scopeSteerBearing,s.heading))<.1){s.scopeAngle=0;s.scopeSteerBearing=null;}}
  // Suppress repeated damage log spam while retaining actual damage.
  if(s.events.length>1&&s.events[0].text===s.events[1].text)s.events.splice(1,1);
@@ -113,8 +114,9 @@ function tick(s,dt,input){
      }
    }
    if(ship.disabled)ship.speed=0;ship.x+=Math.sin(rad(ship.heading))*ship.speed*.514444*dt;ship.y+=Math.cos(rad(ship.heading))*ship.speed*.514444*dt;
-   shipCollision(s,ship);
+
  }
+ resolveTraffic(s,hurt);
  s.alert=clamp(Math.max(danger,s.alert-dt*.65),0,100);
  for(const c of s.contacts){c.age+=dt;c.confidence=Math.max(.05,c.confidence-dt*.0006);}
  s.contacts=s.contacts.filter(c=>c.age<240||c.fix?.source==='satellite'&&s.time-c.fix.time<900);
@@ -159,11 +161,13 @@ export function restore(raw){try{
  if(s.nextLightningAt===undefined)s.nextLightningAt=s.time+8;if(s.soundSequence===undefined)s.soundSequence=1;
  if(s.patrol===undefined)s.patrol={seed:s.environment.seed,photoGoal:2,trackGoal:180,variant:0};
  for(const [k,v] of Object.entries(freshCombat()))if(s[k]===undefined)s[k]=v;
+ if(s.outerHull===undefined)s.outerHull=s.hull;
  for(const [k,v] of Object.entries({...freshMotion(),towerAngle:0,towerPitch:0,cavitation:0,propRpm:0}))if(s[k]===undefined)s[k]=v;
  if(s.systems===undefined)s.systems=freshSystems();else if(s.systems&&s.systems.deckgun===undefined)s.systems.deckgun=100;if(s.shells===undefined)s.shells=[];
  if(s.site===undefined)s.site=null;if(s.operation===undefined)s.operation=null;
  if(s.drone){for(const [k,v] of Object.entries({...freshDrone(),targetDepth:s.drone.depth,targetHeading:s.drone.heading}))if(s.drone[k]===undefined)s.drone[k]=v;}
  const template=createGame(s.mission);for(const [k,v] of Object.entries(template)){if(typeof v==='number'&&!Number.isFinite(s[k]))return null;if(typeof v==='boolean'&&typeof s[k]!=='boolean')return null;if(Array.isArray(v)&&!Array.isArray(s[k]))return null;}
+ if(s.outerHull<0||s.outerHull>100||s.criticalExposure<0||![0,1,2].includes(s.pressureAlarm)||!s.collisionHits||Array.isArray(s.collisionHits)||typeof s.collisionHits!=='object'||!Object.values(s.collisionHits).every(t=>Number.isFinite(t)&&t>=0&&t<=s.time))return null;
  if(!['objective','extract'].includes(s.phase)||!['electric','diesel'].includes(s.engine)||!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y)||!s.drone||!['stowed','remote','return','lost'].includes(s.drone.mode))return null;
  if(!s.environment||!WEATHER[s.environment.startWeather]||!Number.isFinite(s.environment.startHour)||!Number.isFinite(s.environment.seed)||typeof s.environment.changing!=='boolean')return null;
  if(!s.systems||Object.keys(freshSystems()).some(k=>!Number.isFinite(s.systems[k])||s.systems[k]<0||s.systems[k]>100))return null;
@@ -178,6 +182,7 @@ export function restore(raw){try{
  for(const k of ['hull','mobility','buoyancy','camera','verticalSpeed','collisionCooldown','returnStage','returnClearance','returnHoldSide','returnHoldForward'])if(!Number.isFinite(s.drone[k]))return null;
  if(['undersea-rescue','surface-rescue','survey'].includes(s.mission)){
   if(!s.site||!s.operation||!['x','y','depth','heading'].every(k=>Number.isFinite(s.site[k]))||!['surface','wreck','sub'].includes(s.site.kind)||typeof s.site.name!=='string')return null;
+  s.site.hull??=100;if(!Number.isFinite(s.site.hull)||s.site.hull<0||s.site.hull>100)return null;
   const o=s.operation;if(!['rescued','remaining','dead','assessment','boarding','diverReturn','scan','lastCasualty'].every(k=>Number.isFinite(o[k])&&o[k]>=0)||!['known','holding','active','completed'].every(k=>typeof o[k]==='boolean')||!Array.isArray(o.photoAngles)||!o.photoAngles.every(Number.isFinite))return null;
  }else if(s.site||s.operation)return null;
  for(const p of s.shells)if(!['id','x','y','depth','delay','fromX','fromY','total'].every(k=>Number.isFinite(p[k])))return null;

@@ -31,7 +31,7 @@ export function setupOperation(s,seed){
  s.site=null;s.operation=null;
  if(!['undersea-rescue','surface-rescue','survey'].includes(s.mission))return;
  const surface=s.mission==='surface-rescue',survey=s.mission==='survey',x=1430+hash01(seed,801)*330,y=420+hash01(seed,802)*450;
- s.site={x,y,depth:surface?2:bottom(x,y)-5,heading:35+hash01(seed,803)*100,kind:surface?'surface':survey?'wreck':'sub',name:surface?['R/V Halcyon','M/V Solway','R/V Northstar'][Math.floor(hash01(seed,804)*3)]:survey?['SS Aster, 1912','SS Caledonia, 1906','SS Pelican, 1921'][Math.floor(hash01(seed,804)*3)]:['SS-118 Lantern','SS-142 Cormorant','SS-107 Narwhal'][Math.floor(hash01(seed,804)*3)],speed:0};
+ s.site={x,y,hull:100,depth:surface?2:bottom(x,y)-5,heading:35+hash01(seed,803)*100,kind:surface?'surface':survey?'wreck':'sub',name:surface?['R/V Halcyon','M/V Solway','R/V Northstar'][Math.floor(hash01(seed,804)*3)]:survey?['SS Aster, 1912','SS Caledonia, 1906','SS Pelican, 1921'][Math.floor(hash01(seed,804)*3)]:['SS-118 Lantern','SS-142 Cormorant','SS-107 Narwhal'][Math.floor(hash01(seed,804)*3)],speed:0};
  s.operation={rescued:0,remaining:hash01(seed,811)<.08?0:8+Math.floor(hash01(seed,812)*8),dead:0,known:false,assessment:0,boarding:0,diverReturn:0,holding:false,active:false,scan:0,photoAngles:[],lastCasualty:240,completed:false,find:null};
  const start={x:x-260-hash01(seed,805)*120,y:y-200-hash01(seed,806)*180},heading=bearing(start,s.site),depth=surface?0:35+Math.floor(hash01(seed,807)*20);
  Object.assign(s,{...start,depth,targetDepth:depth,heading,targetHeading:heading,speed:3,targetSpeed:3,scope:surface});
@@ -49,7 +49,19 @@ export function operationApproach(s){
 export function operationConditions(s){
  if(!s.site)return null;
  const d=distance(s,s.site),surface=s.site.kind==='surface',depth=surface?0:s.site.depth-11;
- return {range:d,depth,holding:d>=30&&d<=(surface?85:75)&&Math.abs(s.depth-depth)<(surface?1:5)&&Math.abs(s.speed)<=.6};
+ const onStation=d>=30&&d<=(surface?85:75)&&Math.abs(s.speed)<=.6;
+ return {range:d,depth,onStation,holding:onStation&&Math.abs(s.depth-depth)<(surface?1:5)};
+}
+export function startRescue(s){
+ const c=operationConditions(s);
+ if(!c?.onStation||s.status!=='patrol'||s.mission==='survey'||s.operation.completed)return false;
+ s.route=null;s.targetSpeed=0;s.targetDepth=c.depth;
+ log(s,c.holding?'Rescue team on station. Hold here for transfers.':'Holding station. Moving to rescue depth.');
+ return true;
+}
+export function casualtyDeadline(s){
+ const o=s.operation,seed=s.patrol.seed;
+ return o.lastCasualty+(o.dead===0?145+hash01(seed,821)*90:105+hash01(seed,822+o.dead)*110);
 }
 export function dronePhotograph(s){
  const d=s.drone,o=s.operation,site=s.site;
@@ -72,9 +84,9 @@ export function updateOperation(s,dt){
    if(o.remaining>0){o.boarding+=dt;if(o.boarding>=9){o.boarding-=9;o.remaining--;o.rescued++;log(s,`Survivor aboard. ${o.rescued} rescued.`,'success');}}
    if(o.known&&o.remaining===0){o.diverReturn+=dt;if(o.diverReturn>=9){o.completed=true;o.active=false;log(s,o.rescued?`Rescue team recovered. ${o.rescued} survivors safe aboard.`:'Rescue search complete. No survivors found. Team recovered.',o.rescued?'success':'warning');}}
   }else{o.active=false;o.boarding=0;o.diverReturn=0;}
-  if(s.time>o.lastCasualty+70&&o.remaining>0){o.lastCasualty=s.time;o.remaining--;o.dead++;if(o.known)log(s,'A survivor’s signal has stopped. Rescue window is narrowing.','warning');}
+  if(s.time>casualtyDeadline(s)&&o.remaining>0){o.lastCasualty=s.time;o.remaining--;o.dead++;if(o.known)log(s,'A survivor’s signal has stopped. Rescue window is narrowing.','warning');}
   if(s.site.kind==='surface'){
-   s.site.depth=Math.min(bottom(s.site.x,s.site.y)-5,2+s.time/500+Math.max(0,s.time-600)*.35);
+   s.site.depth=Math.min(bottom(s.site.x,s.site.y)-5,2+s.time/500+Math.max(0,s.time-(860+hash01(s.patrol.seed,820)*220))*.35);
    if(s.site.depth>15&&o.remaining>0){o.dead+=o.remaining;o.remaining=0;log(s,'The casualty has gone under. No further survivor signals. Recover the rescue team.','damage');}
   }
  }
