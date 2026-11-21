@@ -55,7 +55,14 @@ export function createSubmarine(T){
  for(const [key,y,z,span,chord] of [['foreplanes',7,-5,5.4,2.7],['aftplanes',0,27,4.8,3.3]]){
   const pivot=new T.Group();pivot.position.set(0,y,z);for(const side of [-1,1]){const fin=new T.Mesh(foil(T,span,chord,.22),bodyMat);fin.position.x=side*1.7;fin.scale.x=side;pivot.add(fin);}root.add(pivot);root.userData[key]=pivot;
  }
- const rudder=new T.Group();rudder.position.set(0,0,28);for(const side of [-1,1]){const fin=new T.Mesh(foil(T,3.5,3.5,.25,true),bodyMat);fin.position.y=side*.8;fin.scale.y=side;rudder.add(fin);}root.add(rudder);root.userData.rudder=rudder;
+ const rudder=new T.Group(),rudderChord=3.5,stockOffset=rudderChord/4;
+ // The stock sits forward of mid-chord. Both blades swing on the same vertical axis.
+ rudder.position.z=28-stockOffset;
+ for(const side of [-1,1]){
+  const fin=new T.Mesh(foil(T,3.5,rudderChord,.25,true),bodyMat);
+  fin.position.set(0,side*.8,stockOffset);fin.scale.y=side;rudder.add(fin);
+ }
+ root.add(rudder);root.userData.rudder=rudder;
  for(const z of [-17,-7,6,16]){const r=D.stations.reduce((best,p)=>Math.abs(p.z-z)<Math.abs(best.z-z)?p:best,D.stations[0]).radius;const seam=new T.Mesh(new T.TorusGeometry(r+.015,.025,4,40),trim);seam.position.z=z;root.add(seam);}
  for(const side of [-1,1])for(let z=-14;z<17;z+=2.8)box(root,[.08,.18,1.3],[side*3.6,3.35,z],trim);
  for(const y of [-5.02,5.05]){const hatch=new T.Mesh(new T.CylinderGeometry(1,1,.18,16),bodyMat);if(y<0){const hinge=new T.Group();hinge.position.set(-1,y,0);hatch.position.x=1;hinge.add(hatch);root.add(hinge);root.userData.rescueHatch=hinge;}else{hatch.position.set(0,y,-17);root.add(hatch);}}

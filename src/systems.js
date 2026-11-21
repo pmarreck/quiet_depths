@@ -76,7 +76,8 @@ export function updateBoat(s,dt){
  s.speed+=clamp(clamp(s.targetSpeed,-Math.min(4,max),max)-s.speed,-dt*.35,dt*.35);
  const turn=delta(s.targetHeading,s.heading),flow=Math.tanh(s.speed/5);
  // An ordered course is absolute. The helmsman reverses the blade angle astern.
- const helm=clamp(turn/8,-1,1)*Math.sign(s.speed);
+ // At rest the steering gear can still swing the rudder for the next movement.
+ const helm=clamp(turn/8,-1,1)*Math.sign(s.speed||s.targetSpeed||1);
  s.rudder+=clamp(helm-s.rudder,-dt*1.8,dt*1.8);
  const yaw=3*flow*s.rudder*s.systems.rudder/100*dt;
  s.heading=(s.heading+(Math.sign(yaw)===Math.sign(turn)&&Math.abs(yaw)>Math.abs(turn)?turn:yaw)+360)%360;

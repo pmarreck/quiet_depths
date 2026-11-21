@@ -73,6 +73,9 @@ test('the propeller shares a neutral hull finish and cross-shaped control surfac
  }
  const rudderSize=new THREE.Box3().setFromObject(model.userData.rudder).getSize(new THREE.Vector3());
  assert.ok(rudderSize.y>7&&rudderSize.x<1,'the paired vertical rudder has a thin hydrofoil profile');
+ const rudder=model.userData.rudder,neutral=new THREE.Box3().setFromObject(rudder);
+ const nose=neutral.min.z,tail=neutral.max.z,axis=rudder.position.z;
+ assert.ok(axis>=nose&&tail-axis>2*(axis-nose),'the trailing edge swings farther than the leading edge around the rudder stock');
 });
 
 test('thin stern and sail foils have outward surface normals for lighting and face culling',()=>{
