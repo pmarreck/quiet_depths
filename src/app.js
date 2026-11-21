@@ -2,7 +2,7 @@ import {depthLimit,pressureLevel} from './pressure.js';
 import {createGame,step,bottom,bearing,delta,distance,rad,clamp,ping,photograph,fire,decoy,deployDrone,recallDrone,log,MISSIONS,restore,getSoundings} from './sim.js';
 import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
-import {objectiveState,operationApproach,operationConditions,startRescue,dronePhotograph} from './missions.js';
+import {objectiveState,operationApproach,operationConditions,startRescue,dronePhotograph,parsePatrolSeed} from './missions.js';
 import {OceanScene} from './scene.js';
 import {fireDeckGun,aimGunAt,firingBearing} from './combat.js';
 import {HeldInput} from './input.js';
@@ -16,7 +16,7 @@ import {captureOptics,captureSatellite} from './photo-capture.js';
 import {requestRecon,reconStatus,reconAreaForDisplay} from './recon.js';
 import {chartContacts,estimateAt} from './track-estimates.js';
 import {lossPresentation} from './loss.js';
-import {persistPatrol} from './persistence.js';
+import {persistPatrol,resumablePatrol} from './persistence.js';
 import {difficultyControls,patrolDifficulty} from './difficulty.js';
 import {allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
@@ -35,7 +35,7 @@ let bindings=shortcutBindings(),remapping=null;
 try{bindings=shortcutBindings(JSON.parse(localStorage.getItem('quiet-depths-shortcuts-v1')));}catch{}
 try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
 state.photoArchive=library;
-try{saved=restore(localStorage.getItem('quiet-depths-v1'));}catch{}
+try{saved=resumablePatrol(restore(localStorage.getItem('quiet-depths-v1')));}catch{}
 let scene=null;
 try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',e);toast('WebGL unavailable. Sonar and chart are available.');view='sonar';}
 const held=new HeldInput(),keys=held.keys,commandControls=[];let drawer=null;
@@ -47,7 +47,24 @@ const sound=new SoundSystem(()=>state,context,status=>{
  if(status.last){el.dataset.lastAcoustic=status.last.type;el.dataset.lastDelay=status.last.delay.toFixed(3);el.dataset.lastGain=(status.last.currentGain??status.last.gain).toFixed(4);el.dataset.lastCutoff=(status.last.currentCutoff??status.last.cutoff).toFixed(0);}else{for(const key of ['lastAcoustic','lastDelay','lastGain','lastCutoff'])delete el.dataset[key];}
 });
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
-function persist(){if(!patrolStarted)return;try{persistPatrol(localStorage,state,patrolStarted);library=photoArchive(state);$('save-status').textContent='PATROL SAVED';setTimeout(()=>$('save-status').textContent='LOCAL AUTOSAVE',1400);}catch{$('save-status').textContent='SAVING UNAVAILABLE';}}
+let saveStatusTimer,saveWarning='';
+function persist(){
+ if(!patrolStarted)return;
+ library=photoArchive(state);
+ const status=$('save-status');
+ clearTimeout(saveStatusTimer);
+ let warning='';
+ try{
+  const {photosSaved,recordSaved}=persistPatrol(localStorage,state,patrolStarted);
+  if(!photosSaved&&!recordSaved)warning='Photos and service record could not be saved.';
+  else if(!photosSaved)warning='Photos could not be saved.';
+  else if(!recordSaved)warning='Service record could not be saved.';
+ }catch{warning='Patrol progress could not be saved.';}
+ status.textContent=warning||'PATROL SAVED';
+ if(!warning)saveStatusTimer=setTimeout(()=>status.textContent='LOCAL AUTOSAVE',1400);
+ if(warning&&warning!==saveWarning)toast(warning);
+ saveWarning=warning;
+}
 function bindCommand(element,event,action,enabled=()=>true){
  const el=typeof element==='string'?$(element):element;commandControls.push({el,enabled});el.dataset.command='true';
  el.addEventListener(event,e=>{if(view==='orbit'||!canIssue(state,context())||!enabled())return;action(e);updateUI();});
@@ -71,15 +88,27 @@ function updateMissionBriefing(id){
 function renderServiceRecord(){
  try{const record=serviceRecord(localStorage);$('service-record').textContent=`${record.ships} ships sunk · ${record.submarines} submarines sunk · ${record.doubleHunts} two-submarine patrols`;}catch{}
 }
-function openBriefing(){held.clear();persist();renderServiceRecord();$('briefing').showModal();$('resume').classList.toggle('hidden',!saved&&state.time===0);sound.update();}
+function openBriefing(){held.clear();persist();renderServiceRecord();$('briefing').showModal();$('resume').classList.toggle('hidden',!resumablePatrol(saved,patrolStarted?state:null));sound.update();}
 function start(mission=null){
  if(!$('briefing').open)return;
+ if(mission===null){
+  const resumed=resumablePatrol(saved,patrolStarted?state:null);
+  if(!resumed)return;
+  state=resumed;
+ }else{
+  const seedInput=$('patrol-seed');
+  seedInput.value=seedInput.value.trim();
+  const seed=parsePatrolSeed(seedInput.value);
+  seedInput.setCustomValidity(seed===undefined?'Enter a whole number from 0 to 4294967295.':'');
+  if(!seedInput.reportValidity())return;
+  state=createGame(mission,seed??crypto.getRandomValues(new Uint32Array(1))[0],{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked,difficulty});selected=null;
+ }
  patrolStarted=true;
- if(mission===null)state=saved||state;else{const seedText=$('patrol-seed').value.trim(),seed=seedText?Number(seedText)>>>0:crypto.getRandomValues(new Uint32Array(1))[0];state=createGame(mission,seed,{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked,difficulty});selected=null;}
  state.patrolId??=Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
  chart={x:state.x,y:state.y,zoom:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
 }
+$('patrol-seed').addEventListener('input',event=>event.target.setCustomValidity(''));
 $('patrol-time').innerHTML='<option value="random">Random</option>'+Object.entries(TIMES).map(([id,t])=>`<option value="${id}" ${''}>${t.name}</option>`).join('');
 $('patrol-weather').innerHTML='<option value="random">Random</option>'+Object.entries(WEATHER).map(([id,w])=>`<option value="${id}">${w.name}</option>`).join('');
 $('difficulty-options').innerHTML=difficultyControls.map(control=>{

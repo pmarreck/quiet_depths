@@ -13,6 +13,14 @@ export const MISSIONS=[
 
 const convoyTransportIds=['cobalt','meridian','alder'];
 
+export function parsePatrolSeed(text){
+ const digits=text.trim();
+ if(digits==='')return null;
+ if(!/^[0-9]{1,10}$/.test(digits))return undefined;
+ const seed=Number(digits);
+ return seed<=0xffffffff?seed:undefined;
+}
+
 function sunkTransports(s){
  return convoyTransportIds.filter(id=>s.ships.some(ship=>ship.id===id&&ship.hull===0)).length;
 }

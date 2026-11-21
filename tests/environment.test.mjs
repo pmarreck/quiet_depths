@@ -1,8 +1,28 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,step,isVisible,dropDepthCharge,save,restore,getSoundings} from '../src/sim.js';
-import {environmentAt,DAY_SECONDS,WEATHER,TIMES,surfaceHeight,scopeWashed,soundings} from '../src/environment.js';
+import {environmentAt,DAY_SECONDS,WEATHER,TIMES,surfaceHeight,scopeWashed,soundings,waterColumnLight} from '../src/environment.js';
 import {AIR_SOUND_SPEED,WATER_SOUND_SPEED,airWaterPath,propagationTime,perceivedSound,engineSound,emitSound,updateAcoustics} from '../src/acoustics.js';
+test('daylight fades with depth and blue outlasts green and red',()=>{
+ const clear={daylight:1,cloud:0,sunAltitude:1};
+ assert.deepEqual(waterColumnLight(-1,clear),{red:1,green:1,blue:1,direct:1});
+ let previous=waterColumnLight(0,clear);
+ for(const meters of [3,12,25,60,100,200,400]){
+  const light=waterColumnLight(meters,clear);
+  assert.ok(light.red<light.green&&light.green<light.blue);
+  for(const band of ['red','green','blue'])assert.ok(light[band]<previous[band]);
+  previous=light;
+ }
+ assert.ok(Math.abs(waterColumnLight(200,clear).blue-.01)<.001);
+});
+test('cloud and night suppress shafts independently from the diffuse light',()=>{
+ const atDepth=(timeOfDay,weather)=>waterColumnLight(12,environmentAt(createGame('recon',1,{timeOfDay,weather,changing:false})));
+ const clear=atDepth('day','clear'),cloudy=atDepth('day','cloudy'),storm=atDepth('day','storm');
+ assert.ok(clear.direct>cloudy.direct&&cloudy.direct>storm.direct);
+ assert.equal(storm.direct,0);assert.ok(storm.blue>0&&storm.blue<clear.blue);
+ assert.deepEqual(atDepth('night','clear'),{red:0,green:0,blue:0,direct:0});
+});
+
 test('soundings distinguish pressure depth, water depth and five-meter keel offset',()=>{
  assert.deepEqual(soundings(230,12),{waterDepth:230,referenceDepth:12,belowKeel:213,keelOffset:5});const s=createGame();assert.equal(getSoundings(s).belowKeel,getSoundings(s).waterDepth-s.depth-5);
 });

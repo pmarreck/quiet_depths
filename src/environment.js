@@ -35,6 +35,19 @@ export const WAVE_COMPONENTS=Object.freeze([
  {kx:.065,ky:.065,omega:-1.3,amplitude:.24},{kx:.14,ky:.06,omega:1.8,amplitude:.3},{kx:0,ky:.31,omega:-2.3,amplitude:.11}
 ]);
 export function surfaceHeight(x,y,time,e){return e.waveScale*WAVE_COMPONENTS.reduce((n,w)=>n+w.amplitude*Math.sin(x*w.kx+y*w.ky+time*e.waveSpeed*w.omega),0);}
+
+// Visual approximation of clear seawater. Attenuation is exponential in
+// meters, with blue retaining about 1% of surface daylight at 200 m.
+export function waterColumnLight(depth,e){
+ const meters=Math.max(0,depth),diffuse=e.daylight*(1-.52*e.cloud);
+ return {
+  red:diffuse*Math.exp(-.12*meters),
+  green:diffuse*Math.exp(-.045*meters),
+  blue:diffuse*Math.exp(-.023*meters),
+  direct:e.daylight*Math.sqrt(Math.max(0,e.sunAltitude))*(1-e.cloud)**2
+ };
+}
+
 export const SEA_GLSL='float sea(vec2 p){return waveScale*('+WAVE_COMPONENTS.map(w=>`sin(p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+time*waveSpeed*${w.omega.toFixed(3)})*${w.amplitude.toFixed(3)}`).join('+')+');}';
 export const SEA_SAMPLE_GLSL='vec3 seaSample(vec2 p){vec3 s=vec3(0.);'+WAVE_COMPONENTS.map((w,i)=>`float phase${i}=p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+time*waveSpeed*${w.omega.toFixed(3)};s+=${w.amplitude.toFixed(3)}*vec3(sin(phase${i}),cos(phase${i})*${w.kx.toFixed(3)},cos(phase${i})*${w.ky.toFixed(3)});`).join('')+'return s*waveScale;}';
 export function scopeEyeHeight(s,e){return s.depth<2?9+surfaceHeight(s.x,s.y,s.time,e)*.6:3.8+Math.sin(s.time*.72)*.35*e.waveScale;}

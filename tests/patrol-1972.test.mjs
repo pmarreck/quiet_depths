@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createGame,step,MISSIONS,save,restore,bottom,contact,fire} from '../src/sim.js';
-import {objectiveState} from '../src/missions.js';
+import {objectiveState,parsePatrolSeed} from '../src/missions.js';
 import * as controls from '../src/controls.js';
 import * as THREE from '../vendor/three.module.js';
 import * as acoustics from '../src/acoustics.js';
@@ -10,11 +10,32 @@ import * as combat from '../src/combat.js';
 import {propellerState} from '../src/mechanics.js';
 const live={view:'scope',paused:false,modal:false};
 
+test('patrol seeds distinguish random selection, exact decimal values, and invalid input',()=>{
+ assert.equal(parsePatrolSeed(''),null);
+ assert.equal(parsePatrolSeed('  '),null);
+ for(const [input,expected] of [['0',0],['0000000042',42],[' 123 ',123],['4294967295',4294967295]]){
+  assert.equal(parsePatrolSeed(input),expected);
+ }
+ for(const input of ['-1','1.0','1e2','0x10','12foo','00000000000','4294967296','9999999999']){
+  assert.equal(parsePatrolSeed(input),undefined,input);
+ }
+});
+
 test('every statically required application control exists in the HTML exactly once',async()=>{
  const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8'),app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);assert.equal(ids.length,new Set(ids).size,'HTML IDs must be unique');
  const required=new Set([...app.matchAll(/(?:\$\(|bindCommand\()'([^']+)'/g)].map(m=>m[1]));
  for(const id of required)assert.ok(ids.includes(id),`missing required UI control: ${id}`);
+});
+
+test('each modal takes its accessible name from its own heading',async()=>{
+ const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
+ const dialogs=[...html.matchAll(/<dialog\s+([^>]+)>([\s\S]*?)<\/dialog>/g)];
+ assert.ok(dialogs.length>0);
+ for(const [,attributes,content] of dialogs){
+  const label=/\baria-labelledby="([^"]+)"/.exec(attributes)?.[1];
+  assert.ok(label&&content.includes(`<h2 id="${label}">`),attributes);
+ }
 });
 
 test('aircraft engines approach spatially and become quieter and muffled below the surface',()=>{
