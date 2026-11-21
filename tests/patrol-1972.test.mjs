@@ -2,13 +2,22 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createGame,step,MISSIONS,save,restore,bottom,contact,fire} from '../src/sim.js';
-import {objectiveState,parsePatrolSeed} from '../src/missions.js';
+import {objectiveState,parsePatrolSeed,patrolSetup} from '../src/missions.js';
 import * as controls from '../src/controls.js';
 import * as THREE from '../vendor/three.module.js';
 import * as acoustics from '../src/acoustics.js';
 import * as combat from '../src/combat.js';
 import {propellerState} from '../src/mechanics.js';
 const live={view:'scope',paused:false,modal:false};
+
+test('the setup recovered from a played and restored patrol reproduces its entire initial state',()=>{
+ for(const {id} of MISSIONS)for(const seed of [0,1983,4294967295]){
+  const original=createGame(id,seed,{timeOfDay:'random',weather:seed?'rain':'random',changing:seed===0,difficulty:{orbitCamera:true,drone:false}});
+  const progressed=restore(save(original));step(progressed,8);
+  const setup=patrolSetup(restore(save(progressed)));
+  assert.deepEqual(createGame(setup.mission,setup.seed,setup.options),original);
+ }
+});
 
 test('patrol seeds distinguish random selection, exact decimal values, and invalid input',()=>{
  assert.equal(parsePatrolSeed(''),null);

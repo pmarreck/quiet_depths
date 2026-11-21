@@ -56,6 +56,36 @@ function disposeGroup(group){
  const geometries=new Set(),materials=new Set();group.traverse(o=>{if(o.geometry&&!o.isSprite)geometries.add(o.geometry);if(o.material)for(const material of Array.isArray(o.material)?o.material:[o.material])materials.add(material);});
  for(const geometry of geometries)geometry.dispose();for(const material of materials)material.dispose();group.removeFromParent();
 }
+
+// Frame just this boat with an independent orbit camera. A save from sonar or
+// a dark station still has a recognizable portrait and reveals no contacts.
+export function captureSlotPortrait(o,s){
+ if(!available(o))return '';
+ const T=o.THREE,r=o.renderer,width=240,height=104;
+ const world=new T.Scene(),boat=o.makeSub(),camera=new T.PerspectiveCamera(32,width/height,.1,200);
+ const target=new T.WebGLRenderTarget(width,height);
+ target.texture.colorSpace=T.SRGBColorSpace;
+ const previous=r.getRenderTarget(),viewport=r.getViewport(new T.Vector4()),scissor=r.getScissor(new T.Vector4()),scissorTest=r.getScissorTest();
+ const clear=r.getClearColor(new T.Color()),alpha=r.getClearAlpha();
+ try{
+  world.background=new T.Color(s.depth<5?0x375d68:0x183c4b);
+  boat.rotation.x=s.pitch;
+  boat.userData.mast.visible=s.systems.periscope>0;
+  boat.userData.gun.rotation.y=-s.gun.angle*Math.PI/180;
+  boat.userData.foreplanes.rotation.x=-s.planes;boat.userData.aftplanes.rotation.x=s.planes;
+  const sun=new T.DirectionalLight(0xffe8bf,3.2);sun.position.set(28,50,-36);
+  world.add(boat,new T.HemisphereLight(0xd4ebf0,0x497180,2.6),sun);
+  camera.position.set(56,19,-14);camera.lookAt(0,2,0);
+  r.setRenderTarget(target);r.setScissorTest(false);r.setViewport(0,0,width,height);r.render(world,camera);
+  const bytes=new Uint8Array(width*height*4);r.readRenderTargetPixels(target,0,0,width,height,bytes);
+  const {canvas,context}=canvas2d(width,height),image=context.createImageData(width,height);
+  image.data.set(flipRgbaRows(bytes,width,height));context.putImageData(image,0,0);
+  return canvas.toDataURL('image/jpeg',.8);
+ }finally{
+  r.setRenderTarget(previous);r.setViewport(viewport);r.setScissor(scissor);r.setScissorTest(scissorTest);
+  r.setClearColor(clear,alpha);target.dispose();disposeGroup(boat);
+ }
+}
 function clouds(canvas,context,plan){
  if(plan.coverage>=.99)return;
  const layer=canvas2d(canvas.width,canvas.height),c=layer.context,random=noise(seedOf(plan.id)+41),opacity=.2+(1-plan.coverage)*.7;

@@ -1,5 +1,5 @@
 import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanics.js';
-import {hash01} from './environment.js';
+import {hash01,TIMES} from './environment.js';
 export const MISSIONS=[
  {id:'recon',name:'A quiet observation',type:'RECONNAISSANCE',desc:'Photograph the briefed number of different merchant ships through your periscope. Leave the escort wondering if you were ever there.',short:'Photograph the merchant convoy',minutes:'8–12 MIN',torps:6},
  {id:'intercept',name:'The long way home',type:'INTERCEPTION',desc:'Intercept the briefed military freighter. Confirm her silhouette before firing. The fishing boats are neutral.',short:'Identify and sink the military freighter',minutes:'10–15 MIN',torps:6},
@@ -12,6 +12,14 @@ export const MISSIONS=[
 ];
 
 const convoyTransportIds=['cobalt','meridian','alder'];
+
+export function patrolSetup(state){
+ const env=state.environment;
+ const timeOfDay=Object.keys(TIMES).find(key=>TIMES[key].hour===env.startHour);
+ return {mission:state.mission,seed:state.patrol.seed,options:{
+  timeOfDay:timeOfDay??'random',weather:env.startWeather,changing:env.changing,difficulty:{...state.difficulty}
+ }};
+}
 
 export function parsePatrolSeed(text){
  const digits=text.trim();

@@ -8,9 +8,9 @@
 /* Fixed phone helm: the scene gets the remaining height, never the control list. */
 @media(max-width:1100px){
  html,body{height:100%;min-height:0;min-width:0;margin:0;overflow:hidden;overscroll-behavior:none}
- body{padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+ body{padding:env(safe-area-inset-top) 0 0}
  button{touch-action:manipulation}
- .topbar{height:44px;min-height:44px;padding:0 8px;gap:6px;flex-wrap:nowrap}
+ .topbar{height:44px;min-height:44px;padding:0 max(8px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));gap:6px;flex-wrap:nowrap}
  .brand{font:500 13px var(--mono);letter-spacing:.5px;gap:5px;min-width:0;flex:1}.brand-mark{font-size:24px}.brand small,.top-coords{display:none}
  .top-actions{gap:3px;margin:0;width:auto}.top-actions button{min-height:44px;padding:0 5px;letter-spacing:0;font-size:12px}
  .top-actions #sound{min-width:59px;gap:4px}.top-actions #sound span{display:inline;font-size:12px}#sound svg{width:17px;height:17px}.top-actions #guide{font-size:0;min-width:32px}.top-actions #guide span{font-size:16px;margin:0}
@@ -172,4 +172,35 @@ body.orbiting>.topbar,body.orbiting>.bottom-bar,body.orbiting .console>:not(.mai
   border:2px solid #253135;border-radius:50%;background:var(--gold)
  }
  input[type=range]:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+}
+
+/* Extend gameplay to both viewport edges while keeping controls clear of cutouts. */
+@media (max-width:1100px){
+ .stations,.watch-strip,.mobile-vitals,.station-actions,.mobile-footer-actions,.mobile-fixed-helm{
+  padding-inline-start:env(safe-area-inset-left);padding-inline-end:env(safe-area-inset-right)
+ }
+}
+@media(max-width:1100px) and (orientation:landscape) and (max-height:540px){
+ .mobile-fixed-helm{padding-inline-start:0}.station-actions{padding-inline-end:0}
+}
+#current-patrol{border-block:1px solid var(--line);padding:12px 0;margin-bottom:10px}
+#current-mission{display:block;margin:5px 0;color:var(--cream)}
+.seed-actions{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap}
+.seed-actions input{flex:1 1 7em;min-width:0}
+.seed-actions button,.slot-actions button{border:1px solid #526b61;padding:5px 10px;min-height:44px;color:var(--cream);font:12px var(--mono)}
+.seed-actions button:hover,.slot-actions button:enabled:hover{background:#25413e}
+#current-seed{font-variant-numeric:tabular-nums;color:var(--gold)}
+#seed-status:empty{display:none}
+#patrol-slots{margin:14px 0;color:var(--cream)}
+#patrol-slots summary{cursor:pointer;padding:10px 0}
+.slot-list{display:grid;gap:5px}
+.patrol-slot{display:grid;grid-template-columns:64px minmax(0,1fr) auto;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+.slot-caption small,.slot-caption b{display:block}
+.slot-caption small,#patrol-slots small[role=status]{color:#b9c8c1}
+.slot-actions{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.slot-actions button:disabled{opacity:.45}
+.slot-number,.slot-image{width:64px;aspect-ratio:240/104;background:#122a32;align-content:center;text-align:center;color:#a5b4aa}
+@media(max-width:500px){
+ .patrol-slot{grid-template-columns:64px minmax(0,1fr)}
+ .slot-actions{grid-column:2}
 }
