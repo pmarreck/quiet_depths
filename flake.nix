@@ -38,7 +38,7 @@
         pname = "quiet-depths";
         version = releaseVersion;
         src = self;
-        nativeBuildInputs = [ pkgs.nodejs pkgs.elmPackages.elm pkgs.espeak-ng ];
+        nativeBuildInputs = [ pkgs.nodejs pkgs.elmPackages.elm ];
         preBuild = pkgs.elmPackages.fetchElmDeps {
           elmPackages = elmDependencies;
           elmVersion = elmConfig.elm-version;
@@ -56,15 +56,6 @@
           install -m 0644 LICENSE "$out/LICENSE"
           cp mission-picker.js "$out/mission-picker.js"
           ${installElmLicenses}
-          mkdir "$out/crew"
-          espeak-ng -v en-us -s 155 -p 35 -w "$out/crew/mess-a.wav" 'Passing the coffee. Anyone want more?'
-          espeak-ng -v en-gb -s 150 -p 45 -w "$out/crew/mess-b.wav" 'Take a seat. There is still plenty in the pot.'
-          espeak-ng -v en-us -s 178 -p 56 -w "$out/crew/hit.wav" 'Holy shit! Hold on!'
-          espeak-ng -v en-gb -s 180 -p 52 -w "$out/crew/hit-alt.wav" 'What the hell was that?'
-          espeak-ng -v en-gb -s 171 -p 54 -w "$out/crew/leak.wav" 'Taking on water!'
-          espeak-ng -v en-us -s 167 -p 48 -w "$out/crew/leak-alt.wav" 'Water coming in! Check the bilge!'
-          espeak-ng -v en-us+whisper -s 154 -p 38 -w "$out/crew/hit-quiet.wav" 'Holy shit.'
-          espeak-ng -v en-gb+whisper -s 151 -p 39 -w "$out/crew/leak-quiet.wav" 'Taking on water.'
           node scripts/build-offline.mjs "$out"
           runHook postInstall
         '';

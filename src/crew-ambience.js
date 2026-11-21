@@ -14,7 +14,7 @@ export class CrewAmbience {
   this.context=context;this.bus=context.createGain();this.bus.gain.value=0;this.bus.connect(master);
   this.clips=new Map();this.state=null;this.slot=-1;this.nextHit=0;this.nextLeak=0;this.lastHull=100;this.lastFlood=0;
   if(typeof context.decodeAudioData==='function')for(const name of clips){
-   fetch(new URL(`crew/${name}.wav`,import.meta.url)).then(response=>{
+   fetch(new URL(`crew/${name}.mp3`,import.meta.url)).then(response=>{
     if(!response.ok)throw Error('Crew clip unavailable');return response.arrayBuffer();
    }).then(data=>context.decodeAudioData(data)).then(buffer=>this.clips.set(name,buffer)).catch(()=>{});
   }
