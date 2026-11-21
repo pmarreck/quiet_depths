@@ -2,5 +2,15 @@
 set -eu
 CDPATH= cd "$(dirname "$0")"
 
+case "$#:${1:-}" in
+  1:--help|1:-h)
+    printf '%s\n' 'Usage: ./run [--help | --about]' 'Build and preview Quiet Depths at http://127.0.0.1:4173.' 'Use --about to print the version, build revision, and preview platform.'
+    exit 0 ;;
+  1:--about)
+    site=$(./build --no-link --print-out-paths)
+    exec nix develop --command node scripts/serve.mjs "$site" --about ;;
+  0:) ;;
+  *) printf '%s\n' 'Usage: ./run [--help | --about]' >&2; exit 2 ;;
+esac
 site=$(./build --out-link result-preview --print-out-paths)
 exec nix develop --command node scripts/serve.mjs "$site"

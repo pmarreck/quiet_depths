@@ -1,6 +1,6 @@
 # Quiet Depths code review
 
-Reviewed 2026-11-21 by Codex. The starting revision was
+The review on 2026-11-21 began at
 `541c0d3eccb68f2646f79bc0a80efb7c2396f3ad` on a clean checkout. The review
 traced the start and resume flows, saved patrols and photo storage, mobile
 input and dialog layout, the underwater camera and lighting, and offline

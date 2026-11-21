@@ -1,7 +1,8 @@
 {
   description = "Quiet Depths browser submarine game";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  outputs = { self, nixpkgs }: let
+  inputs.performance-profile.url = "github:pmarreck/performance_profiling/ecf713b81a74a51f76719bf9debc44fe23a0b331";
+  outputs = { self, nixpkgs, performance-profile }: let
     systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
     each = nixpkgs.lib.genAttrs systems;
     releaseVersion = (builtins.fromJSON (builtins.readFile ./package.json)).version;
@@ -38,6 +39,7 @@
         pname = "quiet-depths";
         version = releaseVersion;
         src = self;
+        strictDeps = true;
         nativeBuildInputs = [ pkgs.nodejs pkgs.elmPackages.elm ];
         preBuild = pkgs.elmPackages.fetchElmDeps {
           elmPackages = elmDependencies;
@@ -47,8 +49,21 @@
         buildPhase = ''
           runHook preBuild
           elm make elm/MissionPicker.elm --optimize --output=mission-picker.js
-          node --test tests/*.test.mjs
           runHook postBuild
+        '';
+        doCheck = true;
+        nativeCheckInputs = [ pkgs.gitMinimal ];
+        checkPhase = ''
+          runHook preCheck
+          patchShebangs --build build test run
+          (
+            export HOME="$TMPDIR/test-home" XDG_RUNTIME_DIR="$TMPDIR/test-runtime"
+            export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+            export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+            mkdir -p -m 700 "$HOME" "$XDG_RUNTIME_DIR"
+            node --test tests/*.test.mjs
+          )
+          runHook postCheck
         '';
         installPhase = ''
           runHook preInstall
@@ -59,6 +74,12 @@
           node scripts/build-offline.mjs "$out"
           runHook postInstall
         '';
+        doInstallCheck = true;
+        installCheckPhase = ''
+          runHook preInstallCheck
+          node tests/site-artifact.mjs "$out"
+          runHook postInstallCheck
+        '';
       };
     in {
       default = pkgs.lib.makeOverridable build { };
@@ -66,6 +87,7 @@
     checks = each (system: { site = self.packages.${system}.default; });
     devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
       default = pkgs.mkShell { packages = [ pkgs.nodejs pkgs.elmPackages.elm ]; };
+      profiling = pkgs.mkShell { packages = [ pkgs.nodejs performance-profile.packages.${system}.default ]; };
     });
   };
 }

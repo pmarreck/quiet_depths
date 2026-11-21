@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+cd -- "$(dirname -- "$0")" || exit 1
+if [[ -z ${PERFORMANCE_HISTORY_URL:-} ]]; then
+  export PERFORMANCE_HISTORY_URL="file://${XDG_STATE_HOME:-$HOME/.local/state}/performance-history"
+fi
+exec nix develop .#profiling --command performance-profile run --mode cg "$@"

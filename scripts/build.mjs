@@ -22,6 +22,7 @@ const index = join(output, 'index.html');
 const html = await readFile(index, 'utf8');
 const buildNumberElement = '<span id="briefing-build">Build number unavailable</span>';
 if (!html.includes(buildNumberElement)) throw new Error('The briefing is missing its build number field');
-await writeFile(index, html.replace(buildNumberElement, `<span id="briefing-build">${buildNumber}</span>`));
+const title=provenance.status==='verified'?` title="${provenance.revision}"`:'';
+await writeFile(index, html.replace(buildNumberElement, `<span id="briefing-build"${title}>${buildNumber}</span>`));
 await writeFile(join(output, 'build-provenance.json'), JSON.stringify(provenance) + '\n', { flag: 'wx' });
 console.log('Built static game');

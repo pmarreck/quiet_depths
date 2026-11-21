@@ -6,6 +6,32 @@ import * as environment from '../src/environment.js';
 import {save,restore} from '../src/sim.js';
 import {launchTorpedo} from '../src/combat.js';
 import * as uiGeometry from '../src/ui.js';
+import {countContactRowReads} from './contact-row-probe.mjs';
+import {readFile} from 'node:fs/promises';
+
+test('every mission picker port has a browser adapter in the declared direction',async()=>{
+ const elm=await readFile(new URL('../elm/MissionPicker.elm',import.meta.url),'utf8');
+ const js=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
+ const declared=[...elm.matchAll(/^port (\w+)\s*:\s*(.+)$/gm)].map(([,name,signature])=>{
+  const type=/\b(Cmd|Sub) msg$/.exec(signature);
+  assert.ok(type,'unrecognized port signature for '+name);
+  return name+'.'+(type[1]==='Cmd'?'subscribe':'send');
+ });
+ const used=[...js.matchAll(/\bmissionPicker\.ports\.(\w+)\.(\w+)\(/g)].map(([,name,action])=>name+'.'+action);
+ assert.ok(declared.length>0);
+ assert.deepEqual(new Set(used),new Set(declared));
+});
+
+test('refreshing stable contact rows takes linear key reads',async()=>{
+ const config=JSON.parse(await readFile(new URL('../profiling.json',import.meta.url)));
+ const {sizes,bounds}=config.cases.find(c=>c.name==='contact_rows');
+ const samples=sizes.map(size=>countContactRowReads(size,1972));
+ assert.ok(samples[0]>0&&sizes.length>=3);
+ for(let i=1;i<sizes.length;i++){
+  assert.equal(sizes[i],2*sizes[i-1]);
+  const growth=samples[i]/samples[i-1];assert.ok(growth>=bounds[0]&&growth<=bounds[1]);
+ }
+});
 
 test('sonar circles leave room for headers and bearing labels on short and tall screens',()=>{
  assert.equal(typeof uiGeometry.sonarLayout,'function');

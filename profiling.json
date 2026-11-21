@@ -1,0 +1,14 @@
+{
+  "schema": "performance-project/v1",
+  "project": "quiet_depths",
+  "history_url": "file:///var/lib/performance-history",
+  "identity": {"runtime": "Node.js", "build_mode": "optimized", "concurrency": 1},
+  "cases": [
+    {
+      "name": "contact_rows", "definition": "stable-contact-rows-v1",
+      "mode": "cg", "metric": "operations", "cores": 1,
+      "command": ["node", "tests/contact-row-probe.mjs", "{sizes}", "{seed}"],
+      "sizes": [32, 64, 128, 256], "bounds": [1.9, 2.1]
+    }
+  ]
+}

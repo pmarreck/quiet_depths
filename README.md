@@ -14,13 +14,16 @@ Nix is required to build and test the static site. Enable flakes. The pinned too
 
 ```sh
 ./build  # Build the site with Nix and link it at result/
-./test   # Run the complete verification gate with build logs
+./test   # Verify the game and installed site without changing result/
 ./run    # Build and preview at http://127.0.0.1:4173
+./run --about  # Print the release version, build revision and preview platform
 ```
 
-The build compiles the Elm mission picker and runs the full Node test suite and JavaScript syntax checks. Preview serves the Nix output directly. Any static web server can serve it. The tracked `dist/` is the snapshot used by the existing staging Site.
+The build compiles the Elm mission picker and runs the full Node test suite and JavaScript syntax checks. The installed-site check verifies that the service worker requests every packaged asset and that the briefing and preview command agree with the build record. Preview serves the Nix output directly. Any static web server can serve it. The tracked `dist/` is the snapshot used by the existing staging Site.
 
-The built site's `build-provenance.json` records the release version and, for a clean Git build through `./build` or `./test` with complete `yolo` history, the `rN-abcdef` revision, full commit hash, and primary-branch base. Dirty builds, shallow clones, source exports, and direct `nix build` calls report when a revision is unavailable. GitHub Pages verifies the artifact commit against the workflow checkout before publication.
+The built site's `build-provenance.json` records the release version and, for a clean Git build through `./build` or `./test` with complete `yolo` history, the `rN-abcdef` revision, full commit hash, and primary-branch base. The briefing shows the short `rN` label and includes the full revision in its tooltip. Dirty builds, shallow clones, source exports, and direct `nix build` calls report when a revision is unavailable. GitHub Pages verifies the artifact commit against the workflow checkout before publishing from `yolo`.
+
+The regular test suite checks that refreshing an unchanged list of contacts takes O(n) key reads. To compare this workload against historical measurements, create a local history directory once with `mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/performance-history"` and run `./big_o`. Set `PERFORMANCE_HISTORY_URL` to use another existing directory. The profiler reports the first observation for each hardware cohort for review before accepting a baseline.
 
 ## Play
 

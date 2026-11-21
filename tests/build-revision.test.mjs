@@ -1,0 +1,41 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {copyFile,mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+
+test('the build wrapper selects the yolo base, pins the built commit, and declines incomplete history',async t=>{
+ const scratch=await mkdtemp(join(tmpdir(),'quiet-depths-revision-'));
+ t.after(()=>rm(scratch,{recursive:true,force:true}));
+ const repo=join(scratch,'source'),bin=join(scratch,'bin');
+ await mkdir(repo);await mkdir(bin);
+ const shell=execFileSync('sh',['-c','command -v sh'],{encoding:'utf8'}).trim();
+ // Record what the wrapper passes to Nix without starting Nix inside a derivation.
+ await writeFile(join(bin,'nix'),'#!'+shell+'\nprintf "%s\\n" "$@"\n',{mode:0o700});
+ const env={...process.env,HOME:scratch,XDG_CONFIG_HOME:scratch,GIT_CONFIG_NOSYSTEM:'1',PATH:bin+':'+process.env.PATH};
+ const run=(file,args,cwd=repo)=>execFileSync(file,args,{cwd,env,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trimEnd();
+ const git=(...args)=>run('git',args);
+ const args=(cwd=repo)=>run(shell,['./build','--no-link'],cwd).split('\n');
+ const passed=(items,key)=>{const i=items.indexOf(key);assert.notEqual(i,-1,key);return items[i+1];};
+ for(const file of ['build','test','run'])await copyFile(new URL('../'+file,import.meta.url),join(repo,file));
+ assert.match(run(shell,['./run','--help']),/Usage: .\/run/);
+ assert.throws(()=>run(shell,['./run','--unknown']),error=>error.status===2);
+ assert.deepEqual(args(),['build','--no-link'],'source export');
+ git('init','--initial-branch=yolo');git('config','user.name','Fixture');git('config','user.email','fixture@example.invalid');
+ git('add','build','test','run');git('commit','-m','base');
+ const base=git('rev-parse','HEAD');
+ git('checkout','-b','topic');git('commit','--allow-empty','-m','topic');
+ const topic=git('rev-parse','HEAD');
+ let invocation=args();
+ assert.equal(passed(invocation,'commit'),topic);assert.equal(passed(invocation,'base'),base);assert.equal(passed(invocation,'count'),'1');
+ git('checkout','yolo');git('commit','--allow-empty','-m','main');git('merge','--no-ff','-m','merge','topic');
+ invocation=args();
+ assert.equal(passed(invocation,'base'),git('rev-parse','HEAD'));assert.equal(passed(invocation,'count'),'4');
+ const testArgs=run(shell,['./test']).split('\n');assert.ok(testArgs.includes('--no-link'),'tests leave product links alone');
+ const shallow=join(scratch,'shallow');
+ git('clone','--depth=1',pathToFileURL(repo).href,shallow);assert.deepEqual(args(shallow),['build','--no-link']);
+ await writeFile(join(repo,'test'),'dirty fixture');
+ assert.deepEqual(args(),['build','--no-link'],'uncommitted tracked changes');
+});

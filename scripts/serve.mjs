@@ -4,6 +4,14 @@ import { extname, resolve, sep } from 'node:path';
 const output = process.argv[2];
 if (!output) throw new Error('A built site directory is required');
 const root = resolve(output);
+if(process.argv[3]==='--about'){
+  const {releaseVersion,revision}=JSON.parse(await readFile(resolve(root,'build-provenance.json'),'utf8'));
+  const os={linux:'linux',darwin:'macos',win32:'mswin'}[process.platform];
+  const arch={x64:'amd64',arm64:'arm64'}[process.arch];
+  if(!os||!arch)throw new Error('Unsupported preview platform');
+  console.log(`Quiet Depths ${releaseVersion} | ${revision??'Build revision unavailable'} | Browser submarine game preview | PF=${os}-${arch}`);
+  process.exit(0);
+}
 const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.wav':'audio/wav', '.ttf':'font/ttf', '.wasm':'application/wasm' };
 http.createServer(async (req,res) => {
   try {
@@ -14,4 +22,4 @@ http.createServer(async (req,res) => {
     res.setHeader('Cache-Control','no-store');
     res.end(await readFile(file));
   } catch {res.writeHead(404);res.end('Not found');}
-}).listen(4173,'127.0.0.1',()=>console.log('Local: http://127.0.0.1:4173'));
+}).listen(4173,'127.0.0.1',()=>console.error('Preview at http://127.0.0.1:4173'));
