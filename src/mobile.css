@@ -1,8 +1,8 @@
 /* The 3x Duo cover is 466 by 678 CSS px. Safari may reserve its side rail,
    leaving 382px. The inner display's Split View uses 385px.
-   Allow at least 38px with narrow glyphs so the whole button clears the camera. */
+   Move every dialog's close button at least 38px left to clear the camera. */
 @media (pointer: coarse) and (resolution: 3dppx) and (device-width: 466px) and (device-height: 678px) and ((width: 382px) or (width: 466px)) {
- #close-briefing { transform: translateX(min(-130%, -38px)); }
+ .dialog-close { transform: translateX(min(-130%, -38px)); }
 }
 
 /* Fixed phone helm: the scene gets the remaining height, never the control list. */
