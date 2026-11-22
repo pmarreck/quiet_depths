@@ -9,6 +9,7 @@ import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateB
 import {MAX_RUN,ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
 import {designation,fixContact,estimateAt,applyReconPacket} from './track-estimates.js';
+import {observationBias} from './contact-readings.js';
 import {photoArchive,validPhoto,PHOTO_BUDGET} from './photos.js';
 import {playerReport,pursueAndAttack,reportHunterState,updateHostileTrack,validReport} from './hostile-tracks.js';
 import {patrolDifficulty} from './difficulty.js';
@@ -33,11 +34,16 @@ export function contact(s,ship,method){
  let c=s.contacts.find(c=>c.id===ship.id);
  const b=bearing(s,ship),d=distance(s,ship);
  if(!c){c={id:ship.id,label:designation(s.nextId++),bearing:b,range:0,confidence:0,age:0,identified:false,method:'passive',x:0,y:0};s.contacts.push(c);log(s,`New contact. ${c.label}, bearing ${Math.round(b)}.`, 'contact');}
- c.bearing=(b+(method==='passive'?(rand(s)-.5)*6:0)+360)%360;c.age=0;c.method=method;
+ // Patrol saves share a random stream across systems. Reserve the original
+ // draw for every observation so changing the display preserves seeded events.
+ const observationRoll=rand(s);
+ c.bearing=(b+(method==='passive'?3*observationBias(s.patrol.seed,c.id,'passive'):0)+360)%360;c.age=0;c.method=method;
  if(method!=='passive'){
-   c.range=d*(method==='visual'?.94+rand(s)*.12:.97+rand(s)*.06);c.x=s.x+Math.sin(rad(c.bearing))*c.range;c.y=s.y+Math.cos(rad(c.bearing))*c.range;c.confidence=method==='visual'?.9:.75;
-   const existing=estimateAt(c,s.time),sigma=method==='visual'?Math.max(25,d*.045):Math.max(15,d*.03);
-   if(!c.fix||s.time-c.fix.time>=5&&existing.major>sigma*2.448){
+   const sigma=method==='visual'?Math.max(25,d*.045):Math.max(15,d*.03);
+   const continuedSight=method==='visual'&&c.fix?.source==='visual';
+   if(!c.fix||s.time-c.fix.time>=5&&(continuedSight||estimateAt(c,s.time).major>sigma*2.448)){
+    c.range=d*(method==='visual'?1+.06*observationBias(s.patrol.seed,c.id,'visual'):.97+observationRoll*.06);
+    c.x=s.x+Math.sin(rad(b))*c.range;c.y=s.y+Math.cos(rad(b))*c.range;c.confidence=method==='visual'?.9:.75;
     const measurement={x:c.x,y:c.y,time:s.time,positionSigma:sigma,velocitySigma:1.5,maneuverSigma:.03,source:method};
     if(method==='active'&&ship.kind==='sub'){
      c.kind='sub';c.depthEstimate=clamp(Math.round((ship.depth+(rand(s)-.5)*(12+d*.012))/10)*10,0,320);

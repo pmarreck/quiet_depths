@@ -33,3 +33,32 @@ test('supplies are bounded across seed, speed, depth and engine sweeps',()=>{
 test('noisemakers are finite and do not manufacture supplies',()=>{const s=createGame();s.alert=80;for(let i=0;i<3;i++)assert.ok(decoy(s));assert.equal(decoy(s),false);assert.equal(s.decoys,0);assert.equal(s.alert,0);});
 test('terminal patrol states do not advance',()=>{for(const status of ['won','lost','compromised','expired']){const s=createGame();s.status=status;const before=save(s);step(s,60);assert.equal(save(s),before);}});
 test('corrupted save fields fail closed instead of crashing the renderer',()=>{for(const key of ['drone','ships','events','home','oxygen','depth']){const s=createGame();s[key]=null;assert.equal(restore(JSON.stringify(s)),null,key);}const s=createGame();s.ships[0].x='broken';assert.equal(restore(JSON.stringify(s)),null);});
+
+test('a stationary visual contact holds its imperfect range between frames and across new fixes',()=>{
+ const s=createGame('shadow',37,{timeOfDay:'day',weather:'clear',changing:false});
+ Object.assign(s,{x:0,y:0,speed:0,targetSpeed:0,depth:6,targetDepth:6,heading:0,targetHeading:0});
+ s.ships=[Object.assign(s.ships[0],{x:0,y:1500,heading:0,speed:0,military:false})];
+ step(s,1/60,{look:0});
+ const c=s.contacts[0],range=c.range,firstTime=c.fix.time;
+ assert.ok(range>=1410&&range<=1590&&range!==1500);
+ for(let frame=0;frame<60;frame++){
+  step(s,1/60,{look:0});
+  assert.equal(c.range,range,'stationary ship at the 1.5 km ring');
+ }
+ step(s,15,{look:0});assert.ok(c.fix.time>firstTime);
+ assert.equal(c.range,range);
+ s.ships[0].y=1100;step(s,15,{look:0});
+ assert.ok(c.range<1200,'subsequent sightings follow real movement');
+});
+
+test('passive bearings hold for stationary traffic across repeated listens and follow a change of direction',()=>{
+ const s=createGame('shadow',39),ship=s.ships[0];
+ Object.assign(s,{x:0,y:0});Object.assign(ship,{x:0,y:1500});
+ const c=contact(s,ship,'passive'),first=c.bearing;
+ for(const seconds of [3,6,9,12]){
+  s.time=seconds;contact(s,ship,'passive');
+  assert.equal(c.bearing,first);assert.equal(c.range,0);assert.equal(c.fix,undefined);
+ }
+ Object.assign(ship,{x:1500,y:0});contact(s,ship,'passive');
+ assert.ok(Math.abs((c.bearing-first+360)%360-90)<1e-8);
+});

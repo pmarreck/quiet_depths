@@ -16,6 +16,7 @@ import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
 import {requestRecon,reconStatus,reconAreaForDisplay} from './recon.js';
 import {chartContacts,estimateAt} from './track-estimates.js';
+import {sonarReading} from './contact-readings.js';
 import {lossPresentation} from './loss.js';
 import {persistPatrol,resumablePatrol} from './persistence.js';
 import {SLOT_COUNT,listSlots,writeSlot,loadSlot} from './patrol-slots.js';
@@ -474,7 +475,7 @@ function updateUI(){
  $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
  $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
- const contactModels=s.contacts.map(c=>{const e=estimateAt(c,s.time),range=c.range&&e?Math.hypot(e.x-s.x,e.y-s.y):0;return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED')+' · '+(range?(range/1000).toFixed(1)+' KM':'RANGE ?'),bearing:deg(relativeBearing(c.bearing,s.heading))+'° R'};});
+ const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED')+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
 
  $('torp-count').textContent=String(s.torps).padStart(2,'0');$('tubes').innerHTML=Array.from({length:6},(_,i)=>`<i class="${i>=s.torps?'spent':''}"></i>`).join('');
@@ -502,18 +503,19 @@ function drawSonar(id,mini,time){
  if(state.pingAge<8){c.strokeStyle=`rgba(192,209,136,${.6*(1-state.pingAge/8)})`;c.beginPath();c.arc(cx,cy,R*state.pingAge/8,0,Math.PI*2);c.stroke();}
  const labels=[];
  for(const q of state.contacts){
-  const fraction=sonarRangeFraction(q.range,scale);
+  const {bearing,range}=sonarReading(state,q);
+  const fraction=sonarRangeFraction(range,scale);
   if(fraction===null)continue;
-  const a=rad(relativeBearing(q.bearing,state.heading)),r=fraction*R,x=cx+Math.sin(a)*r,y=cy-Math.cos(a)*r;
+  const a=rad(relativeBearing(bearing,state.heading)),r=fraction*R,x=cx+Math.sin(a)*r,y=cy-Math.cos(a)*r;
   c.strokeStyle=q.id===selected?'#efd19a':'#a3bd78';c.globalAlpha=Math.max(.25,1-q.age/220);c.lineWidth=q.id===selected?1.5:1;
-  if(!q.range){c.beginPath();c.arc(cx,cy,r,a-Math.PI/2-.05,a-Math.PI/2+.05);c.stroke();c.setLineDash([2,5]);c.beginPath();c.moveTo(cx+Math.sin(a)*R*.2,cy-Math.cos(a)*R*.2);c.lineTo(x,y);c.stroke();c.setLineDash([]);}else{c.beginPath();c.moveTo(x,y-5);c.lineTo(x+5,y);c.lineTo(x,y+5);c.lineTo(x-5,y);c.closePath();c.stroke();}
-  if(!mini)labels.push({q,x,y});c.globalAlpha=1;
+  if(range===null){c.beginPath();c.arc(cx,cy,r,a-Math.PI/2-.05,a-Math.PI/2+.05);c.stroke();c.setLineDash([2,5]);c.beginPath();c.moveTo(cx+Math.sin(a)*R*.2,cy-Math.cos(a)*R*.2);c.lineTo(x,y);c.stroke();c.setLineDash([]);}else{c.beginPath();c.moveTo(x,y-5);c.lineTo(x+5,y);c.lineTo(x,y+5);c.lineTo(x-5,y);c.closePath();c.stroke();}
+  if(!mini)labels.push({q,x,y,range});c.globalAlpha=1;
  }
  const occupied=[];
- for(const {q,x,y} of labels.sort((a,b)=>a.y-b.y)){
+ for(const {q,x,y,range} of labels.sort((a,b)=>a.y-b.y)){
   if(shortLabels){let lx=clamp(x+9,15,w-35),ly=clamp(y-8,65,h-20);if(occupied.some(p=>Math.abs(p.x-lx)<25&&Math.abs(p.y-ly)<14))ly+=14;occupied.push({x:lx,y:ly});c.fillStyle=q.id===selected?'#efd19a':'#c2cfa5';c.textAlign='left';c.font='11px IBM Plex Mono,monospace';c.fillText(q.label,lx,ly);continue;}
   let ly=clamp(y-8,65,h-30),lx=clamp(x+15,20,w-190);while(occupied.some(p=>Math.abs(p.x-lx)<180&&Math.abs(p.y-ly)<38))ly+=38;occupied.push({x:lx,y:ly});
-  c.strokeStyle='#86a17c66';c.beginPath();c.moveTo(x+5,y);c.lineTo(lx-4,ly);c.stroke();c.textAlign='left';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#d4d6af';c.fillText(q.identified?q.name:q.label,lx,ly);c.font='12px IBM Plex Mono,monospace';c.fillStyle='#a2b69a';c.fillText(q.range?Math.round(q.confidence*100)+'% CONFIDENCE':'RANGE UNKNOWN',lx,ly+17);
+  c.strokeStyle='#86a17c66';c.beginPath();c.moveTo(x+5,y);c.lineTo(lx-4,ly);c.stroke();c.textAlign='left';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#d4d6af';c.fillText(q.identified?q.name:q.label,lx,ly);c.font='12px IBM Plex Mono,monospace';c.fillStyle='#a2b69a';c.fillText(range===null?'RANGE UNKNOWN':Math.round(q.confidence*100)+'% CONFIDENCE',lx,ly+17);
  }
  c.fillStyle='#e2d19e';c.beginPath();c.moveTo(cx,cy-8);c.lineTo(cx-4,cy+5);c.lineTo(cx+4,cy+5);c.closePath();c.fill();
 }

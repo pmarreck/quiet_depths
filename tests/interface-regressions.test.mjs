@@ -6,6 +6,7 @@ import * as environment from '../src/environment.js';
 import {save,restore} from '../src/sim.js';
 import {launchTorpedo} from '../src/combat.js';
 import * as uiGeometry from '../src/ui.js';
+import {sonarReading} from '../src/contact-readings.js';
 import {countContactRowReads} from './contact-row-probe.mjs';
 import {readFile} from 'node:fs/promises';
 
@@ -38,6 +39,9 @@ test('sonar circles leave room for headers and bearing labels on short and tall 
  for(const [w,h] of [[320,242],[393,524],[662,221],[600,480],[800,650]]){
   const p=uiGeometry.sonarLayout(w,h,false);assert.ok(p.radius>=40);assert.ok(p.cx-p.radius-20>=0&&p.cx+p.radius+20<=w);assert.ok(p.cy-p.radius-20>=55);assert.ok(p.cy+p.radius+20<=h);
  }
+ const tall=uiGeometry.sonarLayout(479,648);
+ assert.ok(tall.radius*2>=400,'use the width available beside the unfolded portrait helm');
+ assert.ok(tall.cx-tall.radius>=32,'reserve room for three-digit bearings');
 });
 
 test('hydrophone peaks wrap across the bow and stay inside the trace',()=>{
@@ -88,7 +92,20 @@ test('closing the sonar range magnifies fixed contacts while leaving bearing-onl
  const radius=uiGeometry.sonarRangeFraction;
  assert.equal(radius(750,1500),.5);assert.equal(radius(750,3000),.25);
  assert.equal(radius(3100,3000),null);
- assert.equal(radius(0,1500),radius(0,6000));
+ assert.equal(radius(null,1500),.78);assert.equal(radius(null,6000),.78);
+ assert.equal(radius(0,1500),0);
+});
+
+test('sonar range and bearing use the same recorded point as the chart, including after own-boat movement',()=>{
+ const boat={x:300,y:400,time:20};
+ const passive={bearing:224,x:0,y:0,range:0};
+ assert.deepEqual(sonarReading(boat,passive),{range:null,bearing:224});
+ const legacy={...passive,x:300,y:500,range:350};
+ assert.deepEqual(sonarReading(boat,legacy),{bearing:0,range:100});
+ const ranged={...legacy,fix:{x:380,y:400,time:10,vx:2,vy:0,positionSigma:0,velocitySigma:.2,maneuverSigma:.01}};
+ assert.deepEqual(sonarReading(boat,ranged),{bearing:90,range:100});
+ assert.deepEqual(sonarReading({...boat,x:450},ranged),{bearing:270,range:50});
+ assert.deepEqual(sonarReading({...boat,x:400},ranged),{bearing:224,range:0});
 });
 
 test('dragging right in orbit increases yaw, dragging up lowers the viewing angle',()=>{

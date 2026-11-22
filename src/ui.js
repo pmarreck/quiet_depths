@@ -27,15 +27,15 @@ export function patrolNotices(s,opticalActive,soundOn,view){
 
 export function sonarLayout(width,height,mini=false){
  if(mini)return{cx:width/2,cy:height*.49,radius:Math.min(width*.35,height*.32)};
- const top=height>=190?55:height>=140?32:18,room=Math.max(0,height-top-40);
- return{cx:width/2,cy:(height+top)/2,radius:Math.min(width*.31,room/2)};
+ const top=height>=190?55:height>=140?32:18,room=Math.max(0,height-top-48);
+ return{cx:width/2,cy:(height+top)/2,radius:Math.min(Math.max(0,width/2-34),room/2)};
 }
 export function hydrophoneStrength(angles,bearing){
  return Math.min(1,angles.reduce((total,a)=>total+Math.exp(-((delta(a,bearing)/4.5)**2)),0));
 }
 export const SONAR_RANGES=[1500,3000,6000];
 // A passive bearing stays on its lettered spoke when the range scale changes.
-export const sonarRangeFraction=(range,scale)=>range===0?.78:range<=scale?range/scale:null;
+export const sonarRangeFraction=(range,scale)=>range===null?.78:range<=scale?range/scale:null;
 // Keep interactive row elements alive while telemetry changes underneath a press.
 export function reconcileKeyedChildren(container,items,keyOf,create,update){
  const old=new Map([...container.children].map(node=>[node.dataset.rowKey,node])),keep=new Set();

@@ -1,3 +1,5 @@
+import {estimateAt} from './contact-readings.js';
+export {estimateAt};
 // Timestamped observations are independent of live vessel state. All distances
 // are meters; velocity is east/north m/s; ellipse angle is a compass bearing.
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -15,21 +17,6 @@ export function fixContact(contact,observation){
  if(contact.fix&&finite(contact.fix.time)&&fix.time<contact.fix.time)return false;
  contact.fix=fix;return true;
 }
-export function estimateAt(contact,time){
- if(!contact||!finite(time))return null;
- const fix=contact.fix;
- if(!fix||!['x','y','time','vx','vy','positionSigma','velocitySigma','maneuverSigma'].every(k=>finite(fix[k]))){
-  if(!finite(contact.x)||!finite(contact.y))return null;
-  const major=contact.range?(1-clamp(contact.confidence||0,0,1))*1500+100:6500;
-  return{x:contact.x,y:contact.y,major,minor:major*.65,angle:contact.bearing||0,age:Math.max(0,contact.age||0),hasFix:false};
- }
- const age=Math.max(0,time-fix.time),speed=Math.hypot(fix.vx,fix.vy),maneuver=.5*fix.maneuverSigma*age*age;
- // Constant-velocity uncertainty plus unobserved acceleration. 2.448 is the
- // 95% two-dimensional Gaussian radius; these sigmas are game tuning.
- const major=2.448*Math.hypot(fix.positionSigma,fix.velocitySigma*age,maneuver),minor=2.448*Math.hypot(fix.positionSigma,fix.velocitySigma*age*(speed>.1?.6:1),maneuver);
- return{x:fix.x+fix.vx*age,y:fix.y+fix.vy*age,major,minor,angle:speed>.01?(Math.atan2(fix.vx,fix.vy)*180/Math.PI+360)%360:contact.bearing||0,age,hasFix:true};
-}
-
 export function chartContacts(s){
  if(!s.difficulty?.omniscientChart)return s.contacts;
  const hostile=new Set(s.ships.filter(ship=>ship.military).map(ship=>ship.id));

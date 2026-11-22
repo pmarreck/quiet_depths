@@ -9,14 +9,15 @@
 /* Fixed phone helm: the scene gets the remaining height, never the control list. */
 @media(max-width:1100px){
  html,body{height:100%;min-height:0;min-width:0;margin:0;overflow:hidden;overscroll-behavior:none}
- body{padding:env(safe-area-inset-top) 0 0}
+ body{display:flex;flex-direction:column;height:100dvh;padding:env(safe-area-inset-top) 0 0}
+ .topbar,.watch-strip,.bottom-bar{flex:none}
  button{touch-action:manipulation}
  .topbar{height:44px;min-height:44px;padding:0 max(8px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));gap:6px;flex-wrap:nowrap}
  .brand{font:500 13px var(--mono);letter-spacing:.5px;gap:5px;min-width:0;flex:1}.brand-mark{font-size:24px}.brand small,.top-coords{display:none}
  .top-actions{gap:3px;margin:0;width:auto}.top-actions button{min-height:44px;padding:0 5px;letter-spacing:0;font-size:12px}
  .top-actions #sound{min-width:59px;gap:4px}.top-actions #sound span{display:inline;font-size:12px}#sound svg{width:17px;height:17px}.top-actions #guide{font-size:0;min-width:32px}.top-actions #guide span{font-size:16px;margin:0}
  .top-actions .pause-button{font-size:0;min-width:58px;width:auto;height:36px;min-height:36px;padding:0 6px}.top-actions .pause-button:after{content:attr(data-short);font:12px var(--mono)}
- .console{display:block;height:calc(100dvh - 110px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:0}
+ .console{display:block;flex:1;min-height:0;height:auto}
  .main-panel{height:100%;min-height:0;display:flex;flex-direction:column;min-width:0}
  .stations{height:44px;min-height:44px;grid-template-columns:repeat(7,minmax(0,1fr))}.stations:has([data-view=scope].hidden){grid-template-columns:repeat(6,minmax(0,1fr))}
  .stations button{font-size:0;padding:0 1px;min-width:0;letter-spacing:0}.stations button span{display:none}.stations button:after{content:attr(data-short);font:12px var(--mono)}.stations button.active:after{content:attr(data-short);height:auto;background:none;position:static}.stations button.active{box-shadow:inset 0 -2px var(--gold)}
@@ -70,12 +71,38 @@
 @media(max-width:350px){
  .brand{font-size:11px;letter-spacing:0}.brand-mark{display:none}.top-actions #guide{min-width:26px}.top-actions button{padding:0 4px}#sound span{font-size:11px}.stations button:after{font-size:11px}.mobile-vitals{font-size:11px;gap:3px}.mobile-order b{font-size:18px}.mobile-order span{font-size:11px}.mobile-speed-axis{padding-right:1px;grid-template-columns:minmax(0,1fr) var(--range-hit)}.mobile-speed-axis .mobile-order b{font-size:16px}.station-actions button{font-size:11px;padding:0 4px}.station-actions #zoom-tools button{min-width:31px}
 }
+/* Use the long edge for the helm on foldables, tablets and rotated phones. */
+@media (640px <= width <= 1100px), (max-width:1100px) and (orientation:landscape){
+ .main-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:auto auto auto minmax(0,1fr) auto}
+ .stations{grid-column:1/-1;grid-row:1}
+ .mobile-vitals{grid-column:1/-1;grid-row:2}
+ .station-notices{grid-column:1/-1;grid-row:3}
+ .viewport{grid-column:1;grid-row:4;min-height:80px}
+ .station-actions{grid-column:1;grid-row:5}
+ .mobile-fixed-helm{grid-column:2;grid-row:4/6;height:auto;min-height:0;grid-template-columns:1fr 84px;grid-template-rows:1fr 1fr}
+ .mobile-speed-axis{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;padding:0}
+ .mobile-order{min-height:48px;gap:0;padding:2px}
+ .mobile-order b{font-size:17px}
+ .mobile-speed-track{flex:1}.mobile-speed-rail{height:90px}
+ .left-panel,.right-panel{bottom:calc(77px + env(safe-area-inset-bottom));right:calc(198px + env(safe-area-inset-right));max-height:calc(100dvh - 115px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+ #drawer-backdrop{inset:70px 190px 76px 0}#toast{bottom:80px}
+}
 @media(max-width:1100px) and (orientation:landscape) and (max-height:540px){
- .topbar{height:36px;min-height:36px}.console{height:calc(100dvh - 94px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}.bottom-bar{height:calc(36px + env(safe-area-inset-bottom));min-height:36px}.mobile-footer-actions,.mobile-footer-actions button{height:36px;min-height:36px}
- .bottom-bar>.mobile-footer-actions{height:36px}
- .main-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:34px 26px auto minmax(0,1fr) 40px}.stations{grid-column:1/-1;grid-row:1;height:34px;min-height:34px}.mobile-vitals{grid-column:1/-1;grid-row:2;height:26px;min-height:26px}.station-notices{grid-column:1/-1;grid-row:3}.drone-monitor{min-height:24px}.viewport{grid-column:1;grid-row:4;min-height:80px}.station-actions{grid-column:1;grid-row:5;height:40px;min-height:40px}.station-actions button{min-height:40px}
- .mobile-fixed-helm{grid-column:2;grid-row:4/6;height:auto;min-height:0;grid-template-columns:1fr 84px;grid-template-rows:1fr 1fr}.mobile-speed-axis{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;padding:0}.mobile-order{min-height:48px;gap:0;padding:2px}.mobile-order b{font-size:17px}.mobile-step-pair,.mobile-step-pair button{height:36px;min-height:36px}.mobile-speed-track{flex:1}.mobile-speed-rail{height:90px}
- .left-panel,.right-panel{bottom:calc(77px + env(safe-area-inset-bottom));right:calc(198px + env(safe-area-inset-right));max-height:calc(100dvh - 115px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}#drawer-backdrop{inset:70px 190px 76px 0}.view-top{top:5px}.view-top small,.bow-readout{display:none}.compass{top:30px}.look-heading{top:49px}.photo-gallery{inset:34px 8px 8px}#toast{bottom:80px}
+ .topbar{height:36px;min-height:36px}.bottom-bar{height:calc(36px + env(safe-area-inset-bottom));min-height:36px}
+ .bottom-bar>.mobile-footer-actions,.mobile-footer-actions button{height:36px;min-height:36px}
+ .stations{height:34px;min-height:34px}.mobile-vitals{height:26px;min-height:26px}
+ .drone-monitor{min-height:24px}.station-actions{height:40px;min-height:40px}.station-actions button{min-height:40px}
+ .mobile-step-pair,.mobile-step-pair button{height:36px;min-height:36px}
+ .view-top{top:5px}.view-top small,.bow-readout{display:none}.compass{top:30px}.look-heading{top:49px}.photo-gallery{inset:34px 8px 8px}
+}
+@media (640px <= width <= 1100px) and (min-height:541px){
+ .mobile-axis:not(.mobile-speed-axis){display:flex;flex-direction:column;justify-content:center}
+ .mobile-speed-rail{height:clamp(90px,22dvh,170px)}
+ body[data-station=sonar] .viewport{grid-row:4/6}
+ body[data-station=sonar] .mobile-fixed-helm{grid-row:4}
+ body[data-station=sonar] .station-actions{grid-column:2;height:auto;padding:0 env(safe-area-inset-right) 0 0}
+ body[data-station=sonar] #sonar-tools{flex-direction:column;align-items:stretch}
+ body[data-station=sonar] .sonar-ranges button{flex:1;min-width:44px}
 }
 
 body[data-station=drone] .viewport{touch-action:none}
@@ -104,7 +131,7 @@ body[data-station=drone] .viewport{touch-action:none}
  }
  .rov-touch-helm .mobile-speed-tick{left:var(--actual);bottom:7px;width:2px;height:6px}
 }
-@media(max-width:1100px) and (orientation:landscape) and (max-height:540px){
+@media (640px <= width <= 1100px), (max-width:1100px) and (orientation:landscape){
  .rov-touch-helm .mobile-fixed-helm{height:auto}
 }
 
@@ -183,7 +210,7 @@ body.orbiting>.topbar,body.orbiting>.bottom-bar,body.orbiting .console>:not(.mai
   padding-inline-start:env(safe-area-inset-left);padding-inline-end:env(safe-area-inset-right)
  }
 }
-@media(max-width:1100px) and (orientation:landscape) and (max-height:540px){
+@media (640px <= width <= 1100px), (max-width:1100px) and (orientation:landscape){
  .mobile-fixed-helm{padding-inline-start:0}.station-actions{padding-inline-end:0}
 }
 #current-patrol{border-block:1px solid var(--line);padding:12px 0;margin-bottom:10px}
