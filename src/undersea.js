@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {createSwimmer} from './marine-life.js';
+import {schoolFishShape} from './school-fish.js';
 import {bottom,rad,clamp,capsuleContact} from './mechanics.js';
 import {hash01,surfaceHeight} from './environment.js';
 import {floorSurface} from './seafloor.js';
@@ -33,7 +34,19 @@ function diver(){
 export class UnderseaLife{
  constructor(scene,makeSub,makeShip){
   this.scene=scene;this.makeSub=makeSub;this.makeShip=makeShip;this.root=new T.Group();scene.add(this.root);this.lastState=null;
-  const fishGeo=new T.ConeGeometry(.5,2,5);fishGeo.rotateX(-Math.PI/2);this.fish=new T.InstancedMesh(fishGeo,material(0x85b7b3),160);this.fish.instanceMatrix.setUsage(T.DynamicDrawUsage);this.root.add(this.fish);this.dummy=new T.Object3D();this.fish.frustumCulled=false;
+  const shape=schoolFishShape(),fishGeo=new T.BufferGeometry(),count=160;
+  fishGeo.setAttribute('position',new T.Float32BufferAttribute(shape.positions,3));
+  fishGeo.setAttribute('color',new T.Float32BufferAttribute(shape.colors,3));
+  fishGeo.setIndex(shape.indices);fishGeo.computeVertexNormals();
+  fishGeo.setAttribute('beatPhase',new T.InstancedBufferAttribute(Float32Array.from({length:count},(_,i)=>hash01(104,i)*Math.PI*2),1));
+  const fishSkin=new T.MeshStandardMaterial({vertexColors:true,roughness:.62,side:T.DoubleSide});
+  this.swimClock={value:0};
+  fishSkin.onBeforeCompile=shader=>{
+   shader.uniforms.swimClock=this.swimClock;
+   shader.vertexShader='uniform float swimClock; attribute float beatPhase;\n'+shader.vertexShader.replace('#include <begin_vertex>',
+    '#include <begin_vertex>\ntransformed.x += .18 * smoothstep(-.1,1.,position.z) * sin(swimClock*6. + beatPhase - position.z*2.8);');
+  };
+  this.fish=new T.InstancedMesh(fishGeo,fishSkin,count);this.fish.instanceMatrix.setUsage(T.DynamicDrawUsage);this.root.add(this.fish);this.dummy=new T.Object3D();this.fish.frustumCulled=false;
   this.animals=Array.from({length:4},(_,i)=>{const a=createSwimmer(T,i===3);this.root.add(a);return a;});
   this.divers=Array.from({length:3},()=>{const d=diver();this.root.add(d);return d;});
   this.launches=Array.from({length:2},()=>{const g=new T.Group();const boat=new T.Mesh(new T.CapsuleGeometry(1,4,4,8),material(0xb77942));boat.rotation.x=Math.PI/2;boat.scale.y=.5;g.add(boat);for(const x of [-.5,.5])ellipsoid(g,[.3,.7,.3],[x,1,0],material(0xd5b67e));this.root.add(g);return g;});
@@ -66,7 +79,8 @@ export class UnderseaLife{
  update(s,env){
   if(this.lastState!==s)this.reset(s);const t=s.time,a=this.anchor,focusDepth=Math.min(80,bottom(a.x,a.y)-15);
   const elapsed=this.lastTime===null?0:Math.max(0,t-this.lastTime);this.lastTime=t;
-  for(let i=0;i<160;i++){const school=Math.floor(i/20),seed=i%20,angle=t*.08+school*1.8,r=24+school*13,cx=a.x+Math.sin(angle)*r,cy=a.y+Math.cos(angle)*r;
+  this.swimClock.value=t;
+  for(let i=0;i<this.fish.count;i++){const school=Math.floor(i/20),seed=i%20,angle=t*.08+school*1.8,r=24+school*13,cx=a.x+Math.sin(angle)*r,cy=a.y+Math.cos(angle)*r;
    this.dummy.position.set(cx+(hash01(42,i)-.5)*18+Math.sin(t+i)*.4,-focusDepth+school*4+(hash01(43,i)-.5)*5,-cy+(hash01(44,i)-.5)*17);const position=this.dummy.position,previous=this.fishPositions[i];
    avoidBoat(position,s,1);
    if(!previous){this.fishPositions[i]={x:position.x,y:position.y,z:position.z,yaw:-angle-Math.PI/2,pitch:0};}

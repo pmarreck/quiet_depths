@@ -1,4 +1,5 @@
 import {missions} from './mission-catalog.ts';
+import {friendlyLead} from './fleet-action.ts';
 
 export {missions as MISSIONS};
 type Mission = (typeof missions)[number];
@@ -33,6 +34,8 @@ export function evaluateObjective<P extends Patrol>(
       return allSunk(state.ships, goal.targets);
     case 'survive':
       return true;
+    case 'fleetLead':
+      return friendlyLead(state.ships) >= goal.margin;
     case 'gate':
       return Math.hypot(state.x - state.home.x, state.y - state.home.y) <= goal.radius;
     case 'track':

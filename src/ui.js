@@ -16,6 +16,7 @@ export function patrolNotices(s,opticalActive,soundOn,view,rate=1,paused=false){
  if(s.flood>0)notices.push({id:'flood',text:'Taking on water'});
  if(s.repair>0)notices.push({id:'repair',text:'Damage control working'});
  if(s.alert>30)notices.push({id:'detection',text:s.alert>60?'Under pursuit':'Possible detection'});
+ if(s.mission==='tiebreaker'&&s.phase==='extract')notices.push({id:'fleet-clearance',text:'Fleet lead confirmed · extraction open'});
  if(s.difficulty?.airSupport!==false){
   if(support.status==='arming')notices.push({id:'air',text:'Air support preparing · '+Math.max(0,Math.ceil(support.launchAt-s.time))+' s'});
   if(support.status==='airborne'&&s.aircraft.some(p=>p.hull>0&&!['down','return','gone'].includes(p.phase)))notices.push({id:'air',text:'Aircraft airborne'});

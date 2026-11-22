@@ -1,9 +1,25 @@
 import {carrierId,carrierGroup,validCarrier} from './carrier.js';
+import {advanceFleetAction,fleetTheater,validTheater} from './fleet-action.js';
+import {emitSound} from './acoustics.js';
+import {replayEvent} from './instant-replay.js';
 import {operatingFraction} from './equipment.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanics.js';
 import {hash01,TIMES} from './environment.js';
 import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-objective.js';
 export {MISSIONS};
+
+export function updateFleetBattle(s){
+ advanceFleetAction(s,(ship,v,fired)=>{
+  const p=fired?v.from:v.to;
+  const type=fired?(v.underwater?'seeker':'gunfire'):'detonation';
+  emitSound(s,{type,x:p.x,y:p.y,depth:Math.max(0,-p.altitude),altitude:p.altitude,power:fired?.55:.9});
+  if(!fired){
+   const kind=v.damage&&v.underwater?'torpedo':!v.damage&&p.altitude>=-2?'splash':'hit';
+   s.impacts.push({id:s.weaponSequence++,x:p.x,y:p.y,altitude:p.altitude,time:s.time,kind});
+   if(v.underwater&&v.damage)replayEvent(s,{kind:'torpedo',shot:v.id,target:ship.id,enemy:true,point:{x:p.x,y:p.y,depth:-p.altitude}});
+  }
+ });
+}
 
 export function patrolSetup(state){
  const env=state.environment;
@@ -22,6 +38,7 @@ export function parsePatrolSeed(text){
 }
 
 export function validMissionTargets(s){
+ if(s.mission==='tiebreaker')return validTheater(s);
  if(s.mission==='big-kahuna'){
   const carriers=s.ships.filter(v=>v.kind==='carrier'||v.id===carrierId);
   return carriers.length===1&&carriers[0].kind==='carrier'&&carriers[0].id===carrierId&&carriers[0].military===true&&validCarrier(carriers[0])&&(s.phase==='objective'||carriers[0].hull===0);
@@ -104,6 +121,7 @@ export function updateOperation(s,dt){
  return o.completed;
 }
 export function objectiveState(s){
+ if(s.mission==='tiebreaker')return {label:s.phase==='extract'?'EXTRACTION OPEN':'TURN THE TIDE',text:s.phase==='extract'?'Stay to assist or surface at extraction.':'Put the friendly fleet two vessels ahead. Your sub is excluded.',progress:s.phase==='extract'?'CLEARED':'',advice:''};
  if(s.mission==='big-kahuna')return {label:'BIG KAHUNA',text:'Sink fleet carrier Solstice and return to extraction',progress:s.ships.find(v=>v.id===carrierId)?.wreckMark?'WRECK MARKED':'',advice:''};
  if(s.mission==='sneaky-seamen')return {label:'GATE A → GATE B',text:'Reach Gate B at any depth',progress:(distance(s,s.home)/1000).toFixed(1)+' km',advice:'The convoy is expecting you.'};
  if(s.mission==='seek-and-destroy-sub')return {label:'HUNT OR WITHDRAW',text:'Surface at extraction to survive the patrol',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
@@ -139,6 +157,13 @@ export function randomizePatrol(s,seed){
  s.ships.push({id:'alder',name:['Alder','Seaforth','Larch'][Math.floor(h(81)*3)],kind:'merchant',military:false,x:convoy.x+400+h(82)*500,y:convoy.y+450+h(83)*300,heading,speed,hull:100,alert:0,attack:0,flood:0,disabled:false,sinkDepth:0});
  setupOperation(s,seed);
  s.events=s.events.filter(e=>!e.text.startsWith('Helm steady.'));
+ if(s.mission==='tiebreaker'){
+  Object.assign(s,fleetTheater(start,seed));s.home={x:start.x-450,y:start.y-550};
+  updateFleetBattle(s);
+  log(s,'Lark, Marlin and Calliope fly blue forked pennants. The orange pennants are hostile. Nacre is our submarine.');
+  log(s,'Fleet action in progress. Chart rings are friendly patrol areas from the briefing. No current positions confirmed.');
+  return;
+ }
  if(s.mission==='big-kahuna'){
   s.ships=carrierGroup(convoy.x,convoy.y,heading,speed,h(981)<.5,h(982));
   s.airSupport.base={...convoy};

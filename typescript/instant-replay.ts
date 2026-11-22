@@ -1,6 +1,7 @@
 import {boatLocal} from './surface-motion.ts';
 // The recorder owns only pictures of the renderable world. Neither playback
 // nor its camera can advance a patrol, expend ammunition or write a game save.
+import {fleetShotPose,type Volley} from './fleet-action.ts';
 type Point={x:number;y:number;depth:number};
 type Pose=Point & {heading:number;pitch?:number;speed?:number};
 type Ship=Pose & {id:string;kind:string;sinkDepth:number;hull:number};
@@ -10,6 +11,7 @@ type World=Pose & {
   time:number;wavePhase?:number;pitch:number;mission:string; difficulty:{instantReplay:boolean;enemyReplay:boolean};
   ships:Ship[];projectiles:Shot[];aircraft:Actor[];impacts:{id:number;time:number}[];
   blasts:object[];shells:object[];lightning:object[];gunRounds:object[];
+  battle?:{volleys:Volley[]};
   airSupport:object;environment:object;patrol:object;systems:object;gun:object;drone:Pose;
   site:(Pose & {kind:string})|null;operation:object|null;
   planes:number;rudder:number;cavitation:number;propRpm:number;propAngle:number;scopeAngle:number;
@@ -28,6 +30,7 @@ function picture(s:World){
     mission:s.mission,environment:s.environment,patrol:s.patrol,difficulty:s.difficulty,systems:{...s.systems},
     drone:{...s.drone},gun:{...s.gun},site:s.site?{...s.site}:null,operation:s.operation?{...s.operation}:null,airSupport:{...s.airSupport},
     ships:copies(s.ships),aircraft:copies(s.aircraft),projectiles:s.projectiles.map(p=>({...p,path:p.path.slice(-32)})),
+    ...(s.battle?{battle:{volleys:copies(s.battle.volleys)}}:{}),
     impacts:copies(s.impacts),lightning:copies(s.lightning),blasts:copies(s.blasts),shells:copies(s.shells),gunRounds:copies(s.gunRounds)};
 }
 const observers=new WeakMap<object,ReplayRecorder>();
@@ -117,7 +120,8 @@ export function replayPicture(clip:Clip,time:number){
     aircraft:actors(a.aircraft,b.aircraft,f),drone:tween(a.drone,b.drone,f)};
 }
 export function replayCamera(frame:Frame,event:TimedEvent,rotation:{yaw:number;pitch:number;zoom:number}){
-  const shot=frame.projectiles.find(p=>p.id===event.shot),v=frame.ships.find(p=>p.id===event.target);
+  const volley=frame.battle?.volleys.find(p=>p.id===event.shot&&p.underwater);
+  const shot=volley?fleetShotPose(volley,frame.time):frame.projectiles.find(p=>p.id===event.shot),v=frame.ships.find(p=>p.id===event.target);
   const vessel=v?{x:v.x,y:v.y,depth:(v.depth??0)+(v.sinkDepth||0)}:event.point;
   const boat={x:frame.x,y:frame.y,depth:frame.depth};
   let focus=boat, yaw=frame.heading*Math.PI/180+1.7, pitch=.19, distance=84;

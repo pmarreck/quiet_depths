@@ -19,10 +19,10 @@ export function fixContact(contact,observation){
 }
 export function chartContacts(s){
  if(!s.difficulty?.omniscientChart)return s.contacts;
- const hostile=new Set(s.ships.filter(ship=>ship.military).map(ship=>ship.id));
+ const hostile=new Set(s.ships.filter(ship=>ship.military&&ship.side!=='friendly').map(ship=>ship.id));
  const observed=s.contacts.filter(contact=>!hostile.has(contact.id));
- const exact=s.ships.filter(ship=>ship.military&&ship.hull>0).map(ship=>({
-  id:ship.id,label:'LIVE',name:ship.name,identified:true,kind:ship.kind,age:0,range:1,exact:true,
+ const exact=s.ships.filter(ship=>hostile.has(ship.id)&&ship.hull>0).map(ship=>({
+  id:ship.id,label:'LIVE',name:ship.name,identified:true,kind:ship.kind,military:ship.military,side:ship.side,age:0,range:1,exact:true,
   x:ship.x,y:ship.y,depthEstimate:ship.kind==='sub'?ship.depth:undefined,
   fix:{time:s.time,x:ship.x,y:ship.y,vx:Math.sin(ship.heading*Math.PI/180)*ship.speed*.514444,
    vy:Math.cos(ship.heading*Math.PI/180)*ship.speed*.514444,positionSigma:0,velocitySigma:0,maneuverSigma:0}
@@ -44,7 +44,7 @@ export function applyReconPacket(s,packet){
   if(fixContact(contact,observation)){
    const estimate=estimateAt(contact,s.time);contact.x=observation.x;contact.y=observation.y;contact.range=Math.hypot(estimate.x-s.x,estimate.y-s.y);contact.bearing=(Math.atan2(estimate.x-s.x,estimate.y-s.y)*180/Math.PI+360)%360;contact.confidence=observation.positionSigma===0?1:clamp(1-observation.positionSigma/1200,.2,.95);contact.age=estimate.age;contact.method='satellite';
   }
-  if(track.identified&&typeof track.name==='string'){contact.identified=true;contact.name=track.name;if(typeof track.kind==='string')contact.kind=track.kind;if(typeof track.military==='boolean')contact.military=track.military;}
+  if(track.identified&&typeof track.name==='string'){contact.identified=true;contact.name=track.name;if(track.side==='friendly'||track.side==='hostile')contact.side=track.side;if(typeof track.kind==='string')contact.kind=track.kind;if(typeof track.military==='boolean')contact.military=track.military;}
  }
  return true;
 }

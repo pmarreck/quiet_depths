@@ -1,7 +1,7 @@
 const storagePrefix='quiet-depths-service-record-v1:';
 
 export function patrolKills(state){
- const credited=state.ships.filter(ship=>ship.military&&ship.playerDamaged&&ship.hull===0);
+ const credited=state.ships.filter(ship=>ship.military&&ship.side!=='friendly'&&ship.playerDamaged&&ship.hull===0);
  const submarines=credited.filter(ship=>ship.kind==='sub').length;
  return {ships:credited.length-submarines,submarines};
 }

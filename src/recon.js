@@ -21,7 +21,7 @@ export function requestRecon(s,area){
 const codeOf=id=>{let value=0;for(const c of id)value=(Math.imul(value,31)+c.charCodeAt(0))|0;return value;};
 function snapshot(s){
  const area=s.recon.area,half=area.size/2,e=environmentAt(s),night=e.daylight<.25;
- const ships=s.ships.filter(v=>v.hull>0&&v.kind!=='sub'&&(v.depth||0)<=3&&Math.abs(v.x-area.x)<=half&&Math.abs(v.y-area.y)<=half&&(!night||v.lights!==false&&!v.blackout)).slice(0,RECON_LIMITS.maxTracks).map(v=>({id:v.id,x:v.x,y:v.y,heading:v.heading,speed:v.speed,kind:v.kind,hull:v.hull,name:v.name,military:v.military}));
+ const ships=s.ships.filter(v=>v.hull>0&&v.kind!=='sub'&&(v.depth||0)<=3&&Math.abs(v.x-area.x)<=half&&Math.abs(v.y-area.y)<=half&&(!night||v.lights!==false&&!v.blackout)).slice(0,RECON_LIMITS.maxTracks).map(v=>({id:v.id,x:v.x,y:v.y,heading:v.heading,speed:v.speed,kind:v.kind,hull:v.hull,name:v.name,military:v.military,...(v.side?{side:v.side}:{})}));
  return{time:s.time,night,weather:{id:e.weatherId,name:e.weather,waveScale:e.waveScale,waveSpeed:e.waveSpeed,wavePhase:s.wavePhase??s.time*e.waveSpeed,cloud:e.cloud,rain:e.rain,storm:e.storm,daylight:e.daylight,hour:e.hour},ships};
 }
 function makePacket(s,first,second){
@@ -35,7 +35,7 @@ function makePacket(s,first,second){
   if(!clear&&hash01(seed,code)>coverage)continue;
   const positionSigma=clear?0:40+cloud*150+second.weather.rain*100,dx=(hash01(seed,code+1201)-.5)*positionSigma*2,dy=(hash01(seed,code+1202)-.5)*positionSigma*2;
   const track={id:ship.id,x:ship.x+dx,y:ship.y+dy,vx:(ship.x-previous.x)/interval,vy:(ship.y-previous.y)/interval,time:second.time,identified:!night&&clear,positionSigma,velocitySigma:clear?.25:.8,maneuverSigma:.008};
-  if(track.identified)Object.assign(track,{name:ship.name,kind:ship.kind,military:ship.military});tracks.push(track);
+  if(track.identified)Object.assign(track,{name:ship.name,kind:ship.kind,military:ship.military,...(ship.side?{side:ship.side}:{})});tracks.push(track);
   sceneShips.push({id:ship.id,x:track.x,y:track.y,heading:ship.heading,speed:ship.speed,kind:night?'light':ship.kind,hull:ship.hull});
  }
  const id='sat-'+s.recon.sequence;

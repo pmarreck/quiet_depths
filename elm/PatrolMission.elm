@@ -1,8 +1,11 @@
 module PatrolMission exposing (Briefing, Mission(..), Objective(..), all, briefing, fromId, startingTorpedoes)
 
-startingTorpedoes : Int
-startingTorpedoes =
-    6
+startingTorpedoes : Mission -> Int
+startingTorpedoes mission =
+    if mission == Tiebreaker then
+        3
+    else
+        6
 
 
 type Mission
@@ -16,6 +19,7 @@ type Mission
     | UnderseaRescue
     | SurfaceRescue
     | Survey
+    | Tiebreaker
 
 
 type Objective
@@ -25,6 +29,7 @@ type Objective
     | ReachGate Float
     | TrackQuietly
     | FinishOperation
+    | FleetLead Int
 
 
 type alias Briefing =
@@ -40,7 +45,7 @@ type alias Briefing =
 
 all : List Mission
 all =
-    [ Recon, Intercept, Convoy, BigKahuna, SubHunt, Transit, Shadow, UnderseaRescue, SurfaceRescue, Survey ]
+    [ Recon, Intercept, Convoy, BigKahuna, SubHunt, Transit, Shadow, UnderseaRescue, SurfaceRescue, Survey, Tiebreaker ]
 
 
 fromId : String -> Maybe Mission
@@ -110,3 +115,9 @@ briefing mission =
                 "Survey an old wreck on the reef shelf. Collect 45 seconds of close sonar scanning, or photograph it from three different sides with your camera ROV. Stay within the 100 m cable."
                 "Scan the wreck or take 3 ROV photographs"
                 FinishOperation
+
+        Tiebreaker ->
+            Briefing "tiebreaker" "Tiebreaker" "FLEET ACTION" "8–15 MIN"
+                "Two fleets are already exchanging fire. Each has three ships and one submarine. Your chart shows the areas assigned to our units before the battle. Ping or look for fresh evidence before committing a torpedo. Give our fleet a two-vessel lead, excluding your own sub. Once command opens extraction, you may leave or stay to help."
+                "Give the friendly fleet a two-vessel lead"
+                (FleetLead 2)

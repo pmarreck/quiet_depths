@@ -149,6 +149,14 @@ export class OceanScene{
   for(let i=0;i<4;i++)this.box(g,[18,8,16],[0,13,-36+i*19],i%2?rust:this.mat(0x6b6b53));
   this.box(g,[.8,36,.8],[0,28,-18],deck);this.box(g,[22,.6,.6],[0,38,-18],deck);this.box(g,[.6,24,.6],[0,36,39],deck);
   this.box(g,[15,1,1],[0,43,39],deck);
+  if(ship.side){
+   const friendly=ship.side==='friendly',pennant=new T.BufferGeometry();
+   const points=friendly?[0,3,0, 1,3,10, .5,0,6, 0,3,0, .5,0,6, 0,-2,0, 0,-2,0, .5,0,6, 1,-2,10]
+                        :[0,3,0, 1,.5,10, 0,-2,0];
+   pennant.setAttribute('position',new T.Float32BufferAttribute(points,3));pennant.computeVertexNormals();
+   const flag=new T.Mesh(pennant,new T.MeshStandardMaterial({color:friendly?0x679acf:0xd98c43,side:T.DoubleSide}));
+   flag.position.set(0,44.5,39);g.add(flag);
+  }
   const lightMat=new T.MeshBasicMaterial({color:0xffd5a0,toneMapped:false,fog:false});for(let i=0;i<4;i++)this.box(lights,[2,1,1],[-6+i*4,21,47.1],lightMat);
   for(const [x,y,z,color,size] of [[-13,16,-25,0xff5c43,28],[13,16,-25,0x6cff9c,28],[0,43,-18,0xffdda5,40],[0,31,39,0xffd493,34]]){const sprite=new T.Sprite(new T.SpriteMaterial({map:this.glowTexture(),color,transparent:true,depthWrite:false,fog:false,toneMapped:false,blending:T.AdditiveBlending}));sprite.position.set(x,y,z);sprite.scale.set(size,size,1);lights.add(sprite);}
   if(escort){this.box(g,[7,4,8],[0,12,-48],hullMat);this.box(g,[1,1,16],[0,15,-55],hullMat);}

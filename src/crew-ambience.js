@@ -14,7 +14,7 @@ export function quietForSleep(s){
  if(s.silent||s.alert>30||s.shock>0||s.flood>0||s.pressureAlarm||s.time<(s.gunLoudUntil||0))return false;
  if(s.projectiles.length||s.shells.length||s.gunRounds.length||s.blasts.length||s.impacts.length)return false;
  if(s.airSupport.status==='arming'||s.airSupport.status==='airborne')return false;
- return !s.ships.some(v=>v.military&&v.hull>0&&(v.tracking==='tracking'||v.tracking==='searching'||Math.hypot(v.x-s.x,v.y-s.y)<850));
+ return !s.ships.some(v=>v.military&&v.side!=='friendly'&&v.hull>0&&(v.tracking==='tracking'||v.tracking==='searching'||Math.hypot(v.x-s.x,v.y-s.y)<850));
 }
 
 export class CrewAmbience {

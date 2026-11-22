@@ -1,3 +1,4 @@
+import {isOpponent} from './fleet-action.js';
 import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes} from './torpedo-tubes.js';
 import {replayEvent} from './instant-replay.js';
 import {gameEcho} from './torpedo-watch.js';
@@ -43,7 +44,7 @@ function putTorpedoInWater(s,owner,origin,heading,depth,launch){
 }
 export function launchTorpedo(s,id){
  const c=s.contacts.find(v=>v.id===id);
- if(!c||c.identified&&!c.military||s.status!=='patrol'||s.depth>100)return false;
+ if(!c||c.side==='friendly'||c.identified&&!c.military||s.status!=='patrol'||s.depth>100)return false;
  const condition=operatingFraction(s.systems.tubes);
  if(!condition)return false;
  const tube=torpedoTubes(s).next;
@@ -94,7 +95,7 @@ export function fireDeckGun(s,aim){
  const a=rad(s.heading),b=rad(aim.bearing),e=rad(clamp(aim.elevation,-15,85)),speed=600;
  s.gunRounds.push({id:s.weaponSequence++,owner:'player',x:s.x+Math.sin(a)*16,y:s.y+Math.cos(a)*16,altitude:6-s.depth,vx:Math.sin(b)*Math.cos(e)*speed,vy:Math.cos(b)*Math.cos(e)*speed,vz:Math.sin(e)*speed,age:0,tracer:s.gun.shots%5===0});
  emitSound(s,{type:'gunfire',x:s.x,y:s.y,altitude:6,power:.6});s.gunLoudUntil=s.time+3;s.alert=clamp(s.alert+8,0,100);
- for(const ship of s.ships)if(ship.military&&distance(s,ship)<6000)ship.alert=Math.max(ship.alert,65);
+ for(const ship of s.ships)if(isOpponent(ship)&&distance(s,ship)<6000)ship.alert=Math.max(ship.alert,65);
  return true;
 }
 export function aimGunAt(s,point){
@@ -125,6 +126,7 @@ function updateRounds(s,dt){
   if(target){const point={x:from.x+(r.x-from.x)*nearest,y:from.y+(r.y-from.y)*nearest,altitude:from.altitude+(r.altitude-from.altitude)*nearest};r.age=99;impact(s,r,point,'hit');
    const damageScale=2**(s.difficulty?.damage??0);
    if(type==='ship'){target.playerDamaged=true;if(target.kind==='carrier')raiseCarrierAlarm(s,target);target.hull=incidentalHull(target,12*damageScale);if(point.altitude+(target.sinkDepth||0)<5)target.flood=(target.flood||0)+2.4*damageScale;
+    if(target.side==='friendly')addDebrief(s,'Your deck gun struck the friendly '+target.name+'.');
     if(!target.military)recordCivilianHit(s,target,'Deck-gun fire struck the neutral '+target.name+'.');
     if(s.time-(target.lastHitLog??-99)>2){target.lastHitLog=s.time;log(s,'Gun impact observed.','info');}
    }else if(type==='aircraft'){target.hull=Math.max(0,target.hull-38*damageScale);if(target.hull<=0)log(s,'Aircraft hit. Going down.','success');}
@@ -278,7 +280,7 @@ function torpedoStrike(s,p,from){
   return true;
  }
  hit.playerDamaged=true;hit.hull=Math.max(0,hit.hull-100*2**(s.difficulty?.damage??0));
- if(hit.military)addDebrief(s,'Your torpedo struck '+hit.name+'.');
+ if(hit.military)addDebrief(s,'Your torpedo struck '+(hit.side==='friendly'?'the friendly ':'')+hit.name+'.');
  else recordCivilianHit(s,hit,p.diverted&&p.intended!==hit.id
   ?'A decoy diverted your torpedo before it acquired and struck the neutral '+hit.name+'.'
   :'Your torpedo struck the neutral '+hit.name+'.');
@@ -333,7 +335,7 @@ function requestSupport(s){
  if(carrier)support.base=deckOpen?{x:carrier.x,y:carrier.y}:{x:-3200,y:3400};
  if(support.status==='spent')return;
  if(carrier&&!deckOpen&&support.status!=='airborne'){support.status='spent';return;}
- for(const v of s.ships){if(!v.military||v.hull<=0||v.alert<=55)continue;
+ for(const v of s.ships){if(!isOpponent(v)||v.hull<=0||v.alert<=55)continue;
   if(!v.report||v.report.reason==='noisemaker'||s.time-v.report.time>4||v.report.time<(support.lastKnown?.time??0))continue;
   if(support.status==='idle')prepareSortie(s,carrier,v.report);
   else support.lastKnown={...v.report};

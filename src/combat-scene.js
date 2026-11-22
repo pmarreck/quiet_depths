@@ -1,3 +1,4 @@
+import {fleetShotPose} from './fleet-action.js';
 import {blastCloud,animateCloud} from './blast-cloud.js';
 import {periodJet} from './carrier-model.js';
 import * as T from './vendor/three.module.js';
@@ -70,7 +71,13 @@ export class CombatScene{
   if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values())this.removeTorpedo(p);this.planes.clear();this.torpedoes.clear();this.lastState=s;}
   const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane(s.mission==='big-kahuna');this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
-  const torpIds=new Set();for(const p of s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.set(p.pitch,-rad(p.heading),0,'YXZ');
+  const volleys=s.mission==='tiebreaker'?s.battle?.volleys??[]:[];
+  const shots=volleys.filter(v=>v.underwater).map(v=>{
+   const p=fleetShotPose(v,s.time),path=[];
+   for(let i=Math.max(0,Math.ceil((p.age-10)*3));i/3<p.age;i++)path.push(fleetShotPose(v,v.launched+i/3));
+   path.push(p);return {...p,path,pingAge:99};
+  });
+  const torpIds=new Set();for(const p of shots.length?[...s.projectiles,...shots]:s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.set(p.pitch,-rad(p.heading),0,'YXZ');
    const [front,rear]=g.userData.screws,elapsed=p.age-(g.userData.lastAge??p.age);
    front.rotation.z=renderedScrewAngle(front.rotation.z,720,elapsed,TORPEDO_BLADES);
    rear.rotation.z=Math.PI/TORPEDO_BLADES-front.rotation.z;g.userData.lastAge=p.age;
@@ -91,7 +98,19 @@ export class CombatScene{
    g.userData.wake.material.opacity=.8*fade;g.userData.bubbles.material.opacity=BUBBLE_OPACITY*fade;
    this.updateTrail(g,g.userData.path,s.time,e);
   }
-  let n=0;const positions=this.tracerGeometry.attributes.position;for(const r of s.gunRounds){if(!r.tracer||!r.previous||n>=192)continue;positions.setXYZ(n*2,r.previous.x,r.previous.altitude,-r.previous.y);positions.setXYZ(n*2+1,r.x,r.altitude,-r.y);n++;}positions.needsUpdate=true;this.tracerGeometry.setDrawRange(0,n*2);this.tracerGeometry.computeBoundingSphere();
+  let n=0;const positions=this.tracerGeometry.attributes.position;
+  for(const r of s.gunRounds){if(!r.tracer||!r.previous||n>=192)continue;positions.setXYZ(n*2,r.previous.x,r.previous.altitude,-r.previous.y);positions.setXYZ(n*2+1,r.x,r.altitude,-r.y);n++;}
+  for(const v of volleys){
+   if(v.underwater)continue;
+   const f=(s.time-v.launched)/(v.arrives-v.launched);
+   if(n>=192||f<0||f>1)continue;
+   const arc=v.from.altitude>0&&v.to.altitude>0?18:0;
+   for(const [i,t] of [Math.max(0,f-.06),f].entries()){
+    positions.setXYZ(n*2+i,v.from.x+(v.to.x-v.from.x)*t,v.from.altitude+(v.to.altitude-v.from.altitude)*t+4*arc*t*(1-t),-v.from.y-(v.to.y-v.from.y)*t);
+   }
+   n++;
+  }
+  positions.needsUpdate=true;this.tracerGeometry.setDrawRange(0,n*2);this.tracerGeometry.computeBoundingSphere();
   this.effects.forEach((g,i)=>{
    const p=s.impacts[i];g.visible=!!p;if(!p)return;
    const age=time-p.time,{splash,cloud,flash}=g.userData;

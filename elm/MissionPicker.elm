@@ -156,7 +156,7 @@ view model =
             [ b [] [ text "YOUR FIRST ORDERS" ]
             , p []
                 [ text ((PatrolMission.briefing model.selected).description ++ " ")
-                , text ("You carry " ++ String.fromInt PatrolMission.startingTorpedoes ++ " torpedoes in total, with two bow tubes ready. ")
+                , text ("You carry " ++ String.fromInt (PatrolMission.startingTorpedoes model.selected) ++ " torpedoes in total, with two bow tubes ready. ")
                 , Html.strong [] [ text (model.pauseKey ++ " pauses the patrol.") ]
                 ]
             ]

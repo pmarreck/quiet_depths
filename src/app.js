@@ -18,6 +18,7 @@ import {HeldInput} from './input.js';
 import {SoundSystem} from './audio.js';
 import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
+import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js';
@@ -286,7 +287,7 @@ bindCommand('start-rescue','click',()=>{
 bindCommand('hold-position','click',()=>{state.route=null;state.targetSpeed=0;state.targetDepth=state.site?operationApproach(state).depth:state.depth;toast('All stop. Ballast and planes holding ordered depth.');});
 bindCommand('recall-drone','click',()=>recallDrone(state),()=>state.drone.mode==='remote');
 bindCommand('clear-route','click',()=>{state.route=null;toast('Waypoint cleared. Holding ordered heading.');});
-bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast(state.mission==='sneaky-seamen'?'Gate B plotted. Cross at any depth.':'Extraction plotted. Surface inside the pickup circle to finish.');});
+bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast(state.mission==='sneaky-seamen'?'Gate B plotted. Cross at any depth.':'Extraction plotted. Surface inside the pickup circle to finish.');},()=>state.mission!=='tiebreaker'||state.phase==='extract');
 $('center-chart').onclick=()=>{chart.follow=true;updateUI();};
  for(const [id,factor] of [['chart-zoom-in',1.4],['chart-zoom-out',1/1.4]])$(id).onclick=()=>{const r=$('viewport').getBoundingClientRect();zoomChart(chart,factor,r.width/2,r.height/2,r.width,r.height,state);updateUI();};
  all('[data-panel]').forEach(b=>b.onclick=()=>{const next=b.dataset.panel;if(drawer===next){closeDrawer();return;}openDrawer(next);});$('drawer-backdrop').onclick=closeDrawer;
@@ -485,8 +486,8 @@ function updateUI(){
  $('show-recon-chart').classList.toggle('hidden',!s.difficulty.satellite);
  $('recon-panel').classList.toggle('hidden',!s.difficulty.satellite);
  $('mission-type').textContent=m.type;$('mission-name').innerHTML=esc(m.name).replace('observation','<br>observation.').replace('home','<br>home.').replace('through','<br>through.');
- const returning=extract&&!['seek-and-destroy-sub','seek-and-destroy','intercept','big-kahuna'].includes(s.mission);
- $('plot-home').textContent=s.mission==='sneaky-seamen'?'PLOT GATE B':'PLOT EXTRACTION';
+ const returning=extract&&!['tiebreaker','seek-and-destroy-sub','seek-and-destroy','intercept','big-kahuna'].includes(s.mission);
+ $('plot-home').textContent=s.mission==='sneaky-seamen'?'PLOT GATE B':s.mission==='tiebreaker'&&!extract?'AWAIT FLEET CLEARANCE':'PLOT EXTRACTION';
  $('mission-desc').textContent=returning?'Your work is done. Bring everyone home.':m.short;
  $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':returning?'RETURN TO EXTRACTION':objective.label;
  $('objective-text').textContent=pickup?'Request 0 m and wait until surfaced':returning?'Reach the green circle and surface':objective.text;
@@ -500,7 +501,7 @@ function updateUI(){
  $('pressure-warning').hidden=view!=='orbit'||!pressure||s.status!=='patrol';
  $('pressure-warning').classList.toggle('critical',pressure===2);
  $('pressure-warning').textContent=(pressure===2?'CRITICAL · IMPLOSION RISK':'PRESSURE ALARM')+' · Rise above '+limit+' m';
- document.querySelector('.top-coords b').textContent=String(s.patrol.seed);$('home-distance').textContent=(distance(s,s.home)/1000).toFixed(1)+' km · '+deg(bearing(s,s.home))+'°';
+ document.querySelector('.top-coords b').textContent=String(s.patrol.seed);$('home-distance').textContent=s.mission==='tiebreaker'&&!extract?'Awaiting fleet clearance':(distance(s,s.home)/1000).toFixed(1)+' km · '+deg(bearing(s,s.home))+'°';
  $('hull-value').innerHTML=Math.round(s.hull)+'<span>%</span>';$('hull-bar').style.width=s.hull+'%';$('hull-bar').style.background=s.hull<45?'var(--red)':'var(--green)';
  const boatStatus=s.fuelFire?'FUEL FIRE':s.fuelLeak?'FUEL TANK LEAK':s.repair>0?'DAMAGE CONTROL WORKING':s.flood>0?'FLOODING · '+s.flood.toFixed(1)+' T/MIN · '+s.water.toFixed(1)+' T ABOARD':s.hull<99.9?'PRESSURE HULL DAMAGED':s.outerHull<99.9?'OUTER HULL DAMAGED':Object.values(s.systems).some(v=>v<100)?'SUBSYSTEM DAMAGE':'ALL SYSTEMS NOMINAL';
  $('system-status').textContent=boatStatus;$('system-status').style.color=s.flood>0?'var(--red)':s.outerHull<99.9?'var(--gold)':'var(--green)';
@@ -583,7 +584,7 @@ function updateUI(){
  $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
  $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
- const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED')+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
+ const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(affiliation(c)||(c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED'))+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
 
  $('torp-count').textContent=s.torps+' ABOARD';
@@ -594,7 +595,7 @@ function updateUI(){
   status.classList.toggle('ready',remaining===0&&operatingFraction(s.systems.tubes)>0);
  }
  $('run-limit').value=s.runSetting;$('run-readout').textContent=(s.runSetting/1000).toFixed(2)+' km';
- const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(firingBearing(s,target))}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('torpedo-status').textContent=s.projectiles.filter(p=>p.owner==='player').map((p,i)=>`TORP ${i+1} · ${p.age<4?'ARMING':p.lock?'SONAR TRACK':'SEARCHING'} · ${deg(p.heading)}°`).join(' / ');$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='SUB STOP';
+ const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.side==='friendly'?'Confirmed friendly. Hold fire.':target.probableSide==='friendly'&&!target.identified?'Probable friendly. Check identification.':target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(firingBearing(s,target))}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.side!=='friendly'&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('torpedo-status').textContent=s.projectiles.filter(p=>p.owner==='player').map((p,i)=>`TORP ${i+1} · ${p.age<4?'ARMING':p.lock?'SONAR TRACK':'SEARCHING'} · ${deg(p.heading)}°`).join(' / ');$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='SUB STOP';
  for(const id of ['battery','oxygen','fuel']){$(id+'-value').textContent=Math.round(s[id])+(id==='fuel'&&s.systems.fuelTank<100?' / '+Math.floor(s.systems.fuelTank):id==='battery'&&s.systems.batteryBank<100?' / '+Math.floor(s.systems.batteryBank):'')+'%';$(id+'-bar').style.width=s[id]+'%';$(id+'-value').style.color=s[id]<20?'var(--red)':'';}
  $('alert-label').textContent=s.alert>60?'UNDER PURSUIT':s.alert>30?'POSSIBLE DETECTION':'UNDETECTED';$('alert-label').style.color=s.alert>30?'var(--red)':'var(--green)';$('alert-dot').style.background=s.alert>30?'var(--red)':'var(--green)';
  $('noise-value').textContent='SELF NOISE '+Math.round(s.noise)+' dB';$('clearance').textContent='KEEL CLEARANCE '+Math.round(getSoundings(s).belowKeel)+' m';$('damage-flash').style.opacity=s.shock?String(s.shock*.2):'0';$('cracks').classList.toggle('hidden',!(drone?active&&s.drone.camera<65:view==='scope'&&active&&s.systems.periscope<=45));
@@ -636,7 +637,7 @@ function drawSonar(id,mini,time){
   c.globalAlpha=alpha;
   if(shortLabels){let lx=clamp(x+9,15,w-35),ly=clamp(y-8,65,h-20);if(occupied.some(p=>Math.abs(p.x-lx)<25&&Math.abs(p.y-ly)<14))ly+=14;occupied.push({x:lx,y:ly});c.fillStyle=q.id===selected?'#efd19a':'#c2cfa5';c.textAlign='left';c.font='11px IBM Plex Mono,monospace';c.fillText(q.label,lx,ly);continue;}
   let ly=clamp(y-8,65,h-30),lx=clamp(x+15,20,w-190);while(occupied.some(p=>Math.abs(p.x-lx)<180&&Math.abs(p.y-ly)<38))ly+=38;occupied.push({x:lx,y:ly});
-  c.strokeStyle='#86a17c66';c.beginPath();c.moveTo(x+5,y);c.lineTo(lx-4,ly);c.stroke();c.textAlign='left';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#d4d6af';c.fillText(q.identified?q.name:q.label,lx,ly);c.font='12px IBM Plex Mono,monospace';c.fillStyle='#a2b69a';c.fillText(range===null?'RANGE UNKNOWN':Math.round(q.confidence*100)+'% CONFIDENCE',lx,ly+17);
+  c.strokeStyle='#86a17c66';c.beginPath();c.moveTo(x+5,y);c.lineTo(lx-4,ly);c.stroke();c.textAlign='left';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#d4d6af';c.fillText((q.side||q.probableSide?affiliation(q)+' · ':'')+(q.identified?q.name:q.label),lx,ly);c.font='12px IBM Plex Mono,monospace';c.fillStyle='#a2b69a';c.fillText(range===null?'RANGE UNKNOWN':Math.round(q.confidence*100)+'% CONFIDENCE',lx,ly+17);
  }
  c.globalAlpha=1;c.fillStyle='#e2d19e';c.beginPath();c.moveTo(cx,cy-8);c.lineTo(cx-4,cy+5);c.lineTo(cx+4,cy+5);c.closePath();c.fill();
  drawSonarGlass(c,w,h,health);
@@ -676,7 +677,15 @@ function drawChart(){
  c.strokeStyle='#759a8133';c.lineWidth=.6;const grid=chart.zoom<.6?5000:chart.zoom<6?1000:chart.zoom<24?250:chart.zoom<80?100:25;
  for(let x=Math.floor(tl.x/grid)*grid;x<br.x;x+=grid){c.beginPath();c.moveTo(sx(x),0);c.lineTo(sx(x),h);c.stroke();}for(let y=Math.floor(br.y/grid)*grid;y<tl.y;y+=grid){c.beginPath();c.moveTo(0,sy(y));c.lineTo(w,sy(y));c.stroke();}
  c.textAlign='center';c.font='14px IBM Plex Mono,monospace';c.fillStyle='#b9c5a4';c.fillText('GREYBANK ISLAND',sx(-3800),sy(4000));c.fillStyle='#9ab29f';c.font='12px IBM Plex Mono,monospace';c.fillText('REEF · 65–110 M',sx(1900),sy(700));
+ if(state.mission==='tiebreaker'){
+  for(const area of state.battle.areas){
+   c.strokeStyle='#73cfc090';c.fillStyle='#73cfc00c';c.setLineDash([9,7]);c.beginPath();c.arc(sx(area.x),sy(area.y),area.radius*k,0,Math.PI*2);c.fill();c.stroke();c.setLineDash([]);
+   c.fillStyle='#a6d6ce';c.font='12px IBM Plex Mono,monospace';c.textAlign='center';c.fillText(area.label.toUpperCase()+' · BRIEFING',sx(area.x),sy(area.y)-area.radius*k-4);
+  }
+ }
+ if(state.mission!=='tiebreaker'||state.phase==='extract'){
  c.strokeStyle='#90bb9f';c.setLineDash([3,4]);c.beginPath();c.arc(sx(state.home.x),sy(state.home.y),(state.departure?200:400)*k,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#bdd5af';c.font='14px IBM Plex Mono,monospace';c.fillText(state.departure?'GATE B · ANY DEPTH':'EXTRACTION · SURFACE',sx(state.home.x),sy(state.home.y)+(state.departure?200:400)*k+23);
+ }
  for(const t of state.torpedoTracks)drawTorpedoMark(c,t,sx(t.x),sy(t.y),false,0);
  if(state.departure){const x=sx(state.departure.x),y=sy(state.departure.y);c.beginPath();c.arc(x,y,5,0,2*Math.PI);c.stroke();c.fillText('GATE A',x,y-9);}
  for(const v of state.ships){
@@ -705,7 +714,7 @@ function drawChart(){
    else c.fillRect(sx(e.x)-2,sy(e.y)-2,4,4);
    if(q.fix){c.beginPath();c.moveTo(sx(e.x),sy(e.y));c.lineTo(sx(e.x+q.fix.vx*60),sy(e.y+q.fix.vy*60));c.stroke();}
    c.textAlign='left';c.font='12px IBM Plex Mono,monospace';
-   c.fillText(q.label+(q.identified?' · '+q.name:sub?' · SUBMARINE':''),sx(e.x)+9,sy(e.y)-9);
+   c.fillText(q.label+(q.side||q.probableSide?' · '+affiliation(q):'')+(q.identified?' · '+q.name:sub?' · SUBMARINE':''),sx(e.x)+9,sy(e.y)-9);
    c.font='11px IBM Plex Mono,monospace';
    const age=q.exact?'LIVE':e.hasFix?Math.round(e.age)+' s OLD':'ESTIMATE';
    const motion=q.fix&&(q.exact||q.courseEstimated)?deg(e.angle)+'° · '+(Math.hypot(q.fix.vx,q.fix.vy)/.514444).toFixed(1)+' KN':'COURSE / SPEED ?';
@@ -731,10 +740,11 @@ function drawScope(){
  const cy=h*.5,cx=w/2;c.strokeStyle='#d5d8ba8c';c.lineWidth=.8;c.beginPath();c.moveTo(cx-100,cy);c.lineTo(cx-17,cy);c.moveTo(cx+17,cy);c.lineTo(cx+100,cy);c.moveTo(cx,cy-53);c.lineTo(cx,cy-15);c.moveTo(cx,cy+15);c.lineTo(cx,cy+53);for(let x=-80;x<=80;x+=20){if(!x)continue;c.moveTo(cx+x,cy-4);c.lineTo(cx+x,cy+4);}c.stroke();c.strokeStyle='#d5d8ba55';c.beginPath();c.arc(cx,cy,13,0,Math.PI*2);c.stroke();c.fillStyle='#c8ccb3';c.font='14px IBM Plex Mono,monospace';c.textAlign='center';c.fillText('6',cx+124,cy+3);c.fillText('6',cx-124,cy+3);
  if(scopeWashed(state))return;
  const focused=state.contacts.filter(q=>q.identified&&q.age<=3&&q.kind!=='sub'&&Math.abs(delta(q.bearing,look))<19/zoom).sort((a,b)=>Math.abs(delta(a.bearing,look))-Math.abs(delta(b.bearing,look))).slice(0,1);
- for(const q of focused){const d=delta(q.bearing,look);const x=clamp(cx+Math.tan(rad(d))/Math.tan(rad(19/zoom))*cx,105,w-105);c.fillStyle='#d8d9b5';c.font='14px IBM Plex Mono,monospace';c.fillText(q.name.toUpperCase(),x,h*.56);c.fillStyle='#bdc7b0';c.font='12px IBM Plex Mono,monospace';c.fillText((q.range/1000).toFixed(1)+' KM · '+(q.military?'MILITARY':'NEUTRAL'),x,h*.56+19);}
+ for(const q of focused){const d=delta(q.bearing,look);const x=clamp(cx+Math.tan(rad(d))/Math.tan(rad(19/zoom))*cx,105,w-105);c.fillStyle='#d8d9b5';c.font='14px IBM Plex Mono,monospace';c.fillText(q.name.toUpperCase(),x,h*.56);c.fillStyle='#bdc7b0';c.font='12px IBM Plex Mono,monospace';c.fillText((q.range/1000).toFixed(1)+' KM · '+affiliation(q),x,h*.56+19);}
 }
 function drawGun(){const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);const x=w/2,y=h/2;c.strokeStyle='#e3d4ab';c.lineWidth=1;c.beginPath();c.arc(x,y,11,0,Math.PI*2);c.moveTo(x-50,y);c.lineTo(x-15,y);c.moveTo(x+15,y);c.lineTo(x+50,y);c.moveTo(x,y-35);c.lineTo(x,y-15);c.moveTo(x,y+15);c.lineTo(x,y+35);c.stroke();}
 function patrolVictory(s){
+ if(s.mission==='tiebreaker')return 'Your fleet earned a two-vessel lead. You brought your sub and crew home.';
  if(s.mission==='big-kahuna')return 'Solstice sank. You brought your sub and crew home.';
  if(s.mission==='sneaky-seamen')return 'Gate B reached. You crossed the patrol area and brought your crew through alive.';
  if(s.mission==='intercept')return 'The briefed freighter sank and your crew reached pickup.';
@@ -752,12 +762,14 @@ function showResult(){
  const win=state.status==='won';
  $('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';
  $('result-body').textContent=win?patrolVictory(state):state.cookoff?'A torpedo detonated aboard the submarine. The crew lost the sub.':state.imploded?'Your pressure hull collapsed at '+Math.round(state.depth)+' m.':state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.':'Your sub could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';
+ if(state.mission==='tiebreaker'&&state.status==='expired'&&sidesAfloat(state.ships).friendly<2){$('result-title').textContent='Fleet recalled.';$('result-body').textContent='Fewer than two friendly vessels survived to earn extraction clearance.';}
  const kills=patrolKills(state),medals=$('patrol-medals');
  medals.hidden=kills.submarines===0;
  medals.textContent=kills.submarines>=2?'✦ Two-submarine patrol commendation':'✦ Submarine patrol commendation';
  const finding=disciplinaryFinding(state),stamp=$('discipline-stamp');stamp.hidden=!finding;
  if(finding){stamp.textContent=finding.title;stamp.style.setProperty('--stamp-angle',finding.angle+'deg');}
- const entries=[...state.debrief];if(finding)entries.push({time:state.time,text:finding.title+'. '+finding.reason});
+ const entries=[...state.debrief];
+ if(state.mission==='tiebreaker'){const {friendly,hostile}=sidesAfloat(state.ships);entries.push({time:state.time,text:'Fleet action ended with '+friendly+' friendly and '+hostile+' hostile vessels afloat, excluding your sub.'});}if(finding)entries.push({time:state.time,text:finding.title+'. '+finding.reason});
  const debrief=$('patrol-debrief');debrief.hidden=!entries.length;
  $('debrief-entries').replaceChildren(...entries.map(event=>{
   const entry=document.createElement('li');entry.textContent=`${Math.floor(event.time/60)}m ${Math.floor(event.time%60)}s · ${event.text}`;return entry;
@@ -817,7 +829,7 @@ function renderSound(){
 }
 function launchSelected(){
  const target=state.contacts.find(c=>c.id===selected);if(!target)return;
- if(state.depth>100){toast('Rise to 100 m or less to fire.');return;}if(target.identified&&!target.military){toast('Identified neutral. Firing is withheld.');return;}
+ if(state.depth>100){toast('Rise to 100 m or less to fire.');return;}if(target.side==='friendly'){toast('Friendly vessel identified. Hold fire.');return;}if(target.identified&&!target.military){toast('Identified neutral. Firing is withheld.');return;}
  if(fire(state,selected)){sound.tone('fire');setRate(1);toast('Torpedo running. Its own sonar will arm and acquire a return.');}
 }
 function changeZoom(factor){if(!canIssue(state,context())||!feedActive(state,view))return;zoom=clamp(zoom*factor,1,opticalZoomLimit(view));zooms[view]=zoom;updateUI();}

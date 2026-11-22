@@ -34,6 +34,9 @@ encodeObjective objective =
         FinishOperation ->
             rule "operation" []
 
+        FleetLead margin ->
+            rule "fleetLead" [ ( "margin", E.int margin ) ]
+
 
 encodeMission : PatrolMission.Mission -> E.Value
 encodeMission mission =
@@ -47,7 +50,7 @@ encodeMission mission =
         , ( "minutes", E.string b.duration )
         , ( "desc", E.string b.description )
         , ( "short", E.string b.short )
-        , ( "torps", E.int PatrolMission.startingTorpedoes )
+        , ( "torps", E.int (PatrolMission.startingTorpedoes mission) )
         , ( "objective", encodeObjective b.objective )
         ]
 

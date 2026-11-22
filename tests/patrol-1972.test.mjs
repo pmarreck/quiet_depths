@@ -67,13 +67,13 @@ test('cavitation pressure uses the radius of the rendered propeller',async()=>{
  assert.ok(Math.abs(p.sigma-expected)<1e-10);
 });
 
-test('every mission starts with six torpedoes and two loaded bow tubes',()=>{
+test('every mission has its briefed ammunition and two loaded bow tubes',()=>{
  for(const m of MISSIONS){
-  const s=createGame(m.id,19),target=s.ships.find(v=>v.military);
+  const s=createGame(m.id,19),target=s.ships.find(v=>v.military&&v.side!=='friendly');
   contact(s,target,'active');
-  assert.equal(s.torps,6,m.id);
+  assert.equal(s.torps,m.id==='tiebreaker'?3:6,m.id);
   assert.ok(fire(s,target.id),m.id);assert.ok(fire(s,target.id),m.id);
-  assert.deepEqual(s.projectiles.map(p=>p.tubeSide),[-1,1]);
+  assert.deepEqual(s.projectiles.map(p=>p.tubeSide),m.id==='tiebreaker'?[1,-1]:[-1,1]);
   const before=save(s);
   assert.equal(fire(s,target.id),false,m.id+' must wait for a reload');
   assert.equal(save(s),before,'blocked launches cannot consume stock, move the timers, or emit events');
@@ -226,7 +226,7 @@ test('Home Screen, favicon and manifest icons resolve to PNGs of their declared 
 
 test('the mission catalog retains every historical v1 patrol ID in briefing order',()=>{
  const savedIds=['recon','intercept','seek-and-destroy','big-kahuna','seek-and-destroy-sub','sneaky-seamen',
-  'shadow','undersea-rescue','surface-rescue','survey'];
+  'shadow','undersea-rescue','surface-rescue','survey','tiebreaker'];
  assert.deepEqual(MISSIONS.map(m=>m.id),savedIds);
  for(const id of savedIds){
   const patrol=createGame(id,37);
