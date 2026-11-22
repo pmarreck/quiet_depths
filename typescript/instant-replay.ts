@@ -8,7 +8,7 @@ type Ship=Pose & {id:string;kind:string;sinkDepth:number;hull:number};
 type Shot=Pose & {id:number;owner:string;age:number;path:(Point & {time:number})[]};
 type Actor={id:number; x:number;y:number;altitude:number;heading:number};
 type World=Pose & {
-  time:number;wavePhase?:number;pitch:number;mission:string; difficulty:{instantReplay:boolean;enemyReplay:boolean};
+  time:number;wavePhase?:number;flood?:number;imploded?:boolean;pitch:number;mission:string; difficulty:{instantReplay:boolean;enemyReplay:boolean};
   ships:Ship[];projectiles:Shot[];aircraft:Actor[];impacts:{id:number;time:number}[];
   blasts:object[];shells:object[];lightning:object[];gunRounds:object[];
   battle?:{volleys:Volley[]};
@@ -25,7 +25,7 @@ type Frame=ReturnType<typeof picture>;
 export type Clip={event:TimedEvent;frames:Frame[];wall:number};
 const copies=<T extends object>(items:T[])=>items.map(item=>({...item}));
 function picture(s:World){
-  return {time:s.time,wavePhase:s.wavePhase,x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:s.speed,pitch:s.pitch,
+  return {time:s.time,wavePhase:s.wavePhase,flood:s.flood,imploded:s.imploded,x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:s.speed,pitch:s.pitch,
     verticalSpeed:s.verticalSpeed,planes:s.planes,rudder:s.rudder,propRpm:s.propRpm,propAngle:s.propAngle,
     scopeAngle:s.scopeAngle,towerAngle:s.towerAngle,towerPitch:s.towerPitch,scope:s.scope,cavitation:s.cavitation,
     mission:s.mission,environment:s.environment,patrol:s.patrol,difficulty:s.difficulty,systems:{...s.systems},

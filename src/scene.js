@@ -6,6 +6,7 @@ import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
 import {feedActive,cameraEuler,droneCameraPitch,orbitVerticalFov} from './controls.js';
 import {environmentAt,SEA_SAMPLE_GLSL,wavePhaseAt,surfaceHeight,scopePosition,boatSurfacePose,hash01,waterColumnLight} from './environment.js';
+import {FloodBubbles} from './flood-bubbles.js';
 import {SternSpray} from './surface-motion.js';
 import {Atmosphere} from './atmosphere.js';
 import {UnderseaLife} from './undersea.js';
@@ -114,6 +115,21 @@ export class OceanScene{
     void main(){float r=length(gl_PointCoord-.5)*2.;if(r>1.)discard;gl_FragColor=vec4(.72,.9,.96,(1.-r)*opacity*.78);}`
   }));
   this.bubbles.frustumCulled=false;this.own.add(this.bubbles);
+  this.floodStreams=new WeakMap();this.leakAnchor=new T.Vector3();
+  const leakGeometry=new T.BufferGeometry();
+  const skin=new T.PointsMaterial({color:0xc5e9f3,transparent:true,opacity:.85,depthWrite:false,size:1});
+  skin.onBeforeCompile=shader=>{
+   shader.vertexShader='attribute float width;\n'+shader.vertexShader.replace('gl_PointSize = size;', 'gl_PointSize = size * width;');
+   shader.fragmentShader=shader.fragmentShader.replace('#include <map_particle_fragment>',`
+    vec2 cell=gl_PointCoord-0.5;
+    float r=2.*length(cell);
+    if(r>1.)discard;
+    float rim=smoothstep(.52,.81,r)*(1.-smoothstep(.81,1.,r));
+    float glint=1.-smoothstep(.01,.20,length(cell-vec2(-.19,.23)));
+    diffuseColor.a*=.12+.62*rim+.24*glint;
+   `);
+  };
+  this.leakMist=new T.Points(leakGeometry,skin);this.leakMist.frustumCulled=false;this.scene.add(this.leakMist);
   this.sternSpray=new SternSpray();
   const sprayGeometry=new T.BufferGeometry();
   sprayGeometry.setAttribute('position',new T.BufferAttribute(this.sternSpray.positions,3).setUsage(T.DynamicDrawUsage));
@@ -161,6 +177,32 @@ export class OceanScene{
   }
   if(ship.wreck){damageWreck(T,root,false);lights.visible=false;}
   return root;
+ }
+ updateFloodBubbles(s,time,env){
+  let stream=this.floodStreams.get(s);
+  if(!stream){stream=new FloodBubbles();this.floodStreams.set(s,stream);}
+  const geo=this.leakMist.geometry;
+  if(this.currentFloodStream!==stream){
+   if(this.currentFloodStream)geo.dispose();
+   geo.setAttribute('position',new T.BufferAttribute(stream.positions,3).setUsage(T.DynamicDrawUsage));
+   geo.setAttribute('width',new T.BufferAttribute(stream.sizes,1).setUsage(T.DynamicDrawUsage));
+   this.currentFloodStream=stream;
+  }
+  const leaks=[];
+  const addLeak=(id,mesh,rate)=>{
+   if(!mesh||!(rate>0)||mesh.position.distanceToSquared(this.camera.position)>450**2)return;
+   // The breach is on the outer plating, below the surfaced waterline.
+   const side=id.length%2?1:-1,z=-12+id.length%5*3;
+   const p=mesh.localToWorld(this.leakAnchor.set(side*4.98,.65,z));
+   leaks.push({id,rate,x:p.x,y:p.y,z:p.z});
+  };
+  if(!s.imploded)addLeak('player',this.own,s.flood);
+  for(const v of s.ships)if(v.kind==='sub'&&!v.settled&&!v.collapsed)
+   addLeak(v.id,this.ships.get(v.id),v.flood||(v.sunkAt!==undefined?3:0));
+  if(s.site?.kind==='sub')addLeak('casualty',this.life.site,s.site.flood);
+  const count=stream.update(time,leaks,(x,z)=>surfaceHeight(x,-z,time,env));
+  geo.setDrawRange(0,count);this.leakMist.visible=count>0;
+  if(count){geo.attributes.position.needsUpdate=true;geo.attributes.width.needsUpdate=true;}
  }
  updateTerrain(x,y,seed){
   const tile=FLOOR_WIDTH/2,east=Math.round(x/tile)*tile,north=Math.round(y/tile)*tile;
@@ -316,7 +358,7 @@ export class OceanScene{
   this.own.userData.rescueHatch.rotation.z=s.mission==='undersea-rescue'&&s.operation?.active?1.1:0;
   this.bubbles.visible=s.cavitation>.01;this.bubbleUniforms.strength.value=s.cavitation;
   this.bubbleUniforms.clock.value=time;this.bubbleUniforms.trailLength.value=Math.abs(s.speed)*1.4;
-  this.life.update(s,e);this.combat.update(s,e,orbiting,time);
+  this.life.update(s,e);this.updateFloodBubbles(s,time,e);this.combat.update(s,e,orbiting,time);
   const cable=tetherPoints(s,time,48,hull);this.cable.visible=!!cable.length;if(cable.length){const p=this.cable.geometry.attributes.position;cable.forEach((v,i)=>p.setXYZ(i,v.x,-v.depth,-v.y));p.needsUpdate=true;this.cable.geometry.setDrawRange(0,cable.length);this.cable.geometry.computeBoundingSphere();}
 
   this.driftingBubbles.visible=underwater;
