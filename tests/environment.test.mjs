@@ -7,10 +7,10 @@ import * as sea from '../src/environment.js';
 import {SUB_DESIGN as design} from '../src/hull-design.js';
 import {SternSpray} from '../src/surface-motion.js';
 
-test('surface trim exposes one third of the hull diameter and wave pitch fades by periscope depth',()=>{
+test('surface trim exposes one quarter of the hull diameter and wave pitch fades by periscope depth',()=>{
  const s=createGame('recon',121,{weather:'storm',changing:false});s.depth=0;s.pitch=0;
  const e=environmentAt(s),flat=sea.boatSurfacePose(s,{...e,waveScale:0});
- assert.ok(Math.abs((design.hullRadius-flat.depth)/(2*design.hullRadius)-1/3)<1e-8);
+ assert.ok(Math.abs((design.hullRadius-flat.depth)/(2*design.hullRadius)-1/4)<1e-8);
  const sweep=depth=>{
   s.depth=depth;const angles=Array.from({length:240},(_,i)=>sea.boatSurfacePose(s,e,i/4).pitch);
   return [Math.min(...angles),Math.max(...angles)];
@@ -18,6 +18,45 @@ test('surface trim exposes one third of the hull diameter and wave pitch fades b
  const [low,high]=sweep(0),[,mid]=sweep(7),[,deep]=sweep(15);
  assert.ok(low<-.03&&high>.03&&mid<high&&mid>deep&&deep<high*.05);
  s.depth=80;s.pitch=.16;assert.equal(sea.boatSurfacePose(s,e).pitch,.16);
+});
+
+test('a stopped rescue boat rides a late weather front without snapping, including at 20×',()=>{
+ for(const rate of [1,20]){
+  const s=createGame('surface-rescue',21,{weather:'clear',changing:true});
+  Object.assign(s,{time:924,speed:0,targetSpeed:0,depth:0,targetDepth:0,pitch:0});
+  let previous=sea.boatSurfacePose(s),peakPitch=0,peakRoll=0,peakHeave=0;
+  while(s.time<961){
+   step(s,rate/32,{timeRate:rate});
+   const pose=sea.boatSurfacePose(s);
+   peakPitch=Math.max(peakPitch,Math.abs(pose.pitch-previous.pitch)*32);
+   peakRoll=Math.max(peakRoll,Math.abs(pose.roll-previous.roll)*32);
+   peakHeave=Math.max(peakHeave,Math.abs(pose.depth-previous.depth)*32);
+   previous=pose;
+  }
+  assert.ok(peakPitch<.20&&peakRoll<.16&&peakHeave<5,JSON.stringify({rate,peakPitch,peakRoll,peakHeave}));
+  const resumed=restore(save(s));assert.ok(resumed);
+  assert.deepEqual(sea.boatSurfacePose(resumed),previous);
+  for(const boat of [s,resumed])step(boat,.25,{timeRate:5});
+  assert.deepEqual(sea.boatSurfacePose(resumed),sea.boatSurfacePose(s));
+ }
+});
+
+test('surface water and hull share a clock through time compression, pause and a saved patrol',()=>{
+ const slow=createGame('surface-rescue',11,{weather:'rain',changing:false});
+ slow.targetSpeed=slow.speed=0;
+ const fast=restore(save(slow));
+ for(let i=0;i<40;i++){
+  step(slow,.1);step(fast,2,{timeRate:20});
+  const a=environmentAt(slow),b=environmentAt(fast);
+  const height=s=>surfaceHeight(80,32,s.time,environmentAt(s));
+  assert.ok(Math.abs(height(slow)-height(fast))<1e-8);
+  const hullA=sea.boatSurfacePose(slow,a),hullB=sea.boatSurfacePose(fast,b);
+  assert.ok(Math.abs(hullA.depth-hullB.depth)<1e-8&&Math.abs(hullA.pitch-hullB.pitch)<1e-8);
+ }
+ const frozen=save(fast);step(fast,14,{paused:true,timeRate:20});assert.equal(save(fast),frozen);
+ const resumed=restore(frozen);step(resumed,.25);step(slow,.25);
+ assert.ok(Math.abs(resumed.wavePhase-slow.wavePhase)<1e-8);
+ const bad=JSON.parse(frozen);bad.wavePhase=-1;assert.equal(restore(JSON.stringify(bad)),null);
 });
 
 test('a surface-piercing screw throws more spray at higher RPM and leaves its drops behind',()=>{

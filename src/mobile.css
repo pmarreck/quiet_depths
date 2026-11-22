@@ -235,11 +235,44 @@ body.orbiting>.topbar,body.orbiting>.bottom-bar,body.orbiting .console>:not(.mai
  .slot-actions{grid-column:2}
 }
 
-#red-beacon{position:relative;display:inline-block;flex:0 0 9px;width:9px;height:9px;margin-inline:3px;border:1px solid #7c5552;border-radius:50%;background:#3c2523;pointer-events:none}
-#red-beacon.lit{background:#ff493e;border-color:#ff9a7d;box-shadow:0 0 8px #ff3125;z-index:4}
-#red-beacon.lit::before{content:'';position:absolute;inset:-37px;border-radius:50%;background:conic-gradient(from -45deg,#ff312a77 0deg 90deg,transparent 90deg 180deg,#ff312a77 180deg 270deg,transparent 270deg);mask-image:radial-gradient(black,transparent 70%);animation:red-beacon-turn 1s linear infinite}
+#briefing{overscroll-behavior:contain}
+#briefing::backdrop{background:#081219;backdrop-filter:none}
+#red-beacon{
+ --lamp-width:54px;position:relative;display:block;flex:0 0 var(--lamp-width);
+ width:var(--lamp-width);height:calc(var(--lamp-width)*.76);pointer-events:none;z-index:4;
+}
+#red-beacon::after{
+ content:'';position:absolute;bottom:0;left:2%;width:96%;height:21%;border-radius:20% / 42%;
+ background:linear-gradient(#879390,#394342 25%,#192123 65%,#545e59 83%,#1d2827);box-shadow:0 2px 3px #0009;
+}
+.beacon-lens{
+ position:absolute;inset:2% 8% 12%;overflow:hidden;border-radius:48% 48% 15% 15% / 57% 57% 18% 18%;
+ border:1px solid #92554c;background:repeating-linear-gradient(90deg,transparent 0 4px,#fa837c19 4px 5px),
+ radial-gradient(ellipse at 40% 25%,#803434,#492120 60%,#29191b);box-shadow:inset 0 -3px 4px #240c0d;
+}
+.beacon-lens::after{
+ content:'';position:absolute;inset:9% 12% 12%;border-radius:inherit;
+ background:linear-gradient(107deg,transparent 10%,#ffe5d52e 17%,transparent 26%);
+}
+#red-beacon.lit .beacon-lens{
+ border-color:#ff9a75;background:repeating-linear-gradient(90deg,transparent 0 4px,#ffd1a754 4px 5px),
+ radial-gradient(ellipse at 50% 68%,#ff9570,#fa3025 45%,#8a1518 85%);box-shadow:0 0 12px 3px #ff30288a;
+}
+#red-beacon.lit::before{
+ content:'';position:absolute;left:50%;top:50%;width:clamp(230px,24vw,370px);aspect-ratio:1;translate:-50% -50%;
+ background:conic-gradient(from -45deg,#ff392b88 0deg 90deg,transparent 90deg 180deg,#ff392b88 180deg 270deg,transparent 270deg);
+ mask-image:radial-gradient(black 9%,#0009 38%,transparent 70%);animation:red-beacon-turn 1s linear infinite;
+}
+#red-beacon.lit .beacon-lens::before{
+ content:'';position:absolute;inset:8% 12% 4%;border-radius:50%;
+ background:linear-gradient(90deg,transparent,#fff7ab 48%,#ffa760 57%,transparent);
+ animation:beacon-reflector 1s ease-in-out infinite;
+}
 @keyframes red-beacon-turn{to{transform:rotate(1turn)}}
-body.paused #red-beacon::before{animation-play-state:paused}
+@keyframes beacon-reflector{0%,100%{transform:translateX(-68%) scaleX(.42);opacity:.5}50%{transform:translateX(60%) scaleX(.88);opacity:1}}
+body.paused #red-beacon::before,body.paused .beacon-lens::before{animation-play-state:paused}
+@media(max-width:1100px){#red-beacon{--lamp-width:39px}}
+@media(max-width:520px){.topbar .brand-mark{display:none}#red-beacon{--lamp-width:34px}}
 #torpedo-tracks>div{padding:6px 0;border-top:1px solid var(--line);font:12px/1.55 var(--mono);color:#efd19a}
 body.replaying .viewport>#replay-overlay{visibility:visible;position:absolute;inset:0;z-index:25;touch-action:none;user-select:none;display:flex;align-items:flex-start;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left))}
 body.replaying .viewport>#world{visibility:visible;display:block!important;filter:none!important;opacity:1!important}
@@ -249,4 +282,4 @@ body.replaying #pressure-warning,body.replaying #orbit-tools,body.replaying .vie
 .replay-caption span{padding:3px 6px;background:#102029df;color:#eee8d0}
 #replay-exit{min-height:44px;padding:0 14px;border:1px solid #b4b0a0;background:#12222df2;color:#fff}
 @keyframes replay-pulse{50%{opacity:.6}}
-@media(prefers-reduced-motion:reduce){#red-beacon.lit::before,.replay-caption strong{animation:none}}
+@media(prefers-reduced-motion:reduce){#red-beacon.lit::before,#red-beacon.lit .beacon-lens::before,.replay-caption strong{animation:none}}

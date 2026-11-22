@@ -129,7 +129,7 @@ export function captureSatellite(o,s,packet){
   o.water.position.set(plan.area.x,0,-plan.area.y);
   const setUniform=(key,value)=>{const u=o.waterUniforms[key];if(!u)return;if(u.value?.set&&Array.isArray(value))u.value.set(...value);else u.value=value;};
   setUniform('origin',[plan.area.x,plan.area.y]);setUniform('time',plan.capturedAt);setUniform('underwater',0);setUniform('flash',0);setUniform('fogDensity',0);
-  for(const key of ['daylight','cloud','twilight','waveScale','waveSpeed'])setUniform(key,environment[key]);setUniform('sunDir',[environment.sunDirection.x,environment.sunDirection.y,environment.sunDirection.z]);
+  for(const key of ['daylight','cloud','twilight','waveScale'])setUniform(key,environment[key]);setUniform('sunDir',[environment.sunDirection.x,environment.sunDirection.y,environment.sunDirection.z]);
   if(o.hemi)o.hemi.intensity=.18+1.8*environment.daylight;
   if(o.sun){o.sun.intensity=environment.daylight*(1-environment.cloud*.7)*2.7;o.sun.position.set(environment.sunDirection.x*5000,environment.sunDirection.y*5000,environment.sunDirection.z*5000);}
   if(o.moon){o.moon.intensity=(1-environment.daylight)*.28;o.moon.position.set(-environment.sunDirection.x*5000,-environment.sunDirection.y*5000,-environment.sunDirection.z*5000);}

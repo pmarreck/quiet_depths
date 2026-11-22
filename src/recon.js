@@ -22,7 +22,7 @@ const codeOf=id=>{let value=0;for(const c of id)value=(Math.imul(value,31)+c.cha
 function snapshot(s){
  const area=s.recon.area,half=area.size/2,e=environmentAt(s),night=e.daylight<.25;
  const ships=s.ships.filter(v=>v.hull>0&&v.kind!=='sub'&&(v.depth||0)<=3&&Math.abs(v.x-area.x)<=half&&Math.abs(v.y-area.y)<=half&&(!night||v.lights!==false&&!v.blackout)).slice(0,RECON_LIMITS.maxTracks).map(v=>({id:v.id,x:v.x,y:v.y,heading:v.heading,speed:v.speed,kind:v.kind,hull:v.hull,name:v.name,military:v.military}));
- return{time:s.time,night,weather:{id:e.weatherId,name:e.weather,cloud:e.cloud,rain:e.rain,storm:e.storm,daylight:e.daylight,hour:e.hour},ships};
+ return{time:s.time,night,weather:{id:e.weatherId,name:e.weather,waveScale:e.waveScale,waveSpeed:e.waveSpeed,wavePhase:s.wavePhase??s.time*e.waveSpeed,cloud:e.cloud,rain:e.rain,storm:e.storm,daylight:e.daylight,hour:e.hour},ships};
 }
 function makePacket(s,first,second){
  const seed=seedOf(s),cloud=second.weather.cloud,night=second.night,clear=cloud<.35&&second.weather.rain<.1,coverage=clear?1:clamp(1-cloud*.8-second.weather.rain*.15,.12,.9),quality=clear?1:clamp(1-cloud*.7-second.weather.rain*.2,.1,.85),tracks=[],sceneShips=[];
@@ -76,7 +76,7 @@ export function reconStatus(s){
  const [title,detail]=labels[r.phase]||labels.idle;
  return{phase:r.phase,title,detail,progress:clamp(r.progress||0,0,1),canRequest:['idle','complete','failed'].includes(r.phase)&&cooldownRemaining<=0&&!blocked,cooldownRemaining,linkLabel:link.label};
 }
-function validWeather(value){return value&&Object.hasOwn(WEATHER,value.id)&&['cloud','rain','storm','daylight','hour'].every(k=>finite(value[k]))&&['cloud','rain','storm','daylight'].every(k=>value[k]>=0&&value[k]<=1);}
+function validWeather(value){return value&&Object.hasOwn(WEATHER,value.id)&&['waveScale','waveSpeed','wavePhase'].every(k=>value[k]===undefined||finite(value[k])&&value[k]>=0)&&['cloud','rain','storm','daylight','hour'].every(k=>finite(value[k]))&&['cloud','rain','storm','daylight'].every(k=>value[k]>=0&&value[k]<=1);}
 function validFrame(value){
  return value&&finite(value.time)&&value.time>=0&&typeof value.night==='boolean'&&validWeather(value.weather)&&Array.isArray(value.ships)&&value.ships.length<=RECON_LIMITS.maxTracks&&value.ships.every(v=>v&&typeof v.id==='string'&&['x','y','heading','speed','hull'].every(k=>finite(v[k])));
 }

@@ -126,9 +126,15 @@ function patrolReceipt(s,source){
  }
 }
 function tick(s,dt,input){
+ // Continue older saves from the wave they last displayed.
+ if(s.wavePhase===undefined)s.wavePhase=s.time*environmentAt(s).waveSpeed;
  s.time+=dt;s.pingAge+=dt;s.pingCooldown=Math.max(0,s.pingCooldown-dt);s.photoCooldown=Math.max(0,s.photoCooldown-dt);s.shock=Math.max(0,(s.shock||0)-dt);
  if(s.noisemaker&&s.time-s.noisemaker.time>32)delete s.noisemaker;
  const env=environmentAt(s);
+ // Only the next interval uses the new weather speed. The sea keeps wall
+ // time during compression while objectives and traffic keep patrol time.
+ s.wavePhase+=env.waveSpeed*dt/Math.max(1,input.timeRate||1);
+ env.wavePhase=s.wavePhase;
  if(s.time>=s.nextLightningAt){
   if(env.storm>.35){const angle=s.time<30?rad(s.heading+s.scopeAngle+(rand(s)-.5)*26):rand(s)*Math.PI*2,range=1800+rand(s)*4000,strike={id:s.soundSequence,time:s.time,x:s.x+Math.sin(angle)*range,y:s.y+Math.cos(angle)*range,height:1050+rand(s)*900,seed:Math.floor(rand(s)*1000000)};
    s.lightning.push(strike);emitSound(s,{type:'thunder',x:strike.x,y:strike.y,altitude:strike.height*.65,power:.8+rand(s)*.4});}
@@ -203,6 +209,7 @@ export function save(s){return JSON.stringify(s);}
 export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charge={id:s.soundSequence++,x,y,depth,delay,totalDelay:delay,age:0,exploded:false,kind};s.blasts.push(charge);return charge;}
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
+ if(s.wavePhase!==undefined&&(!Number.isFinite(s.wavePhase)||s.wavePhase<0))return null;
  // Patrols saved before the orbit option existed always used station views.
  s.difficulty=patrolDifficulty({orbitCamera:false,instantReplay:false,...s.difficulty});
  if(s.torpedoTracks===undefined)s.torpedoTracks=[];

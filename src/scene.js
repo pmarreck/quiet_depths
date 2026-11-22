@@ -3,7 +3,7 @@ import {damageWreck} from './wrecks.js';
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
 import {feedActive,cameraEuler,droneCameraPitch,orbitVerticalFov} from './controls.js';
-import {environmentAt,SEA_SAMPLE_GLSL,surfaceHeight,scopePosition,boatSurfacePose,hash01,waterColumnLight} from './environment.js';
+import {environmentAt,SEA_SAMPLE_GLSL,wavePhaseAt,surfaceHeight,scopePosition,boatSurfacePose,hash01,waterColumnLight} from './environment.js';
 import {SternSpray} from './surface-motion.js';
 import {Atmosphere} from './atmosphere.js';
 import {UnderseaLife} from './undersea.js';
@@ -14,19 +14,19 @@ import {CombatScene} from './combat-scene.js';
 import {tetherPoints} from './tether.js';
 const ROV_LAMP_INTENSITY=1100;
 const waterVertex=`
-uniform float time;uniform vec2 origin;uniform float waveScale;uniform float waveSpeed;
+uniform float time;uniform vec2 origin;uniform float waveScale;uniform float wavePhase;
 varying vec3 vWorld;
 varying vec3 vNormal;
 ${SEA_SAMPLE_GLSL}
 void main(){vec3 p=position;vec3 sea=seaSample(p.xy+origin);p.z=sea.x;vec4 world=modelMatrix*vec4(p,1.);vWorld=world.xyz;vNormal=normalize(vec3(-sea.y,1.,sea.z));gl_Position=projectionMatrix*viewMatrix*world;}`;
 const waterFragment=`
-uniform float time;uniform vec3 sunDir;uniform float underwater;uniform float daylight;uniform float cloud;uniform float twilight;uniform float waveScale;uniform float waveSpeed;uniform vec3 fogColor;uniform float fogDensity;uniform float flash;
+uniform float time;uniform vec3 sunDir;uniform float underwater;uniform float daylight;uniform float cloud;uniform float twilight;uniform float waveScale;uniform float wavePhase;uniform vec3 fogColor;uniform float fogDensity;uniform float flash;
 uniform float underwaterSun;
 varying vec3 vWorld;varying vec3 vNormal;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.)),f.x),f.y);}
 float waveFocus(vec2 p){
- float phase=time*waveSpeed*1.6;
+ float phase=wavePhase*1.6;
  float a=sin(dot(p,vec2(.53,.19))+phase+sin(p.y*.24)*.8);
  float b=sin(dot(p,vec2(-.33,.71))-phase*.68);
  return 1.-smoothstep(.04,.42,abs(a+.65*b));
@@ -64,7 +64,7 @@ export class OceanScene{
   this.THREE=T;this.canvas=canvas;this.renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:false,preserveDrawingBuffer:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1));this.renderer.setClearColor(0x687a78);this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.15;
   this.scene=new T.Scene();this.scene.fog=new T.FogExp2(0x627475,.00015);this.camera=new T.PerspectiveCamera(38,1,.5,23000);
   this.hemi=new T.HemisphereLight(0xd4d9c8,0x18353e,2);this.scene.add(this.hemi);this.sun=new T.DirectionalLight(0xffd6a0,2.7);this.scene.add(this.sun);this.moon=new T.DirectionalLight(0xb8d3ff,.2);this.scene.add(this.moon);
-  this.waterUniforms={time:{value:0},origin:{value:new T.Vector2()},sunDir:{value:new T.Vector3(-.5,.12,-1).normalize()},underwater:{value:0},underwaterSun:{value:0},waveScale:{value:1},waveSpeed:{value:1},daylight:{value:1},cloud:{value:0},twilight:{value:0},fogColor:{value:new T.Color()},fogDensity:{value:.0002},flash:{value:0}};
+  this.waterUniforms={time:{value:0},origin:{value:new T.Vector2()},sunDir:{value:new T.Vector3(-.5,.12,-1).normalize()},underwater:{value:0},underwaterSun:{value:0},waveScale:{value:1},wavePhase:{value:0},daylight:{value:1},cloud:{value:0},twilight:{value:0},fogColor:{value:new T.Color()},fogDensity:{value:.0002},flash:{value:0}};
   const geo=new T.PlaneGeometry(30000,30000,256,256);const wp=geo.attributes.position;for(let i=0;i<wp.count;i++){for(const axis of ['X','Y']){const u=wp['get'+axis](i)/15000;wp['set'+axis](i,Math.sign(u)*15000*Math.pow(Math.abs(u),2.4));}}this.water=new T.Mesh(geo,new T.ShaderMaterial({uniforms:this.waterUniforms,vertexShader:waterVertex,fragmentShader:waterFragment,side:T.DoubleSide}));this.water.rotation.x=-Math.PI/2;this.scene.add(this.water);
   this.atmosphere=new Atmosphere(this.scene);
   const terrainGeo=new T.PlaneGeometry(FLOOR_WIDTH,FLOOR_WIDTH,FLOOR_SEGMENTS,FLOOR_SEGMENTS);const pos=terrainGeo.attributes.position;const colors=[];for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);const b=bottom(x,y);pos.setZ(i,-b);const c=new T.Color(b<0?0x414c42:0x264541);c.multiplyScalar(.8+hash01(1983,i)*.3);colors.push(c.r,c.g,c.b);}terrainGeo.setAttribute('color',new T.Float32BufferAttribute(colors,3));terrainGeo.computeVertexNormals();this.terrain=new T.Mesh(terrainGeo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide}));this.terrain.rotation.x=-Math.PI/2;this.scene.add(this.terrain);
@@ -224,11 +224,11 @@ export class OceanScene{
   this.caustics.causticStrength.value=(light?.direct??0)*.63*Math.exp(-Math.max(0,s.depth)/37);
   this.water.position.set(listener.x,0,-listener.y);
   const water=this.waterUniforms;
-  water.time.value=time;
+  water.time.value=time;water.wavePhase.value=wavePhaseAt(time,e);
   water.underwater.value=underwater?1:0;
   water.underwaterSun.value=light?.direct??0;
   water.origin.value.set(listener.x,listener.y);
-  for(const k of ['waveScale','waveSpeed','daylight','cloud','twilight'])water[k].value=e[k];
+  for(const k of ['waveScale','daylight','cloud','twilight'])water[k].value=e[k];
   water.fogColor.value.copy(fog);
   water.fogDensity.value=this.scene.fog.density=underwater?(view==='replay'?Math.min(.006,.60/orbit.distance):.009):1.1/e.opticalRange;
   water.sunDir.value.set(e.sunDirection.x,e.sunDirection.y,e.sunDirection.z).normalize();

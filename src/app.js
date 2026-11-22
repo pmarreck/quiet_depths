@@ -101,16 +101,11 @@ function changeOrbit(){
  previousView=view;setView('orbit');$('orbit-pause').focus({preventScroll:true});
 }
 function zoomOrbit(factor){orbit.distance=clamp(orbit.distance*factor,37,120);}
-function updateMissionBriefing(id){
- const mission=MISSIONS.find(m=>m.id===id);
- if(!mission)return;
- document.querySelector('.briefing-tip p').innerHTML=esc(mission.desc)+' <strong>'+esc(keyLabel(bindings.Escape))+' pauses the patrol.</strong>';
-}
 function renderServiceRecord(){
  try{const record=serviceRecord(localStorage);$('service-record').textContent=`${record.ships} ships sunk · ${record.submarines} submarines sunk · ${record.doubleHunts} two-submarine patrols`;}catch{}
 }
 const briefingPatrol=()=>patrolStarted?state:saved;
-let briefingVisit=0;
+let briefingVisit=0,frameRequest=null;
 function openBriefing(){
  held.clear();persist();renderServiceRecord();briefingVisit++;
  const current=briefingPatrol();
@@ -122,6 +117,7 @@ function openBriefing(){
  }
  $('seed-status').textContent='';$('current-seed-status').textContent='';
  $('briefing').showModal();
+ if(frameRequest!==null){cancelAnimationFrame(frameRequest);frameRequest=null;}
  $('resume').classList.toggle('hidden',!resumablePatrol(current));
  refreshSlots();sound.update();
 }
@@ -147,7 +143,7 @@ function start(setup=null,snapshot=null){
   orbit=null;lossSoundPlayed=false;
   recorder=scene&&state.difficulty.instantReplay?new ReplayRecorder(state):null;
  }
- patrolStarted=true;
+ renderClock=state.time;patrolStarted=true;
  state.patrolId??=Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
  chart={x:state.x,y:state.y,zoom:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
@@ -172,20 +168,19 @@ $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const missionPicker=globalThis.Elm.MissionPicker.init({
  node:$('patrol-briefing-controls'),
- flags:{selected:state.mission,difficulty:difficultyPanel(difficulty),times:conditionChoices(TIMES),weather:conditionChoices(WEATHER)}
+ flags:{selected:state.mission,pauseKey:keyLabel(bindings.Escape),difficulty:difficultyPanel(difficulty),times:conditionChoices(TIMES),weather:conditionChoices(WEATHER)}
 });
 missionPicker.ports.difficultyChanged.subscribe(({id,value})=>{
  difficulty=patrolDifficulty({...difficulty,[id]:value});
  try{localStorage.setItem('quiet-depths-difficulty-v1',JSON.stringify(difficulty));}catch{}
 });
-missionPicker.ports.missionSelected.subscribe(updateMissionBriefing);
 missionPicker.ports.patrolRequested.subscribe(start);
 $('reuse-patrol').onclick=()=>{
  const {seed,mission,options}=patrolSetup(briefingPatrol());
  missionPicker.ports.selectSetup.send({mission,conditions:{timeOfDay:options.timeOfDay,weather:options.weather,changing:options.changing}});
  $('patrol-seed').value=seed;$('patrol-seed').setCustomValidity('');
  difficulty=patrolDifficulty(options.difficulty);missionPicker.ports.showDifficulty.send(difficultyPanel(difficulty));
- $('current-seed-status').textContent='Original setup selected. Choose Begin Patrol to replay.';
+ $('current-seed-status').textContent='Original setup selected. Choose Begin Mission to replay.';
 };
 let slotsRequest=0;
 async function refreshSlots(message=''){
@@ -369,7 +364,7 @@ vp.addEventListener('wheel',e=>{
  if(view==='chart'){e.preventDefault();const r=vp.getBoundingClientRect();zoomChart(chart,Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);updateUI();}
  else if(['scope','tower','gun'].includes(view)&&feedActive(state,view)&&canIssue(state,context())){e.preventDefault();zoom=clamp(zoom-e.deltaY*.002,1,opticalZoomLimit(view));updateUI();}
 },{passive:false});
-function saveShortcuts(){try{localStorage.setItem('quiet-depths-shortcuts-v1',JSON.stringify(bindings));}catch{}}
+function saveShortcuts(){missionPicker.ports.showPauseKey.send(keyLabel(bindings.Escape));try{localStorage.setItem('quiet-depths-shortcuts-v1',JSON.stringify(bindings));}catch{}}
 function showShortcuts(){
  $('shortcut-list').replaceChildren(...Object.entries(shortcutActions).map(([action,label])=>{
   const button=document.createElement('button');button.type='button';button.dataset.shortcut=action;
@@ -705,18 +700,24 @@ function showResult(){
  $('result-stats').innerHTML=`<span>PATROL<br>${Math.floor(state.time/60)}m ${Math.floor(state.time%60)}s</span><span>HULL<br>${Math.round(state.hull)}%</span><span>PHOTOS<br>${state.photos.length}</span><span>SUNK<br>${kills.ships} ships · ${kills.submarines} subs</span>`;
  $('result-dialog').showModal();
 }
+function scheduleFrame(){
+ if(frameRequest===null&&!$('briefing').open)frameRequest=requestAnimationFrame(frame);
+}
+$('briefing').addEventListener('close',()=>{last=performance.now();scheduleFrame();});
 function frame(now){
+ frameRequest=null;
+ if($('briefing').open)return;
  const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
  if(replay){
   const r=vp.getBoundingClientRect();
   if(replay.advance(realDt)){scene.resize(r.width,r.height);scene.render(replay.world,'replay',1,replay.cursor,replay.camera(),replay.cursor);}
   else exitReplay();
-  requestAnimationFrame(frame);return;
+  scheduleFrame();return;
  }
  if(canIssue(state,ctx)){
   const previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
   applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;const observation=['scope','gun','tower','drone'].includes(view)&&feedActive(state,view)?view:null;
-  step(state,realDt*rate,{afterTick:recorder?s=>recorder.capture(s):undefined,observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
+  step(state,realDt*rate,{timeRate:rate,afterTick:recorder?s=>recorder.capture(s):undefined,observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
   if(state.pressureAlarm>previousPressure)setRate(1);
   if((state.operation?.rescued||0)>priorRescued)sound.tone('photo');
   if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}
@@ -730,7 +731,7 @@ function frame(now){
   const ended=state.status!=='patrol';
   if(ended&&state.status==='lost'&&!lossSoundPlayed){sound.loss(state);lossSoundPlayed=true;}
   const clip=recorder?.take(state.time,ended,event=>sound.replayTailActive(event));
-  if(clip){beginReplay(clip);requestAnimationFrame(frame);return;}
+  if(clip){beginReplay(clip);scheduleFrame();return;}
   if(ended&&!recorder?.pending.length)showResult();
  }
  if(String(feedActive(state,view))!==$('world').dataset.online)updateUI();
@@ -742,7 +743,7 @@ function frame(now){
  const r=vp.getBoundingClientRect();
  if(scene&&feedActive(state,view)){scene.resize(r.width,r.height);scene.render(state,view,zoom,renderClock,orbit,presentationSeconds);}
  if(view==='scope'&&feedActive(state,'scope'))drawScope();if(view==='gun'&&feedActive(state,'gun'))drawGun();if(view==='sonar'){drawSonar('tactical',false,renderClock);drawHydrophones(renderClock);}if(view==='chart')drawChart();drawSonar('mini-sonar',true,renderClock);captureEvidence();
- if(now-lastUI>100){updateUI();sound.update();lastUI=now;}if(now-lastSave>8000&&!ctx.modal&&!paused){persist();lastSave=now;}requestAnimationFrame(frame);
+ if(now-lastUI>100){updateUI();sound.update();lastUI=now;}if(now-lastSave>8000&&!ctx.modal&&!paused){persist();lastSave=now;}scheduleFrame();
 }
 function openDrawer(next){drawer=next;document.body.dataset.drawer=next;$('drawer-backdrop').classList.remove('hidden');all('[data-panel]').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.panel===next)));}
 function renderSound(){
@@ -832,4 +833,4 @@ function captureEvidence(){
 }
 
 initializeExtras();
-setView(scene?'scope':'sonar');updateUI();openBriefing();requestAnimationFrame(frame);
+setView(scene?'scope':'sonar');updateUI();openBriefing();

@@ -1,6 +1,6 @@
 import {SUB_DESIGN} from './hull-design.ts';
 
-interface Sea { waveScale: number; waveSpeed: number }
+interface Sea { waveScale: number; waveSpeed: number; wavePhase?: number; sampledAt?: number }
 interface Point { x: number; y: number; depth: number }
 interface Hull extends Point { heading: number; pitch: number; roll?: number }
 interface Offset { side?: number; forward?: number; down?: number }
@@ -13,9 +13,16 @@ export const WAVE_COMPONENTS = [
   {kx:0, ky:.31, omega:-2.3, amplitude:.11}
 ] as const;
 
+// Phase is accumulated during play. A saved or photographed frame can be
+// sampled again without retiming every preceding wave when the front changes.
+export function wavePhaseAt(time: number, sea: Sea): number {
+  return sea.wavePhase === undefined ? time*sea.waveSpeed : sea.wavePhase+(time-(sea.sampledAt??time))*sea.waveSpeed;
+}
+
 export function surfaceHeight(x: number, y: number, time: number, sea: Sea): number {
+  const phase = wavePhaseAt(time,sea);
   let sum = 0;
-  for (const w of WAVE_COMPONENTS) sum += w.amplitude * Math.sin(x*w.kx + y*w.ky + time*sea.waveSpeed*w.omega);
+  for (const w of WAVE_COMPONENTS) sum += w.amplitude * Math.sin(x*w.kx + y*w.ky + phase*w.omega);
   return sea.waveScale * sum;
 }
 
@@ -25,14 +32,25 @@ export function surfaceMotion(boat: Hull, sea: Sea, time: number): Hull {
   const response = Math.max(0, 1 - Math.max(0, boat.depth) / periscopeDepth) ** 2;
   if (!response) return {x, y, heading, depth:boat.depth, pitch:boat.pitch, roll:0};
   const angle = heading*Math.PI/180, east = Math.sin(angle), north = Math.cos(angle);
-  const wave = (ahead: number, right: number) => surfaceHeight(x+ahead*east+right*north, y+ahead*north-right*east, time, sea);
-  const arm = 23, bow = wave(arm,0), stern = wave(-arm,0);
-  const heave = (bow + 2*wave(0,0) + stern) / 4;
+  const arm = 23, phase = wavePhaseAt(time,sea);
+  let heave = 0, pitchSlope = 0, rollSlope = 0;
+  for (const w of WAVE_COMPONENTS) {
+    const at = x*w.kx + y*w.ky + phase*w.omega;
+    const forward = w.kx*east + w.ky*north, starboard = w.kx*north - w.ky*east;
+    // Steady response of a 1.25-second first-order lag to this harmonic.
+    // Long swells carry the hull. Short crests mostly pass underneath it.
+    const lag = 1.25*w.omega*sea.waveSpeed, scale = w.amplitude*sea.waveScale/(1+lag*lag);
+    const sin = Math.sin(at), cos = Math.cos(at);
+    const height = scale*(sin-lag*cos), slope = scale*(cos+lag*sin);
+    heave += height*(1+Math.cos(forward*arm))/2;
+    pitchSlope += slope*Math.sin(forward*arm)/arm;
+    rollSlope += slope*Math.sin(starboard*hullRadius)/hullRadius;
+  }
   return {
     x, y, heading,
-    depth: boat.depth + response*(hullRadius/3 - heave),
-    pitch: boat.pitch + response*Math.atan2(bow-stern, 2*arm),
-    roll: response*.45*Math.atan2(wave(0,hullRadius)-wave(0,-hullRadius), 2*hullRadius)
+    depth: boat.depth + response*(hullRadius/2 - heave),
+    pitch: boat.pitch + response*Math.atan(pitchSlope),
+    roll: response*.45*Math.atan(rollSlope)
   };
 }
 

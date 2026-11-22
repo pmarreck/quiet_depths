@@ -1,6 +1,6 @@
-import {surfaceMotion,surfaceHeight,WAVE_COMPONENTS,hash01,boatPoint} from './surface-motion.js';
+import {surfaceMotion,wavePhaseAt,surfaceHeight,WAVE_COMPONENTS,hash01,boatPoint} from './surface-motion.js';
 import {SUB_DESIGN as D} from './hull-design.js';
-export {surfaceHeight,WAVE_COMPONENTS,hash01};
+export {wavePhaseAt,surfaceHeight,WAVE_COMPONENTS,hash01};
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const mix=(a,b,t)=>a+(b-a)*t;
 const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);};
@@ -20,6 +20,7 @@ export function environmentAt(s){
  const idAt=n=>n<=0?cfg.startWeather:ids[Math.floor(hash01(cfg.seed,n)*ids.length)];
  const a=WEATHER[idAt(cfg.changing?slot-1:0)],b=WEATHER[idAt(cfg.changing?slot:0)],blend=slot>0&&cfg.changing?smooth(0,75,time%300):0,e={};
  for(const k of ['cloud','rain','storm','waveScale','waveSpeed','wind','visibility'])e[k]=mix(a[k],b[k],blend);
+ if(s.wavePhase!==undefined){e.sampledAt=time;e.wavePhase=s.wavePhase;}
  e.weather=(blend<.5?a:b).name;e.weatherId=blend<.5?idAt(cfg.changing?slot-1:0):idAt(cfg.changing?slot:0);
  e.hour=((cfg.startHour+time*24/DAY_SECONDS)%24+24)%24;const angle=(e.hour-6)*Math.PI/12;
  e.sunAltitude=Math.sin(angle);e.daylight=smooth(-.14,.18,e.sunAltitude);e.twilight=1-Math.abs(e.daylight*2-1);
@@ -45,8 +46,8 @@ export function waterColumnLight(depth,e){
  };
 }
 
-export const SEA_GLSL='float sea(vec2 p){return waveScale*('+WAVE_COMPONENTS.map(w=>`sin(p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+time*waveSpeed*${w.omega.toFixed(3)})*${w.amplitude.toFixed(3)}`).join('+')+');}';
-export const SEA_SAMPLE_GLSL='vec3 seaSample(vec2 p){vec3 s=vec3(0.);'+WAVE_COMPONENTS.map((w,i)=>`float phase${i}=p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+time*waveSpeed*${w.omega.toFixed(3)};s+=${w.amplitude.toFixed(3)}*vec3(sin(phase${i}),cos(phase${i})*${w.kx.toFixed(3)},cos(phase${i})*${w.ky.toFixed(3)});`).join('')+'return s*waveScale;}';
+export const SEA_GLSL='float sea(vec2 p){return waveScale*('+WAVE_COMPONENTS.map(w=>`sin(p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+wavePhase*${w.omega.toFixed(3)})*${w.amplitude.toFixed(3)}`).join('+')+');}';
+export const SEA_SAMPLE_GLSL='vec3 seaSample(vec2 p){vec3 s=vec3(0.);'+WAVE_COMPONENTS.map((w,i)=>`float phase${i}=p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+wavePhase*${w.omega.toFixed(3)};s+=${w.amplitude.toFixed(3)}*vec3(sin(phase${i}),cos(phase${i})*${w.kx.toFixed(3)},cos(phase${i})*${w.ky.toFixed(3)});`).join('')+'return s*waveScale;}';
 export function boatSurfacePose(s,e=environmentAt(s),time=s.time){return surfaceMotion(s,e,time);}
 export function scopePosition(pose){return boatPoint(pose,{forward:-D.scopeZ,down:-D.scopeEye});}
 export function scopeWashed(s,e=environmentAt(s)){

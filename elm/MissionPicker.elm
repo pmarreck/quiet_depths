@@ -12,6 +12,7 @@ import PatrolMission exposing (Mission)
 type alias Flags =
     { selected : String
     , difficulty : Difficulty.Model
+    , pauseKey : String
     , times : List Choice
     , weather : List Choice
     }
@@ -32,7 +33,7 @@ type alias Slots =
     { entries : List Slot, canSave : Bool, message : String }
 
 type alias Model =
-    { selected : Mission, difficulty : Difficulty.Model, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
+    { selected : Mission, pauseKey : String, difficulty : Difficulty.Model, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
 
 
 type Msg
@@ -44,6 +45,7 @@ type Msg
     | SetChanging Bool
     | ChangeDifficulty Difficulty.Msg
     | ShowDifficulty Difficulty.Model
+    | ShowPauseKey String
     | Refresh Slots
     | Save Slot
     | Confirm Slot
@@ -55,7 +57,7 @@ port difficultyChanged : { id : String, value : Encode.Value } -> Cmd msg
 
 port showDifficulty : (Difficulty.Model -> msg) -> Sub msg
 
-port missionSelected : String -> Cmd msg
+port showPauseKey : (String -> msg) -> Sub msg
 
 
 port beginPatrol : (() -> msg) -> Sub msg
@@ -74,9 +76,9 @@ port readSlot : { id : Int, revision : String } -> Cmd msg
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init = \flags -> ( { selected = PatrolMission.fromId flags.selected |> Maybe.withDefault PatrolMission.Recon, difficulty = flags.difficulty, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False, times = flags.times, weather = flags.weather, conditions = { timeOfDay = "random", weather = "random", changing = True } }, Cmd.none )
+        { init = \flags -> ( { selected = PatrolMission.fromId flags.selected |> Maybe.withDefault PatrolMission.Recon, pauseKey = flags.pauseKey, difficulty = flags.difficulty, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False, times = flags.times, weather = flags.weather, conditions = { timeOfDay = "random", weather = "random", changing = True } }, Cmd.none )
         , update = update
-        , subscriptions = \_ -> Sub.batch [ beginPatrol (\() -> BeginPatrol), showSlots Refresh, selectSetup SelectSetup, showDifficulty ShowDifficulty ]
+        , subscriptions = \_ -> Sub.batch [ beginPatrol (\() -> BeginPatrol), showSlots Refresh, selectSetup SelectSetup, showDifficulty ShowDifficulty, showPauseKey ShowPauseKey ]
         , view = view
         }
 
@@ -88,7 +90,7 @@ update msg model =
     in
     case msg of
         Choose mission ->
-            ( { model | selected = mission }, missionSelected (PatrolMission.briefing mission).id )
+            ( { model | selected = mission }, Cmd.none )
 
         BeginPatrol ->
             ( model, patrolRequested { mission = (PatrolMission.briefing model.selected).id, conditions = conditions } )
@@ -96,7 +98,7 @@ update msg model =
         SelectSetup setup ->
             case PatrolMission.fromId setup.mission of
                 Just mission ->
-                    ( { model | selected = mission, conditions = setup.conditions }, missionSelected setup.mission )
+                    ( { model | selected = mission, conditions = setup.conditions }, Cmd.none )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -118,6 +120,9 @@ update msg model =
 
         ShowDifficulty settings ->
             ( { model | difficulty = settings }, Cmd.none )
+
+        ShowPauseKey name ->
+            ( { model | pauseKey = name }, Cmd.none )
 
         Refresh slots ->
             ( { model | slots = slots, busy = False, confirm = Nothing }, Cmd.none )
@@ -147,6 +152,13 @@ view model =
             , small [ attribute "role" "status" ] [ text model.slots.message ]
             ]
         , div [ id "mission-picker" ] (List.map (missionButton model.selected) PatrolMission.all)
+        , div [ class "briefing-tip", attribute "aria-live" "polite" ]
+            [ b [] [ text "YOUR FIRST ORDERS" ]
+            , p []
+                [ text ((PatrolMission.briefing model.selected).description ++ " ")
+                , Html.strong [] [ text (model.pauseKey ++ " pauses the patrol.") ]
+                ]
+            ]
         , fieldset [ class "patrol-conditions" ]
             [ legend [] [ text "PATROL CONDITIONS" ]
             , conditionMenu "Time of day" "patrol-time" "Patrol time of day" model.times model.conditions.timeOfDay SetTime
