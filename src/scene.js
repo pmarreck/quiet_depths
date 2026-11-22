@@ -67,7 +67,7 @@ export class OceanScene{
   this.waterUniforms={time:{value:0},origin:{value:new T.Vector2()},sunDir:{value:new T.Vector3(-.5,.12,-1).normalize()},underwater:{value:0},underwaterSun:{value:0},waveScale:{value:1},wavePhase:{value:0},daylight:{value:1},cloud:{value:0},twilight:{value:0},fogColor:{value:new T.Color()},fogDensity:{value:.0002},flash:{value:0}};
   const geo=new T.PlaneGeometry(30000,30000,256,256);const wp=geo.attributes.position;for(let i=0;i<wp.count;i++){for(const axis of ['X','Y']){const u=wp['get'+axis](i)/15000;wp['set'+axis](i,Math.sign(u)*15000*Math.pow(Math.abs(u),2.4));}}this.water=new T.Mesh(geo,new T.ShaderMaterial({uniforms:this.waterUniforms,vertexShader:waterVertex,fragmentShader:waterFragment,side:T.DoubleSide}));this.water.rotation.x=-Math.PI/2;this.scene.add(this.water);
   this.atmosphere=new Atmosphere(this.scene);
-  const terrainGeo=new T.PlaneGeometry(FLOOR_WIDTH,FLOOR_WIDTH,FLOOR_SEGMENTS,FLOOR_SEGMENTS);const pos=terrainGeo.attributes.position;const colors=[];for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);const b=bottom(x,y);pos.setZ(i,-b);const c=new T.Color(b<0?0x414c42:0x264541);c.multiplyScalar(.8+hash01(1983,i)*.3);colors.push(c.r,c.g,c.b);}terrainGeo.setAttribute('color',new T.Float32BufferAttribute(colors,3));terrainGeo.computeVertexNormals();this.terrain=new T.Mesh(terrainGeo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide}));this.terrain.rotation.x=-Math.PI/2;this.scene.add(this.terrain);
+  const terrainGeo=new T.PlaneGeometry(FLOOR_WIDTH,FLOOR_WIDTH,FLOOR_SEGMENTS,FLOOR_SEGMENTS);terrainGeo.setAttribute('color',new T.Float32BufferAttribute(new Float32Array(terrainGeo.attributes.position.count*3),3));this.terrain=new T.Mesh(terrainGeo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide}));this.terrain.rotation.x=-Math.PI/2;this.scene.add(this.terrain);
   this.ships=new Map();this.own=this.makeSub();this.scene.add(this.own);
   this.caustics={causticTime:{value:0},causticStrength:{value:0}};
   this.own.traverse(part=>{
@@ -162,12 +162,26 @@ export class OceanScene{
   if(escort){this.box(g,[7,4,8],[0,12,-48],hullMat);this.box(g,[1,1,16],[0,15,-55],hullMat);}
   root.scale.setScalar(scale);return root;
  }
+ updateTerrain(x,y,seed){
+  const tile=FLOOR_WIDTH/2,east=Math.round(x/tile)*tile,north=Math.round(y/tile)*tile;
+  if(this.terrainSeed===seed&&this.terrainEast===east&&this.terrainNorth===north)return;
+  this.terrainSeed=seed;this.terrainEast=east;this.terrainNorth=north;
+  const g=this.terrain.geometry,p=g.attributes.position,colors=g.attributes.color,color=new T.Color();
+  for(let i=0;i<p.count;i++){
+   const depth=bottom(east+p.getX(i),north+p.getY(i),seed);
+   p.setZ(i,-depth);color.setHex(depth<0?0x414c42:0x264541).multiplyScalar(.8+hash01(1983,i)*.3);
+   colors.setXYZ(i,color.r,color.g,color.b);
+  }
+  p.needsUpdate=true;colors.needsUpdate=true;g.computeVertexNormals();g.computeBoundingSphere();
+  this.terrain.position.set(east,0,-north);
+ }
  makeSub(){return createSubmarine(T);}
  resize(w,h){if(this.canvas.width!==Math.floor(w*this.renderer.getPixelRatio())||this.canvas.height!==Math.floor(h*this.renderer.getPixelRatio())){this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}}
  clear(){this.renderer.setClearColor(0x0a171b);this.renderer.clear();}
  render(s,view,zoom,time,orbit,frameSeconds=time){
   if(view!=='replay'&&!feedActive(s,view)){this.clear();return;}
   const orbiting=view==='orbit'||view==='replay',e=environmentAt(s),drone=view==='drone',tower=view==='tower',gun=view==='gun',listener=view==='replay'?orbit.focus:drone?s.drone:s;
+  this.updateTerrain(listener.x,listener.y,s.environment.chartSeed);
   const hull=boatSurfacePose(s,e,time),hullY=-hull.depth;
   const motionDt=this.motionState===s?time-this.motionTime:0;
   this.motionState=s;this.motionTime=time;
@@ -175,7 +189,7 @@ export class OceanScene{
    const focus=orbit.focus??{x:s.x,y:s.y,depth:hull.depth};
    const offset=orbit.distance*Math.cos(orbit.pitch),x=focus.x+offset*Math.sin(orbit.yaw),y=focus.y+offset*Math.cos(orbit.yaw);
    let elevation=-focus.depth+orbit.distance*Math.sin(orbit.pitch);
-   elevation=Math.max(-bottom(x,y)+1,elevation);
+   elevation=Math.max(-bottom(x,y,s.environment.chartSeed)+1,elevation);
    this.camera.position.set(x,elevation,-y);this.camera.lookAt(focus.x,-focus.depth,-focus.y);
    this.camera.fov=orbitVerticalFov(this.camera.aspect);
    this.light.position.copy(this.camera.position);this.light.target.position.set(focus.x,-focus.depth,-focus.y);this.particles.position.copy(this.camera.position);
@@ -225,6 +239,7 @@ export class OceanScene{
    direct=.52*light.blue*(1-e.cloud*.8);
   }else{
    fog.setHex(0x061022).lerp(new T.Color(e.cloud>.6?0x526373:0x98b9ce),e.daylight);
+   if(e.fog>0)fog.lerp(new T.Color(0xa4afac),e.fog*.85);
    ambient=.15+1.8*e.daylight;
    direct=2.7*e.daylight*(1-e.cloud*.7);
   }
@@ -263,7 +278,7 @@ export class OceanScene{
    if(sunk&&!mesh.userData.wreck)damageWreck(T,mesh,sub);
    const d=Math.hypot(listener.x-ship.x,listener.y-ship.y),drop=ship.sinkDepth||0;
    mesh.visible=(drone||orbiting||!sub)&&d<(underwater?350:e.opticalRange);
-   if(mesh.userData.lights)mesh.userData.lights.visible=!sunk&&!underwater&&e.daylight<.85&&d<e.lightRange;
+   if(mesh.userData.lights)mesh.userData.lights.visible=!sunk&&!underwater&&e.navigationLights&&ship.lights!==false&&!ship.blackout&&d<e.lightRange;
    if(!underwater&&!sunk&&!sub&&d<e.lightRange&&mesh.userData.body){mesh.visible=true;mesh.userData.body.visible=d<e.opticalRange;}
    else if(mesh.userData.body)mesh.userData.body.visible=true;
    mesh.position.set(ship.x,(sub?-ship.depth:sunk?0:surfaceHeight(ship.x,ship.y,time,e)*.65)-drop,-ship.y);
@@ -305,7 +320,7 @@ export class OceanScene{
     const x=origin[0]+(hash01(seed,733)-.25)*160+Math.sin(time*.8+i)*.7;
     const y=origin[1]+(hash01(seed,734)-.25)*95+age*.45;
     const z=origin[2]+(hash01(seed,735)-.25)*160+Math.cos(time*.75+i)*.7;
-    if(y<surfaceHeight(x,-z,time,e)&&y>-bottom(x,-z))positions.setXYZ(count++,x,y,z);
+    if(y<surfaceHeight(x,-z,time,e)&&y>-bottom(x,-z,s.environment.chartSeed))positions.setXYZ(count++,x,y,z);
    }
    positions.needsUpdate=true;this.driftingBubbles.geometry.setDrawRange(0,count);
   }

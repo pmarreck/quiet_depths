@@ -13,7 +13,7 @@ export const WEATHER=Object.freeze({
 });
 export const TIMES=Object.freeze({dawn:{name:'Dawn',hour:6},day:{name:'Day',hour:12},dusk:{name:'Dusk',hour:18},night:{name:'Night',hour:22}});
 export function makeEnvironment(seed=19830604,options={}){
- return{startHour:options.timeOfDay==='random'?Object.values(TIMES)[Math.floor(hash01(seed,750)*4)].hour:TIMES[options.timeOfDay]?.hour??18,startWeather:options.weather==='random'?Object.keys(WEATHER)[Math.floor(hash01(seed,751)*4)]:WEATHER[options.weather]?options.weather:'clear',changing:options.changing!==false,seed:seed>>>0};
+ return{chartSeed:seed>>>0,startHour:options.timeOfDay==='random'?Object.values(TIMES)[Math.floor(hash01(seed,750)*4)].hour:TIMES[options.timeOfDay]?.hour??18,startWeather:options.weather==='random'?Object.keys(WEATHER)[Math.floor(hash01(seed,751)*4)]:WEATHER[options.weather]?options.weather:'clear',changing:options.changing!==false,seed:seed>>>0};
 }
 export function environmentAt(s){
  const cfg=s.environment||makeEnvironment(),time=s.time||0,ids=Object.keys(WEATHER),slot=Math.floor(time/300);
@@ -25,10 +25,16 @@ export function environmentAt(s){
  e.hour=((cfg.startHour+time*24/DAY_SECONDS)%24+24)%24;const angle=(e.hour-6)*Math.PI/12;
  e.sunAltitude=Math.sin(angle);e.daylight=smooth(-.14,.18,e.sunAltitude);e.twilight=1-Math.abs(e.daylight*2-1);
  e.phase=e.daylight<.12?'Night':e.daylight>.9?'Day':e.hour<12?'Dawn':'Dusk';
+ const day=Math.floor((cfg.startHour+time*24/DAY_SECONDS)/24),mist=hash01(cfg.seed,8150+day);
+ e.fog=mist<.46?(1-smooth(.05,.55,e.rain))*smooth(4.5,5.75,e.hour)*(1-smooth(7,9,e.hour))*(.64+.30*mist/.46):0;
+ if(e.fog>.16)e.weather='Morning fog';
+ e.visibility*=1-.79*e.fog;
  e.sunDirection={x:Math.cos(angle),y:Math.sin(angle),z:-.32};
  e.opticalRange=(3900+2600*e.daylight)*e.visibility;
  e.subVisualRange=(1800+3700*e.daylight)*e.visibility;
  e.lightRange=(7000-1000*e.daylight)*(.65+.35*e.visibility);
+ if(e.fog>0)e.lightRange*=1-.55*e.fog;
+ e.navigationLights=e.daylight<.85||e.fog>.16;
  e.seaState=e.waveScale<.7?2:e.waveScale<1.2?3:e.waveScale<1.8?4:6;
  e.flash=0;for(const strike of s.lightning||[]){const age=time-strike.time;if(age>=0&&age<.75){const pulse=Math.exp(-age*13)+.75*Math.exp(-(((age-.22)/.05)**2));const d=Math.hypot(strike.x-s.x,strike.y-s.y);e.flash=Math.max(e.flash,pulse/(1+d/14000));}}
  return e;

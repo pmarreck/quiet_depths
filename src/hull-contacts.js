@@ -63,7 +63,7 @@ function resolvePair(s,a,b,hurt){
  const vb=(!b.kind||b.kind==='sub')&&b!==s.site?wb:0;
  let move=hit.overlap+.015;
  let da=va?move*hit.nd*va/(va+vb):0,db=vb?-move*hit.nd*vb/(va+vb):0;
- const blocked=(body,d)=>d<0&&body.depth+d<0||d>0&&body.depth+d>keelLimit(body);
+ const blocked=(body,d)=>d<0&&body.depth+d<0||d>0&&body.depth+d>keelLimit(body,s.environment.chartSeed);
  if(!(va+vb)||blocked(a,da)||blocked(b,db)){
   const angle=rad(a.heading),len=Math.hypot(hit.nx,hit.ny);
   hit.nx=len>.001?hit.nx/len:Math.cos(angle);hit.ny=len>.001?hit.ny/len:-Math.sin(angle);
@@ -88,13 +88,13 @@ function resolvePair(s,a,b,hurt){
   if(body!==s.site){body.speed*=.45;if(body.verticalSpeed)body.verticalSpeed*=.4;}
  }
 }
-export function keelLimit(body){
+export function keelLimit(body,seed){
  const sub=!body.kind||body.kind==='sub',scale=body.kind==='fishing'?.38:body.kind==='escort'?.78:1;
  const half=body.kind==='carrier'?carrierSize.halfLength:sub?27.5:52*scale,draft=sub?5:5*scale;
  let floor=Infinity;
  for(const forward of [-half,0,half]){
   const pose=boatPoint(body,{forward});
-  floor=Math.min(floor,bottom(pose.x,pose.y)-draft+forward*Math.sin(body.pitch||0));
+  floor=Math.min(floor,bottom(pose.x,pose.y,seed)-draft+forward*Math.sin(body.pitch||0));
  }
  return floor;
 }
@@ -113,18 +113,18 @@ export function resolveTraffic(s,hurt){
   resolvePair(s,s,ship,hurt);
   if(s.site)resolvePair(s,ship,s.site,hurt);
   for(let j=0;j<i;j++)resolvePair(s,ship,ships[j],hurt);
-  const floor=keelLimit(ship);
+  const floor=keelLimit(ship,s.environment.chartSeed);
   if((ship.depth??0)>floor){
    if(ship.kind==='sub')ship.depth=Math.max(0,floor);
-   if(floor<0)pushOffShoal(ship,-floor);
+   if(floor<0)pushOffShoal(ship,-floor,s.environment.chartSeed);
    if(s.time-(ship.groundedAt??-99)>5){ship.hull=incidentalHull(ship,2+Math.abs(ship.speed)*.7);ship.groundedAt=s.time;}
    ship.speed*=.35;
   }
  }
 }
-export function pushOffShoal(body,overlap){
- const dx=(bottom(body.x+1,body.y)-bottom(body.x-1,body.y))/2;
- const dy=(bottom(body.x,body.y+1)-bottom(body.x,body.y-1))/2;
+export function pushOffShoal(body,overlap,seed){
+ const dx=(bottom(body.x+1,body.y,seed)-bottom(body.x-1,body.y,seed))/2;
+ const dy=(bottom(body.x,body.y+1,seed)-bottom(body.x,body.y-1,seed))/2;
  const slope=dx*dx+dy*dy;if(slope<1e-8)return;
  const scale=Math.min((overlap+.01)/slope,30/Math.sqrt(slope));
  body.x+=dx*scale;body.y+=dy*scale;

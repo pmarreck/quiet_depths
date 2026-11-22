@@ -9,11 +9,7 @@ export const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 export const separation=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.depth-b.depth);
 export function rand(s){s.rng^=s.rng<<13;s.rng^=s.rng>>>17;s.rng^=s.rng<<5;return(s.rng>>>0)/4294967296;}
 export function log(s,text,kind='info'){if(s.events[0]?.text===text)return;s.events.unshift({t:s.time,text,kind});s.events=s.events.slice(0,45);}
-export function bottom(x,y){
- const reef=155*Math.exp(-((x-1900)**2+(y-700)**2)/470000);
- const island=460*Math.exp(-((x+3800)**2+(y-4000)**2)/1900000);
- return 230+30*Math.sin(x/1100)*Math.cos(y/900)-reef-island;
-}
+export {chartDepth as bottom} from './coast.js';
 // Signed distance to a capsule, using the same centerline and radius as its mesh.
 export function capsuleContact(point,body,halfLength=27.5,radius=5,pointRadius=.7){
  const a=rad(body.heading),sn=Math.sin(a),cs=Math.cos(a),cp=Math.cos(body.pitch||0),sp=Math.sin(body.pitch||0),dx=point.x-body.x,dy=point.y-body.y,dz=point.depth-body.depth;

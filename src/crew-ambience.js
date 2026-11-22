@@ -1,14 +1,10 @@
 import {hash01} from './environment.js';
+import {crewPeriod,messClips,messLine} from './mess-watch.js';
+export {crewPeriod};
 
-const clips=['mess-a','mess-b','hit','hit-alt','leak','leak-alt','hit-quiet','leak-quiet'];
+const clips=[...messClips,'hit','hit-alt','leak','leak-alt','hit-quiet','leak-quiet'];
 const melodies=[[55,58,60,62,65,62,60,58,55,53,55,58,57,55],
  [60,64,67,69,67,64,62,65,67,65,62,60,57,60]];
-
-export function crewPeriod(hour){
- if(hour>=0&&hour<6)return 'sleep';
- if([7,12,18].some(meal=>hour>=meal&&hour<meal+.55))return 'meal';
- return hour>=19&&hour<23?'music':null;
-}
 
 export function quietForSleep(s){
  if(s.silent||s.alert>30||s.shock>0||s.flood>0||s.pressureAlarm||s.time<(s.gunLoudUntil||0))return false;
@@ -30,7 +26,7 @@ export class CrewAmbience {
  speak(name,volume){
   const buffer=this.clips.get(name);if(!buffer)return;
   const source=this.context.createBufferSource(),gain=this.context.createGain();source.buffer=buffer;gain.gain.value=volume;
-  source.connect(gain).connect(this.bus);source.start();
+  source.connect(gain).connect(this.bus);source.start();return true;
  }
  note(frequency,when,length,volume,type='sine'){
   const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.type=type;
@@ -72,13 +68,23 @@ export class CrewAmbience {
    if(index%4===0)this.note(frequency/4,when,.65,.018);
   });
  }
+ distantSound(s,event){
+  if(this.state!==s||this.reaction||s.silent||s.alert>30||this.context.currentTime<this.nextChatter)return;
+  if(!['blast','detonation','thunder','collapse','implosion'].includes(event.type)||!(event.perceived?.distance>=500))return;
+  const roll=hash01(s.patrol.seed,event.id+8520);
+  if(roll<.22)this.reaction={at:this.context.currentTime+1.2,line:roll<.11?'what-noise':'hear-that'};
+ }
  update(s,e,active){
-  if(this.state!==s){this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=0;}
+  if(this.state!==s){this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=this.nextChatter=0;this.reaction=null;this.goodnightDay=-1;this.lastLine='';}
   const now=this.context.currentTime,quiet=s.silent||s.alert>30;
   const period=crewPeriod(e.hour),sleeping=active&&period==='sleep'&&quietForSleep(s);
+  if(!active||quiet)this.reaction=null;
   if(!sleeping)this.stopSnore();
   this.bus.gain.setTargetAtTime(active?(quiet?.08:.7):0,now,.09);
   if(active){
+   const day=Math.floor((s.environment.startHour+s.time/120)/24);
+   if(!quiet&&period==='lights-out'&&this.goodnightDay!==day&&this.speak('goodnight',.12))this.goodnightDay=day;
+   if(this.reaction&&now>=this.reaction.at){this.speak(this.reaction.line,.16);this.reaction=null;this.nextChatter=now+30;}
    const alternative=hash01(s.patrol.seed,Math.floor(s.time*4)+1800)<.5;
    if(s.hull<this.lastHull-1&&s.time>=this.nextHit){this.speak(quiet?'hit-quiet':alternative?'hit-alt':'hit',quiet?.34:.29);this.nextHit=s.time+16;}
    if(s.flood>this.lastFlood+.15&&s.time>=this.nextLeak){this.speak(quiet?'leak-quiet':alternative?'leak-alt':'leak',quiet?.32:.26);this.nextLeak=s.time+20;}
@@ -86,8 +92,9 @@ export class CrewAmbience {
    if(this.slot!==slot){
     this.slot=slot;
     const choice=hash01(s.patrol.seed,slot+1100);
-    if(!quiet&&period==='meal'&&choice<.8){
-     this.speak(choice<.4?'mess-a':'mess-b',.08);this.note(1840,now+.12,.19,.023);this.note(2700,now+.29,.15,.013);
+    const line=messLine(period,hash01(s.patrol.seed,slot+1150),this.lastLine);
+    if(!quiet&&line&&choice<.72&&now>=this.nextChatter){
+     this.speak(line,.12);this.lastLine=line;this.nextChatter=now+12;this.note(1840,now+.12,.19,.023);this.note(2700,now+.29,.15,.013);
     }
     if(sleeping&&choice<.12&&now>=this.nextSnore){
      this.playSnore(choice/.12);

@@ -1,19 +1,19 @@
-import {bottom,clamp} from './mechanics.js';
+import {bottom} from './mechanics.js';
 
 export const FLOOR_WIDTH=16000,FLOOR_SEGMENTS=140;
 
 // Three's PlaneGeometry splits each cell along its bottom-left to top-right diagonal.
 // x and north are simulation coordinates. Slope Z increases toward world-space south.
-export function floorSurface(x,north){
+export function floorSurface(x,north,seed){
  const cell=FLOOR_WIDTH/FLOOR_SEGMENTS,half=FLOOR_WIDTH/2;
- const col=clamp(Math.floor((x+half)/cell),0,FLOOR_SEGMENTS-1);
- const row=clamp(Math.floor((half-north)/cell),0,FLOOR_SEGMENTS-1);
+ const col=Math.floor((x+half)/cell);
+ const row=Math.floor((half-north)/cell);
  const west=col*cell-half,top=half-row*cell,u=(x-west)/cell,v=(top-north)/cell;
- const b=-bottom(west,top-cell),d=-bottom(west+cell,top);
+ const b=-bottom(west,top-cell,seed),d=-bottom(west+cell,top,seed);
  if(u+v<=1){
-  const a=-bottom(west,top);
+  const a=-bottom(west,top,seed);
   return {height:a+(d-a)*u+(b-a)*v,slopeX:(d-a)/cell,slopeZ:(b-a)/cell};
  }
- const c=-bottom(west+cell,top-cell);
+ const c=-bottom(west+cell,top-cell,seed);
  return {height:c+(c-b)*(u-1)+(c-d)*(v-1),slopeX:(c-b)/cell,slopeZ:(c-d)/cell};
 }

@@ -57,7 +57,7 @@ export function setupOperation(s,seed){
  s.site=null;s.operation=null;
  if(!['undersea-rescue','surface-rescue','survey'].includes(s.mission))return;
  const surface=s.mission==='surface-rescue',survey=s.mission==='survey',x=1430+hash01(seed,801)*330,y=420+hash01(seed,802)*450;
- s.site={x,y,hull:100,depth:surface?2:bottom(x,y)-5,heading:35+hash01(seed,803)*100,kind:surface?'surface':survey?'wreck':'sub',name:surface?['R/V Halcyon','M/V Solway','R/V Northstar'][Math.floor(hash01(seed,804)*3)]:survey?['SS Aster, 1912','SS Caledonia, 1906','SS Pelican, 1921'][Math.floor(hash01(seed,804)*3)]:['SS-118 Lantern','SS-142 Cormorant','SS-107 Narwhal'][Math.floor(hash01(seed,804)*3)],speed:0};
+ s.site={x,y,hull:100,depth:surface?2:bottom(x,y,s.environment.chartSeed)-5,heading:35+hash01(seed,803)*100,kind:surface?'surface':survey?'wreck':'sub',name:surface?['R/V Halcyon','M/V Solway','R/V Northstar'][Math.floor(hash01(seed,804)*3)]:survey?['SS Aster, 1912','SS Caledonia, 1906','SS Pelican, 1921'][Math.floor(hash01(seed,804)*3)]:['SS-118 Lantern','SS-142 Cormorant','SS-107 Narwhal'][Math.floor(hash01(seed,804)*3)],speed:0};
  s.operation={rescued:0,remaining:hash01(seed,811)<.08?0:8+Math.floor(hash01(seed,812)*8),dead:0,known:false,assessment:0,boarding:0,diverReturn:0,holding:false,active:false,scan:0,photoAngles:[],lastCasualty:240,completed:false,find:null};
  const start={x:x-260-hash01(seed,805)*120,y:y-200-hash01(seed,806)*180},heading=bearing(start,s.site),depth=surface?0:35+Math.floor(hash01(seed,807)*20);
  Object.assign(s,{...start,depth,targetDepth:depth,heading,targetHeading:heading,speed:3,targetSpeed:3,scope:surface});
@@ -66,10 +66,10 @@ export function setupOperation(s,seed){
  const escort=s.ships.find(v=>v.id==='kestrel');Object.assign(escort,{x:x+1200,y:y+700,heading:230,speed:5,alert:hostile?35:0});
  // Civil traffic remains distant; an optional hunter is the pressure on a rescue.
  if(!hostile||survey)s.ships=s.ships.filter(v=>v.kind!=='escort'&&v.kind!=='sub');
- log(s,survey?'Wreck coordinates received. Plot an approach and inspect the reef shelf.':'Distress coordinates received. Survivor count unknown. Time matters.');
+ log(s,s.difficulty.longPatrol?'Last report received. Search the briefed area for the mission site.':survey?'Wreck coordinates received. Plot an approach and inspect the reef shelf.':'Distress coordinates received. Survivor count unknown. Time matters.');
 }
 export function operationApproach(s){
- if(!s.site)return null;
+ if(!s.site||s.search&&!s.search.located)return null;
  return {x:s.site.x-55,y:s.site.y,depth:s.site.kind==='surface'?0:Math.max(0,s.site.depth-11),radius:8};
 }
 export function operationConditions(s){
@@ -114,13 +114,15 @@ export function updateOperation(s,dt){
   }else{o.active=false;o.boarding=0;o.diverReturn=0;}
   if(s.time>casualtyDeadline(s)&&o.remaining>0){o.lastCasualty=s.time;o.remaining--;o.dead++;if(o.known)log(s,'A survivor’s signal has stopped. Rescue window is narrowing.','warning');}
   if(s.site.kind==='surface'){
-   s.site.depth=Math.min(bottom(s.site.x,s.site.y)-5,2+s.time/500+Math.max(0,s.time-(860+hash01(s.patrol.seed,820)*220))*.35);
+   const age=s.time-(s.search?.protectedTime??0);
+   s.site.depth=Math.min(bottom(s.site.x,s.site.y,s.environment.chartSeed)-5,2+age/500+Math.max(0,age-(860+hash01(s.patrol.seed,820)*220))*.35);
    if(s.site.depth>15&&o.remaining>0){o.dead+=o.remaining;o.remaining=0;log(s,'The casualty has gone under. No further survivor signals. Recover the rescue team.','damage');}
   }
  }
  return o.completed;
 }
 export function objectiveState(s){
+ if(s.site&&s.search&&!s.search.located)return {label:'FIND THE MISSION SITE',text:'Search the last reported area.',progress:'',advice:'Look for the casualty or wreck. A close sonar ping can resolve the site.'};
  if(s.mission==='tiebreaker')return {label:s.phase==='extract'?'EXTRACTION OPEN':'TURN THE TIDE',text:s.phase==='extract'?'Stay to assist or surface at extraction.':'Put the friendly fleet two vessels ahead. Your sub is excluded.',progress:s.phase==='extract'?'CLEARED':'',advice:''};
  if(s.mission==='big-kahuna')return {label:'BIG KAHUNA',text:'Sink fleet carrier Solstice and return to extraction',progress:s.ships.find(v=>v.id===carrierId)?.wreckMark?'WRECK MARKED':'',advice:''};
  if(s.mission==='sneaky-seamen')return {label:'GATE A → GATE B',text:'Reach Gate B at any depth',progress:(distance(s,s.home)/1000).toFixed(1)+' km',advice:'The convoy is expecting you.'};
@@ -159,9 +161,9 @@ export function randomizePatrol(s,seed){
  s.events=s.events.filter(e=>!e.text.startsWith('Helm steady.'));
  if(s.mission==='tiebreaker'){
   Object.assign(s,fleetTheater(start,seed));s.home={x:start.x-450,y:start.y-550};
-  updateFleetBattle(s);
+  if(!s.difficulty.longPatrol)updateFleetBattle(s);
   log(s,'Lark, Marlin and Calliope fly blue forked pennants. The orange pennants are hostile. Nacre is our submarine.');
-  log(s,'Fleet action in progress. Chart rings are friendly patrol areas from the briefing. No current positions confirmed.');
+  log(s,s.difficulty.longPatrol?'Both fleets are approaching the sector. Friendly patrol areas are marked on the chart.':'Fleet action in progress. Chart rings are friendly patrol areas from the briefing. No current positions confirmed.');
   return;
  }
  if(s.mission==='big-kahuna'){
@@ -196,7 +198,7 @@ export function randomizePatrol(s,seed){
   for(const ship of s.ships)if(convoyTransportIds.includes(ship.id))ship.military=true;
   if(h(87)>=.4)s.ships=s.ships.filter(ship=>ship.id!=='echo');
   const lastBearing=(Math.round(bearing(start,convoy)/45)*45)%360;
-  log(s,`Patrol ${seed}. Last report put the convoy around bearing ${String(lastBearing).padStart(3,'0')}°. Listen for the transports and escort.`);
+  if(!s.difficulty.longPatrol)log(s,`Patrol ${seed}. Last report put the convoy around bearing ${String(lastBearing).padStart(3,'0')}°. Listen for the transports and escort.`);
   return;
  }
  log(s,`Patrol ${seed}. ${s.operation?s.site.name:s.mission==='shadow'?s.patrol.trackGoal+' seconds of passive tracking':s.mission==='recon'?s.patrol.photoGoal+' merchant photographs required':s.ships[0].name+' is the objective'}.`);

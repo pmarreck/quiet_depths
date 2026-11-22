@@ -6,6 +6,18 @@ import {engineSound,aircraftSound,perceivedSound} from './acoustics.js';
 import {CrewAmbience} from './crew-ambience.js';
 
 const ownFrequency=s=>31+Math.abs(s.speed)*2;
+const openBridge=(s,view)=>s.depth<=1&&(view==='tower'||view==='gun');
+export function weatherMix(s,view){
+ if(openBridge(s,view))return {rain:.34,cutoff:4200,thunder:1.35};
+ const hull=s.depth<=2?1:.4*Math.exp(-s.depth/200);
+ return {rain:.05*hull,cutoff:s.depth<=2?850:330,thunder:.38};
+}
+function stationSound(source,s,view){
+ const p=source.perceived??perceivedSound(source,s);
+ if(source.type!=='thunder')return p;
+ const mix=weatherMix(s,view);
+ return {...p,gain:p.gain*mix.thunder,cutoff:Math.min(p.cutoff,mix.cutoff)};
+}
 
 export class SoundSystem{
  constructor(getState,getContext,onStatus=()=>{}){this.getState=getState;this.getContext=getContext;this.onStatus=onStatus;this.on=false;this.ctx=null;this.voices=new Map();this.played=new Set();this.lastState=null;this.tailUntil=0;this.effects=0;this.effectVoices=new Set();this.lastReceipt=null;}
@@ -35,7 +47,7 @@ export class SoundSystem{
   this.impulse({id:'loss-'+s.patrol.seed,type:s.cookoff?'detonation':'implosion',x:s.x,y:s.y,depth:s.depth,power:1.2,perceived:{gain:1,cutoff:1400,pan:0,distance:0,delay:0}});return true;
  }
  impulse(source){
-  const p=source.perceived||perceivedSound(source,this.getState());if(p.gain<.002||this.effects>=12)return;
+  const p=stationSound(source,this.getState(),this.getContext().view);if(p.gain<.002||this.effects>=12)return;
   const c=this.ctx,t=c.currentTime,thunder=source.type==='thunder',gun=source.type==='gunfire',seeker=['seeker','sweep'].includes(source.type),creak=source.type==='creak',loss=['implosion','collapse'].includes(source.type),duration=creak?2.8:loss?8:thunder?4.8:gun?.24:seeker?.7:3;
   const noise=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain(),pan=c.createStereoPanner(),spatialGain=c.createGain();noise.buffer=this.noise;noise.loop=true;filter.type='lowpass';filter.frequency.value=p.cutoff;filter.Q.value=.6;pan.pan.value=p.pan*.9;spatialGain.gain.value=p.gain;
   const peak=thunder?1.2:.95;gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(creak?.08:seeker?.015:peak,t+(thunder?.08:.008));gain.gain.exponentialRampToValueAtTime(.0001,t+duration);noise.connect(filter).connect(gain).connect(pan).connect(spatialGain).connect(this.master);
@@ -46,6 +58,7 @@ export class SoundSystem{
   rumble.connect(bass).connect(pan);
   const voice={source,filter,pan,spatialGain,stop:()=>{noise.stop();rumble.stop();}};this.effectVoices.add(voice);this.effects++;noise.onended=()=>{this.effects--;this.effectVoices.delete(voice);noise.disconnect();filter.disconnect();gain.disconnect();rumble.disconnect();bass.disconnect();pan.disconnect();spatialGain.disconnect();};noise.start(t);noise.stop(t+duration);rumble.start(t);rumble.stop(t+duration);
   this.tailUntil=Math.max(this.tailUntil,t+duration);this.lastReceipt={id:source.id,type:source.type,delay:p.delay,distance:p.distance,gain:p.gain,cutoff:p.cutoff};
+  this.crew.distantSound(this.getState(),source);
  }
  replayTailActive(event){
   if(!this.on||this.ctx?.state!=='running')return false;
@@ -59,7 +72,7 @@ export class SoundSystem{
   if(this.lastState!==s){this.lastState=s;this.played=new Set(s.acoustics.filter(e=>e.heard).map(e=>e.id));for(const v of this.voices.values()){v.osc.stop();v.pulse.stop();}for(const v of this.effectVoices)v.stop();this.effectVoices.clear();this.voices.clear();this.lastReceipt=null;this.tailUntil=0;this.alarmLevel=0;}
   const c=this.ctx,t=c.currentTime,active=!context.paused&&!context.modal&&s.status==='patrol',e=environmentAt(s);
   for(const event of s.acoustics){if(!event.heard||this.played.has(event.id))continue;this.played.add(event.id);if(this.on&&!context.paused&&!context.modal)this.impulse(event);}
-  for(const voice of this.effectVoices){const p=voice.source.perceived??perceivedSound(voice.source,s);voice.spatialGain.gain.setTargetAtTime(p.gain,t,.1);if(!['implosion','collapse'].includes(voice.source.type))voice.filter.frequency.setTargetAtTime(p.cutoff,t,.12);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.1);if(this.lastReceipt?.id===voice.source.id){this.lastReceipt.currentGain=p.gain;this.lastReceipt.currentCutoff=p.cutoff;}}
+  for(const voice of this.effectVoices){const p=stationSound(voice.source,s,context.view);voice.spatialGain.gain.setTargetAtTime(p.gain,t,.1);if(!['implosion','collapse'].includes(voice.source.type))voice.filter.frequency.setTargetAtTime(p.cutoff,t,.12);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.1);if(this.lastReceipt?.id===voice.source.id){this.lastReceipt.currentGain=p.gain;this.lastReceipt.currentCutoff=p.cutoff;}}
   const tail=s.status!=='patrol'&&t<this.tailUntil&&!context.paused;
   this.master.gain.setTargetAtTime(this.on&&(active||tail)?.55:0,t,.12);
   const wet=s.depth<=2?1:.18*Math.exp(-s.depth/200),running=this.on&&active;
@@ -68,7 +81,8 @@ export class SoundSystem{
   if(running&&alarm&&!this.alarmLevel){redAlertSound(c,this.master,s.silent);this.alarmLevel=1;}
   if(!alarm)this.alarmLevel=0;
   this.sea.filter.frequency.setTargetAtTime(120+e.wind*6,t,.5);this.sea.gain.gain.setTargetAtTime(running?(.03+e.waveScale*.035)*wet:0,t,.3);
-  this.rain.filter.frequency.setTargetAtTime(s.depth>2?330:2400,t,.3);this.rain.gain.gain.setTargetAtTime(running?e.rain*.11*wet:0,t,.3);
+  const mix=weatherMix(s,context.view);
+  this.rain.filter.frequency.setTargetAtTime(mix.cutoff,t,.3);this.rain.gain.gain.setTargetAtTime(running?e.rain*mix.rain:0,t,.3);
   const plant=propulsion(s),powered=plant.drive>0||plant.generator>0;
   const motorGain=s.engine==='diesel'?.1*plant.generator:.03*plant.drive;
   this.own.frequency.setTargetAtTime(ownFrequency(s),t,.4);this.ownGain.gain.setTargetAtTime(running&&powered?motorGain:0,t,.25);

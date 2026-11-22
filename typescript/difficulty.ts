@@ -5,6 +5,7 @@ export const difficultyControls = [
   {id:'depthStealth', label:'Depth protection from detection', min:0, max:2, step:.1, initial:1, low:'Weak', high:'Strong'},
   {id:'pursuit', label:'Enemy pursuit persistence', min:.4, max:2, step:.1, initial:1, low:'Careless', high:'Relentless'},
   {id:'airSupport', label:'Enemy air support', initial:true},
+  {id:'longPatrol', label:'Longer mission (contacts start out of sonar range)', initial:false},
   {id:'satellite', label:'Classified satellite photography', initial:true},
   {id:'drone', label:'External ROV', initial:true},
   {id:'omniscientChart', label:'Exact enemy positions on chart', initial:false},

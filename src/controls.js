@@ -10,7 +10,7 @@ export const relativeBearing=(absolute,heading)=>wrapHeading(absolute-heading);
 export const scopeBearing=s=>wrapHeading(s.heading+s.scopeAngle);
 export const canIssue=(s,context)=>s.status==='patrol'&&!context.paused&&!context.modal;
 export const feedActive=(s,view)=>view==='orbit'?s.difficulty?.orbitCamera===true:view==='scope'?s.scope&&s.depth<=15&&operatingFraction(s.systems?.periscope??100)>0:['tower','gun'].includes(view)?isSurfaced(s):view==='drone'?['remote','return'].includes(s.drone.mode)&&operatingFraction(s.drone.camera??100)>0:false;
-export const opticalZoomLimit=view=>view==='tower'?12:view==='scope'?4:view==='gun'?5:1;
+export const opticalZoomLimit=view=>view==='tower'?48:view==='scope'?4:view==='gun'?5:1;
 export const helmFor=(s,view)=>view==='drone'?s.drone:s;
 
 export function setHelmOrder(s,context,axis,value){

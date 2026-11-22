@@ -124,6 +124,7 @@ export function captureSatellite(o,s,packet){
  const previous={target:renderer.getRenderTarget(),clear:renderer.getClearColor(new T.Color()),alpha:renderer.getClearAlpha(),autoClear:renderer.autoClear,viewport:renderer.getViewport(new T.Vector4()),scissor:renderer.getScissor(new T.Vector4()),scissorTest:renderer.getScissorTest()};
  const target=new T.WebGLRenderTarget(plan.width,plan.height,{format:T.RGBAFormat,type:T.UnsignedByteType,depthBuffer:true,stencilBuffer:false});target.texture.colorSpace=T.SRGBColorSpace;
  try{
+  o.updateTerrain?.(plan.area.x,plan.area.y,s.environment?.chartSeed);
   o.water.material=photoWater;
   const keep=new Set([o.water,o.terrain,o.hemi,o.sun,o.moon]);for(const child of world.children)child.visible=keep.has(child);world.fog=null;world.background=null;world.add(group);
   o.water.position.set(plan.area.x,0,-plan.area.y);

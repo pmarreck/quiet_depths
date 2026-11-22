@@ -30,7 +30,7 @@ export function deployDrone(s){
  log(s,'Inspection drone deployed. Stay within 100 m; slow the sub for recovery.');return true;
 }
 export function recallDrone(s){if(s.drone.mode==='remote'){
- const d=s.drone,p=boatLocal(s,d),below=s.depth+8<Math.min(279,bottom(s.x,s.y)-1);
+ const d=s.drone,p=boatLocal(s,d),below=s.depth+8<Math.min(279,bottom(s.x,s.y,s.environment.chartSeed)-1);
  Object.assign(d,{mode:'return',nosePitch:null,returnStage:p.side>=9&&Math.abs(p.forward)<24?3:0,returnClearance:below?8:s.depth>10?-8:8,returnHoldSide:p.side,returnHoldForward:p.forward});
  log(s,'Drone returning by the clearance lane to the starboard recovery hatch.');
 }}
@@ -157,8 +157,8 @@ export function updateBoat(s,dt){
  else{s.fuel=Math.min(s.fuel,s.systems.fuelTank);s.battery=clamp(s.battery-dt*(.009+s.speed*s.speed*.0007),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen-dt*(.024+(1-operatingFraction(s.systems.oxygen))*.1),0,100);}
  if(s.depth<2)s.oxygen=clamp(s.oxygen+dt*.45,0,100);
  if(s.depth>15||!operatingFraction(s.systems.periscope))s.scope=false;
- const floor=keelLimit(s);
- if(s.depth>floor){s.depth=Math.max(0,floor);if(floor<0)pushOffShoal(s,-floor);if(s.time-(s.collisionHits.ground??-99)>4){replayEvent(s,{kind:'ground',point:{x:s.x,y:s.y,depth:s.depth}});hurt(s,2+Math.abs(s.speed)+Math.abs(s.verticalSpeed)*2,'Seafloor contact. Rise now.','planes');s.collisionHits.ground=s.time;}s.verticalSpeed=Math.min(0,s.verticalSpeed);s.speed*=Math.exp(-dt*1.5);}
+ const floor=keelLimit(s,s.environment.chartSeed);
+ if(s.depth>floor){s.depth=Math.max(0,floor);if(floor<0)pushOffShoal(s,-floor,s.environment.chartSeed);if(s.time-(s.collisionHits.ground??-99)>4){replayEvent(s,{kind:'ground',point:{x:s.x,y:s.y,depth:s.depth}});hurt(s,2+Math.abs(s.speed)+Math.abs(s.verticalSpeed)*2,'Seafloor contact. Rise now.','planes');s.collisionHits.ground=s.time;}s.verticalSpeed=Math.min(0,s.verticalSpeed);s.speed*=Math.exp(-dt*1.5);}
  updatePressure(s,dt);if(s.status==='lost')return diesel;
  if(s.oxygen<=0){s.hull=Math.max(0,s.hull-dt*2);log(s,'Air exhausted. Surface immediately.','damage');}
  const crew=s.systems.crew/100;
@@ -211,7 +211,7 @@ export function updateDrone(s,dt,diesel){
   if(closing>.3&&d.collisionCooldown<=0){const damage=clamp(3+closing*closing*1.4,3,60);damageDrone(s,damage,object.own?'pressure hull':'vessel / wreck');if(object.own){replayEvent(s,{kind:'collision',point:{x:d.x,y:d.y,depth:d.depth}});hurt(s,damage*.07,'Drone struck our hull. Minor plating damage.');}d.collisionCooldown=2;}
   d.speed*=.15;d.verticalSpeed*=.2;
  }
- const floor=bottom(d.x,d.y)-.7;if(d.depth>floor){d.depth=Math.max(0,floor);if(d.collisionCooldown<=0){damageDrone(s,3+Math.abs(d.speed)*1.5,'seabed');d.collisionCooldown=2;}d.verticalSpeed=0;d.speed*=.7;}
+ const floor=bottom(d.x,d.y,s.environment.chartSeed)-.7;if(d.depth>floor){d.depth=Math.max(0,floor);if(d.collisionCooldown<=0){damageDrone(s,3+Math.abs(d.speed)*1.5,'seabed');d.collisionCooldown=2;}d.verticalSpeed=0;d.speed*=.7;}
  // Pressure-front receipt is independent of when the sub hears the same blast.
  for(const sound of s.acoustics)if(sound.type==='blast'&&!sound.droneHit&&s.time-sound.time>=propagationTime(sound,d)){sound.droneHit=true;const r=separation(d,{...sound,depth:sound.depth||0});if(r<140)damageDrone(s,85*(1-r/140),'depth charge pressure wave');}
  if(d.mode==='lost')return;

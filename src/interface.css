@@ -9,6 +9,8 @@
 .drone-monitor>span{flex:1}.drone-monitor button{border:1px solid #526d5c;font:12px var(--mono);padding:5px 8px;white-space:nowrap}.drone-monitor.caution{color:var(--gold)}.drone-monitor.danger{background:#4b211f;color:#ffd0bc;animation:rov-warning 1s steps(2,end) infinite}
 @keyframes rov-warning{50%{background:#782b21}}
 .zoom-tools{display:none}
+.viewport>.zoom-tools.binoculars{position:absolute;bottom:44px;left:16px;z-index:4;display:flex;border:1px solid #70816b;background:#142620e8}
+.viewport>.zoom-tools.binoculars button{min-width:38px;min-height:34px;color:#dae1cb;font:14px var(--mono)}
 .recon-panel{padding:18px 20px;border-top:1px solid var(--line);font:12px/1.6 var(--mono);flex-shrink:0}.recon-panel>b{display:block;color:var(--gold);margin-top:12px}.recon-panel p{font:14px/1.5 var(--sans);color:#b4c7bc;margin:10px 0}.recon-panel>span{display:block;margin:8px 0}.recon-panel>button{border:1px solid #70816b;font:12px var(--mono);padding:10px 8px;width:100%;margin-top:5px}
 .recon-meter{height:5px;background:#2a3f40;overflow:hidden}.recon-meter>i{display:block;width:0;height:100%;background:#c6c68e}.recon-panel.loading .recon-meter>i{background:repeating-linear-gradient(110deg,#9fb897 0 9px,#d5d5a4 10px 16px);background-size:32px 100%;animation:recon-scan .8s linear infinite}
 @keyframes recon-scan{to{background-position:32px 0}}

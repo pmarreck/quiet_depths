@@ -149,7 +149,7 @@ function shipDamage(s,dt){
   if(v.sunkAt===undefined){v.sunkAt=s.time;addDebrief(s,v.name+' began sinking.');}
   // Keep the grounded hull against the same triangles the underwater camera displays.
   const clearance=v.kind==='sub'||v.kind==='fishing'?3:8;
-  const bed=Math.max(0,-floorSurface(v.x,v.y).height-clearance-origin);
+  const bed=Math.max(0,-floorSurface(v.x,v.y,s.environment.chartSeed).height-clearance-origin);
   const beforeDrop=v.sinkDepth;
   v.speed=0;v.sinkDepth=Math.min(bed,v.sinkDepth+dt*1.3*(v.kind==='carrier'?Math.max(1,v.directHits-1):1));
   const age=s.time-v.sunkAt,depth=origin+v.sinkDepth;
@@ -348,7 +348,7 @@ function requestSupport(s){
   const x=carrier?carrier.x+Math.sin(rad(heading))*along:support.base.x-i*20;
   const y=carrier?carrier.y+Math.cos(rad(heading))*along:support.base.y;
   s.aircraft.push({id:'air-'+s.weaponSequence++,name:(carrier?'Carrier fighter ':'Island attack aircraft ')+(i+1),x,y,
-   altitude:carrier?carrierSize.deckHeight+2:Math.max(8,-bottom(support.base.x,support.base.y)+8+i*12),
+   altitude:carrier?carrierSize.deckHeight+2:Math.max(8,-bottom(support.base.x,support.base.y,s.environment.chartSeed)+8+i*12),
    heading,speed:70,hull:100,phase:'takeoff',takeoffUntil:s.time+(carrier?2:6),attack:0,bank:0,bombDropped:false});
  }
  log(s,carrier?'Flight-deck transmission. '+(count===1?'One fighter is':count+' fighters are')+' airborne.':'Aircraft airborne from Greybank. They still have to reach the patrol area.','warning');

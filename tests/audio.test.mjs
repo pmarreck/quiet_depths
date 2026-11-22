@@ -19,14 +19,16 @@ test('a fresh session never opens an audio device before explicit Sound activati
 });
 
 test('crew ambience follows the patrol clock, including dinner and lights-out boundaries',()=>{
- for(const meal of [7,12,18]){
+ for(const meal of [12,18]){
   assert.equal(crewPeriod(meal-.001),null);
   assert.equal(crewPeriod(meal),'meal');
   assert.equal(crewPeriod(meal+.6),null);
  }
  assert.equal(crewPeriod(19),'music');
  assert.equal(crewPeriod(22.99),'music');
- assert.equal(crewPeriod(23),null);
+ assert.equal(crewPeriod(23),'lights-out');
+ assert.equal(crewPeriod(7),'breakfast');assert.equal(crewPeriod(7.99),'breakfast');assert.equal(crewPeriod(8),null);
+ assert.equal(crewPeriod(14),'coffee');assert.equal(crewPeriod(14.99),'coffee');assert.equal(crewPeriod(15),null);
 });
 
 test('engine oscillators start at the current pitch and smooth later speed changes',()=>{

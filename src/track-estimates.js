@@ -19,7 +19,8 @@ export function fixContact(contact,observation){
 }
 export function chartContacts(s){
  if(!s.difficulty?.omniscientChart)return s.contacts;
- const hostile=new Set(s.ships.filter(ship=>ship.military&&ship.side!=='friendly').map(ship=>ship.id));
+ const identified=s.search?new Set(s.contacts.filter(c=>c.identified||c.kind==='sub'&&c.fix).map(c=>c.id)):null;
+ const hostile=new Set(s.ships.filter(ship=>ship.military&&ship.side!=='friendly'&&(!identified||identified.has(ship.id))).map(ship=>ship.id));
  const observed=s.contacts.filter(contact=>!hostile.has(contact.id));
  const exact=s.ships.filter(ship=>hostile.has(ship.id)&&ship.hull>0).map(ship=>({
   id:ship.id,label:'LIVE',name:ship.name,identified:true,kind:ship.kind,military:ship.military,side:ship.side,age:0,range:1,exact:true,

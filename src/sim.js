@@ -3,6 +3,7 @@ import {replayEvent} from './instant-replay.js';
 import {gameEcho,observeTorpedo,validEcho,validTracks} from './torpedo-watch.js';
 import {fullCondition,BOAT_PARTS,DRONE_PARTS,readLimits,operatingFraction} from './equipment.js';
 import {report,hearWreck} from './patrol-reports.js';
+import {incidentalHull} from './carrier.js';
 import {resolveTraffic} from './hull-contacts.js';
 // Units: meters, seconds, knots, degrees clockwise from north. No rendering here.
 import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from './environment.js';
@@ -20,6 +21,7 @@ import {observationBias} from './contact-readings.js';
 import {photoArchive,validPhoto,PHOTO_BUDGET} from './photos.js';
 import {playerReport,pursueAndAttack,reportHunterState,updateHostileTrack,validReport} from './hostile-tracks.js';
 import {patrolDifficulty} from './difficulty.js';
+import {longPatrol,advanceApproach,approachProgress,validSearch} from './patrol-search.js';
 import {addDebrief,validDebrief} from './debrief.js';
 export {clamp,rad,bearing,delta,distance,bottom,log,MISSIONS,deployDrone,recallDrone,hurt};
 export function createGame(mission='recon',seed=19830604,options={}){
@@ -30,9 +32,22 @@ export function createGame(mission='recon',seed=19830604,options={}){
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
  {id:'tern',name:'Tern',kind:'fishing',military:false,x:-850,y:1350,heading:110,speed:3,hull:100,alert:0,attack:0},
  {id:'echo',name:'Unknown submarine',kind:'sub',military:true,x:3800,y:900,depth:75,heading:280,speed:4,hull:100,alert:0,attack:0}
- ]};s.torpedoTracks=[];s.repairLimits=fullCondition(BOAT_PARTS);s.drone.repairLimits=fullCondition(DRONE_PARTS);s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
+ ]};s.torpedoTracks=[];s.repairLimits=fullCondition(BOAT_PARTS);s.drone.repairLimits=fullCondition(DRONE_PARTS);s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);
+ if(s.difficulty.longPatrol){
+  Object.assign(s,longPatrol(s));
+  if(s.battle){
+   const east=Math.sign(s.battle.areas[1].x-s.battle.areas[0].x);
+   for(const ship of s.ships){
+    const direction=ship.side==='friendly'?east:-east;
+    ship.x-=direction*800;ship.heading=direction>0?90:270;
+   }
+  }
+  if(s.departure)s.departure={x:s.x,y:s.y};
+  log(s,'Long patrol. Search the dashed area on the chart. Its center is an estimate.');
+ }
+ return s;
 }
-export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y),v.depth,drone?.7:5+27.5*Math.abs(Math.sin(s.pitch)));}
+export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y,s.environment.chartSeed),v.depth,drone?.7:5+27.5*Math.abs(Math.sin(s.pitch)));}
 export function isVisible(s,ship,look=null,env=environmentAt(s)){
  if(ship.hull<=0||ship.kind==='sub'||s.depth>15||!s.scope)return false;
  return !scopeWashed(s,env)&&distance(s,ship)<env.opticalRange*operatingFraction(s.systems.periscope)&&(look===null||Math.abs(delta(bearing(s,ship),look))<19);
@@ -45,7 +60,7 @@ export function contact(s,ship,method){
  // draw for every observation so changing the display preserves seeded events.
  const observationRoll=rand(s);
  c.bearing=(b+(method==='passive'?3*observationBias(s.patrol.seed,c.id,'passive'):0)+360)%360;c.age=0;c.method=method;
- if(method!=='passive'){
+ if(method!=='passive'&&method!=='lights'){
    const sigma=method==='visual'?Math.max(25,d*.045):Math.max(15,d*.03);
    const continuedSight=method==='visual'&&c.fix?.source==='visual';
    if(!c.fix||s.time-c.fix.time>=5&&(continuedSight||estimateAt(c,s.time).major>sigma*2.448)){
@@ -71,6 +86,9 @@ export function contact(s,ship,method){
 export function ping(s){
  if(s.pingCooldown>0||s.status!=='patrol'||!operatingFraction(s.systems.sonar))return false;
  s.pingAge=0;s.pingCooldown=15;
+ if(s.search&&!s.search.located&&s.site&&separation(s,s.site)<1500*operatingFraction(s.systems.sonar)){
+  s.search.located=true;log(s,'Mission site echo identified. Position marked on chart.','success');
+ }
  for(const p of s.projectiles)if(Math.hypot(distance(s,p),s.depth-p.depth)<6000*operatingFraction(s.systems.sonar))observeTorpedo(s,gameEcho(s,p,s.time,TORPEDO_SPEED),true);
  if(s.mission==='tiebreaker')for(const volley of s.battle.volleys){
   if(!volley.underwater)continue;
@@ -143,12 +161,27 @@ function tick(s,dt,input){
  s.time+=dt;s.pingAge+=dt;s.pingCooldown=Math.max(0,s.pingCooldown-dt);s.photoCooldown=Math.max(0,s.photoCooldown-dt);s.shock=Math.max(0,(s.shock||0)-dt);
  if(s.noisemaker&&s.time-s.noisemaker.time>32)delete s.noisemaker;
  const env=environmentAt(s);
+ const previousApproach=s.search&&approachProgress(s.search);
+ const approaching=s.search&&advanceApproach(s.search,dt,input.timeRate||1);
+ const formationTravel=approaching&&s.battle?800*(approachProgress(s.search)-previousApproach):0;
+ if(approaching&&s.operation)s.operation.lastCasualty+=dt;
  // Only the next interval uses the new weather speed. The sea keeps wall
  // time during compression while objectives and traffic keep patrol time.
  s.wavePhase+=env.waveSpeed*dt/Math.max(1,input.timeRate||1);
  env.wavePhase=s.wavePhase;
  if(s.time>=s.nextLightningAt){
-  if(env.storm>.35){const angle=s.time<30?rad(s.heading+s.scopeAngle+(rand(s)-.5)*26):rand(s)*Math.PI*2,range=1800+rand(s)*4000,strike={id:s.soundSequence,time:s.time,x:s.x+Math.sin(angle)*range,y:s.y+Math.cos(angle)*range,height:1050+rand(s)*900,seed:Math.floor(rand(s)*1000000)};
+  if(env.storm>.35){const angle=s.time<30?rad((input.look??(s.heading+s.scopeAngle))+(rand(s)-.5)*26):rand(s)*Math.PI*2,range=1800+rand(s)*4000,strike={id:s.soundSequence,time:s.time,x:s.x+Math.sin(angle)*range,y:s.y+Math.cos(angle)*range,height:1050+rand(s)*900,seed:Math.floor(rand(s)*1000000)};
+   if(hash01(strike.seed,910)<.09){
+    const exposed=s.ships.filter(v=>v.hull>0&&(v.depth??0)<=1&&distance(s,v)<6000);
+    if(s.depth<=1)exposed.push(s);
+    const hit=exposed[Math.floor(hash01(strike.seed,911)*exposed.length)];
+    if(hit){
+     strike.x=hit.x;strike.y=hit.y;strike.altitude=hit===s?9:18;
+     const damage=5+Math.floor(12*hash01(strike.seed,912));
+     if(hit===s)hurt(s,damage,'Lightning struck the surfaced sub.',null);
+     else{hit.hull=incidentalHull(hit,damage);addDebrief(s,'Lightning struck '+hit.name+'.');}
+    }
+   }
    s.lightning.push(strike);emitSound(s,{type:'thunder',x:strike.x,y:strike.y,altitude:strike.height*.65,power:.8+rand(s)*.4});}
   s.nextLightningAt=s.time+18+rand(s)*36;
  }
@@ -164,7 +197,13 @@ function tick(s,dt,input){
    if(ship.hull<=0)continue;
    const d=distance(s,ship);
    if(operatingFraction(s.systems.sonar)>0&&(s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)*(1-env.storm*.25*Math.exp(-s.depth/80))*operatingFraction(s.systems.sonar)&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
-   if(isVisible(s,ship,input.look??((s.heading+s.scopeAngle)%360),env))contact(s,ship,'visual');
+   const topside=['tower','gun'].includes(input.observation)&&s.depth<=1;
+   const look=input.look??((s.heading+s.scopeAngle)%360);
+   if(topside?ship.kind!=='sub'&&d<env.opticalRange&&Math.abs(delta(bearing(s,ship),look))<25:isVisible(s,ship,look,env))contact(s,ship,'visual');
+   else if(env.fog>.16&&ship.kind!=='sub'&&ship.lights!==false&&!ship.blackout&&d<env.lightRange&&
+    (topside||input.observation==='scope'&&s.scope&&s.depth<=15&&operatingFraction(s.systems.periscope)>0&&!scopeWashed(s,env))&&
+    Math.abs(delta(bearing(s,ship),look))<19&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'lights');
+   if(approaching&&!s.battle&&!ship.report)ship.heading=(ship.heading+dt*.36)%360;
    if(s.mission==='sneaky-seamen')patrolSweep(s,ship);
    if(isOpponent(ship)&&!ship.disabled){
      const track=updateHostileTrack(s,ship,env,dt);
@@ -173,10 +212,26 @@ function tick(s,dt,input){
       if(track){pursueAndAttack(s,ship,track,dt,dropDepthCharge,launchHostileTorpedo);danger=Math.max(danger,ship.alert);}
      }
    }
-   if(ship.disabled)ship.speed=0;ship.x+=Math.sin(rad(ship.heading))*ship.speed*.514444*dt;ship.y+=Math.cos(rad(ship.heading))*ship.speed*.514444*dt;
+   if(ship.disabled)ship.speed=0;
+   const travel=approaching&&s.battle&&!ship.report&&!ship.disabled?formationTravel:ship.speed*.514444*dt;
+   ship.x+=Math.sin(rad(ship.heading))*travel;ship.y+=Math.cos(rad(ship.heading))*travel;
 
  }
- if(s.mission==='tiebreaker')updateFleetBattle(s);
+ if(s.mission==='tiebreaker'&&!approaching)updateFleetBattle(s);
+ if(s.search&&!s.search.located){
+  if(s.site){
+   const surfaceSight=s.site.kind==='surface'&&['scope','tower','gun'].includes(input.observation)&&
+    (input.observation==='scope'?s.scope&&s.depth<=15&&!scopeWashed(s,env):s.depth<=1)&&
+    distance(s,s.site)<env.opticalRange&&Math.abs(delta(bearing(s,s.site),input.look??s.heading))<19;
+   const close=separation(s,s.site)<120||s.drone.mode==='remote'&&separation(s.drone,s.site)<80;
+   if(surfaceSight||close){s.search.located=true;log(s,'Mission site located. Position marked on chart.','success');}
+  }else{
+   for(const c of s.contacts)if((c.identified||c.kind==='sub'&&c.fix)&&s.search.targets.includes(c.id)&&!s.search.recognized.includes(c.id))s.search.recognized.push(c.id);
+   if(s.search.recognized.length===s.search.targets.length){
+    s.search.located=true;log(s,'Search contacts accounted for. Chart now shows their individual tracks.');
+   }
+  }
+ }
  resolveTraffic(s,hurt);
  s.alert=clamp(Math.max(danger,s.alert-dt*.65),0,100);
  for(const c of s.contacts){c.age+=dt;c.confidence=Math.max(.05,c.confidence-dt*.0006);}
@@ -222,7 +277,8 @@ function tick(s,dt,input){
  }
  if(s.status==='patrol'&&s.phase==='extract'&&distance(s,s.home)<400&&s.depth<=1){s.status='won';log(s,'Patrol complete. Surfaced at pickup. Sub and crew home safely.','success');}
  if(s.mission==='tiebreaker'&&s.phase==='objective'&&s.status==='patrol'&&sidesAfloat(s.ships).friendly<2){s.status='expired';addDebrief(s,'Too few friendly vessels remained to establish the lead. Command recalled the patrol.');}
- if(s.time>1800&&s.status==='patrol'&&!(s.mission==='tiebreaker'&&s.phase==='extract')){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
+ const patrolWindow=s.search?5400+s.search.protectedTime:1800;
+ if(s.time>patrolWindow&&s.status==='patrol'&&!(s.mission==='tiebreaker'&&s.phase==='extract')){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
 }
 export function save(s){return JSON.stringify(s);}
 export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charge={id:s.soundSequence++,x,y,depth,delay,totalDelay:delay,age:0,exploded:false,kind};s.blasts.push(charge);return charge;}
@@ -243,7 +299,7 @@ export function restore(raw){try{
  photoArchive(s);
  if(s.scopeAngle===undefined)s.scopeAngle=0;
  if(s.scopeSteerBearing===undefined)s.scopeSteerBearing=null;
- if(s.environment===undefined)s.environment=makeEnvironment(s.rng);
+ if(s.environment===undefined){s.environment=makeEnvironment(s.rng);delete s.environment.chartSeed;}
  if(s.lightning===undefined)s.lightning=[];if(s.acoustics===undefined)s.acoustics=[];
  if(s.nextLightningAt===undefined)s.nextLightningAt=s.time+8;if(s.soundSequence===undefined)s.soundSequence=1;
  if(s.patrol===undefined)s.patrol={seed:s.environment.seed,photoGoal:2,trackGoal:180,variant:0};
@@ -264,6 +320,7 @@ export function restore(raw){try{
  if(s.outerHull<0||s.outerHull>100||s.criticalExposure<0||![0,1,2].includes(s.pressureAlarm)||!s.collisionHits||Array.isArray(s.collisionHits)||typeof s.collisionHits!=='object'||!Object.values(s.collisionHits).every(t=>Number.isFinite(t)&&t>=0&&t<=s.time))return null;
  if(!isDieselMode(s.dieselMode))return null;
  if(!['objective','extract'].includes(s.phase)||!['electric','diesel'].includes(s.engine)||!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y)||!s.drone||!['stowed','remote','return','lost'].includes(s.drone.mode))return null;
+ if(s.environment?.chartSeed!==undefined&&(!Number.isInteger(s.environment.chartSeed)||s.environment.chartSeed<0||s.environment.chartSeed>0xffffffff))return null;
  if(!s.environment||!WEATHER[s.environment.startWeather]||!Number.isFinite(s.environment.startHour)||!Number.isFinite(s.environment.seed)||typeof s.environment.changing!=='boolean')return null;
  if(!s.systems||Object.keys(freshSystems()).some(k=>!Number.isFinite(s.systems[k])||s.systems[k]<0||s.systems[k]>100))return null;
  s.repairLimits=readLimits(BOAT_PARTS,{...s.systems,hull:s.hull},s.repairLimits);
@@ -295,6 +352,7 @@ export function restore(raw){try{
  if(s.ships.some(ship=>ship.report!==undefined&&!validReport(ship.report,s.time)))return null;
  if(s.ships.some(ship=>ship.torpedoDecoys!==undefined&&(!Number.isInteger(ship.torpedoDecoys)||ship.torpedoDecoys<0||ship.torpedoDecoys>ENEMY_DECOY_SUPPLY)))return null;
  if(!validMissionTargets(s))return null;
+ if(s.difficulty.longPatrol?!validSearch(s):s.search!==undefined)return null;
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k]))||c.depthEstimate!==undefined&&!Number.isFinite(c.depthEstimate)||c.courseEstimated!==undefined&&typeof c.courseEstimated!=='boolean')return null;
  if(s.drone.nosePitch!==null&&(!Number.isFinite(s.drone.nosePitch)||Math.abs(s.drone.nosePitch)>maxNosePitch))return null;
  if(s.drone.returnStage<0||s.drone.returnStage>3||!Number.isInteger(s.drone.returnStage))return null;

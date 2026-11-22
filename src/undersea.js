@@ -7,8 +7,8 @@ import {floorSurface} from './seafloor.js';
 
 const material=(color)=>new T.MeshStandardMaterial({color,roughness:.72});
 const up=new T.Vector3(0,1,0),groundNormal=new T.Vector3();
-function ground(object,x,north,yaw=0,lift=0){
- const {height,slopeX,slopeZ}=floorSurface(x,north);
+function groundOnChart(seed,object,x,north,yaw=0,lift=0){
+ const {height,slopeX,slopeZ}=floorSurface(x,north,seed);
  groundNormal.set(-slopeX,1,-slopeZ).normalize();
  object.position.set(x,height,-north).addScaledVector(groundNormal,lift);
  object.quaternion.setFromUnitVectors(up,groundNormal);
@@ -53,6 +53,7 @@ export class UnderseaLife{
   this.staticRoot=new T.Group();this.root.add(this.staticRoot);this.site=null;
  }
  reset(s){
+  const ground=(...args)=>groundOnChart(s.environment?.chartSeed,...args);
   for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.isInstancedMesh)o.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
   this.site=null;this.lastTime=null;this.fishPositions=[];this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
   if(s.site){this.site=s.site.kind==='surface'?this.makeShip({kind:'fishing'}):this.makeSub();this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
@@ -77,7 +78,7 @@ export class UnderseaLife{
   for(let i=0;i<3;i++){const oct=new T.Group(),m=material(0x9b657d);ellipsoid(oct,[.8,1.1,.8],[0,.6,0],m);for(let j=0;j<8;j++){const a=j*Math.PI/4,pts=[new T.Vector3(0,.3,0),new T.Vector3(Math.sin(a),.1,Math.cos(a)),new T.Vector3(Math.sin(a)*2,.15,Math.cos(a)*2)];oct.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),8,.13,4),m));}const x=this.anchor.x-25+i*28,y=this.anchor.y+25;oct.name='Octopus';ground(oct,x,y,hash01(seed,i)*Math.PI*2,-.04);this.staticRoot.add(oct);}
  }
  update(s,env){
-  if(this.lastState!==s)this.reset(s);const t=s.time,a=this.anchor,focusDepth=Math.min(80,bottom(a.x,a.y)-15);
+  if(this.lastState!==s)this.reset(s);const t=s.time,a=this.anchor,focusDepth=Math.min(80,bottom(a.x,a.y,s.environment?.chartSeed)-15);
   const elapsed=this.lastTime===null?0:Math.max(0,t-this.lastTime);this.lastTime=t;
   this.swimClock.value=t;
   for(let i=0;i<this.fish.count;i++){const school=Math.floor(i/20),seed=i%20,angle=t*.08+school*1.8,r=24+school*13,cx=a.x+Math.sin(angle)*r,cy=a.y+Math.cos(angle)*r;
@@ -95,7 +96,7 @@ export class UnderseaLife{
    const whale=i===3,rate=whale?.008:.025,r=whale?145:50+i*24;
    const place=(position,time)=>{
     const angle=time*rate+i*2;
-    position.set(a.x+Math.sin(angle)*r,-Math.min(50+i*9,bottom(a.x,a.y)-20),-a.y-Math.cos(angle)*r);
+    position.set(a.x+Math.sin(angle)*r,-Math.min(50+i*9,bottom(a.x,a.y,s.environment?.chartSeed)-20),-a.y-Math.cos(angle)*r);
     avoidBoat(position,s,whale?8:3);
    };
    place(animal.position,t);const ahead=this.dummy.position;place(ahead,t+.15);ahead.sub(animal.position);
