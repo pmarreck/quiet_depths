@@ -8,7 +8,7 @@ export const difficultyControls = [
   {id:'satellite', label:'Classified satellite photography', initial:true},
   {id:'drone', label:'External ROV', initial:true},
   {id:'omniscientChart', label:'Exact enemy positions on chart', initial:false},
-  {id:'orbitCamera', label:'External orbit camera', initial:false}
+  {id:'orbitCamera', label:'External orbit camera (Turn off for more realism)', initial:true}
 ];
 
 export function patrolDifficulty(input={}) {

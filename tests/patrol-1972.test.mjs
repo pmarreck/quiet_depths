@@ -191,3 +191,16 @@ test('the mission catalog retains every historical v1 patrol ID in briefing orde
   assert.equal(restore(save(patrol))?.mission,id);
  }
 });
+
+test('the orbit camera defaults on for new patrols and preserves saved realism choices',()=>{
+ assert.equal(createGame().difficulty.orbitCamera,true);
+ for(const enabled of [false,true]){
+  const game=createGame('recon',17,{difficulty:{orbitCamera:enabled}});
+  const resumed=restore(save(game));
+  assert.equal(resumed.difficulty.orbitCamera,enabled);
+  assert.equal(patrolSetup(resumed).options.difficulty.orbitCamera,enabled);
+ }
+ const legacy=createGame();
+ delete legacy.difficulty.orbitCamera;
+ assert.equal(restore(save(legacy)).difficulty.orbitCamera,false);
+});

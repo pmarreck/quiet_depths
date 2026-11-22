@@ -198,7 +198,8 @@ export function save(s){return JSON.stringify(s);}
 export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charge={id:s.soundSequence++,x,y,depth,delay,totalDelay:delay,age:0,exploded:false,kind};s.blasts.push(charge);return charge;}
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
- s.difficulty=patrolDifficulty(s.difficulty);
+ // Patrols saved before the orbit option existed always used station views.
+ s.difficulty=patrolDifficulty({orbitCamera:false,...s.difficulty});
  s.debrief??=[];
  if(!validDebrief(s.debrief,s.time)||s.patrolId!==undefined&&(typeof s.patrolId!=='string'||!/^[a-f0-9]{32}$/.test(s.patrolId)))return null;
  if(s.noisemaker!==undefined&&!validReport(s.noisemaker,s.time))return null;
