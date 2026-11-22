@@ -25,7 +25,7 @@ import {sonarReading} from './contact-readings.js';
 import {lossPresentation} from './loss.js';
 import {persistPatrol,resumablePatrol} from './persistence.js';
 import {SLOT_COUNT,listSlots,writeSlot,loadSlot} from './patrol-slots.js';
-import {difficultyControls,patrolDifficulty} from './difficulty.js';
+import {difficultyPanel,patrolDifficulty} from './difficulty.js';
 import {allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
@@ -169,24 +169,14 @@ $('current-seed').onclick=()=>copySeed(briefingPatrol().patrol.seed,$('current-s
 $('copy-seed').onclick=()=>copySeed(parsePatrolSeed($('patrol-seed').value));
 $('patrol-seed').onclick=event=>{event.target.select();copySeed(parsePatrolSeed(event.target.value));};
 $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity('');$('seed-status').textContent='';});
-function renderDifficulty(){$('difficulty-options').innerHTML=difficultyControls.map(control=>{
- const value=difficulty[control.id];
- if(typeof value==='boolean')return `<label>${control.label}<input type="checkbox" data-difficulty="${control.id}" ${value?'checked':''} ${control.requires&&!difficulty[control.requires]?'disabled':''}></label>`;
- return `<label>${control.label}<output>${value}</output><input type="range" data-difficulty="${control.id}" min="${control.min}" max="${control.max}" step="${control.step}" value="${value}"><small>${control.low} ↔ ${control.high}</small></label>`;
-}).join('');}
-renderDifficulty();
-$('difficulty-options').addEventListener('input',event=>{
- const input=event.target,id=input.dataset.difficulty;
- if(!id)return;
- difficulty=patrolDifficulty({...difficulty,[id]:input.type==='checkbox'?input.checked:Number(input.value)});
- for(const child of difficultyControls.filter(c=>c.requires===id))$('difficulty-options').querySelector('[data-difficulty="'+child.id+'"]').disabled=!difficulty[id];
- const output=input.closest('label').querySelector('output');if(output)output.value=difficulty[id];
- try{localStorage.setItem('quiet-depths-difficulty-v1',JSON.stringify(difficulty));}catch{}
-});
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const missionPicker=globalThis.Elm.MissionPicker.init({
  node:$('patrol-briefing-controls'),
- flags:{selected:state.mission,times:conditionChoices(TIMES),weather:conditionChoices(WEATHER)}
+ flags:{selected:state.mission,difficulty:difficultyPanel(difficulty),times:conditionChoices(TIMES),weather:conditionChoices(WEATHER)}
+});
+missionPicker.ports.difficultyChanged.subscribe(({id,value})=>{
+ difficulty=patrolDifficulty({...difficulty,[id]:value});
+ try{localStorage.setItem('quiet-depths-difficulty-v1',JSON.stringify(difficulty));}catch{}
 });
 missionPicker.ports.missionSelected.subscribe(updateMissionBriefing);
 missionPicker.ports.patrolRequested.subscribe(start);
@@ -194,7 +184,7 @@ $('reuse-patrol').onclick=()=>{
  const {seed,mission,options}=patrolSetup(briefingPatrol());
  missionPicker.ports.selectSetup.send({mission,conditions:{timeOfDay:options.timeOfDay,weather:options.weather,changing:options.changing}});
  $('patrol-seed').value=seed;$('patrol-seed').setCustomValidity('');
- difficulty=patrolDifficulty(options.difficulty);renderDifficulty();
+ difficulty=patrolDifficulty(options.difficulty);missionPicker.ports.showDifficulty.send(difficultyPanel(difficulty));
  $('current-seed-status').textContent='Original setup selected. Choose Begin Patrol to replay.';
 };
 let slotsRequest=0;

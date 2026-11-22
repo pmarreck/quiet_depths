@@ -99,3 +99,16 @@ test('a repair alert follows work on damage that crews can still repair',()=>{
  s.repair=0;s.drone.camera=28;assert.equal(seriousRepairs(s),true);
  s.drone.mode='remote';assert.equal(seriousRepairs(s),false);
 });
+
+test('reusing a saved setup gives Elm the saved replay choices and normalized slider limits',async()=>{
+ const {difficultyPanel,patrolDifficulty}=await import('../src/difficulty.js');
+ const canonical=patrolDifficulty({instantReplay:false,enemyReplay:true,damage:2,pursuit:'2'});
+ const panel=difficultyPanel(canonical);
+ const child=panel.switches.find(c=>c.id==='enemyReplay');
+ assert.equal(child.value,true);assert.equal(child.requires,'instantReplay');
+ assert.equal(panel.switches.find(c=>c.id===child.requires).value,false);
+ assert.equal(panel.sliders.find(c=>c.id==='damage').value,1);
+ assert.equal(panel.sliders.find(c=>c.id==='pursuit').value,1);
+ const settings=Object.fromEntries([...panel.switches,...panel.sliders].map(c=>[c.id,c.value]));
+ assert.deepEqual(settings,canonical);
+});

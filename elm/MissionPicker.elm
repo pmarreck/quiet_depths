@@ -4,11 +4,14 @@ import Browser
 import Html exposing (Html, b, button, details, div, fieldset, img, input, label, legend, option, p, select, small, span, summary, text)
 import Html.Attributes exposing (alt, attribute, checked, class, classList, disabled, id, selected, src, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
+import Json.Encode as Encode
+import PatrolDifficulty as Difficulty
 import PatrolMission exposing (Mission)
 
 
 type alias Flags =
     { selected : String
+    , difficulty : Difficulty.Model
     , times : List Choice
     , weather : List Choice
     }
@@ -29,7 +32,7 @@ type alias Slots =
     { entries : List Slot, canSave : Bool, message : String }
 
 type alias Model =
-    { selected : Mission, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
+    { selected : Mission, difficulty : Difficulty.Model, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
 
 
 type Msg
@@ -39,12 +42,18 @@ type Msg
     | SetTime String
     | SetWeather String
     | SetChanging Bool
+    | ChangeDifficulty Difficulty.Msg
+    | ShowDifficulty Difficulty.Model
     | Refresh Slots
     | Save Slot
     | Confirm Slot
     | Cancel
     | Load Slot
 
+
+port difficultyChanged : { id : String, value : Encode.Value } -> Cmd msg
+
+port showDifficulty : (Difficulty.Model -> msg) -> Sub msg
 
 port missionSelected : String -> Cmd msg
 
@@ -65,9 +74,9 @@ port readSlot : { id : Int, revision : String } -> Cmd msg
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init = \flags -> ( { selected = PatrolMission.fromId flags.selected |> Maybe.withDefault PatrolMission.Recon, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False, times = flags.times, weather = flags.weather, conditions = { timeOfDay = "random", weather = "random", changing = True } }, Cmd.none )
+        { init = \flags -> ( { selected = PatrolMission.fromId flags.selected |> Maybe.withDefault PatrolMission.Recon, difficulty = flags.difficulty, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False, times = flags.times, weather = flags.weather, conditions = { timeOfDay = "random", weather = "random", changing = True } }, Cmd.none )
         , update = update
-        , subscriptions = \_ -> Sub.batch [ beginPatrol (\() -> BeginPatrol), showSlots Refresh, selectSetup SelectSetup ]
+        , subscriptions = \_ -> Sub.batch [ beginPatrol (\() -> BeginPatrol), showSlots Refresh, selectSetup SelectSetup, showDifficulty ShowDifficulty ]
         , view = view
         }
 
@@ -100,6 +109,15 @@ update msg model =
 
         SetChanging changing ->
             ( { model | conditions = { conditions | changing = changing } }, Cmd.none )
+
+        ChangeDifficulty change ->
+            let
+                ( settings, changed ) = Difficulty.update change model.difficulty
+            in
+            ( { model | difficulty = settings }, Maybe.withDefault Cmd.none (Maybe.map difficultyChanged changed) )
+
+        ShowDifficulty settings ->
+            ( { model | difficulty = settings }, Cmd.none )
 
         Refresh slots ->
             ( { model | slots = slots, busy = False, confirm = Nothing }, Cmd.none )
@@ -139,6 +157,7 @@ view model =
                 ]
             , p [] [ text "Day turns to night during your patrol. Clear skies, rain and storms change how far either side can see." ]
             ]
+        , Html.map ChangeDifficulty (Difficulty.view model.difficulty)
         ]
 
 conditionMenu : String -> String -> String -> List Choice -> String -> (String -> Msg) -> Html Msg
