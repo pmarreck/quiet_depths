@@ -12,6 +12,7 @@ function objectives(s:Setup):Traffic[]{
     case 'intercept':return s.ships.filter(v=>v.id==='cobalt');
     case 'seek-and-destroy-sub':return s.ships.filter(v=>v.kind==='sub');
     case 'tiebreaker':return s.ships.filter(v=>v.side==='hostile');
+    case 'wolf-in-the-henhouse':return s.ships.filter(v=>v.side==='friendly'&&v.id!=='plover');
     case 'seek-and-destroy':return s.ships.filter(v=>v.military&&v.kind==='merchant');
     case 'recon':case 'shadow':return s.ships.filter(v=>v.kind==='merchant');
     default:return s.ships;

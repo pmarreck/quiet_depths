@@ -1,4 +1,5 @@
 import {carrierId,carrierGroup,validCarrier} from './carrier.js';
+import {setupHenhouse,validConvoy,convoyLosses} from './convoy-watch.js';
 import {advanceFleetAction,fleetTheater,validTheater} from './fleet-action.js';
 import {emitSound} from './acoustics.js';
 import {replayEvent} from './instant-replay.js';
@@ -38,6 +39,7 @@ export function parsePatrolSeed(text){
 }
 
 export function validMissionTargets(s){
+ if(s.mission==='wolf-in-the-henhouse')return validConvoy(s);
  if(s.mission==='tiebreaker')return validTheater(s);
  if(s.mission==='big-kahuna'){
   const carriers=s.ships.filter(v=>v.kind==='carrier'||v.id===carrierId);
@@ -122,6 +124,7 @@ export function updateOperation(s,dt){
  return o.completed;
 }
 export function objectiveState(s){
+ if(s.convoy)return {label:'PROTECT THE CONVOY',text:'Sink the hunter. Further convoy losses: '+convoyLosses(s)+'/2.',progress:'',advice:''};
  if(s.site&&s.search&&!s.search.located)return {label:'FIND THE MISSION SITE',text:'Search the last reported area.',progress:'',advice:'Look for the casualty or wreck. A close sonar ping can resolve the site.'};
  if(s.mission==='tiebreaker')return {label:s.phase==='extract'?'EXTRACTION OPEN':'TURN THE TIDE',text:s.phase==='extract'?'Stay to assist or surface at extraction.':'Put the friendly fleet two vessels ahead. Your sub is excluded.',progress:s.phase==='extract'?'CLEARED':'',advice:''};
  if(s.mission==='big-kahuna')return {label:'BIG KAHUNA',text:'Sink fleet carrier Solstice and return to extraction',progress:s.ships.find(v=>v.id===carrierId)?.wreckMark?'WRECK MARKED':'',advice:''};
@@ -130,8 +133,10 @@ export function objectiveState(s){
  if(s.mission==='seek-and-destroy')return {label:'SINK THE CONVOY',text:'Find and sink the military transports',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
  if(s.operation){const o=s.operation,c=operationConditions(s);
   if(s.mission==='survey'){
-   if(s.difficulty?.drone===false)return {label:'SURVEY THE WRECK',text:`${Math.floor(o.scan)}/45 s scan`,progress:Math.floor(o.scan)+'/45',advice:o.find||'Scan within 100 m at 0.5–3 kn.'};
-   return {label:'SURVEY THE WRECK',text:`${Math.floor(o.scan)}/45 s scan · ${o.photoAngles.length}/3 camera angles`,progress:o.photoAngles.length+'/3',advice:o.find||'Scan within 100 m at 0.5–3 kn, or take drone photos from three sides.'};
+   const camera=s.difficulty?.drone!==false&&s.drone.mode!=='lost';
+   const tally=Math.floor(o.scan)+'/45',prefix=o.active?'Scanning. ':s.drone.mode==='lost'?'ROV lost. ':'';
+   return {label:'SURVEY THE WRECK',text:tally+' s scan'+(camera?' · '+o.photoAngles.length+'/3 camera angles':''),
+    progress:tally,advice:o.find||prefix+'Your sub scans automatically at 0.5–3 kn, within 100 m horizontally and 32 m vertically. Slow passes add up.'};
   }
   return {label:s.site.kind==='surface'?'RECOVER SURVIVORS':'DIVER RESCUE',text:`${o.rescued} aboard · ${o.known?o.remaining:'?'} awaiting rescue`,progress:o.rescued+'/'+(o.known?o.rescued+o.remaining:'?'),advice:o.completed?`${o.rescued} survivors and the rescue team aboard. Surface at extraction.`:c.holding?(o.known?'Hold position. Transfers every 9 seconds.':'Hold position. Rescue team assessing the casualty…'):`Hold 30–${s.site.kind==='surface'?85:75} m away · depth ${c.depth.toFixed(0)} m ±${s.site.kind==='surface'?1:5} · ≤0.6 kn`};
  }
@@ -159,6 +164,7 @@ export function randomizePatrol(s,seed){
  s.ships.push({id:'alder',name:['Alder','Seaforth','Larch'][Math.floor(h(81)*3)],kind:'merchant',military:false,x:convoy.x+400+h(82)*500,y:convoy.y+450+h(83)*300,heading,speed,hull:100,alert:0,attack:0,flood:0,disabled:false,sinkDepth:0});
  setupOperation(s,seed);
  s.events=s.events.filter(e=>!e.text.startsWith('Helm steady.'));
+ if(s.mission==='wolf-in-the-henhouse'){setupHenhouse(s);return;}
  if(s.mission==='tiebreaker'){
   Object.assign(s,fleetTheater(start,seed));s.home={x:start.x-450,y:start.y-550};
   if(!s.difficulty.longPatrol)updateFleetBattle(s);

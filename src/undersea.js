@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.js';
 import {createSwimmer} from './marine-life.js';
+import {surfaceHull} from './surface-hull.js';
 import {schoolFishShape} from './school-fish.js';
 import {bottom,rad,clamp,capsuleContact} from './mechanics.js';
 import {hash01,surfaceHeight} from './environment.js';
@@ -49,16 +50,22 @@ export class UnderseaLife{
   this.fish=new T.InstancedMesh(fishGeo,fishSkin,count);this.fish.instanceMatrix.setUsage(T.DynamicDrawUsage);this.root.add(this.fish);this.dummy=new T.Object3D();this.fish.frustumCulled=false;
   this.animals=Array.from({length:4},(_,i)=>{const a=createSwimmer(T,i===3);this.root.add(a);return a;});
   this.divers=Array.from({length:3},()=>{const d=diver();this.root.add(d);return d;});
-  this.launches=Array.from({length:2},()=>{const g=new T.Group();const boat=new T.Mesh(new T.CapsuleGeometry(1,4,4,8),material(0xb77942));boat.rotation.x=Math.PI/2;boat.scale.y=.5;g.add(boat);for(const x of [-.5,.5])ellipsoid(g,[.3,.7,.3],[x,1,0],material(0xd5b67e));this.root.add(g);return g;});
+  this.launches=Array.from({length:2},()=>{
+   const g=new T.Group();
+   g.add(new T.Mesh(surfaceHull(T,'launch'),new T.MeshStandardMaterial({vertexColors:true,roughness:.82})));
+   for(const z of [-1,1]){const seat=new T.Mesh(new T.BoxGeometry(1.7,.1,.32),material(0x805e47));seat.position.set(0,.37,z);g.add(seat);}
+   for(const [x,z] of [[-.3,-1],[.3,1]])ellipsoid(g,[.27,.54,.28],[x,.86,z],material(0xd5b67e));
+   this.root.add(g);return g;
+  });
   this.staticRoot=new T.Group();this.root.add(this.staticRoot);this.site=null;
  }
  reset(s){
   const ground=(...args)=>groundOnChart(s.environment?.chartSeed,...args);
   for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.isInstancedMesh)o.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
   this.site=null;this.lastTime=null;this.fishPositions=[];this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
-  if(s.site){this.site=s.site.kind==='surface'?this.makeShip({kind:'fishing'}):this.makeSub();this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
+  if(s.site){this.site=s.site.kind==='sub'?this.makeSub():this.makeShip({kind:s.site.kind==='wreck'?'merchant':'fishing',wreck:s.site.kind==='wreck'});this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
    const rust=material(0x705343);this.site.traverse(o=>{if(o.isMesh){o.material=rust;}});
-   if(s.site.kind==='wreck'){const mast=new T.Mesh(new T.CylinderGeometry(.4,.7,25,8),rust);mast.rotation.z=.5;mast.position.set(0,11,0);this.site.add(mast);const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}
+   if(s.site.kind==='wreck'){this.site.scale.setScalar(.5);const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}
   }
   const gravel=new T.InstancedMesh(new T.IcosahedronGeometry(1,0),material(0x73766a),140);
   const sponges=new T.InstancedMesh(new T.CylinderGeometry(.34,.23,1,8,1,true),new T.MeshStandardMaterial({color:0xa77d60,roughness:1,side:T.DoubleSide}),35);

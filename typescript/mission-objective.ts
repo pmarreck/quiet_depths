@@ -36,6 +36,8 @@ export function evaluateObjective<P extends Patrol>(
       return true;
     case 'fleetLead':
       return friendlyLead(state.ships) >= goal.margin;
+    case 'protectConvoy':
+      return allSunk(state.ships,[goal.hunter]);
     case 'gate':
       return Math.hypot(state.x - state.home.x, state.y - state.home.y) <= goal.radius;
     case 'track':

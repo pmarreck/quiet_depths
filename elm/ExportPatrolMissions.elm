@@ -37,6 +37,9 @@ encodeObjective objective =
         FleetLead margin ->
             rule "fleetLead" [ ( "margin", E.int margin ) ]
 
+        ProtectConvoy hunter limit ->
+            rule "protectConvoy" [ ( "hunter", E.string hunter ), ( "lossLimit", E.int limit ) ]
+
 
 encodeMission : PatrolMission.Mission -> E.Value
 encodeMission mission =

@@ -20,6 +20,7 @@ type Mission
     | SurfaceRescue
     | Survey
     | Tiebreaker
+    | Henhouse
 
 
 type Objective
@@ -30,6 +31,7 @@ type Objective
     | TrackQuietly
     | FinishOperation
     | FleetLead Int
+    | ProtectConvoy String Int
 
 
 type alias Briefing =
@@ -45,7 +47,7 @@ type alias Briefing =
 
 all : List Mission
 all =
-    [ Recon, Intercept, Convoy, BigKahuna, SubHunt, Transit, Shadow, UnderseaRescue, SurfaceRescue, Survey, Tiebreaker ]
+    [ Recon, Intercept, Convoy, BigKahuna, SubHunt, Transit, Shadow, UnderseaRescue, SurfaceRescue, Survey, Tiebreaker, Henhouse ]
 
 
 fromId : String -> Maybe Mission
@@ -112,7 +114,7 @@ briefing mission =
 
         Survey ->
             Briefing "survey" "What the sea remembers" "WRECK SURVEY" "8–12 MIN"
-                "Survey an old wreck on the reef shelf. Collect 45 seconds of close sonar scanning, or photograph it from three different sides with your camera ROV. Stay within the 100 m cable."
+                "Survey an old wreck on the reef shelf. Pass within 100 m horizontally and 32 m vertically at 0.5–3 knots. Your sub scans automatically. Collect 45 seconds across as many passes as you need, or take three ROV photos from different sides. The cable reaches 100 m."
                 "Scan the wreck or take 3 ROV photographs"
                 FinishOperation
 
@@ -121,3 +123,9 @@ briefing mission =
                 "Two fleets are already exchanging fire. Each has three ships and one submarine. Your chart shows the areas assigned to our units before the battle. Ping or look for fresh evidence before committing a torpedo. Give our fleet a two-vessel lead, excluding your own sub. Once command opens extraction, you may leave or stay to help."
                 "Give the friendly fleet a two-vessel lead"
                 (FleetLead 2)
+
+        Henhouse ->
+            Briefing "wolf-in-the-henhouse" "Wolf in the Henhouse" "CONVOY DEFENSE" "6–12 MIN"
+                "Plover is already on the bottom. A submarine is hunting the rest of our convoy. Surface near the ships to be hailed, then keep the signaling ship in your periscope or tower binoculars. Her lamp repeats an estimate. Your listeners may be able to match it to a bearing. You can also hunt on your own. Sink the hunter before two more friendly vessels go down."
+                "Sink the hunter before two more convoy losses"
+                (ProtectConvoy "wolf" 2)

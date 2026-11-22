@@ -1,4 +1,5 @@
 import {validTubeTimes} from './torpedo-tubes.js';
+import {convoyLosses,updateLamp,updateConvoyRaid,resolveConvoyCharge} from './convoy-watch.js';
 import {replayEvent} from './instant-replay.js';
 import {gameEcho,observeTorpedo,validEcho,validTracks} from './torpedo-watch.js';
 import {fullCondition,BOAT_PARTS,DRONE_PARTS,readLimits,operatingFraction} from './equipment.js';
@@ -60,6 +61,7 @@ export function contact(s,ship,method){
  // draw for every observation so changing the display preserves seeded events.
  const observationRoll=rand(s);
  c.bearing=(b+(method==='passive'?3*observationBias(s.patrol.seed,c.id,'passive'):0)+360)%360;c.age=0;c.method=method;
+ if(s.convoy&&method==='passive'){c.passiveBearing=c.bearing;c.passiveAt=s.time;c.passiveX=s.x;c.passiveY=s.y;}
  if(method!=='passive'&&method!=='lights'){
    const sigma=method==='visual'?Math.max(25,d*.045):Math.max(15,d*.03);
    const continuedSight=method==='visual'&&c.fix?.source==='visual';
@@ -90,7 +92,7 @@ export function ping(s){
   s.search.located=true;log(s,'Mission site echo identified. Position marked on chart.','success');
  }
  for(const p of s.projectiles)if(Math.hypot(distance(s,p),s.depth-p.depth)<6000*operatingFraction(s.systems.sonar))observeTorpedo(s,gameEcho(s,p,s.time,TORPEDO_SPEED),true);
- if(s.mission==='tiebreaker')for(const volley of s.battle.volleys){
+ for(const volley of s.battle?.volleys??(s.convoy?.shot?[s.convoy.shot]:[])){
   if(!volley.underwater)continue;
   const p=fleetShotPose(volley,s.time);
   if(separation(s,p)<6000*operatingFraction(s.systems.sonar))observeTorpedo(s,gameEcho(s,p,s.time,p.speed),true);
@@ -218,6 +220,7 @@ function tick(s,dt,input){
 
  }
  if(s.mission==='tiebreaker'&&!approaching)updateFleetBattle(s);
+ if(s.convoy){updateConvoyRaid(s,dt,approaching,dropDepthCharge);updateLamp(s,env,input,dt);}
  if(s.search&&!s.search.located){
   if(s.site){
    const surfaceSight=s.site.kind==='surface'&&['scope','tower','gun'].includes(input.observation)&&
@@ -238,7 +241,7 @@ function tick(s,dt,input){
  s.contacts=s.contacts.filter(c=>c.age<240||c.fix?.source==='satellite'&&s.time-c.fix.time<900);
  const packet=updateRecon(s,dt);if(packet&&applyReconPacket(s,packet))log(s,`Orbital reconnaissance received. ${packet.tracks.length} timestamped surface tracks.`,'success');
  updateCombat(s,dt);
- for(const b of s.blasts){b.delay-=dt;if(b.delay<=0&&!b.exploded){b.exploded=true;b.explodedAt=s.time;emitSound(s,{type:'blast',x:b.x,y:b.y,depth:b.depth,power:1.2});}if(b.exploded)b.age=s.time-b.explodedAt;}
+ for(const b of s.blasts){b.delay-=dt;if(b.delay<=0&&!b.exploded){b.exploded=true;b.explodedAt=s.time;if(s.convoy&&b.convoyCharge)resolveConvoyCharge(s,b);emitSound(s,{type:'blast',x:b.x,y:b.y,depth:b.depth,power:1.2});}if(b.exploded)b.age=s.time-b.explodedAt;}
  s.blasts=s.blasts.filter(b=>b.age<5);
  for(const shell of s.shells){shell.delay-=dt;if(shell.delay<=0&&!shell.hit){shell.hit=true;emitSound(s,{type:'detonation',x:shell.x,y:shell.y,depth:0,power:.8});
   const range=distance(s,shell),hit=s.depth<7&&range<65;
@@ -256,7 +259,7 @@ function tick(s,dt,input){
   const rov=input.observation==='drone',eye=rov?s.drone:s;
   const optical=rov?s.drone.mode==='remote'&&operatingFraction(s.drone.camera)>0:input.observation==='scope'?s.scope&&s.depth<=15&&operatingFraction(s.systems.periscope)>0&&!scopeWashed(s,env):s.depth<=1;
   if(optical)for(const v of s.ships){
-   if(rov&&s.mission==='tiebreaker'&&v.hull>0&&Math.hypot(distance(eye,v),eye.depth-(v.depth||0))<70*operatingFraction(s.drone.camera)&&Math.abs(delta(bearing(eye,v),input.look??eye.heading))<25)contact(s,v,'visual');
+   if(rov&&(s.convoy||s.mission==='tiebreaker')&&v.hull>0&&Math.hypot(distance(eye,v),eye.depth-(v.depth||0))<70*operatingFraction(s.drone.camera)&&Math.abs(delta(bearing(eye,v),input.look??eye.heading))<25)contact(s,v,'visual');
    if(v.hull>0||v.wreckMark?.observed)continue;
    const depth=(v.kind==='sub'?v.depth:0)+(v.sinkDepth||0);
    if((rov?Math.hypot(distance(eye,v),eye.depth-depth)<70*operatingFraction(s.drone.camera):depth<5&&distance(s,v)<Math.min(1200,env.opticalRange)*(input.observation==='scope'?operatingFraction(s.systems.periscope):1))&&Math.abs(delta(bearing(eye,v),input.look??eye.heading))<25){
@@ -269,6 +272,11 @@ function tick(s,dt,input){
   if(s.ships.some(c=>c.kind==='merchant'&&c.hull>0&&distance(s,c)<listeningRange))s.trackTime+=dt;
  }
  const done=objectiveComplete(s,dt);
+ if(s.convoy&&s.status==='patrol'){
+  const limit=MISSIONS.find(m=>m.id===s.mission).objective.lossLimit;
+  if(convoyLosses(s)>=limit){s.status='convoy-lost';addDebrief(s,'Two more convoy vessels were lost after Plover.');}
+  else if(done){s.status='won';addDebrief(s,'The hunter sank. The surviving convoy is clear.');}
+ }
  if(s.mission==='sneaky-seamen'&&done&&s.status==='patrol'){s.status='won';log(s,'Gate B reached. Patrol corridor cleared.','success');}
  if(s.status==='patrol'&&done&&s.phase==='objective'){
   s.phase='extract';
@@ -283,7 +291,8 @@ function tick(s,dt,input){
 export function save(s){return JSON.stringify(s);}
 export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charge={id:s.soundSequence++,x,y,depth,delay,totalDelay:delay,age:0,exploded:false,kind};s.blasts.push(charge);return charge;}
 export function restore(raw){try{
- const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
+ const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired','convoy-lost'].includes(s.status))return null;
+ if(s.mission!=='wolf-in-the-henhouse'&&(s.convoy!==undefined||s.status==='convoy-lost'))return null;
  if(s.wavePhase!==undefined&&(!Number.isFinite(s.wavePhase)||s.wavePhase<0))return null;
  // Patrols saved before the orbit option existed always used station views.
  s.difficulty=patrolDifficulty({orbitCamera:false,instantReplay:false,...s.difficulty});
@@ -357,7 +366,8 @@ export function restore(raw){try{
  if(s.drone.nosePitch!==null&&(!Number.isFinite(s.drone.nosePitch)||Math.abs(s.drone.nosePitch)>maxNosePitch))return null;
  if(s.drone.returnStage<0||s.drone.returnStage>3||!Number.isInteger(s.drone.returnStage))return null;
  for(const c of s.contacts){
-  for(const side of [c.side,c.probableSide])if(side!==undefined&&(s.mission!=='tiebreaker'||!['friendly','hostile'].includes(side)))return null;
+  for(const side of [c.side,c.probableSide])if(side!==undefined&&(!s.convoy&&s.mission!=='tiebreaker'||!['friendly','hostile'].includes(side)))return null;
+  if(c.passiveAt!==undefined&&(!Number.isFinite(c.passiveAt)||c.passiveAt<0||c.passiveAt>s.time||![c.passiveBearing,c.passiveX,c.passiveY].every(Number.isFinite)))return null;
   if(c.lastSweep!==undefined&&(!Number.isFinite(c.lastSweep)||c.lastSweep<0||c.lastSweep>s.time))return null;
   if(c.sweepArea&&(!['x','y','time','size'].every(k=>Number.isFinite(c.sweepArea[k]))||c.sweepArea.size!==900||c.sweepArea.time>s.time))return null;
   if(c.fix&&!fixContact({},c.fix))return null;const old=/^Sierra (\d+)$/.exec(c.label);if(old)c.label=designation(Number(old[1]));}

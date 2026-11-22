@@ -56,3 +56,5 @@ body.loss #result-dialog{border-color:#d79377;background:#28191cf5;box-shadow:0 
  .log-panel .section-heading{flex:none}
  #log{flex:1;min-height:0;max-height:none;margin-top:8px;overscroll-behavior:contain;scrollbar-gutter:stable}
 }
+#lamp-copy:not([hidden]){display:block;color:#f5d58f;font:12px/1.4 var(--mono);margin-top:3px}
+#lamp-copy[hidden],.extraction[hidden],#plot-home[hidden]{display:none}

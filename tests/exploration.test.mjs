@@ -11,7 +11,7 @@ import {weatherMix} from '../src/audio.js';
 import {messLine,messClips,crewPeriod} from '../src/mess-watch.js';
 import {CrewAmbience} from '../src/crew-ambience.js';
 const options={weather:'clear',changing:false,difficulty:{longPatrol:true,airSupport:false,omniscientChart:true}};
-test('all eleven long patrols begin in water outside all sonar ranges, with a reproducible uncertain briefing',()=>{
+test('all long patrols begin in water outside all sonar ranges, with a reproducible uncertain briefing',()=>{
  for(const m of MISSIONS)for(let seed=0;seed<30;seed++){
   const s=createGame(m.id,seed,options),a=s.search;
   assert.ok(!createGame(m.id,seed).search);

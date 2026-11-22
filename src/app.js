@@ -1,3 +1,4 @@
+import {copyPercent,matchingBearing,reportRadius} from './signal-lamp.js';
 import {chartRelief} from './chart-relief.js';
 import {dieselModes,isDieselMode,dieselRoutingStatus,propulsion,batteryOutput,generatorOutput,throttlePercent,throttleOrder,SURFACE_KNOTS} from './power-plant.js';
 import {torpedoTubes} from './torpedo-tubes.js';
@@ -288,7 +289,7 @@ bindCommand('start-rescue','click',()=>{
 bindCommand('hold-position','click',()=>{state.route=null;state.targetSpeed=0;state.targetDepth=operationApproach(state)?.depth??state.depth;toast('All stop. Ballast and planes holding ordered depth.');});
 bindCommand('recall-drone','click',()=>recallDrone(state),()=>state.drone.mode==='remote');
 bindCommand('clear-route','click',()=>{state.route=null;toast('Waypoint cleared. Holding ordered heading.');});
-bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast(state.mission==='sneaky-seamen'?'Gate B plotted. Cross at any depth.':'Extraction plotted. Surface inside the pickup circle to finish.');},()=>state.mission!=='tiebreaker'||state.phase==='extract');
+bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast(state.mission==='sneaky-seamen'?'Gate B plotted. Cross at any depth.':'Extraction plotted. Surface inside the pickup circle to finish.');},()=>!state.convoy&&(state.mission!=='tiebreaker'||state.phase==='extract'));
 $('center-chart').onclick=()=>{chart.follow=true;updateUI();};
  for(const [id,factor] of [['chart-zoom-in',1.4],['chart-zoom-out',1/1.4]])$(id).onclick=()=>{const r=$('viewport').getBoundingClientRect();zoomChart(chart,factor,r.width/2,r.height/2,r.width,r.height,state);updateUI();};
  all('[data-panel]').forEach(b=>b.onclick=()=>{const next=b.dataset.panel;if(drawer===next){closeDrawer();return;}openDrawer(next);});$('drawer-backdrop').onclick=closeDrawer;
@@ -488,6 +489,7 @@ function updateUI(){
  $('recon-panel').classList.toggle('hidden',!s.difficulty.satellite);
  $('mission-type').textContent=m.type;$('mission-name').innerHTML=esc(m.name).replace('observation','<br>observation.').replace('home','<br>home.').replace('through','<br>through.');
  const returning=extract&&!['tiebreaker','seek-and-destroy-sub','seek-and-destroy','intercept','big-kahuna'].includes(s.mission);
+ $('plot-home').hidden=!!s.convoy;document.querySelector('.extraction').hidden=!!s.convoy;
  $('plot-home').textContent=s.mission==='sneaky-seamen'?'PLOT GATE B':s.mission==='tiebreaker'&&!extract?'AWAIT FLEET CLEARANCE':'PLOT EXTRACTION';
  $('mission-desc').textContent=returning?'Your work is done. Bring everyone home.':m.short;
  $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':returning?'RETURN TO EXTRACTION':objective.label;
@@ -585,7 +587,8 @@ function updateUI(){
  $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
  $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
- const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(affiliation(c)||(c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED'))+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
+ const lampContact=matchingBearing(s.convoy?.pin,s,s.time,s.contacts);
+ const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.id===lampContact?'POSSIBLE SUB · LAMP + PASSIVE':affiliation(c)||(c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED'))+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
 
  $('torp-count').textContent=s.torps+' ABOARD';
@@ -600,6 +603,12 @@ function updateUI(){
  for(const id of ['battery','oxygen','fuel']){$(id+'-value').textContent=Math.round(s[id])+(id==='fuel'&&s.systems.fuelTank<100?' / '+Math.floor(s.systems.fuelTank):id==='battery'&&s.systems.batteryBank<100?' / '+Math.floor(s.systems.batteryBank):'')+'%';$(id+'-bar').style.width=s[id]+'%';$(id+'-value').style.color=s[id]<20?'var(--red)':'';}
  $('alert-label').textContent=s.alert>60?'UNDER PURSUIT':s.alert>30?'POSSIBLE DETECTION':'UNDETECTED';$('alert-label').style.color=s.alert>30?'var(--red)':'var(--green)';$('alert-dot').style.background=s.alert>30?'var(--red)':'var(--green)';
  $('noise-value').textContent='SELF NOISE '+Math.round(s.noise)+' dB';$('clearance').textContent='KEEL CLEARANCE '+Math.round(getSoundings(s).belowKeel)+' m';$('damage-flash').style.opacity=s.shock?String(s.shock*.2):'0';$('cracks').classList.toggle('hidden',!(drone?active&&s.drone.camera<65:view==='scope'&&active&&s.systems.periscope<=45));
+ const message=s.convoy?.message,readout=$('lamp-copy');
+ readout.hidden=!message||!['scope','tower'].includes(view)||!active;
+ if(!readout.hidden){
+  const sender=s.ships.find(ship=>ship.id===message.estimate.sender);
+  readout.textContent=sender.name.toUpperCase()+' · TELEGRAM '+message.estimate.number+' · '+copyPercent(message)+'% COPIED';
+ }
  updateExtras(s,env,v);
  $('viewport').dataset.paused=String(paused);$('viewport').dataset.station=view;
  for(const {el,enabled} of commandControls)el.disabled=!canIssue(s,context())||!enabled();
@@ -680,7 +689,7 @@ function drawChart(){
    c.fillStyle='#a6d6ce';c.font='12px IBM Plex Mono,monospace';c.textAlign='center';c.fillText(area.label.toUpperCase()+' · BRIEFING',sx(area.x),sy(area.y)-area.radius*k-4);
   }
  }
- if(state.mission!=='tiebreaker'||state.phase==='extract'){
+ if(!state.convoy&&(state.mission!=='tiebreaker'||state.phase==='extract')){
  c.strokeStyle='#90bb9f';c.setLineDash([3,4]);c.beginPath();c.arc(sx(state.home.x),sy(state.home.y),(state.departure?200:400)*k,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#bdd5af';c.font='14px IBM Plex Mono,monospace';c.fillText(state.departure?'GATE B · ANY DEPTH':'EXTRACTION · SURFACE',sx(state.home.x),sy(state.home.y)+(state.departure?200:400)*k+23);
  }
  for(const t of state.torpedoTracks)drawTorpedoMark(c,t,sx(t.x),sy(t.y),false,0);
@@ -689,7 +698,7 @@ function drawChart(){
   if(!v.wreckMark)continue;
   const mark=v.wreckMark,x=sx(mark.x),y=sy(mark.y);
   c.strokeStyle='#e6d7b7';c.lineWidth=2;c.beginPath();c.moveTo(x,y-7);c.lineTo(x,y+8);c.moveTo(x-5,y-2);c.lineTo(x+5,y-2);c.stroke();
-  c.textAlign='left';c.fillStyle='#e6d7b7';c.font='11px IBM Plex Mono,monospace';c.fillText(mark.observed?'WRECK':'PROBABLE WRECK',x+8,y+3);
+  c.textAlign='left';c.fillStyle='#e6d7b7';c.font='11px IBM Plex Mono,monospace';c.fillText(state.convoy&&v.id==='plover'?'PLOVER · KNOWN WRECK':mark.observed?'WRECK':'PROBABLE WRECK',x+8,y+3);
  }
  c.lineWidth=1;
  if(state.site&&(!state.search||state.search.located)){const site=state.site;c.strokeStyle='#e5c389';c.beginPath();c.arc(sx(site.x),sy(site.y),Math.max(7,75*k),0,Math.PI*2);c.stroke();c.fillStyle='#efcf98';c.font='14px IBM Plex Mono,monospace';c.textAlign='left';c.fillText(site.name,sx(site.x)+12,sy(site.y)-12);c.font='12px IBM Plex Mono,monospace';c.fillText('MISSION SITE · '+Math.round(site.depth)+' M',sx(site.x)+12,sy(site.y)+8);}
@@ -722,6 +731,23 @@ function drawChart(){
   }
   c.setLineDash([]);c.globalAlpha=1;
  }
+ if(state.convoy?.pin){
+  const pin=state.convoy.pin,x=sx(pin.x),y=sy(pin.y),radius=reportRadius(pin,state.time)*k;
+  const id=matchingBearing(pin,state,state.time,state.contacts),contact=state.contacts.find(q=>q.id===id);
+  c.strokeStyle='#edcf84';c.fillStyle='#edd59310';c.setLineDash([6,5]);c.beginPath();c.arc(x,y,radius,0,Math.PI*2);c.fill();c.stroke();c.setLineDash([]);
+  c.beginPath();c.moveTo(x,y+4);c.lineTo(x,y-9);c.lineTo(x+9,y-6);c.lineTo(x,y-3);c.stroke();
+  if(x>=0&&x<=w&&y>=0&&y<=h){
+   const title=(contact?contact.label+' · ':'')+'POSSIBLE SUB · TELEGRAM '+pin.number;
+   const note=(contact?'LAMP + PASSIVE':'CONVOY ESTIMATE')+' · '+Math.round(state.time-pin.time)+' s OLD';
+   c.font='12px IBM Plex Mono,monospace';c.textAlign='left';
+   const width=Math.max(c.measureText(title).width,c.measureText(note).width)+12;
+   const left=clamp(x-width/2,3,Math.max(3,w-width-3)),offset=clamp(radius,32,68)+11;
+   const base=y-offset>46?y-offset:y+offset+30;
+   c.beginPath();c.moveTo(x,y-4);c.lineTo(x,base<y?base:base-31);c.stroke();
+   c.fillStyle='#182e31';c.fillRect(left,base-31,width,31);
+   c.fillStyle='#f3d995';c.fillText(title,left+6,base-18);c.fillText(note,left+6,base-4);
+  }
+ }
  drawReconArea(c,sx,sy,k);
 
  if(state.route){c.setLineDash([4,5]);c.strokeStyle='#d7bd82';c.beginPath();c.moveTo(sx(state.x),sy(state.y));c.lineTo(sx(state.route.x),sy(state.route.y));c.stroke();c.setLineDash([]);c.beginPath();c.arc(sx(state.route.x),sy(state.route.y),6,0,Math.PI*2);c.stroke();}
@@ -741,6 +767,7 @@ function drawScope(){
 }
 function drawGun(){const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);const x=w/2,y=h/2;c.strokeStyle='#e3d4ab';c.lineWidth=1;c.beginPath();c.arc(x,y,11,0,Math.PI*2);c.moveTo(x-50,y);c.lineTo(x-15,y);c.moveTo(x+15,y);c.lineTo(x+50,y);c.moveTo(x,y-35);c.lineTo(x,y-15);c.moveTo(x,y+15);c.lineTo(x,y+35);c.stroke();}
 function patrolVictory(s){
+ if(s.convoy)return 'The hunter is down. The surviving convoy can continue.';
  if(s.mission==='tiebreaker')return 'Your fleet earned a two-vessel lead. You brought your sub and crew home.';
  if(s.mission==='big-kahuna')return 'Solstice sank. You brought your sub and crew home.';
  if(s.mission==='sneaky-seamen')return 'Gate B reached. You crossed the patrol area and brought your crew through alive.';
@@ -760,6 +787,8 @@ function showResult(){
  $('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';
  $('result-body').textContent=win?patrolVictory(state):state.cookoff?'A torpedo detonated aboard the submarine. The crew lost the sub.':state.imploded?'Your pressure hull collapsed at '+Math.round(state.depth)+' m.':state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?(state.search?'The extended patrol window closed. Command recalled the sub.':'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.'):'Your sub could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';
  if(state.mission==='tiebreaker'&&state.status==='expired'&&sidesAfloat(state.ships).friendly<2){$('result-title').textContent='Fleet recalled.';$('result-body').textContent='Fewer than two friendly vessels survived to earn extraction clearance.';}
+ if(state.convoy&&win)$('result-title').textContent='Convoy secured.';
+ if(state.status==='convoy-lost'){$('result-title').textContent='Convoy broken.';$('result-body').textContent='Two more friendly ships went down after Plover.';}
  const kills=patrolKills(state),medals=$('patrol-medals');
  medals.hidden=kills.submarines===0;
  medals.textContent=kills.submarines>=2?'✦ Two-submarine patrol commendation':'✦ Submarine patrol commendation';
@@ -791,7 +820,7 @@ function frame(now){
  if(canIssue(state,ctx)){
   const previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
   applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;const observation=['scope','gun','tower','drone'].includes(view)&&feedActive(state,view)?view:null;
-  step(state,realDt*rate,{timeRate:rate,afterTick:recorder?s=>recorder.capture(s):undefined,observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
+  step(state,realDt*rate,{timeRate:rate,lampInView:scene?.lampView===view?scene.lampSource:null,afterTick:recorder?s=>recorder.capture(s):undefined,observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
   if(state.pressureAlarm>previousPressure)setRate(1);
   if((state.operation?.rescued||0)>priorRescued)sound.tone('photo');
   if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}

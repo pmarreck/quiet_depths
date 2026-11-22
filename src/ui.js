@@ -1,4 +1,6 @@
-import {DAY_SECONDS} from './environment.js';
+import {DAY_SECONDS,environmentAt} from './environment.js';
+import {lampRange} from './signal-lamp.js';
+import {signalHail} from './convoy-watch.js';
 import {threats,etaText} from './torpedo-watch.js';
 import {bearing,delta,distance} from './mechanics.js';
 import {depthLimit,pressureLevel} from './pressure.js';
@@ -17,6 +19,15 @@ export function patrolNotices(s,opticalActive,soundOn,view,rate=1,paused=false){
  if(s.repair>0)notices.push({id:'repair',text:'Damage control working'});
  if(s.alert>30)notices.push({id:'detection',text:s.alert>60?'Under pursuit':'Possible detection'});
  if(s.mission==='tiebreaker'&&s.phase==='extract')notices.push({id:'fleet-clearance',text:'Fleet lead confirmed · extraction open'});
+ if(s.convoy?.message&&!s.convoy.message.delivered){
+  const sender=s.ships.find(v=>v.id===s.convoy.message.estimate.sender);
+  if(sender&&!s.reports?.some(r=>r.id==='convoy-hail'&&s.time-r.time<18))notices.push({id:'signal-watch',text:signalHail(sender,lampRange(environmentAt(s)))});
+ }
+ const pin=s.convoy?.pin;
+ if(pin&&!s.reports.some(r=>r.id==='telegram-'+pin.number&&s.time-r.time<18)){
+  const sender=s.ships.find(v=>v.id===pin.sender);
+  notices.push({id:'telegram-'+pin.number,text:'TELEGRAM '+pin.number+' · '+sender.name.toUpperCase()+' · '+pin.text+' FROM US · estimate on chart'});
+ }
  if(s.difficulty?.airSupport!==false){
   if(support.status==='arming')notices.push({id:'air',text:'Air support preparing · '+Math.max(0,Math.ceil(support.launchAt-s.time))+' s'});
   if(support.status==='airborne'&&s.aircraft.some(p=>p.hull>0&&!['down','return','gone'].includes(p.phase)))notices.push({id:'air',text:'Aircraft airborne'});

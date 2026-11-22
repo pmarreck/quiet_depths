@@ -12,6 +12,7 @@ type World=Pose & {
   ships:Ship[];projectiles:Shot[];aircraft:Actor[];impacts:{id:number;time:number}[];
   blasts:object[];shells:object[];lightning:object[];gunRounds:object[];
   battle?:{volleys:Volley[]};
+  convoy?:{shot:Volley|null};
   airSupport:object;environment:object;patrol:object;systems:object;gun:object;drone:Pose;
   site:(Pose & {kind:string})|null;operation:object|null;
   planes:number;rudder:number;cavitation:number;propRpm:number;propAngle:number;scopeAngle:number;
@@ -30,7 +31,7 @@ function picture(s:World){
     mission:s.mission,environment:s.environment,patrol:s.patrol,difficulty:s.difficulty,systems:{...s.systems},
     drone:{...s.drone},gun:{...s.gun},site:s.site?{...s.site}:null,operation:s.operation?{...s.operation}:null,airSupport:{...s.airSupport},
     ships:copies(s.ships),aircraft:copies(s.aircraft),projectiles:s.projectiles.map(p=>({...p,path:p.path.slice(-32)})),
-    ...(s.battle?{battle:{volleys:copies(s.battle.volleys)}}:{}),
+    ...(s.battle?{battle:{volleys:copies(s.battle.volleys)}}:s.convoy?.shot?{battle:{volleys:copies([s.convoy.shot])}}:{}),
     impacts:copies(s.impacts),lightning:copies(s.lightning),blasts:copies(s.blasts),shells:copies(s.shells),gunRounds:copies(s.gunRounds)};
 }
 const observers=new WeakMap<object,ReplayRecorder>();

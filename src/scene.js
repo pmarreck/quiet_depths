@@ -1,3 +1,5 @@
+import {lampLit,lampRange} from './signal-lamp.js';
+import {surfaceShip} from './surface-ship.js';
 import {makeCarrier} from './carrier-model.js';
 import {damageWreck} from './wrecks.js';
 import * as T from './vendor/three.module.js';
@@ -68,6 +70,7 @@ export class OceanScene{
   const geo=new T.PlaneGeometry(30000,30000,256,256);const wp=geo.attributes.position;for(let i=0;i<wp.count;i++){for(const axis of ['X','Y']){const u=wp['get'+axis](i)/15000;wp['set'+axis](i,Math.sign(u)*15000*Math.pow(Math.abs(u),2.4));}}this.water=new T.Mesh(geo,new T.ShaderMaterial({uniforms:this.waterUniforms,vertexShader:waterVertex,fragmentShader:waterFragment,side:T.DoubleSide}));this.water.rotation.x=-Math.PI/2;this.scene.add(this.water);
   this.atmosphere=new Atmosphere(this.scene);
   const terrainGeo=new T.PlaneGeometry(FLOOR_WIDTH,FLOOR_WIDTH,FLOOR_SEGMENTS,FLOOR_SEGMENTS);terrainGeo.setAttribute('color',new T.Float32BufferAttribute(new Float32Array(terrainGeo.attributes.position.count*3),3));this.terrain=new T.Mesh(terrainGeo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide}));this.terrain.rotation.x=-Math.PI/2;this.scene.add(this.terrain);
+  this.lampRay=new T.Raycaster();this.lampPosition=new T.Vector3();this.lampScreen=new T.Vector3();
   this.ships=new Map();this.own=this.makeSub();this.scene.add(this.own);
   this.caustics={causticTime:{value:0},causticStrength:{value:0}};
   this.own.traverse(part=>{
@@ -142,25 +145,22 @@ export class OceanScene{
  makeShip(ship){
   if(ship.kind==='carrier')return makeCarrier(T);
   if(ship.kind==='sub')return this.makeSub();
-  const root=new T.Group(),g=new T.Group(),lights=new T.Group(),small=ship.kind==='fishing',escort=ship.kind==='escort';const scale=small?.38:escort?.78:1;root.add(g,lights);root.userData.body=g;root.userData.lights=lights;
-  const hullMat=this.mat(escort?0x505f60:0x343b3b),deck=this.mat(0x737969),rust=this.mat(0x6b4633);
-  const hull=new T.Mesh(new T.CylinderGeometry(17,14,130,12,14),hullMat);hull.rotation.x=Math.PI/2;hull.scale.x=.8;hull.scale.z=.6;hull.position.y=3;g.add(hull);root.userData.hull=hull;
-  this.box(g,[24,6,103],[0,7,0],hullMat);this.box(g,[19,15,21],[0,17,36],deck);this.box(g,[16,5,15],[0,27,37],deck);this.box(g,[4,15,6],[0,29,25],rust);
-  for(let i=0;i<4;i++)this.box(g,[18,8,16],[0,13,-36+i*19],i%2?rust:this.mat(0x6b6b53));
-  this.box(g,[.8,36,.8],[0,28,-18],deck);this.box(g,[22,.6,.6],[0,38,-18],deck);this.box(g,[.6,24,.6],[0,36,39],deck);
-  this.box(g,[15,1,1],[0,43,39],deck);
+  const root=surfaceShip(T,ship.kind),{body:g,lights,flagAt,signalAt,bridgeAt}=root.userData;
   if(ship.side){
    const friendly=ship.side==='friendly',pennant=new T.BufferGeometry();
    const points=friendly?[0,3,0, 1,3,10, .5,0,6, 0,3,0, .5,0,6, 0,-2,0, 0,-2,0, .5,0,6, 1,-2,10]
                         :[0,3,0, 1,.5,10, 0,-2,0];
    pennant.setAttribute('position',new T.Float32BufferAttribute(points,3));pennant.computeVertexNormals();
    const flag=new T.Mesh(pennant,new T.MeshStandardMaterial({color:friendly?0x679acf:0xd98c43,side:T.DoubleSide}));
-   flag.position.set(0,44.5,39);g.add(flag);
+   flag.position.set(...flagAt);g.add(flag);
   }
-  const lightMat=new T.MeshBasicMaterial({color:0xffd5a0,toneMapped:false,fog:false});for(let i=0;i<4;i++)this.box(lights,[2,1,1],[-6+i*4,21,47.1],lightMat);
-  for(const [x,y,z,color,size] of [[-13,16,-25,0xff5c43,28],[13,16,-25,0x6cff9c,28],[0,43,-18,0xffdda5,40],[0,31,39,0xffd493,34]]){const sprite=new T.Sprite(new T.SpriteMaterial({map:this.glowTexture(),color,transparent:true,depthWrite:false,fog:false,toneMapped:false,blending:T.AdditiveBlending}));sprite.position.set(x,y,z);sprite.scale.set(size,size,1);lights.add(sprite);}
-  if(escort){this.box(g,[7,4,8],[0,12,-48],hullMat);this.box(g,[1,1,16],[0,15,-55],hullMat);}
-  root.scale.setScalar(scale);return root;
+  const [beam,y,z]=bridgeAt,[,mastY,mastZ]=signalAt;
+  for(const [x,h,along,color,size] of [[-beam,y,z,0xff5c43,28],[beam,y,z,0x6cff9c,28],[0,mastY+4,mastZ,0xffdda5,36],[0,y+2,z+8,0xffd493,25]]){
+   const sprite=new T.Sprite(new T.SpriteMaterial({map:this.glowTexture(),color,transparent:true,depthWrite:false,fog:false,toneMapped:false,blending:T.AdditiveBlending}));
+   sprite.position.set(x,h,along);sprite.scale.set(size,size,1);lights.add(sprite);
+  }
+  if(ship.wreck){damageWreck(T,root,false);lights.visible=false;}
+  return root;
  }
  updateTerrain(x,y,seed){
   const tile=FLOOR_WIDTH/2,east=Math.round(x/tile)*tile,north=Math.round(y/tile)*tile;
@@ -179,6 +179,7 @@ export class OceanScene{
  resize(w,h){if(this.canvas.width!==Math.floor(w*this.renderer.getPixelRatio())||this.canvas.height!==Math.floor(h*this.renderer.getPixelRatio())){this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}}
  clear(){this.renderer.setClearColor(0x0a171b);this.renderer.clear();}
  render(s,view,zoom,time,orbit,frameSeconds=time){
+  this.lampView=view;this.lampSource=null;
   if(view!=='replay'&&!feedActive(s,view)){this.clear();return;}
   const orbiting=view==='orbit'||view==='replay',e=environmentAt(s),drone=view==='drone',tower=view==='tower',gun=view==='gun',listener=view==='replay'?orbit.focus:drone?s.drone:s;
   this.updateTerrain(listener.x,listener.y,s.environment.chartSeed);
@@ -281,6 +282,15 @@ export class OceanScene{
    if(mesh.userData.lights)mesh.userData.lights.visible=!sunk&&!underwater&&e.navigationLights&&ship.lights!==false&&!ship.blackout&&d<e.lightRange;
    if(!underwater&&!sunk&&!sub&&d<e.lightRange&&mesh.userData.body){mesh.visible=true;mesh.userData.body.visible=d<e.opticalRange;}
    else if(mesh.userData.body)mesh.userData.body.visible=true;
+   const message=s.convoy?.message;
+   if(message&&ship.id===message.estimate.sender&&!sunk&&!underwater&&d<=lampRange(e)){
+    let lamp=mesh.userData.signalLamp;
+    if(!lamp){
+     lamp=new T.Sprite(new T.SpriteMaterial({map:this.glowTexture(),color:0xfff1bd,fog:false,transparent:true,depthWrite:false,toneMapped:false,blending:T.AdditiveBlending}));
+     lamp.position.set(...mesh.userData.signalAt);lamp.scale.setScalar(46);mesh.add(lamp);mesh.userData.signalLamp=lamp;
+    }
+    mesh.visible=true;lamp.visible=lampLit(message);
+   }else if(mesh.userData.signalLamp)mesh.userData.signalLamp.visible=false;
    mesh.position.set(ship.x,(sub?-ship.depth:sunk?0:surfaceHeight(ship.x,ship.y,time,e)*.65)-drop,-ship.y);
    mesh.rotation.order='YXZ';mesh.rotation.y=-rad(ship.heading);
    mesh.rotation.z=sunk?Math.min(1.38,.18+drop*.018):Math.sin(time*.8+ship.x)*.012*e.waveScale+Math.min(.35,(ship.flood||0)*.012);
@@ -325,6 +335,19 @@ export class OceanScene{
    positions.needsUpdate=true;this.driftingBubbles.geometry.setDrawRange(0,count);
   }
   this.camera.updateProjectionMatrix();const blastFlash=this.atmosphere.update(s,e,this.camera,underwater,frameSeconds);this.waterUniforms.flash.value=Math.max(blastFlash*.45,e.flash*(underwater?.05:.35));this.renderer.render(this.scene,this.camera);
+  if((view==='scope'||view==='tower')&&!underwater&&s.convoy?.message){
+   const id=s.convoy.message.estimate.sender,mesh=this.ships.get(id),lamp=mesh?.userData.signalLamp;
+   if(mesh?.visible&&lamp){
+    const position=lamp.getWorldPosition(this.lampPosition),p=this.lampScreen.copy(position).project(this.camera);
+    if(p.z>=-1&&p.z<=1&&Math.abs(p.x)<1&&Math.abs(p.y)<1){
+     const direction=position.sub(this.camera.position);
+     this.lampRay.far=direction.length();this.lampRay.set(this.camera.position,direction.normalize());
+     const blocked=(tower&&this.own.userData.mast.visible&&this.lampRay.intersectObject(this.own.userData.mast).length>0)||
+      [...this.ships.values()].some(other=>other!==mesh&&other.visible&&other.userData.body?.visible&&this.lampRay.intersectObject(other.userData.body).length>0);
+     if(!blocked)this.lampSource=id;
+    }
+   }
+  }
   const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));this.boltVisible=[...this.atmosphere.strikes.values()].some(group=>group.visible&&group.children[1].material.opacity>.2&&frustum.intersectsObject(group.children[1]));
  }
 }

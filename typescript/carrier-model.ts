@@ -1,3 +1,4 @@
+import {surfaceHull,type HullKit} from './surface-hull.ts';
 import {carrierSize,carrierDeck} from './carrier.ts';
 
 // The renderer supplies its existing Three.js instance, including in offline
@@ -9,18 +10,17 @@ interface ModelNode {
   add(...children: ModelNode[]): unknown;
   userData: {body?: ModelNode; lights?: ModelNode; hull?: ModelNode; parked?: ModelNode};
 }
-interface ModelKit {
+interface ModelKit extends HullKit {
   Group: new() => ModelNode;
   Mesh: new(geometry: object, material: object) => ModelNode;
   Vector2: new(x: number,y: number) => object;
   Shape: new(points: object[]) => object;
   ExtrudeGeometry: new(shape: object, settings: {depth: number; bevelEnabled: boolean}) => {rotateX(angle: number): object};
-  MeshStandardMaterial: new(settings: {color: number; roughness: number; metalness: number}) => object;
+  MeshStandardMaterial: new(settings: {color: number; roughness: number; metalness: number; vertexColors?: boolean}) => object;
   MeshBasicMaterial: new(settings: {color: number; toneMapped: boolean}) => object;
   SphereGeometry: new(...values: Triple) => object;
   BoxGeometry: new(...size: Triple) => object;
   ConeGeometry: new(...values: Triple) => object;
-  LatheGeometry: new(profile: object[], segments: number) => object;
 }
 
 function plate(T: ModelKit, points: readonly (readonly [number,number])[], thickness: number){
@@ -76,9 +76,8 @@ export function makeCarrier(T: ModelKit){
  root.add(body,lights);root.userData.body=body;root.userData.lights=lights;
  const hullPaint=paint(T,0x48555b),islandPaint=paint(T,0x8a9290),deckPaint=paint(T,0x44494a),stripe=paint(T,0xc7c4ae);
  const box=(size: Triple,xyz: Triple,material: object)=>part(T,body,new T.BoxGeometry(...size),material,...xyz);
- const profile=[[-108,.8],[-100,7],[-78,14],[-54,16],[55,16],[86,14],[100,10],[103,.6]];
- const hull=part(T,body,new T.LatheGeometry(profile.map(([z,r])=>new T.Vector2(r,z)),16),hullPaint,0,3,0);
- hull.rotation.x=Math.PI/2;hull.scale.z=.73;root.userData.hull=hull;
+ const hull=part(T,body,surfaceHull(T,'carrier'),new T.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.86,metalness:.15}));
+ root.userData.hull=hull;
  const hangar=[[-4,-103],[5,-103],[16,-70],[17,75],[12,98],[-12,98],[-17,77],[-17,-64]] as const;
  part(T,body,plate(T,hangar,8),hullPaint,0,7.5,0);
  const recess=paint(T,0x39474d),rail=paint(T,0xa7aaa2);
