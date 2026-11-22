@@ -1,4 +1,4 @@
-module PatrolDifficulty exposing (Model, Msg, update, view)
+module PatrolDifficulty exposing (Model, Msg, longPatrolEnabled, update, view)
 
 import Html exposing (Html, details, div, input, label, output, small, summary, text)
 import Html.Attributes exposing (attribute, checked, class, disabled, id, type_, value)
@@ -21,6 +21,16 @@ type alias Model =
 type Msg
     = Slide Slider String
     | Toggle Switch Bool
+
+
+longPatrolId : String
+longPatrolId =
+    "longPatrol"
+
+
+longPatrolEnabled : Model -> Bool
+longPatrolEnabled model =
+    List.any (\switch -> switch.id == longPatrolId && switch.value) model.switches
 
 
 enabled : Model -> Switch -> Bool
@@ -58,8 +68,8 @@ update msg model =
                     ( model, Nothing )
 
 
-view : Model -> Html Msg
-view model =
+view : String -> Model -> Html Msg
+view playtime model =
     let
         range slider =
             label []
@@ -75,13 +85,18 @@ view model =
                 ]
 
         checkbox switch =
-            label []
+            label [] <|
                 [ text switch.label
                 , input
                     [ type_ "checkbox", attribute "data-difficulty" switch.id, checked switch.value
                     , disabled (not (enabled model switch)), onCheck (Toggle switch)
                     ] []
                 ]
+                    ++ (if switch.id == longPatrolId then
+                            [ small [ attribute "role" "status" ] [ text ("Estimated play time · " ++ String.toLower playtime) ] ]
+                        else
+                            []
+                       )
     in
     details [ class "patrol-difficulty" ]
         [ summary [] [ text "Difficulty and realism" ]

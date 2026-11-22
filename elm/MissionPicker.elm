@@ -145,17 +145,24 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
+    let
+        longer =
+            Difficulty.longPatrolEnabled model.difficulty
+
+        selectedMission =
+            PatrolMission.briefing model.selected
+    in
     div []
         [ details [ id "patrol-slots" ]
             [ summary [] [ text "Save slots" ]
             , div [ class "slot-list" ] (List.map (slotView model) model.slots.entries)
             , small [ attribute "role" "status" ] [ text model.slots.message ]
             ]
-        , div [ id "mission-picker" ] (List.map (missionButton model.selected) PatrolMission.all)
+        , div [ id "mission-picker" ] (List.map (missionButton longer model.selected) PatrolMission.all)
         , div [ class "briefing-tip", attribute "aria-live" "polite" ]
             [ b [] [ text "YOUR FIRST ORDERS" ]
             , p []
-                [ text ((PatrolMission.briefing model.selected).description ++ " ")
+                [ text (selectedMission.description ++ " ")
                 , text ("You carry " ++ String.fromInt (PatrolMission.startingTorpedoes model.selected) ++ " torpedoes in total, with two bow tubes ready. ")
                 , Html.strong [] [ text (model.pauseKey ++ " pauses the patrol.") ]
                 ]
@@ -170,7 +177,7 @@ view model =
                 ]
             , p [] [ text "Day turns to night during your patrol. Clear skies, rain and storms change how far either side can see." ]
             ]
-        , Html.map ChangeDifficulty (Difficulty.view model.difficulty)
+        , Html.map ChangeDifficulty (Difficulty.view (PatrolMission.estimatedMinutes longer selectedMission) model.difficulty)
         ]
 
 conditionMenu : String -> String -> String -> List Choice -> String -> (String -> Msg) -> Html Msg
@@ -210,8 +217,8 @@ slotView model slot =
         ]
 
 
-missionButton : Mission -> Mission -> Html Msg
-missionButton selected choice =
+missionButton : Bool -> Mission -> Mission -> Html Msg
+missionButton longer selected choice =
     let
         mission =
             PatrolMission.briefing choice
@@ -228,5 +235,5 @@ missionButton selected choice =
         ]
         [ span [ attribute "aria-hidden" "true" ] []
         , div [] [ b [] [ text mission.name ], small [] [ text mission.category ] ]
-        , span [] [ text mission.duration ]
+        , span [] [ text (PatrolMission.estimatedMinutes longer mission) ]
         ]

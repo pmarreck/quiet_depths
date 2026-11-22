@@ -11,6 +11,19 @@ import {weatherMix} from '../src/audio.js';
 import {messLine,messClips,crewPeriod} from '../src/mess-watch.js';
 import {CrewAmbience} from '../src/crew-ambience.js';
 const options={weather:'clear',changing:false,difficulty:{longPatrol:true,airSupport:false,omniscientChart:true}};
+test('every briefing has a complete play-time range for each patrol length',()=>{
+ const bounds=text=>{
+  const range=/^(\d+)–(\d+) MIN$/.exec(text);
+  assert.ok(range,'Expected a play-time range, got '+text);
+  const [low,high]=range.slice(1).map(Number);
+  assert.ok(low>0&&high>low);return [low,high];
+ };
+ for(const mission of MISSIONS){
+  const standard=bounds(mission.minutes),longer=bounds(mission.longMinutes);
+  assert.ok(longer[0]>standard[0]&&longer[1]>standard[1],mission.name);
+ }
+});
+
 test('all long patrols begin in water outside all sonar ranges, with a reproducible uncertain briefing',()=>{
  for(const m of MISSIONS)for(let seed=0;seed<30;seed++){
   const s=createGame(m.id,seed,options),a=s.search;
