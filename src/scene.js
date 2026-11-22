@@ -70,7 +70,18 @@ export class OceanScene{
   this.waterUniforms={time:{value:0},origin:{value:new T.Vector2()},sunDir:{value:new T.Vector3(-.5,.12,-1).normalize()},underwater:{value:0},underwaterSun:{value:0},waveScale:{value:1},wavePhase:{value:0},daylight:{value:1},cloud:{value:0},twilight:{value:0},fogColor:{value:new T.Color()},fogDensity:{value:.0002},flash:{value:0}};
   const geo=new T.PlaneGeometry(30000,30000,256,256);const wp=geo.attributes.position;for(let i=0;i<wp.count;i++){for(const axis of ['X','Y']){const u=wp['get'+axis](i)/15000;wp['set'+axis](i,Math.sign(u)*15000*Math.pow(Math.abs(u),2.4));}}this.water=new T.Mesh(geo,new T.ShaderMaterial({uniforms:this.waterUniforms,vertexShader:waterVertex,fragmentShader:waterFragment,side:T.DoubleSide}));this.water.rotation.x=-Math.PI/2;this.scene.add(this.water);
   this.atmosphere=new Atmosphere(this.scene);
-  const terrainGeo=new T.PlaneGeometry(FLOOR_WIDTH,FLOOR_WIDTH,FLOOR_SEGMENTS,FLOOR_SEGMENTS);terrainGeo.setAttribute('color',new T.Float32BufferAttribute(new Float32Array(terrainGeo.attributes.position.count*3),3));this.terrain=new T.Mesh(terrainGeo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide}));this.terrain.rotation.x=-Math.PI/2;this.scene.add(this.terrain);
+  const terrainGeo=new T.PlaneGeometry(FLOOR_WIDTH,FLOOR_WIDTH,FLOOR_SEGMENTS,FLOOR_SEGMENTS);
+  terrainGeo.setAttribute('color',new T.Float32BufferAttribute(new Float32Array(terrainGeo.attributes.position.count*3),3));
+  const sediment=new T.MeshStandardMaterial({vertexColors:true,color:0x847e70,roughness:1,side:T.DoubleSide});
+  new T.TextureLoader().load(new URL('./seafloor-sediment.jpg',import.meta.url).href,map=>{
+   map.colorSpace=T.SRGBColorSpace;
+   map.wrapS=map.wrapT=T.MirroredRepeatWrapping;
+   // Each 8 km terrain recenter advances 500 tiles, preserving the mirror phase.
+   map.repeat.setScalar(FLOOR_WIDTH/16);
+   map.anisotropy=Math.min(4,this.renderer.capabilities.getMaxAnisotropy());
+   sediment.map=map;sediment.color.setHex(0xffffff);sediment.needsUpdate=true;
+  });
+  this.terrain=new T.Mesh(terrainGeo,sediment);this.terrain.rotation.x=-Math.PI/2;this.scene.add(this.terrain);
   this.lampRay=new T.Raycaster();this.lampPosition=new T.Vector3();this.lampScreen=new T.Vector3();
   this.ships=new Map();this.own=this.makeSub();this.scene.add(this.own);
   this.caustics={causticTime:{value:0},causticStrength:{value:0}};
@@ -210,8 +221,9 @@ export class OceanScene{
   this.terrainSeed=seed;this.terrainEast=east;this.terrainNorth=north;
   const g=this.terrain.geometry,p=g.attributes.position,colors=g.attributes.color,color=new T.Color();
   for(let i=0;i<p.count;i++){
-   const depth=bottom(east+p.getX(i),north+p.getY(i),seed);
-   p.setZ(i,-depth);color.setHex(depth<0?0x414c42:0x264541).multiplyScalar(.8+hash01(1983,i)*.3);
+   const x=east+p.getX(i),y=north+p.getY(i),depth=bottom(x,y,seed);
+   const patch=Math.sin(x/95+Math.cos(y/140))*Math.cos(y/81+x/300);
+   p.setZ(i,-depth);color.setHex(depth<0?0x81917d:0x9eb1a7).multiplyScalar(.88+.12*patch);
    colors.setXYZ(i,color.r,color.g,color.b);
   }
   p.needsUpdate=true;colors.needsUpdate=true;g.computeVertexNormals();g.computeBoundingSphere();
