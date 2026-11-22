@@ -1,6 +1,8 @@
+import {propulsion,throttlePercent,batteryOutput} from './power-plant.js';
+import {addDebrief} from './debrief.js';
 import {replayEvent} from './instant-replay.js';
 import {carrierSize} from './carrier.js';
-import {SYSTEM_NAMES,SYSTEM_KEYS,DRONE_PARTS,DRONE_HIT_FACTORS,fullCondition,damagePart,repairPart,operatingFraction} from './equipment.js';
+import {SYSTEM_NAMES,SYSTEM_KEYS,hitSystem,hitSection,DRONE_PARTS,DRONE_HIT_FACTORS,fullCondition,damagePart,repairPart,operatingFraction} from './equipment.js';
 import {updatePressure} from './pressure.js';
 import {keelLimit,pushOffShoal} from './hull-contacts.js';
 import {clamp,rad,bearing,delta,distance,separation,rand,log,bottom,capsuleContact,propellerState} from './mechanics.js';
@@ -9,7 +11,7 @@ import {boatPoint,boatLocal,recoveryDock,droneReturnSpeed} from './vehicle-statu
 export const DRONE_LIMITS=Object.freeze({deploySpeed:3,depth:280,range:100,speed:10,returnSpeed:10});
 export {SYSTEM_NAMES} from './equipment.js';
 export const freshSystems=()=>fullCondition(SYSTEM_KEYS);
-export const freshMotion=()=>({outerHull:100,pressureAlarm:0,criticalExposure:0,imploded:false,collisionHits:{},verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
+export const freshMotion=()=>({plantVersion:1,fuelLeak:0,fuelFire:0,cookoff:false,outerHull:100,pressureAlarm:0,criticalExposure:0,imploded:false,collisionHits:{},verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
 export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:'',returnStage:0,returnClearance:8,returnHoldSide:18,returnHoldForward:0});
 export function droneDeployReason(s){
  if(s.difficulty?.drone===false)return 'The ROV is disabled for this patrol.';
@@ -25,7 +27,7 @@ export function deployDrone(s){
  if(s.status!=='patrol'||droneDeployReason(s))return false;
  const a=rad(s.heading),x=s.x+Math.cos(a)*18,y=s.y-Math.sin(a)*18,depth=Math.min(DRONE_LIMITS.depth,s.depth+3),heading=bearing({x,y},s);
  Object.assign(s.drone,{mode:'remote',x,y,depth,targetDepth:depth,heading,targetHeading:heading,speed:0,targetSpeed:0,verticalSpeed:0,collisionCooldown:0});
- log(s,'Inspection drone deployed. Stay within 100 m; slow the boat for recovery.');return true;
+ log(s,'Inspection drone deployed. Stay within 100 m; slow the sub for recovery.');return true;
 }
 export function recallDrone(s){if(s.drone.mode==='remote'){
  const d=s.drone,p=boatLocal(s,d),below=s.depth+8<Math.min(279,bottom(s.x,s.y)-1);
@@ -53,19 +55,59 @@ export function loseDrone(s,reason){if(s.drone.mode==='lost')return;s.drone.mode
 export function damageSystem(s,key,amount){
  const old=s.systems[key];damagePart(s.systems,s.repairLimits,key,amount);
  const health=s.systems[key];
+ if(key==='fuelTank'&&health<old){
+  s.fuel=Math.min(s.fuel,health);
+  if(s.fuel>0){s.fuelLeak=Math.min(1,s.fuelLeak+(old-health)/100);log(s,'Fuel tank leaking. Assign damage control.','damage');}
+ }
+ if(key==='batteryBank')s.battery=Math.min(s.battery,health);
  if(key==='periscope'&&!operatingFraction(health))s.scope=false;
  if(old>0&&health===0)log(s,SYSTEM_NAMES[key]+' destroyed. Beyond onboard repair.','damage');
  else if(old>=20&&health<20&&key!=='crew')log(s,SYSTEM_NAMES[key]+' offline.','damage');
  else if(old>=60&&health<60)log(s,SYSTEM_NAMES[key]+' damaged. Performance reduced.','damage');
 }
-export function hurt(s,amount,text,subsystem=null){
+export function hurt(s,amount,text,subsystem=null,point=null){
  if(amount<=0||s.status!=='patrol')return;
  amount*=2**-(s.difficulty?.damage??0);
  s.outerHull=clamp(s.outerHull-amount*.85,0,100);
  damagePart(s,s.repairLimits,'hull',amount);s.flood=clamp(s.flood+amount*.11,0,25);s.shock=2;log(s,text,'damage');
- if(amount>=2||subsystem)damageSystem(s,subsystem||SYSTEM_KEYS[Math.floor(rand(s)*SYSTEM_KEYS.length)],amount*(1.2+rand(s)));
- if(amount>24&&s.torps>0&&rand(s)<.035){s.torps--;damagePart(s,s.repairLimits,'hull',32);s.outerHull=Math.max(0,s.outerHull-14);s.flood+=4;emitSound(s,{type:'detonation',x:s.x,y:s.y,depth:s.depth,power:1.5});log(s,'Torpedo room fire. A stored warhead detonated.','damage');}
+ const section=point?hitSection(s,point):null;
+ if(amount>=2||subsystem){
+  const key=subsystem||hitSystem(section,rand(s));
+  damageSystem(s,key,amount*(1.2+rand(s)));
+  if(section)log(s,section.toUpperCase()+' hit · '+SYSTEM_NAMES[key]+' '+Math.ceil(s.systems[key])+'%.','damage');
+ }
+ if(section==='bow'&&amount>24&&s.torps>0&&rand(s)<.025){
+  s.torps--;s.cookoff=true;s.status='lost';damagePart(s,s.repairLimits,'hull',100);
+  const message='Torpedo-room cook-off. The submarine is lost.';
+  onboardExplosion(s,'cookoff',point);log(s,message,'damage');addDebrief(s,message);return;
+ }
  if(s.hull<=0){s.status='lost';log(s,'Pressure hull lost. All stations, abandon ship.','damage');}
+}
+function onboardExplosion(s,kind,point){
+ s.shock=2;s.impacts.push({id:s.weaponSequence++,x:point.x,y:point.y,altitude:-point.depth,time:s.time,kind});
+ emitSound(s,{type:'detonation',x:point.x,y:point.y,depth:point.depth,power:kind==='cookoff'?2:.8});
+}
+function fuelEmergency(s,dt,crew){
+ const working=s.repair>0?crew:0;
+ if(s.fuelLeak>0){
+  s.fuel=Math.max(0,s.fuel-s.fuelLeak*.12*dt);
+  s.fuelLeak=Math.max(0,s.fuelLeak-working*.018*dt);
+  if(s.fuelLeak===0)log(s,'Crew sealed the fuel leak.','success');
+  if(s.fuel>0&&!s.fuelFire&&s.fuelLeak&&rand(s)<-Math.expm1(-dt*s.fuelLeak*.012)){
+   s.fuelFire=24;log(s,'Fuel fire! Damage control requested.','damage');addDebrief(s,'Leaking fuel caught fire.');
+  }
+ }
+ if(s.fuelFire>0){
+  s.fuel=Math.max(0,s.fuel-dt*.07);s.hull=Math.max(0,s.hull-dt*.09);
+  if(s.fuel>0&&rand(s)<-Math.expm1(-dt*.0015)){
+   const message='Fuel vapor explosion in the machinery space.';
+   onboardExplosion(s,'vapor',s);replayEvent(s,{kind:'blast',point:{x:s.x,y:s.y,depth:s.depth}});
+   hurt(s,9,message,'diesel');addDebrief(s,message);s.fuelFire=0;
+  }else{
+   s.fuelFire=Math.max(0,s.fuelFire-dt*(.5+working*3));
+   if(!s.fuelFire)log(s,'Fuel fire out.','success');
+  }
+ }
 }
 export function damageDrone(s,amount,reason){
  const d=s.drone;if(!['remote','return'].includes(d.mode)||amount<=0)return;
@@ -75,11 +117,10 @@ export function damageDrone(s,amount,reason){
  if(d.hull<=0)loseDrone(s,'Drone destroyed.');
 }
 export function updateBoat(s,dt){
- if(s.water>=70||s.hull<=0){s.status='lost';log(s,s.water>=70?'Flooding overwhelmed the boat. Buoyancy lost.':'Pressure hull lost.','damage');return false;}
- const engine=operatingFraction(s.systems.engine),drive=Math.min(engine,operatingFraction(s.systems.propeller));
- const diesel=s.engine==='diesel'&&s.depth<=14&&s.fuel>0&&engine>0,available=diesel||s.engine==='electric'&&s.battery>0;
- const max=available?Math.min(s.silent?3:Infinity,(diesel?17:14)*drive):0;
- const order=clamp(s.targetSpeed,-Math.min(4*drive,max),max);
+ if(s.water>=70||s.hull<=0){s.status='lost';log(s,s.water>=70?'Flooding overwhelmed the sub. Buoyancy lost.':'Pressure hull lost.','damage');return false;}
+ const {generator,drive,ahead,astern}=propulsion(s),diesel=generator>0;
+ const lever=throttlePercent(s.targetSpeed)/100;
+ const order=clamp(lever*(lever<0?astern:ahead),s.silent?-3:-4,s.silent?3:ahead);
  const accelerating=Math.sign(order)===Math.sign(order-s.speed);
  const change=dt*.35*(accelerating&&order!==0?drive:1);
  s.speed+=clamp(order-s.speed,-change,change);
@@ -112,8 +153,8 @@ export function updateBoat(s,dt){
  s.x+=Math.sin(rad(s.heading))*horizontal*dt;s.y+=Math.cos(rad(s.heading))*horizontal*dt;
  const prop=propellerState(s.speed,s.depth,s.systems.propeller);s.propAngle=(s.propAngle+prop.rpm*Math.PI/30*dt)%(2*Math.PI);s.cavitation=prop.cavitation;s.propRpm=prop.rpm;
  s.noise=clamp(Math.max((diesel?65:8)+s.speed*s.speed*.39+(s.flood>0?12:0)+s.cavitation*23-(s.silent?7:0),s.time<(s.gunLoudUntil||0)?80:0),2,100);
- if(diesel){s.fuel=clamp(s.fuel-dt*.015,0,100);s.battery=clamp(s.battery+dt*.12*engine,0,100);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}
- else{s.battery=clamp(s.battery-dt*(.009+s.speed*s.speed*.0007),0,100);s.oxygen=clamp(s.oxygen-dt*(.024+(1-operatingFraction(s.systems.oxygen))*.1),0,100);}
+ if(diesel){s.fuel=clamp(s.fuel-dt*.015,0,s.systems.fuelTank);s.battery=clamp(s.battery+dt*.12*generator*operatingFraction(s.systems.batteryBank),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}
+ else{s.fuel=Math.min(s.fuel,s.systems.fuelTank);s.battery=clamp(s.battery-dt*(.009+s.speed*s.speed*.0007),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen-dt*(.024+(1-operatingFraction(s.systems.oxygen))*.1),0,100);}
  if(s.depth<2)s.oxygen=clamp(s.oxygen+dt*.45,0,100);
  if(s.depth>15||!operatingFraction(s.systems.periscope))s.scope=false;
  const floor=keelLimit(s);
@@ -121,15 +162,16 @@ export function updateBoat(s,dt){
  updatePressure(s,dt);if(s.status==='lost')return diesel;
  if(s.oxygen<=0){s.hull=Math.max(0,s.hull-dt*2);log(s,'Air exhausted. Surface immediately.','damage');}
  const crew=s.systems.crew/100;
- if(crew===0||s.battery===0)s.repair=0;
+ if(crew===0||(!diesel&&!batteryOutput(s)))s.repair=0;
+ fuelEmergency(s,dt,crew);
  const working=s.repair>0;
  const pump=(working?5:1.2)*crew,rate=s.flood-pump;
  s.water=clamp(s.water+rate*dt/60,0,100);
  if(s.water>4&&rate>0&&!s.floodAlarm){s.floodAlarm=true;log(s,'FLOODING ALARM. Inflow exceeds pumps. Assign damage control.','damage');}
  if(rate<=0)s.floodAlarm=false;
- if(working){s.repair=Math.max(0,s.repair-dt);s.flood=Math.max(0,s.flood-dt*.045*crew);s.hull=repairPart(s.hull,s.repairLimits.hull,dt*.06*crew);s.battery=Math.max(0,s.battery-dt*.016);for(const key of SYSTEM_KEYS)s.systems[key]=repairPart(s.systems[key],s.repairLimits[key],dt*.11*crew);}
+ if(working){s.repair=Math.max(0,s.repair-dt);s.flood=Math.max(0,s.flood-dt*.045*crew);s.hull=repairPart(s.hull,s.repairLimits.hull,dt*.06*crew);if(!diesel)s.battery=Math.max(0,s.battery-dt*.016);for(const key of SYSTEM_KEYS)s.systems[key]=repairPart(s.systems[key],s.repairLimits[key],dt*.11*crew);}
  if(s.water>12)s.hull=Math.max(0,s.hull-dt*(s.water-12)*.012);
- if(s.water>=70||s.hull<=0){s.status='lost';log(s,s.water>=70?'Flooding overwhelmed the boat. Buoyancy lost.':'Pressure hull lost.','damage');}
+ if(s.water>=70||s.hull<=0){s.status='lost';log(s,s.water>=70?'Flooding overwhelmed the sub. Buoyancy lost.':'Pressure hull lost.','damage');}
  s.collisionCooldown=Math.max(0,s.collisionCooldown-dt);
  return diesel;
 }
@@ -137,13 +179,13 @@ export function updateDrone(s,dt,diesel){
  const d=s.drone;d.collisionCooldown=Math.max(0,d.collisionCooldown-dt);
  if(d.mode==='stowed'){
   Object.assign(d,{x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:0,targetSpeed:0,targetHeading:s.heading,targetDepth:s.depth});
-  if(diesel||s.battery>1){const charge=Math.min(100-d.battery,dt*.32);d.battery+=charge;if(!diesel)s.battery=Math.max(0,s.battery-charge*.08);
+  if(diesel||s.battery>1&&batteryOutput(s)){const charge=Math.min(100-d.battery,dt*.32);d.battery+=charge;if(!diesel)s.battery=Math.max(0,s.battery-charge*.08);
    const repair=dt*.2*s.systems.crew/100;for(const k of DRONE_PARTS)d[k]=repairPart(d[k],d.repairLimits[k],repair);}
   if(d.battery>12)d.lowAlarm=false;return;
  }
  if(d.mode==='lost')return;
  if(separation(d,s)>DRONE_LIMITS.range){loseDrone(s,'Control link exceeded 100 m.');return;}
- if(separation(d,s)>=70&&!d.rangeAlarm){d.rangeAlarm=true;log(s,'Drone link at 70 m. Slow the boat and bring the drone home.','warning');}
+ if(separation(d,s)>=70&&!d.rangeAlarm){d.rangeAlarm=true;log(s,'Drone link at 70 m. Slow the sub and bring the drone home.','warning');}
  if(separation(d,s)<60)d.rangeAlarm=false;
  const batteryBefore=d.battery;d.battery=Math.max(0,d.battery-dt*(.045+d.speed*d.speed*.0013+(100-d.hull)*.0003));
  if(batteryBefore>10&&d.battery<=10&&!d.lowAlarm){d.lowAlarm=true;log(s,'DRONE BATTERY 10%. Return immediately.','damage');}
@@ -166,7 +208,7 @@ export function updateDrone(s,dt,diesel){
   d.speed*=.15;d.verticalSpeed*=.2;
  }
  const floor=bottom(d.x,d.y)-.7;if(d.depth>floor){d.depth=Math.max(0,floor);if(d.collisionCooldown<=0){damageDrone(s,3+Math.abs(d.speed)*1.5,'seabed');d.collisionCooldown=2;}d.verticalSpeed=0;d.speed*=.7;}
- // Pressure-front receipt is independent of when the boat hears the same blast.
+ // Pressure-front receipt is independent of when the sub hears the same blast.
  for(const sound of s.acoustics)if(sound.type==='blast'&&!sound.droneHit&&s.time-sound.time>=propagationTime(sound,d)){sound.droneHit=true;const r=separation(d,{...sound,depth:sound.depth||0});if(r<140)damageDrone(s,85*(1-r/140),'depth charge pressure wave');}
  if(d.mode==='lost')return;
  if(d.mode==='return'&&d.returnStage===3&&separation(d,dock)<1.2&&Math.abs(s.speed)<=3){d.mode='stowed';d.speed=d.targetSpeed=0;log(s,'Drone recovered. Charging and repairs underway.','success');}

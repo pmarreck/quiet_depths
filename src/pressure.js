@@ -23,7 +23,7 @@ export function updatePressure(s,dt){
  }
  if(level===2&&s.criticalExposure>20&&rand(s)<-Math.expm1(-dt*(excess-.12)*.035)){
   damagePart(s,s.repairLimits,'hull',100);s.status='lost';s.imploded=true;s.shock=2;
-  const text='Pressure hull imploded beyond the damaged boat’s depth tolerance.';
+  const text='Pressure hull imploded beyond the damaged sub’s depth tolerance.';
   log(s,text,'damage');addDebrief(s,text);
  }
 }

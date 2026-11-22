@@ -44,10 +44,12 @@ function putTorpedoInWater(s,owner,origin,heading,depth,launch){
 export function launchTorpedo(s,id){
  const c=s.contacts.find(v=>v.id===id);
  if(!c||c.identified&&!c.military||s.status!=='patrol'||s.depth>100)return false;
+ const condition=operatingFraction(s.systems.tubes);
+ if(!condition)return false;
  const tube=torpedoTubes(s).next;
  if(tube===null)return false;
  const tubeSide=tube==='port'?-1:1;
- s.tubeReadyAt[tube]=s.time+RELOAD_SECONDS;
+ s.tubeReadyAt[tube]=s.time+RELOAD_SECONDS/condition;
  s.torps--;s.alert=clamp(s.alert+20,0,100);
  const origin=boatPoint(boatSurfacePose(s),{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
@@ -196,7 +198,7 @@ function releaseEnemyDecoy(s,p,ship){
  ship.torpedoDecoys=remaining-1;
  p.decoysChecked.push(ship.id);
  if(rand(s)>=.25)return;
- // Drop the decoy short of the boat and to one side of the incoming shot.
+ // Drop the decoy short of the sub and to one side of the incoming shot.
  const a=rad(bearing(p,ship)),side=p.searchDirection;
  p.decoyTarget={x:ship.x-Math.sin(a)*60+Math.cos(a)*24*side,y:ship.y-Math.cos(a)*60-Math.sin(a)*24*side,
   depth,expiresAt:s.time+18};
@@ -261,8 +263,8 @@ function torpedoStrike(s,p,from){
  replayEvent(s,{kind:'torpedo',shot:p.id,target:hit===s?undefined:hit.id,enemy:hit!==s&&p.owner!=='player',
   point:{x:p.x,y:p.y,depth:p.depth},heading:p.heading});
  if(hit===s){
-  hurt(s,36,'Torpedo struck the hull. Damage control responding.');
-  addDebrief(s,'An incoming torpedo struck your boat.');
+  hurt(s,36,'Torpedo struck the hull. Damage control responding.',null,p);
+  addDebrief(s,'An incoming torpedo struck your sub.');
   return true;
  }
  if(hit.kind==='carrier'){

@@ -108,7 +108,7 @@ test('loaded tubes, the last spare and legacy saves all respect the remaining am
  const last=restore(save(s));assert.ok(last);
  assert.deepEqual(torpedoTubes(last),{port:null,starboard:12,next:null});
  step(last,12);assert.deepEqual(torpedoTubes(last),{port:null,starboard:0,next:'starboard'});
- for(const malformed of [null,{},[0,0],{port:-1,starboard:0},{port:'20',starboard:0},{port:34,starboard:0}]){
+ for(const malformed of [null,{},[0,0],{port:-1,starboard:0},{port:'20',starboard:0},{port:114,starboard:0}]){
   assert.equal(restore(save({...s,tubeReadyAt:malformed})),null);
  }
 });

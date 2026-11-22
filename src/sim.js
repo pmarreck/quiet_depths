@@ -176,12 +176,12 @@ function tick(s,dt,input){
  for(const shell of s.shells){shell.delay-=dt;if(shell.delay<=0&&!shell.hit){shell.hit=true;emitSound(s,{type:'detonation',x:shell.x,y:shell.y,depth:0,power:.8});
   const range=distance(s,shell),hit=s.depth<7&&range<65;
   if(hit)hurt(s,Math.max(4,24*(1-range/65)),'Shell impact near the hull.','engine');
-  addDebrief(s,hit?'An escort shell struck close enough to damage the hull.':s.depth>=7?'You were below the surface shell’s damage zone when it arrived.':'An escort shell splashed wide of your boat.');
+  addDebrief(s,hit?'An escort shell struck close enough to damage the hull.':s.depth>=7?'You were below the surface shell’s damage zone when it arrived.':'An escort shell splashed wide of your sub.');
  }}
  s.shells=s.shells.filter(p=>p.delay>-3);
  updateAcoustics(s,(source,d)=>{
-  if(d<210){replayEvent(s,{kind:'blast',point:{x:source.x,y:source.y,depth:source.depth}});hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');addDebrief(s,'An underwater explosion was close enough to damage your boat.');}
-  else if(d<2500){log(s,'Depth charge detonation. That pattern missed.');addDebrief(s,'The boat was outside the depth-charge damage zone when it detonated.');}
+  if(d<210){replayEvent(s,{kind:'blast',point:{x:source.x,y:source.y,depth:source.depth}});hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.',null,source);addDebrief(s,'An underwater explosion was close enough to damage your sub.');}
+  else if(d<2500){log(s,'Depth charge detonation. That pattern missed.');addDebrief(s,'The sub was outside the depth-charge damage zone when it detonated.');}
  },source=>patrolReceipt(s,source));
  s.torpedoTracks=s.torpedoTracks.filter(t=>s.time-t.time<35);
  updateDrone(s,dt,diesel);
@@ -203,7 +203,7 @@ function tick(s,dt,input){
  const done=objectiveComplete(s,dt);
  if(s.mission==='sneaky-seamen'&&done&&s.status==='patrol'){s.status='won';log(s,'Gate B reached. Patrol corridor cleared.','success');}
  if(s.status==='patrol'&&done&&s.phase==='objective'){s.phase='extract';if(!['intercept','seek-and-destroy','big-kahuna'].includes(s.mission))log(s,'Objective complete. Return to extraction and surface for pickup.','success');}
- if(s.status==='patrol'&&s.phase==='extract'&&distance(s,s.home)<400&&s.depth<=1){s.status='won';log(s,'Patrol complete. Surfaced at pickup. Boat and crew home safely.','success');}
+ if(s.status==='patrol'&&s.phase==='extract'&&distance(s,s.home)<400&&s.depth<=1){s.status='won';log(s,'Patrol complete. Surfaced at pickup. Sub and crew home safely.','success');}
  if(s.time>1800&&s.status==='patrol'){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
 }
 export function save(s){return JSON.stringify(s);}
@@ -229,6 +229,12 @@ export function restore(raw){try{
  if(s.lightning===undefined)s.lightning=[];if(s.acoustics===undefined)s.acoustics=[];
  if(s.nextLightningAt===undefined)s.nextLightningAt=s.time+8;if(s.soundSequence===undefined)s.soundSequence=1;
  if(s.patrol===undefined)s.patrol={seed:s.environment.seed,photoGoal:2,trackGoal:180,variant:0};
+ if(s.plantVersion===undefined){
+  if(s.systems)for(const key of ['diesel','fuelTank','batteryBank','tubes']){
+   s.systems[key]=key==='diesel'?s.systems.engine:100;
+   if(s.repairLimits)s.repairLimits[key]=key==='diesel'?s.repairLimits.engine:100;
+  }
+ }else if(s.plantVersion!==1||![s.fuelLeak,s.fuelFire].every(Number.isFinite)||s.fuelLeak<0||s.fuelLeak>1||s.fuelFire<0||s.fuelFire>24||typeof s.cookoff!=='boolean')return null;
  for(const [k,v] of Object.entries(freshCombat()))if(s[k]===undefined)s[k]=v;
  if(!validTubeTimes(s.tubeReadyAt,s.time)||!Number.isInteger(s.torps)||s.torps<0)return null;
  if(s.outerHull===undefined)s.outerHull=s.hull;

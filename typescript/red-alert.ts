@@ -1,14 +1,15 @@
-import {DRONE_PARTS,operatingFraction} from './equipment.ts';
+import {batteryOutput,generatorOutput} from './power-plant.ts';
+import {DRONE_PARTS} from './equipment.ts';
 
 type DronePart=typeof DRONE_PARTS[number];
 type DockedDrone=Record<DronePart,number> & {mode:string;repairLimits:Record<DronePart,number>};
-interface Boat {pressureAlarm:number; repair:number; hull:number; water:number; flood:number;
+interface Boat {fuelFire?:number;pressureAlarm:number; repair:number; hull:number; water:number; flood:number;
   systems:Record<string,number>;repairLimits:Record<string,number>;drone:DockedDrone;
   engine:string;depth:number;fuel:number;battery:number}
 const needsMajorRepair=(value:number,limit:number)=>value>0 && value<50 && value<limit;
 export function seriousRepairs(s:Boat){
-  const drone=s.drone,powered=s.battery>1 ||
-    (s.engine==='diesel'&&s.depth<=14&&s.fuel>0&&operatingFraction(s.systems.engine)>0);
+  if(s.fuelFire && s.fuelFire>0)return true;
+  const drone=s.drone,powered=s.battery>1&&batteryOutput(s)>0 || generatorOutput(s)>0;
   if(drone.mode==='stowed'&&powered&&s.systems.crew>0&&DRONE_PARTS.some(k=>needsMajorRepair(drone[k],drone.repairLimits[k])))return true;
   if(s.repair<=0)return false;
   return s.flood>0 || s.water>4 || needsMajorRepair(s.hull,s.repairLimits.hull) ||

@@ -33,15 +33,43 @@ function part(T: ModelKit, group: ModelNode, geometry: object, material: object,
 }
 const paint=(T: ModelKit,color: number)=>new T.MeshStandardMaterial({color,roughness:.8,metalness:.12});
 
-export function carrierFighter(T: ModelKit){
- const jet=new T.Group(),gray=paint(T,0x85928f),glass=paint(T,0x344f59);
- const body=part(T,jet,new T.SphereGeometry(1,12,8),gray);body.scale.set(.85,1,6.8);
- part(T,jet,plate(T,[[0,-3],[6,2.8],[6,4.1],[0,2.4],[-6,4.1],[-6,2.8]],.18),gray);
- part(T,jet,plate(T,[[0,3.7],[2.8,5.4],[2.8,6.1],[0,5.4],[-2.8,6.1],[-2.8,5.4]],.12),gray);
- const fin=part(T,jet,new T.ConeGeometry(1.55,2.7,3),gray,0,1.25,4.9);fin.scale.x=.16;fin.rotation.x=.30;
- const canopy=part(T,jet,new T.SphereGeometry(1,10,6),glass,0,.72,-1.8);canopy.scale.set(.64,.67,1.65);
+// Both jets face -Z, the same convention used by the deck and flight renderer.
+export function periodJet(T: ModelKit, phantom: boolean){
+ const jet=new T.Group(),gray=paint(T,phantom?0x89969d:0x78868b),underside=paint(T,0xb9c3bd);
+ const dark=paint(T,0x323a40),glass=paint(T,0x3f6574),steel=paint(T,0x515458);
+ jet.name=phantom?'F-4 Phantom II':'A-4 Skyhawk';
+ const ellipsoid=(name:string,m:object,x:number,y:number,z:number,w:number,h:number,l:number)=>{
+  const node=part(T,jet,new T.SphereGeometry(1,18,12),m,x,y,z);
+  node.scale.set(w,h,l);node.name=name;return node;
+ };
+ const length=phantom?8.7:6.1;
+ ellipsoid('fuselage',gray,0,0,0,phantom?1.1:.83,1,length);
+ ellipsoid('radome',dark,0,.02,-length*.78,phantom?.69:.55,.62,length*.24);
+ ellipsoid('canopy',glass,0,.79,-length*.33,.65,.64,phantom?2:.95);
+ if(phantom)ellipsoid('canopy bow',gray,0,.82,-2.9,.66,.66,.10);
+ for(const side of [-1,1]){
+  const outline=phantom?[[.55,-2.2],[3.8,.8],[3.75,2.5],[1,3.4]]:[[.5,-1.75],[4.15,2.6],[3.6,3],[.5,2.4]];
+  const wing=part(T,jet,plate(T,outline.map(([x,z])=>[side*x,z]),.17),gray,0,-.25,0);wing.name='main wing';
+  if(phantom){
+   const tip=part(T,jet,plate(T,[[0,.8],[side*2.1,2.7],[side*1.95,3.2],[0,2.5]],.12),gray,side*3.75,-.25,0);
+   tip.rotation.z=side*.22;tip.name='upturned wingtip';
+   ellipsoid('engine fairing',underside,side*.68,-.13,.75,.64,.78,6.4);
+   ellipsoid('intake',dark,side*1.01,.02,-2.1,.37,.60,1.25);
+   ellipsoid('exhaust',steel,side*.65,-.12,6.55,.49,.55,1);
+   ellipsoid('nozzle',dark,side*.65,-.12,7.28,.40,.43,.30);
+  }else{
+   ellipsoid('intake',dark,side*.72,.14,-1.4,.28,.46,.83);
+  }
+  const span=phantom?2.95:1.65;
+  const tail=part(T,jet,plate(T,[[0,-1.25],[side*span,.65],[side*span,1.32],[0,.70]],.12),underside,side*.25,.36,length*.72);
+  tail.rotation.z=phantom?-side*.32:0;tail.name='stabilator';
+ }
+ if(!phantom)ellipsoid('nozzle',dark,0,0,5.35,.44,.47,.7);
+ const fin=part(T,jet,plate(T,[[0,-1.75],[2.65,.72],[2.65,1.82],[0,1.15]],.14),gray,.07,.65,length*.61);
+ fin.rotation.z=Math.PI/2;fin.name='swept fin';
  return jet;
 }
+export const carrierFighter=(T:ModelKit)=>periodJet(T,true);
 
 export function makeCarrier(T: ModelKit){
  const root=new T.Group(),body=new T.Group(),lights=new T.Group();

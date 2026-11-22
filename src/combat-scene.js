@@ -1,4 +1,5 @@
-import {carrierFighter} from './carrier-model.js';
+import {blastCloud,animateCloud} from './blast-cloud.js';
+import {periodJet} from './carrier-model.js';
 import * as T from './vendor/three.module.js';
 import {rad,bottom} from './mechanics.js';
 import {surfaceHeight} from './environment.js';
@@ -11,24 +12,15 @@ export class CombatScene{
  constructor(scene,glow){
   this.root=new T.Group();scene.add(this.root);this.glow=glow;this.planes=new Map();this.torpedoes=new Map();this.lastState=null;
   this.tracerGeometry=new T.BufferGeometry();this.tracerGeometry.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(192*6),3));this.tracers=new T.LineSegments(this.tracerGeometry,new T.LineBasicMaterial({color:0xffb867,transparent:true,opacity:.95,depthWrite:false,toneMapped:false,blending:T.AdditiveBlending}));this.root.add(this.tracers);
-  this.effects=Array.from({length:64},()=>{const g=new T.Group(),splash=mesh(g,new T.ConeGeometry(1,5,8,1,true),new T.MeshBasicMaterial({color:0xe0f0eb,transparent:true,opacity:.7,side:T.DoubleSide})),flash=new T.Sprite(new T.SpriteMaterial({map:glow,color:0xffb35b,transparent:true,depthWrite:false,toneMapped:false,blending:T.AdditiveBlending}));flash.scale.set(6,6,1);g.add(flash);g.userData={splash,flash};this.root.add(g);return g;});
+  this.effects=Array.from({length:64},()=>{const g=new T.Group(),splash=blastCloud(T),cloud=blastCloud(T),flash=new T.Sprite(new T.SpriteMaterial({map:glow,color:0xffb35b,transparent:true,depthWrite:false,toneMapped:false,blending:T.AdditiveBlending}));flash.scale.set(6,6,1);g.add(flash,splash,cloud);g.userData={splash,cloud,flash};this.root.add(g);return g;});
   const base=new T.Group(),ground=Math.max(0,-bottom(-3200,3400))+3;
   mesh(base,new T.BoxGeometry(26,.8,500),mat(0x515650),[0,ground,0]);for(let z=-220;z<240;z+=35)mesh(base,new T.BoxGeometry(1,.05,12),mat(0xcbc8ab),[0,ground+.45,z]);
   for(let i=0;i<3;i++)mesh(base,new T.BoxGeometry(24,13,30),mat(0x686d59),[55,ground+6,-100+i*45]);base.position.set(-3200,0,-3400);base.rotation.y=-rad(45);this.root.add(base);
  }
  plane(fighter=false){
-  if(fighter){
-   const jet=carrierFighter(T);
-   const fire=new T.Sprite(new T.SpriteMaterial({map:this.glow,color:0xff6c28,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));
-   fire.scale.set(7,7,1);jet.add(fire);jet.userData.fire=fire;return jet;
-  }
-  const g=new T.Group(),olive=mat(0x4c5c50),gray=mat(0x919b98);const body=mesh(g,new T.SphereGeometry(1,16,10),olive);body.scale.set(.85,.95,5.5);
-  mesh(g,new T.BoxGeometry(15.5,.22,2.6),gray,[0,-.1,-.4]);mesh(g,new T.BoxGeometry(5.2,.18,1.5),olive,[0,.3,4]);
-  const tail=mesh(g,new T.BoxGeometry(.18,2.5,2),olive,[0,1,4.2]);tail.rotation.x=.15;
-  const canopy=mesh(g,new T.SphereGeometry(1,12,8),new T.MeshStandardMaterial({color:0x69928e,roughness:.25,metalness:.5}),[0,.95,-1]);canopy.scale.set(.65,.65,1.3);
-  const prop=new T.Group();prop.position.z=-5.7;mesh(prop,new T.SphereGeometry(.28,8,6),olive);for(let i=0;i<4;i++){const blade=mesh(prop,new T.BoxGeometry(.17,2.8,.08),mat(0x152123));blade.rotation.z=i*Math.PI/2;}g.add(prop);g.userData.prop=prop;
-  const bombs=new T.Group();for(const x of [-3.2,3.2]){const b=mesh(bombs,new T.CapsuleGeometry(.22,1.3,4,8),mat(0x30372f),[x,-.65,0]);b.rotation.x=Math.PI/2;}g.add(bombs);g.userData.bombs=bombs;
-  const fire=new T.Sprite(new T.SpriteMaterial({map:this.glow,color:0xff6c28,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));fire.scale.set(7,7,1);g.add(fire);g.userData.fire=fire;return g;
+  const jet=periodJet(T,fighter);
+  const fire=new T.Sprite(new T.SpriteMaterial({map:this.glow,color:0xff6c28,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));
+  fire.scale.set(7,7,1);jet.add(fire);jet.userData.fire=fire;return jet;
  }
  torpedo(){
   const g=new T.Group(),body=mesh(g,new T.CapsuleGeometry(.28,4.6,4,12),mat(0xaab9b6));body.rotation.x=Math.PI/2;
@@ -74,9 +66,9 @@ export class CombatScene{
    points.geometry.attributes.position.needsUpdate=true;points.geometry.setDrawRange(0,count);points.geometry.computeBoundingSphere();
   }
  }
- update(s,e,orbiting=false){
+ update(s,e,orbiting=false,time=s.time){
   if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values())this.removeTorpedo(p);this.planes.clear();this.torpedoes.clear();this.lastState=s;}
-  const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane(s.mission==='big-kahuna');this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');if(g.userData.prop)g.userData.prop.rotation.z=s.time*40;if(g.userData.bombs)g.userData.bombs.visible=!p.bombDropped;g.userData.fire.visible=p.hull<=0;}
+  const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane(s.mission==='big-kahuna');this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
   const torpIds=new Set();for(const p of s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.set(p.pitch,-rad(p.heading),0,'YXZ');
    const [front,rear]=g.userData.screws,elapsed=p.age-(g.userData.lastAge??p.age);
@@ -102,23 +94,18 @@ export class CombatScene{
   let n=0;const positions=this.tracerGeometry.attributes.position;for(const r of s.gunRounds){if(!r.tracer||!r.previous||n>=192)continue;positions.setXYZ(n*2,r.previous.x,r.previous.altitude,-r.previous.y);positions.setXYZ(n*2+1,r.x,r.altitude,-r.y);n++;}positions.needsUpdate=true;this.tracerGeometry.setDrawRange(0,n*2);this.tracerGeometry.computeBoundingSphere();
   this.effects.forEach((g,i)=>{
    const p=s.impacts[i];g.visible=!!p;if(!p)return;
-   const age=s.time-p.time,torpedo=p.kind==='torpedo',surfaceBlast=torpedo&&p.altitude>-15;
-   g.position.set(p.x,surfaceBlast?1:p.altitude,-p.y);
-   g.userData.splash.visible=p.kind==='splash'||surfaceBlast;g.userData.flash.visible=p.kind!=='splash';
-   g.userData.flash.material.color.setHex(p.kind==='collapse'?0xb9f5ff:0xffb35b);
-   if(p.kind==='collapse'){
-    g.userData.splash.visible=true;
-    g.userData.splash.scale.set(9+age*13,2+age*10,9+age*13);
-    g.userData.splash.material.opacity=Math.max(0,.8-age*.29);
-    const flash=55*Math.exp(-age*4)+7;
-    g.userData.flash.scale.set(flash,flash,1);g.userData.flash.material.opacity=Math.max(0,.95-age*2);
-    return;
-   }
-   const scale=surfaceBlast?6:1;
-   g.userData.splash.scale.set(scale*(1+age),scale*(1+age*.5),scale*(1+age));
-   g.userData.splash.material.opacity=Math.max(0,.8*(1-age/3));
-   const flash=torpedo?22+age*12:6;
-   g.userData.flash.scale.set(flash,flash,1);g.userData.flash.material.opacity=Math.max(0,1-age/(torpedo?1.1:.6));
+   const age=time-p.time,{splash,cloud,flash}=g.userData;
+   const water=surfaceHeight(p.x,p.y,s.time,e),depth=water-p.altitude;
+   const big=p.kind==='cookoff',collapse=p.kind==='collapse',gun=p.kind==='splash',major=big||collapse||p.kind==='torpedo'||p.kind==='vapor';
+   const extent=big?34:collapse?25:major?19:5;
+   g.position.set(p.x,p.altitude,-p.y);
+   animateCloud(cloud,age,extent,false,p.id);cloud.visible&&=!gun;
+   splash.position.y=depth;
+   animateCloud(splash,age-Math.max(0,depth)/65,extent*.95,true,p.id);
+   splash.visible&&=gun||major&&depth<16;
+   flash.visible=!gun;flash.material.color.setHex(collapse?0xb9f5ff:0xffb35b);
+   flash.scale.setScalar(extent*(.4+1.8*Math.exp(-age*3)));
+   flash.material.opacity=Math.exp(-age*5);
   });
  }
 }

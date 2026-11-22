@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,step,ping,restore,save,isVisible} from '../src/sim.js';
 import {environmentAt} from '../src/environment.js';
-import {damageDrone,hurt,deployDrone} from '../src/systems.js';
+import {damageSystem,damageDrone,hurt,deployDrone} from '../src/systems.js';
 import {feedActive} from '../src/controls.js';
 import {fireDeckGun} from '../src/combat.js';
 import {dronePhotograph,updateOperation} from '../src/missions.js';
@@ -54,7 +54,7 @@ test('propulsion, steering and repairs lose authority at their specified boundar
  for(const health of [0,19,20,50,100]){
   const s=boat();s.ships=[];s.depth=s.targetDepth=30;s.systems.engine=health;s.targetSpeed=-4;step(s,45);
   assert.ok(Math.abs(s.speed+(health<20?0:4*health/100))<.001);
-  s.systems.engine=100;s.systems.propeller=health;s.targetSpeed=14;step(s,60);assert.ok(Math.abs(s.speed-(health<20?0:14*health/100))<.001);
+  s.systems.engine=100;s.systems.propeller=health;s.targetSpeed=17;step(s,60);assert.ok(Math.abs(s.speed-(health<20?0:16*health/100))<.001);
   s.speed=s.targetSpeed=0;assert.ok(deployDrone(s));s.drone.mobility=health;s.drone.targetSpeed=-3;s.drone.targetHeading=s.drone.heading+30;
   const heading=s.drone.heading;step(s,4);assert.equal(s.drone.heading===heading,health<20);
   assert.ok(Math.abs(s.drone.speed+(health<20?0:3*health/100))<.001);
@@ -90,4 +90,79 @@ test('a surveillance patrol needs a working receiver within its remaining range'
  for(const [condition,expected] of [[19,0],[20,0],[50,1]]){
   s.systems.sonar=condition;step(s,1);assert.equal(s.trackTime,expected);
  }
+});
+
+test('damage separates diesel generation, battery storage, electric drive and fuel supply',()=>{
+ function run(engine,key,health){
+  const s=boat();s.ships=[];s.engine=engine;s.targetSpeed=17;s.systems[key]=health;
+  step(s,60);return s;
+ }
+ assert.equal(run('diesel','diesel',100).speed,20.5);assert.equal(run('electric','diesel',100).speed,16);
+ assert.equal(run('diesel','diesel',50).speed,10.25);assert.equal(run('electric','diesel',0).speed,16);
+ assert.equal(run('electric','batteryBank',50).speed,8);assert.equal(run('diesel','batteryBank',0).speed,20.5);
+ assert.equal(run('diesel','engine',50).speed,10.25);assert.equal(run('electric','engine',50).speed,8);
+ assert.equal(run('diesel','fuelTank',19).speed,0);assert.equal(run('electric','fuelTank',0).speed,16);
+ assert.ok(run('diesel','fuelTank',50).fuel<=50);assert.ok(run('diesel','batteryBank',50).battery<=50);
+});
+
+test('the same throttle slows while diving on diesel and the intake closes below 14 m',()=>{
+ const steady=(engine,depth)=>{
+  const s=boat();Object.assign(s,{engine,depth,targetDepth:depth,targetSpeed:17,ships:[]});
+  step(s,60);return s;
+ };
+ assert.equal(steady('diesel',0).speed,20.5);assert.equal(steady('diesel',3).speed,14.75);
+ assert.equal(steady('diesel',14).speed,9);assert.equal(steady('diesel',14.1).speed,0);
+ assert.equal(steady('electric',60).speed,16);
+ const half=steady('diesel',0);half.targetSpeed=8.5;step(half,60);assert.equal(half.speed,10.25);
+});
+
+test('fuel damage loses stored fuel permanently and a crew can contain a fire and seal the leak',()=>{
+ const s=boat();s.ships=[];s.fuel=100;damageSystem(s,'fuelTank',40);
+ assert.equal(s.fuel,60);assert.ok(s.fuelLeak>0);step(s,2);assert.ok(s.fuel<60);
+ s.fuelFire=18;const resumed=restore(save(s));assert.deepEqual(resumed,s);
+ resumed.repair=120;step(resumed,40);assert.equal(resumed.fuelFire,0);assert.equal(resumed.fuelLeak,0);
+ assert.ok(resumed.systems.fuelTank>60);assert.ok(resumed.fuel<60);
+ const seeds=Array.from({length:150},(_,i)=>i+1);
+ let ignitions=0,explosions=0;
+ for(const seed of seeds){
+  const hot=boat();hot.ships=[];hot.rng=seed;hot.fuelLeak=1;step(hot,20);
+  if(hot.debrief.some(d=>d.text.includes('caught fire')))ignitions++;
+  hot.fuelFire=24;step(hot,20);
+  if(hot.debrief.some(d=>d.text.includes('vapor explosion')))explosions++;
+ }
+ assert.ok(ignitions>0&&ignitions<seeds.length);assert.ok(explosions>0&&explosions<ignitions);
+});
+
+test('impact sections turn with the sub, favor local equipment and reserve cook-offs for armed bow hits',()=>{
+ const slots={bow:['tubes','crew','deckgun'],midships:['batteryBank','ballast','sonar','periscope','oxygen'],stern:['diesel','engine','fuelTank','propeller','planes','rudder']};
+ for(const heading of [0,90,215]){
+  for(const [section,angle] of [['bow',0],['midships',90],['stern',180]]){
+   let local=0,cookoffs=0;
+   for(let i=0;i<180;i++){
+    const s=boat();s.heading=heading;s.rng=(i+1)*982451653>>>0;
+    const a=(heading+angle)*Math.PI/180,point={x:s.x+Math.sin(a)*25,y:s.y+Math.cos(a)*25,depth:s.depth};
+    hurt(s,36,'Test impact.',null,point);
+    if(slots[section].some(k=>s.systems[k]<100))local++;
+    if(s.cookoff){cookoffs++;assert.equal(s.status,'lost');assert.ok(s.impacts.some(p=>p.kind==='cookoff'));}
+    if(section==='bow'){
+     const empty=boat();empty.heading=heading;empty.rng=(i+1)*982451653>>>0;empty.torps=0;hurt(empty,36,'Test impact.',null,point);
+     assert.equal(empty.cookoff,false);
+    }
+   }
+   assert.ok(local>130&&local<180,section+' should favor local damage but allow exceptions');
+   if(section==='bow')assert.ok(cookoffs>0&&cookoffs<18);else assert.equal(cookoffs,0);
+  }
+ }
+});
+
+test('pre-compartment saves retain propulsion health and repair ceilings, and damaged tubes take longer to reload',async()=>{
+ const {contact,fire}=await import('../src/sim.js');
+ const s=boat();s.systems.engine=42;s.repairLimits.engine=55;
+ for(const k of ['diesel','fuelTank','batteryBank','tubes']){delete s.systems[k];delete s.repairLimits[k];}
+ for(const k of ['plantVersion','fuelFire','fuelLeak','cookoff'])delete s[k];
+ const old=restore(save(s));assert.ok(old);assert.equal(old.systems.diesel,42);assert.equal(old.repairLimits.diesel,55);assert.equal(old.systems.engine,42);
+ const t=old.ships.find(v=>v.military);contact(old,t,'active');
+ old.systems.tubes=50;assert.ok(fire(old,t.id));assert.equal(old.tubeReadyAt.port,40);
+ assert.deepEqual(restore(save(old)),old);old.systems.tubes=19;assert.equal(fire(old,t.id),false);
+ delete old.systems.batteryBank;assert.equal(restore(save(old)),null);
 });

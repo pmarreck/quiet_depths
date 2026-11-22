@@ -17,7 +17,7 @@ const directions={ahead:[0,1],astern:[0,-1],port:[-1,0],starboard:[1,0]};
 
 function ocean({depth=80,speed=0,heading=0,x=0,y=0,seed=31}={}){
  const s=createGame('recon',seed);
- Object.assign(s,{x,y,depth,targetDepth:depth,speed,targetSpeed:speed,heading,targetHeading:heading,verticalSpeed:0,pitch:0,scope:false,route:null,site:null,operation:null,ships:[],contacts:[],aircraft:[]});
+ Object.assign(s,{x,y,depth,targetDepth:depth,speed,targetSpeed:speed>0?speed*17/16:speed,heading,targetHeading:heading,verticalSpeed:0,pitch:0,scope:false,route:null,site:null,operation:null,ships:[],contacts:[],aircraft:[]});
  return s;
 }
 function launch(s,direction='port',range=60){
@@ -89,7 +89,7 @@ test('return continues while the slow boat obeys a new helm heading',()=>{
   assert.ok(elapsed<=MAX_RETURN_TIME);
   assert.ok(Math.abs(s.heading-oldHeading)>20,'boat must actually turn during recovery');
   assert.equal(s.targetHeading,125,'return must preserve your helm order');
-  assert.equal(s.targetSpeed,3,'return must preserve your speed order');
+  assert.equal(s.targetSpeed,3*17/16,'return must preserve the throttle holding three knots');
  }
 });
 

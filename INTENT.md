@@ -1,6 +1,6 @@
 # Quiet Depths intent
 
-Quiet Depths is a single-player browser submarine game set aboard a fictional diesel-electric boat in 1972. Its central tradeoff is information versus exposure. Players build an incomplete picture from aging observations, and actions such as raising the periscope or pinging active sonar can expose the boat. Running on diesel makes noise and replenishes resources, which gives the player a reason to risk exposure.
+Quiet Depths is a single-player browser submarine game set aboard a fictional diesel-electric submarine in 1972. Its central tradeoff is information versus exposure. Players build an incomplete picture from aging observations, and actions such as raising the periscope or pinging active sonar can expose the sub. Running on diesel makes noise and replenishes resources, which gives the player a reason to risk exposure.
 
 Patrols give players a clear objective and an extraction. Simple helm orders and time compression keep transit manageable. Desktop keyboard and mouse and mobile touch controls support the same patrols. Players can pause and resume from a local save.
 

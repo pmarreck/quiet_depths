@@ -14,7 +14,7 @@ export function freshTubeTimes(): ReadyTimes {
 
 export function validTubeTimes(value: unknown, now: number): value is ReadyTimes {
   if (!value || typeof value !== 'object') return false;
-  const valid = (t: unknown) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= now + RELOAD_SECONDS;
+  const valid = (t: unknown) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= now + RELOAD_SECONDS / .2;
   return 'port' in value && valid(value.port) && 'starboard' in value && valid(value.starboard);
 }
 

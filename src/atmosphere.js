@@ -1,3 +1,4 @@
+import {blastCloud,animateCloud} from './blast-cloud.js';
 import * as T from './vendor/three.module.js';
 import {hash01,surfaceHeight} from './environment.js';
 import {chargeAltitude} from './combat.js';
@@ -26,7 +27,7 @@ export class Atmosphere{
   this.rainUniforms={time:{value:0},speed:{value:30},opacity:{value:0},flash:{value:0}};
   this.rain=new T.LineSegments(geometry,new T.ShaderMaterial({transparent:true,depthWrite:false,uniforms:this.rainUniforms,vertexShader:'attribute float seed;uniform float time;uniform float speed;void main(){vec3 p=position;p.y+=mod(seed-time*speed,100.)-35.;p.x+=p.y*.23;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}',fragmentShader:'uniform float opacity;uniform float flash;void main(){gl_FragColor=vec4(vec3(.54,.65,.75)+flash*.25,opacity);}'}));scene.add(this.rain);
   this.blastLight=new T.PointLight(0xa0d9ff,0,250,1.6);scene.add(this.blastLight);
-  this.shellVisuals=Array.from({length:12},()=>{const group=new T.Group(),shell=new T.Mesh(new T.SphereGeometry(1.4,6,4),new T.MeshBasicMaterial({color:0xffdda4,toneMapped:false})),splash=new T.Mesh(new T.ConeGeometry(3,10,10,1,true),new T.MeshBasicMaterial({color:0xcce0df,transparent:true,opacity:.6,side:T.DoubleSide}));group.add(shell,splash);group.userData={shell,splash};scene.add(group);return group;});
+  this.shellVisuals=Array.from({length:12},()=>{const group=new T.Group(),shell=new T.Mesh(new T.SphereGeometry(1.4,6,4),new T.MeshBasicMaterial({color:0xffdda4,toneMapped:false})),splash=blastCloud(T);group.add(shell,splash);group.userData={shell,splash};scene.add(group);return group;});
  }
  bolt(strike){
   const group=new T.Group(),points=[];for(let i=0;i<=14;i++){const t=i/14;points.push(new T.Vector3((hash01(strike.seed,i)-.5)*100*t,strike.height*t,(hash01(strike.seed,i+20)-.5)*80*t));}
@@ -45,18 +46,18 @@ export class Atmosphere{
   this.uniforms.flash.value=Math.max(e.flash,boltFlash);this.rainUniforms.flash.value=Math.max(e.flash,boltFlash);
   for(const [id,group] of this.strikes)if(!visible.has(id)){this.remove(group);this.strikes.delete(id);}
   this.blastLight.intensity=0;let flash=0;const liveCharges=new Set();
-  this.shellVisuals.forEach((group,i)=>{const p=s.shells[i];group.visible=!!p;if(!p)return;const f=clamp(1-p.delay/p.total,0,1);group.position.set(p.fromX+(p.x-p.fromX)*f,12*(1-f)+Math.sin(f*Math.PI)*80,-p.fromY-(p.y-p.fromY)*f);group.userData.shell.visible=p.delay>0;group.userData.splash.visible=p.delay<=0;if(p.delay<=0){const age=-p.delay;group.position.y=2;group.userData.splash.scale.set(1+age*.9,1+age*.6,1+age*.9);group.userData.splash.material.opacity=Math.max(0,.7*(1-age/3));}});
-  for(const charge of s.blasts){liveCharges.add(charge.id);let group=this.charges.get(charge.id);if(!group){group=new T.Group();const can=new T.Mesh(new T.CylinderGeometry(.55,.55,1.6,10),new T.MeshStandardMaterial({color:0x58625b,roughness:.7}));group.add(can);const bubble=new T.Mesh(new T.SphereGeometry(1,18,12),new T.MeshBasicMaterial({color:0xa5cddd,transparent:true,opacity:.5,depthWrite:false,side:T.BackSide}));group.add(bubble);
+  this.shellVisuals.forEach((group,i)=>{const p=s.shells[i];group.visible=!!p;if(!p)return;const f=clamp(1-p.delay/p.total,0,1);group.position.set(p.fromX+(p.x-p.fromX)*f,12*(1-f)+Math.sin(f*Math.PI)*80,-p.fromY-(p.y-p.fromY)*f);group.userData.shell.visible=p.delay>0;group.userData.splash.visible=p.delay<=0;if(p.delay<=0){const age=-p.delay;group.position.y=2;animateCloud(group.userData.splash,age,8,true,p.fromX);}});
+  for(const charge of s.blasts){liveCharges.add(charge.id);let group=this.charges.get(charge.id);if(!group){group=new T.Group();const can=new T.Mesh(new T.CylinderGeometry(.55,.55,1.6,10),new T.MeshStandardMaterial({color:0x58625b,roughness:.7}));group.add(can);const bubble=blastCloud(T);group.add(bubble);
    const trailGeo=new T.BufferGeometry();trailGeo.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(48*3),3));
    const trail=new T.Points(trailGeo,new T.PointsMaterial({size:.75,color:0xc3eaff,transparent:true,opacity:.64,depthWrite:false}));group.add(trail);
-   const plume=new T.Mesh(new T.ConeGeometry(2,8,10,1,true),new T.MeshBasicMaterial({color:0xd5f0e9,transparent:true,opacity:.5,depthWrite:false,side:T.DoubleSide}));group.add(plume);
+   const plume=blastCloud(T);group.add(plume);
    group.userData={can,bubble,trail,plume};this.charges.set(charge.id,group);this.scene.add(group);}
    const altitude=chargeAltitude(charge);group.position.set(charge.x,altitude,-charge.y);const d=group.position.distanceTo(camera.position);
    const plumeAge=charge.age-charge.depth/65,surfaceBlast=!underwater&&charge.exploded&&charge.depth<105&&plumeAge>=0&&plumeAge<2.8;
    group.visible=(surfaceBlast||(underwater?altitude<=1:altitude>=-2))&&d<(underwater?500:3000);
    group.userData.can.visible=!charge.exploded;group.userData.bubble.visible=charge.exploded&&underwater;
    const plume=group.userData.plume;plume.visible=surfaceBlast;
-   if(surfaceBlast){plume.position.y=surfaceHeight(charge.x,charge.y,s.time,e)-altitude+1;plume.scale.set(1+plumeAge*1.9,1+Math.sin(Math.min(1,plumeAge)*Math.PI)*.9,1+plumeAge*1.9);plume.material.opacity=(1-plumeAge/2.8)*(.58-charge.depth*.003);}
+   if(surfaceBlast){plume.position.y=surfaceHeight(charge.x,charge.y,s.time,e)-altitude+1;animateCloud(plume,plumeAge,24-charge.depth*.12,true,charge.id);}
    const trail=group.userData.trail;
    trail.visible=underwater&&altitude<0;
    if(trail.visible){
@@ -67,7 +68,7 @@ export class Atmosphere{
     }
     positions.needsUpdate=true;trail.geometry.computeBoundingSphere();
    }
-   if(charge.exploded){group.userData.bubble.scale.setScalar(2+charge.age*13);group.userData.bubble.material.opacity=Math.max(0,.65*(1-charge.age/5));const strength=Math.exp(-charge.age*8)/(1+d/120);if(strength>flash){flash=strength;this.blastLight.position.copy(group.position);this.blastLight.intensity=4000*strength;}}
+   if(charge.exploded){const bubbleCloud=group.userData.bubble;animateCloud(bubbleCloud,charge.age,25,false,charge.id);bubbleCloud.visible&&=underwater;const strength=Math.exp(-charge.age*8)/(1+d/120);if(strength>flash){flash=strength;this.blastLight.position.copy(group.position);this.blastLight.intensity=4000*strength;}}
   }
   for(const [id,group] of this.charges)if(!liveCharges.has(id)){this.remove(group);this.charges.delete(id);}
   return Math.max(flash,underwater?0:boltFlash);

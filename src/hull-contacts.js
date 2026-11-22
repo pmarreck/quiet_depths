@@ -83,7 +83,7 @@ function resolvePair(s,a,b,hurt){
   }
   else{
    const before=body.hull??100;body.hull=incidentalHull(body,severity);
-   if(a===s&&body.military===false&&before>0&&body.hull===0)recordCivilianHit(s,body,'Your boat collided with the neutral '+body.name+' and sank her.');
+   if(a===s&&body.military===false&&before>0&&body.hull===0)recordCivilianHit(s,body,'Your sub collided with the neutral '+body.name+' and sank her.');
   }
   if(body!==s.site){body.speed*=.45;if(body.verticalSpeed)body.verticalSpeed*=.4;}
  }

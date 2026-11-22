@@ -1,7 +1,8 @@
 // Condition and repair limits are independent. A light hit may leave more
 // working equipment intact than the crew could rebuild after a later hit.
 export const SYSTEM_NAMES = {
-  engine: 'ENGINE', propeller: 'PROPELLER', oxygen: 'AIR / SCRUBBERS',
+  diesel: 'DIESEL GENERATOR', fuelTank: 'FUEL TANK / FEED', batteryBank: 'BATTERY BANK',
+  tubes: 'BOW TUBES', engine: 'ELECTRIC DRIVE MOTOR', propeller: 'PROPELLER', oxygen: 'AIR / SCRUBBERS',
   ballast: 'BALLAST', planes: 'DIVE PLANES', rudder: 'RUDDER', sonar: 'SONAR',
   periscope: 'PERISCOPE', deckgun: 'DECK GUN', crew: 'REPAIR CREW',
 } as const;
@@ -53,4 +54,28 @@ export function conditionLabel(current: number, limit: number, offlineBelow20 = 
   const flag = current < 20 && offlineBelow20 ? ' · OFFLINE' : '';
   const ceiling = limit < 100 ? ' · MAX REPAIR ' + (Math.floor(limit*100)/100) + '%' : '';
   return Math.floor(current) + '%' + flag + ceiling;
+}
+
+type Section = 'bow' | 'midships' | 'stern';
+type System = keyof typeof SYSTEM_NAMES;
+// Fictional board-game compartments. A shock can also damage equipment elsewhere.
+const compartments: Record<System, Section> = {
+  tubes:'bow', deckgun:'bow', crew:'bow', ballast:'midships', oxygen:'midships',
+  periscope:'midships', sonar:'midships', batteryBank:'midships', diesel:'stern',
+  fuelTank:'stern', engine:'stern', propeller:'stern', rudder:'stern', planes:'stern',
+};
+const sections = Object.fromEntries(['bow','midships','stern'].map(z =>
+  [z, SYSTEM_KEYS.filter(key => compartments[key] === z)])) as Record<Section, System[]>;
+
+export function hitSection(s: {x:number;y:number;heading:number}, hit: {x:number;y:number}): Section {
+  const angle=s.heading*Math.PI/180, dx=hit.x-s.x, dy=hit.y-s.y;
+  const longitudinal=(dx*Math.sin(angle)+dy*Math.cos(angle))/Math.max(30,Math.hypot(dx,dy));
+  return longitudinal > .34 ? 'bow' : longitudinal < -.34 ? 'stern' : 'midships';
+}
+
+export function hitSystem(section: Section | null, roll: number): System {
+  const local=section!==null && roll<.8;
+  const pool=local ? sections[section] : SYSTEM_KEYS;
+  const pick=section===null ? roll : local ? roll/.8 : (roll-.8)/.2;
+  return pool[Math.min(pool.length-1,Math.floor(pick*pool.length))];
 }

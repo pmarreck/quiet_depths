@@ -77,7 +77,7 @@ briefing mission =
 
         SubHunt ->
             Briefing "seek-and-destroy-sub" "Seek and Destroy: Sub" "SUBMARINE HUNT" "10–18 MIN"
-                "Find the hostile submarine. A second boat may be in the area. Sink what you can and surface at extraction to survive the patrol."
+                "Find the hostile submarine. A second sub may be in the area. Sink what you can and surface at extraction to survive the patrol."
                 "Hunt enemy submarines or withdraw to extraction"
                 Survive
 
