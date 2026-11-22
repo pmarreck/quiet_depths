@@ -99,9 +99,15 @@ test('dragging right in orbit increases yaw, dragging up lowers the viewing angl
 });
 
 test('heavy seas increase bounded optical motion while a paused observation stays repeatable',()=>{
- assert.equal(typeof environment.opticalSway,'function');
+ assert.equal(typeof environment.boatSurfacePose,'function');
  const calm=createGame('recon',1972,{timeOfDay:'day',weather:'clear',changing:false}),storm=createGame('recon',1972,{timeOfDay:'day',weather:'storm',changing:false});
- for(const view of ['scope','tower']){let calmPower=0,stormPower=0;for(let t=0;t<60;t+=.25){calm.time=storm.time=t;const a=environment.opticalSway(calm,view,t),b=environment.opticalSway(storm,view,t);for(const key of ['pitch','roll','yaw']){assert.ok(Number.isFinite(a[key])&&Number.isFinite(b[key]));assert.ok(Math.abs(b[key])<.1);calmPower+=a[key]**2;stormPower+=b[key]**2;}assert.deepEqual(environment.opticalSway(storm,view,t),b);}assert.ok(stormPower>calmPower*2);}
+ let calmPower=0,stormPower=0;
+ for(let t=0;t<60;t+=.25){
+  calm.time=storm.time=t;const a=environment.boatSurfacePose(calm),b=environment.boatSurfacePose(storm);
+  for(const key of ['pitch','roll']){assert.ok(Number.isFinite(a[key])&&Number.isFinite(b[key]));assert.ok(Math.abs(b[key])<.1);calmPower+=a[key]**2;stormPower+=b[key]**2;}
+  assert.deepEqual(environment.boatSurfacePose(storm),b);
+ }
+ assert.ok(stormPower>calmPower*2);
 });
 test('corrupted persisted image sources are rejected before gallery rendering',()=>{
  const s=createGame();s.photoArchive=[{id:1,source:'scope',image:'https://example.invalid/tracker',takenAt:0,caption:'corrupt'}];assert.equal(restore(save(s)),null);

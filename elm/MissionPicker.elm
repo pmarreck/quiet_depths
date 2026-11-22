@@ -1,9 +1,9 @@
 port module MissionPicker exposing (main)
 
 import Browser
-import Html exposing (Html, b, button, details, div, img, small, span, summary, text)
-import Html.Attributes exposing (alt, attribute, class, classList, disabled, id, src, type_)
-import Html.Events exposing (onClick)
+import Html exposing (Html, b, button, details, div, fieldset, img, input, label, legend, option, p, select, small, span, summary, text)
+import Html.Attributes exposing (alt, attribute, checked, class, classList, disabled, id, selected, src, type_, value)
+import Html.Events exposing (onCheck, onClick, onInput)
 
 
 type alias Mission =
@@ -17,7 +17,18 @@ type alias Mission =
 type alias Flags =
     { missions : List Mission
     , selected : String
+    , times : List Choice
+    , weather : List Choice
     }
+
+type alias Choice =
+    { id : String, name : String }
+
+type alias Conditions =
+    { timeOfDay : String, weather : String, changing : Bool }
+
+type alias Setup =
+    { mission : String, conditions : Conditions }
 
 type alias Slot =
     { id : Int, revision : String, image : String, label : String }
@@ -26,13 +37,16 @@ type alias Slots =
     { entries : List Slot, canSave : Bool, message : String }
 
 type alias Model =
-    { missions : List Mission, selected : String, slots : Slots, confirm : Maybe Slot, busy : Bool }
+    { missions : List Mission, selected : String, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
 
 
 type Msg
     = Choose Mission
     | BeginPatrol
-    | SelectSetup String
+    | SelectSetup Setup
+    | SetTime String
+    | SetWeather String
+    | SetChanging Bool
     | Refresh Slots
     | Save Slot
     | Confirm Slot
@@ -46,9 +60,9 @@ port missionSelected : String -> Cmd msg
 port beginPatrol : (() -> msg) -> Sub msg
 
 
-port patrolRequested : String -> Cmd msg
+port patrolRequested : Setup -> Cmd msg
 
-port selectSetup : (String -> msg) -> Sub msg
+port selectSetup : (Setup -> msg) -> Sub msg
 
 port showSlots : (Slots -> msg) -> Sub msg
 
@@ -59,7 +73,7 @@ port readSlot : { id : Int, revision : String } -> Cmd msg
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init = \flags -> ( { missions = flags.missions, selected = flags.selected, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False }, Cmd.none )
+        { init = \flags -> ( { missions = flags.missions, selected = flags.selected, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False, times = flags.times, weather = flags.weather, conditions = { timeOfDay = "random", weather = "random", changing = True } }, Cmd.none )
         , update = update
         , subscriptions = \_ -> Sub.batch [ beginPatrol (\() -> BeginPatrol), showSlots Refresh, selectSetup SelectSetup ]
         , view = view
@@ -68,15 +82,27 @@ main =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        conditions = model.conditions
+    in
     case msg of
         Choose mission ->
             ( { model | selected = mission.id }, missionSelected mission.id )
 
         BeginPatrol ->
-            ( model, patrolRequested model.selected )
+            ( model, patrolRequested { mission = model.selected, conditions = conditions } )
 
-        SelectSetup mission ->
-            ( { model | selected = mission }, missionSelected mission )
+        SelectSetup setup ->
+            ( { model | selected = setup.mission, conditions = setup.conditions }, missionSelected setup.mission )
+
+        SetTime time ->
+            ( { model | conditions = { conditions | timeOfDay = time } }, Cmd.none )
+
+        SetWeather weather ->
+            ( { model | conditions = { conditions | weather = weather } }, Cmd.none )
+
+        SetChanging changing ->
+            ( { model | conditions = { conditions | changing = changing } }, Cmd.none )
 
         Refresh slots ->
             ( { model | slots = slots, busy = False, confirm = Nothing }, Cmd.none )
@@ -106,6 +132,30 @@ view model =
             , small [ attribute "role" "status" ] [ text model.slots.message ]
             ]
         , div [ id "mission-picker" ] (List.map (missionButton model.selected) model.missions)
+        , fieldset [ class "patrol-conditions" ]
+            [ legend [] [ text "PATROL CONDITIONS" ]
+            , conditionMenu "Time of day" "patrol-time" "Patrol time of day" model.times model.conditions.timeOfDay SetTime
+            , conditionMenu "Weather" "patrol-weather" "Patrol starting weather" model.weather model.conditions.weather SetWeather
+            , label [ class "weather-fronts" ]
+                [ input [ id "changing-weather", type_ "checkbox", checked model.conditions.changing, onCheck SetChanging ] []
+                , text " Changing weather fronts"
+                ]
+            , p [] [ text "Day turns to night during your patrol. Clear skies, rain and storms change how far either side can see." ]
+            ]
+        ]
+
+conditionMenu : String -> String -> String -> List Choice -> String -> (String -> Msg) -> Html Msg
+conditionMenu title elementId accessible choices current change =
+    let
+        item choice =
+            option [ value choice.id, selected (choice.id == current) ] [ text choice.name ]
+    in
+    label []
+        [ text title
+        , span [ class "select-wrap" ]
+            [ select [ id elementId, attribute "aria-label" accessible, onInput change ]
+                (List.map item ({ id = "random", name = "Random" } :: choices))
+            ]
         ]
 
 slotView : Model -> Slot -> Html Msg

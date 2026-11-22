@@ -2,7 +2,7 @@ import {recordCivilianHit,report} from './patrol-reports.js';
 import {floorSurface} from './seafloor.js';
 // Fictional combat tuning. Positions are meters; gun aim is compass/elevation.
 import {clamp,rad,bearing,delta,distance,log,rand,bottom} from './mechanics.js';
-import {hash01,environmentAt,boatHeave} from './environment.js';
+import {hash01,environmentAt,boatSurfacePose} from './environment.js';
 import {emitSound} from './acoustics.js';
 import {hurt} from './systems.js';
 import {isSurfaced,boatPoint} from './vehicle-status.js';
@@ -40,8 +40,7 @@ export function launchTorpedo(s,id){
  if(!c||c.identified&&!c.military||s.torps<=0||s.status!=='patrol'||s.depth>100)return false;
  const tubeSide=s.torps%2?1:-1;
  s.torps--;s.alert=clamp(s.alert+20,0,100);
- const origin=boatPoint(s,{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
- origin.depth-=boatHeave(s);
+ const origin=boatPoint(boatSurfacePose(s),{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
  putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:s.heading,pitch:s.pitch,tubeSide});
  log(s,`Tube away. Bearing ${Math.round(heading)}. Seeker arms after its run-out.`,'warning');return true;

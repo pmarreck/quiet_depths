@@ -40,7 +40,7 @@
         version = releaseVersion;
         src = self;
         strictDeps = true;
-        nativeBuildInputs = [ pkgs.nodejs pkgs.elmPackages.elm ];
+        nativeBuildInputs = [ pkgs.nodejs pkgs.elmPackages.elm pkgs.typescript ];
         preBuild = pkgs.elmPackages.fetchElmDeps {
           elmPackages = elmDependencies;
           elmVersion = elmConfig.elm-version;
@@ -48,6 +48,8 @@
         };
         buildPhase = ''
           runHook preBuild
+          tsc --project tsconfig.json --noEmit false --outDir "$TMPDIR/typed-game"
+          cp "$TMPDIR/typed-game/"*.js src/
           elm make elm/MissionPicker.elm --optimize --output=mission-picker.js
           runHook postBuild
         '';
@@ -86,7 +88,7 @@
     });
     checks = each (system: { site = self.packages.${system}.default; });
     devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
-      default = pkgs.mkShell { packages = [ pkgs.nodejs pkgs.elmPackages.elm ]; };
+      default = pkgs.mkShell { packages = [ pkgs.nodejs pkgs.elmPackages.elm pkgs.typescript ]; };
       profiling = pkgs.mkShell { packages = [ pkgs.nodejs performance-profile.packages.${system}.default ]; };
     });
   };

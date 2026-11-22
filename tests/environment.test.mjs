@@ -3,6 +3,42 @@ import assert from 'node:assert/strict';
 import {createGame,step,isVisible,dropDepthCharge,save,restore,getSoundings} from '../src/sim.js';
 import {environmentAt,DAY_SECONDS,WEATHER,TIMES,surfaceHeight,scopeWashed,soundings,waterColumnLight} from '../src/environment.js';
 import {AIR_SOUND_SPEED,WATER_SOUND_SPEED,airWaterPath,propagationTime,perceivedSound,engineSound,emitSound,updateAcoustics} from '../src/acoustics.js';
+import * as sea from '../src/environment.js';
+import {SUB_DESIGN as design} from '../src/hull-design.js';
+import {SternSpray} from '../src/surface-motion.js';
+
+test('surface trim exposes one third of the hull diameter and wave pitch fades by periscope depth',()=>{
+ const s=createGame('recon',121,{weather:'storm',changing:false});s.depth=0;s.pitch=0;
+ const e=environmentAt(s),flat=sea.boatSurfacePose(s,{...e,waveScale:0});
+ assert.ok(Math.abs((design.hullRadius-flat.depth)/(2*design.hullRadius)-1/3)<1e-8);
+ const sweep=depth=>{
+  s.depth=depth;const angles=Array.from({length:240},(_,i)=>sea.boatSurfacePose(s,e,i/4).pitch);
+  return [Math.min(...angles),Math.max(...angles)];
+ };
+ const [low,high]=sweep(0),[,mid]=sweep(7),[,deep]=sweep(15);
+ assert.ok(low<-.03&&high>.03&&mid<high&&mid>deep&&deep<high*.05);
+ s.depth=80;s.pitch=.16;assert.equal(sea.boatSurfacePose(s,e).pitch,.16);
+});
+
+test('a surface-piercing screw throws more spray at higher RPM and leaves its drops behind',()=>{
+ const flat={waveScale:0,waveSpeed:1},pose={x:0,y:0,depth:1,heading:0,pitch:0,roll:0};
+ const trial=(rpm,depth)=>{
+  const spray=new SternSpray(),patrol={};
+  let count;
+  for(let i=0;i<=16;i++)count=spray.update(patrol,i/16,{...pose,depth},rpm,flat);
+  return {spray,patrol,count};
+ };
+ const {spray,patrol,count}=trial(180,1);
+ assert.ok(count>60&&count<=spray.capacity);assert.ok(trial(45,1).count<count);
+ assert.equal(trial(-180,1).count,count);assert.equal(trial(0,1).count,0);
+ assert.equal(trial(180,design.propellerRadius+.01).count,0);
+ const frame=spray.positions.slice();assert.equal(spray.update(patrol,1,pose,180,flat),count);
+ assert.deepEqual(spray.positions,frame);
+ const remaining=spray.update(patrol,1.25,{...pose,x:100,depth:20},0,flat);
+ assert.ok(remaining>0);assert.ok(Math.abs(spray.positions[0])<20);
+ assert.equal(spray.update(patrol,3,pose,0,flat),0);
+ assert.equal(spray.update({},0,pose,0,flat),0);
+});
 test('daylight fades with depth and blue outlasts green and red',()=>{
  const clear={daylight:1,cloud:0,sunAltitude:1};
  assert.deepEqual(waterColumnLight(-1,clear),{red:1,green:1,blue:1,direct:1});

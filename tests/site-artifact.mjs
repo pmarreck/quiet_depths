@@ -53,6 +53,11 @@ await install;
 // The browser fetches the worker itself independently of the asset cache.
 assert.deepEqual(requested.sort(),[scope,...files.filter(f=>f!=='service-worker.js').map(f=>new URL(f,scope).href)].sort());
 for(const name of ['mission-picker.js','app.js','manifest.webmanifest','LICENSE'])assert.ok(files.includes(name),name);
+for(const entry of await readdir(new URL('../typescript/',import.meta.url))){
+ if(!entry.endsWith('.ts'))continue;
+ const js=await read(entry.replace(/\.ts$/,'.js'));
+ assert.doesNotMatch(js,/\bfrom\s*['"][^'"]*\.ts['"]/,'Pages must serve compiled JavaScript for '+entry);
+}
 
 const about=execFileSync(process.execPath,[fileURLToPath(new URL('../scripts/serve.mjs',import.meta.url)),root,'--about'],{
  encoding:'utf8',env:{...process.env,PF:'unrelated-platform'}

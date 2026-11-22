@@ -118,10 +118,10 @@ function openBriefing(){
  $('resume').classList.toggle('hidden',!resumablePatrol(current));
  refreshSlots();sound.update();
 }
-function start(mission=null,snapshot=null){
+function start(setup=null,snapshot=null){
  if(!$('briefing').open)return;
  const previousPatrol=state;
- if(mission===null){
+ if(setup===null){
   const resumed=snapshot||resumablePatrol(saved,patrolStarted?state:null);
   if(!resumed)return;
   if(resumed!==state)selected=null;
@@ -132,7 +132,7 @@ function start(mission=null,snapshot=null){
   const seed=parsePatrolSeed(seedInput.value);
   seedInput.setCustomValidity(seed===undefined?'Enter a whole number from 0 to 4294967295.':'');
   if(!seedInput.reportValidity())return;
-  state=createGame(mission,seed??randomSeed(),{timeOfDay:$('patrol-time').value,weather:$('patrol-weather').value,changing:$('changing-weather').checked,difficulty});
+  state=createGame(setup.mission,seed??randomSeed(),{...setup.conditions,difficulty});
   selected=null;
   newSeed();
  }
@@ -159,8 +159,6 @@ $('current-seed').onclick=()=>copySeed(briefingPatrol().patrol.seed,$('current-s
 $('copy-seed').onclick=()=>copySeed(parsePatrolSeed($('patrol-seed').value));
 $('patrol-seed').onclick=event=>{event.target.select();copySeed(parsePatrolSeed(event.target.value));};
 $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity('');$('seed-status').textContent='';});
-$('patrol-time').innerHTML='<option value="random">Random</option>'+Object.entries(TIMES).map(([id,t])=>`<option value="${id}" ${''}>${t.name}</option>`).join('');
-$('patrol-weather').innerHTML='<option value="random">Random</option>'+Object.entries(WEATHER).map(([id,w])=>`<option value="${id}">${w.name}</option>`).join('');
 function renderDifficulty(){$('difficulty-options').innerHTML=difficultyControls.map(control=>{
  const value=difficulty[control.id];
  if(typeof value==='boolean')return `<label>${control.label}<input type="checkbox" data-difficulty="${control.id}" ${value?'checked':''}></label>`;
@@ -174,18 +172,17 @@ $('difficulty-options').addEventListener('input',event=>{
  const output=input.closest('label').querySelector('output');if(output)output.value=difficulty[id];
  try{localStorage.setItem('quiet-depths-difficulty-v1',JSON.stringify(difficulty));}catch{}
 });
+const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const missionPicker=globalThis.Elm.MissionPicker.init({
  node:$('patrol-briefing-controls'),
- flags:{selected:state.mission,missions:MISSIONS.map(({id,name,type,minutes})=>({id,name,category:type,duration:minutes}))}
+ flags:{selected:state.mission,times:conditionChoices(TIMES),weather:conditionChoices(WEATHER),missions:MISSIONS.map(({id,name,type,minutes})=>({id,name,category:type,duration:minutes}))}
 });
 missionPicker.ports.missionSelected.subscribe(updateMissionBriefing);
 missionPicker.ports.patrolRequested.subscribe(start);
 $('reuse-patrol').onclick=()=>{
  const {seed,mission,options}=patrolSetup(briefingPatrol());
- missionPicker.ports.selectSetup.send(mission);
+ missionPicker.ports.selectSetup.send({mission,conditions:{timeOfDay:options.timeOfDay,weather:options.weather,changing:options.changing}});
  $('patrol-seed').value=seed;$('patrol-seed').setCustomValidity('');
- $('patrol-time').value=options.timeOfDay;
- $('patrol-weather').value=options.weather;$('changing-weather').checked=options.changing;
  difficulty=patrolDifficulty(options.difficulty);renderDifficulty();
  $('current-seed-status').textContent='Original setup selected. Choose Begin Patrol to replay.';
 };

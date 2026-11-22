@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "noEmitOnError": true,
+    "rewriteRelativeImportExtensions": true,
+    "target": "ES2022",
+    "module": "ES2022",
+    "rootDir": "typescript"
+  },
+  "include": ["typescript/**/*.ts"]
+}
