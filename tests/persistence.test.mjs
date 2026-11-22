@@ -56,3 +56,24 @@ test('a failed patrol save leaves the previous patrol and archive recoverable',(
  assert.throws(()=>persistence.persistPatrol(store,createGame(),true),{name:'QuotaExceededError'});
  assert.deepEqual([...store.values],before);
 });
+
+test('only explicit briefing commands begin or continue a patrol',async()=>{
+ const {bindBriefingNavigation}=await import('../src/briefing-navigation.js');
+ const dialog=new EventTarget(),buttons=new Map(['#start','#resume','#close-briefing'].map(id=>[id,new EventTarget()]));
+ const actions=[];
+ dialog.querySelector=id=>buttons.get(id);
+ dialog.close=()=>actions.push('closed');
+ bindBriefingNavigation(dialog,()=>actions.push('begin'),()=>actions.push('continue'),()=>actions.push('return'));
+
+ buttons.get('#close-briefing').dispatchEvent(new Event('click'));
+ assert.deepEqual(actions.splice(0),['closed','return']);
+ const escape=new Event('cancel',{cancelable:true});
+ dialog.dispatchEvent(escape);
+ assert.ok(escape.defaultPrevented);
+ assert.deepEqual(actions.splice(0),['closed','return']);
+
+ buttons.get('#start').dispatchEvent(new Event('click'));
+ assert.deepEqual(actions.splice(0),['begin']);
+ buttons.get('#resume').dispatchEvent(new Event('click'));
+ assert.deepEqual(actions,['continue']);
+});

@@ -1,3 +1,4 @@
+import {bindBriefingNavigation} from './briefing-navigation.js';
 import {ReplayRecorder,ReplayPlayback,replayLabels} from './instant-replay.js';
 import {seriousRepairs} from './red-alert.js';
 import {threats} from './torpedo-watch.js';
@@ -48,7 +49,7 @@ try{saved=resumablePatrol(restore(localStorage.getItem('quiet-depths-v1')));}cat
 let scene=null;
 try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',e);toast('WebGL unavailable. Sonar and chart are available.');view='sonar';}
 const held=new HeldInput(),keys=held.keys,commandControls=[];let drawer=null;
-const context=()=>({view,paused:paused||!!replay,modal:!!document.querySelector('dialog[open]')});
+const context=()=>({view,paused:!patrolStarted||paused||!!replay,modal:!!document.querySelector('dialog[open]')});
 const pilotEnabled=()=>view!=='orbit'&&(view!=='drone'||state.drone.mode==='remote');
 const compactLayout=matchMedia('(max-width:1100px)');
 const sound=new SoundSystem(()=>state,context,status=>{
@@ -143,7 +144,7 @@ function start(setup=null,snapshot=null){
   orbit=null;lossSoundPlayed=false;
   recorder=scene&&state.difficulty.instantReplay?new ReplayRecorder(state):null;
  }
- renderClock=state.time;patrolStarted=true;
+ renderClock=state.time;patrolStarted=true;document.body.classList.remove('standby');
  state.patrolId??=Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
  chart={x:state.x,y:state.y,zoom:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
@@ -211,16 +212,14 @@ missionPicker.ports.readSlot.subscribe(async({id,revision})=>{
   if($('briefing').open&&visit===briefingVisit){start(null,loaded);toast('Loaded slot '+id+'.');}
  }catch(error){await refreshSlots(error.message||'Could not load the slot.');}
 });
-function requestPatrol(){missionPicker.ports.beginPatrol.send(null);}
-function dismissBriefing(){
- if(patrolStarted){$('briefing').close();updateUI();}
- else if(saved)start();
- else requestPatrol();
-}
-$('start').onclick=requestPatrol;$('resume').onclick=()=>start();$('close-briefing').onclick=dismissBriefing;$('another-patrol').onclick=()=>{$('result-dialog').close();openBriefing();};
+bindBriefingNavigation($('briefing'),()=>missionPicker.ports.beginPatrol.send(null),()=>start(),()=>{
+ if(!patrolStarted)$('choose-mission').focus();
+ else if(resultShown)$('result-dialog').showModal();
+});
+$('choose-mission').onclick=openBriefing;
+$('another-patrol').onclick=()=>{$('result-dialog').close();openBriefing();};
 $('sound').onclick=()=>{sound.toggle();renderSound();};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{held.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
 all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI();}));
-$('briefing').addEventListener('cancel',e=>{e.preventDefault();dismissBriefing();});
 all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
 $('open-orbit').onclick=changeOrbit;$('orbit-exit').onclick=changeOrbit;$('orbit-pause').onclick=()=>setPaused(!paused);
 $('orbit-in').onclick=()=>zoomOrbit(1/1.2);$('orbit-out').onclick=()=>zoomOrbit(1.2);
@@ -395,7 +394,7 @@ window.addEventListener('keydown',e=>{
   return;
  }
  if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches('textarea,input:not([type="range"]),[contenteditable="true"]'))return;
- if(context().modal)return;
+ if(!patrolStarted||context().modal)return;
  const action=Object.keys(bindings).find(key=>bindings[key]===e.code);
  if(view==='orbit'){
   if(e.code==='Escape'||action==='KeyV'){e.preventDefault();if(!e.repeat)changeOrbit();}
@@ -411,8 +410,8 @@ window.addEventListener('keydown',e=>{
  ({KeyP:scopeToggle,KeyF:takePhoto,KeyG:doPing,KeyR:silent})[action]?.();
 });
 window.addEventListener('keyup',e=>held.release('keyboard:'+e.code));
-window.addEventListener('blur',()=>{held.clear();if(!context().modal&&state.status==='patrol')setPaused(true);});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){held.clear();setPaused(true);}});window.addEventListener('pagehide',persist);
+window.addEventListener('blur',()=>{held.clear();if(patrolStarted&&!context().modal&&state.status==='patrol')setPaused(true);});
+document.addEventListener('visibilitychange',()=>{if(patrolStarted&&document.hidden){held.clear();setPaused(true);}});window.addEventListener('pagehide',persist);
 
 function updateTicker(notices){
  const ticker=$('status-ticker'),items=$('ticker-items'),next=$('ticker-next');
@@ -428,7 +427,7 @@ $('ticker-next').onclick=()=>{
  items.scrollLeft=items.scrollLeft+items.clientWidth<items.scrollWidth-1?items.scrollLeft+items.clientWidth:0;
 };
 function updateUI(){
- if(replay)return;
+ if(!patrolStarted||replay)return;
  const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=(extract||['intercept','seek-and-destroy','big-kahuna'].includes(s.mission))&&distance(s,s.home)<400,objective=objectiveState(s);
  if(view==='scope'&&s.systems.periscope===0)view='tower';
  $('open-orbit').classList.toggle('hidden',!s.difficulty.orbitCamera||!scene);
@@ -495,7 +494,13 @@ function updateUI(){
  for(const id of ['compass','look-heading']){$(id).classList.toggle('hidden',!optical||!active);$(id).style.opacity='1';}
  $('view-message').classList.toggle('hidden',!optical||active);
  $('view-message').innerHTML=gun?'DECK GUN OFFLINE<br><small>Surface fully to aim and fire the deck gun.</small>':tower?'CONNING TOWER OFFLINE<br><small>Surface to view from the top of the conning tower.</small>':view==='scope'?`PERISCOPE OFFLINE<br><small>${!operatingFraction(s.systems.periscope)?'Flooded optics. The scope needs 20% condition to operate.':s.depth>15?'Rise to 15 meters or less to look.':'The mast is lowered. Press P to raise it.'}</small>`:s.drone.mode==='lost'?'DRONE LOST<br><small>'+esc(s.drone.lostReason)+'</small>':['remote','return'].includes(s.drone.mode)?'ROV CAMERA OFFLINE<br><small>Remote helm and recall remain available.</small>':'DRONE STOWED<br><small>'+esc(droneDeployReason(s)||'Deploy at ≤3 knots, down to 280 meters. Keep within 100 m.')+'</small>';
- $('scope-tools').classList.toggle('hidden',view!=='scope');$('zoom-tools').classList.toggle('hidden',!['scope','tower','gun'].includes(view));$('zoom-readout').textContent=(view==='scope'?6*zoom:zoom).toFixed(zoom<2?1:0)+'×';$('scope-alignment').classList.toggle('hidden',view!=='scope');$('bow-readout').classList.toggle('hidden',view!=='scope'||!active);const rel=((s.scopeAngle+540)%360)-180;$('bow-readout').textContent=`BOW ${deg(s.heading)}° · VIEW ${deg(scopeBearing(s))}° · ${Math.abs(rel).toFixed(0)}° ${rel<0?'PORT':'STARBOARD'}${s.scopeSteerBearing!==null?' · BOAT TURNING TO VIEW':''}`;$('gun-tools').classList.toggle('hidden',!gun);$('gun-trigger').disabled=!canIssue(s,context())||!active||s.gun.ammo<=0||!operatingFraction(s.systems.deckgun);$('gun-sight-status').textContent=!operatingFraction(s.systems.deckgun)?'DECK GUN OFFLINE':`${s.gun.ammo} ROUNDS · ELEV ${s.gun.elevation.toFixed(1)}°`;$('drone-photo').textContent=s.mission==='survey'?'SURVEY PHOTO':'PHOTO';
+ $('scope-tools').classList.toggle('hidden',view!=='scope');$('zoom-tools').classList.toggle('hidden',!['scope','tower','gun'].includes(view));$('zoom-readout').textContent=(view==='scope'?6*zoom:zoom).toFixed(zoom<2?1:0)+'×';$('scope-alignment').classList.toggle('hidden',view!=='scope');
+ $('bow-readout').classList.toggle('hidden',view!=='scope'||!active);
+ const rel=((s.scopeAngle+540)%360)-180;
+ $('sight-bearings').textContent=`BOW ${deg(s.heading)}° · VIEW ${deg(scopeBearing(s))}°`;
+ $('sight-relative').textContent=`${Math.abs(rel).toFixed(0)}° ${rel<0?'PORT':'STARBOARD'}`;
+ $('sight-order').hidden=s.scopeSteerBearing===null;
+ $('gun-tools').classList.toggle('hidden',!gun);$('gun-trigger').disabled=!canIssue(s,context())||!active||s.gun.ammo<=0||!operatingFraction(s.systems.deckgun);$('gun-sight-status').textContent=!operatingFraction(s.systems.deckgun)?'DECK GUN OFFLINE':`${s.gun.ammo} ROUNDS · ELEV ${s.gun.elevation.toFixed(1)}°`;$('drone-photo').textContent=s.mission==='survey'?'SURVEY PHOTO':'PHOTO';
  $('drone-instruments').classList.toggle('hidden',!drone||!active);$('drone-instruments').innerHTML=`<b>ROV ${s.drone.mode.toUpperCase()}</b><span>CHARGE ${Math.round(s.drone.battery)}% · HULL ${Math.round(s.drone.hull)}%</span><span>LINK ${Math.round(separation(s,s.drone))} / 100 M</span><span>MOBILITY ${Math.round(s.drone.mobility)}% · BUOYANCY ${Math.round(s.drone.buoyancy)}%</span>`;
  const alertOn=s.pressureAlarm>0||seriousRepairs(s)||threats(s).length>0;
  $('red-beacon').classList.toggle('lit',alertOn);$('red-beacon').setAttribute('aria-label',alertOn?'Red alert':'Red alert off');
@@ -701,12 +706,12 @@ function showResult(){
  $('result-dialog').showModal();
 }
 function scheduleFrame(){
- if(frameRequest===null&&!$('briefing').open)frameRequest=requestAnimationFrame(frame);
+ if(patrolStarted&&frameRequest===null&&!$('briefing').open)frameRequest=requestAnimationFrame(frame);
 }
 $('briefing').addEventListener('close',()=>{last=performance.now();scheduleFrame();});
 function frame(now){
  frameRequest=null;
- if($('briefing').open)return;
+ if(!patrolStarted||$('briefing').open)return;
  const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
  if(replay){
   const r=vp.getBoundingClientRect();
@@ -833,4 +838,4 @@ function captureEvidence(){
 }
 
 initializeExtras();
-setView(scene?'scope':'sonar');updateUI();openBriefing();
+openBriefing();

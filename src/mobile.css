@@ -283,3 +283,31 @@ body.replaying #pressure-warning,body.replaying #orbit-tools,body.replaying .vie
 #replay-exit{min-height:44px;padding:0 14px;border:1px solid #b4b0a0;background:#12222df2;color:#fff}
 @keyframes replay-pulse{50%{opacity:.6}}
 @media(prefers-reduced-motion:reduce){#red-beacon.lit::before,#red-beacon.lit .beacon-lens::before,.replay-caption strong{animation:none}}
+
+#patrol-standby{display:none}
+body.standby{display:flex;flex-direction:column}
+body.standby :is(.console,.watch-strip,.bottom-bar,.top-actions,.top-coords,#red-beacon){display:none}
+body.standby #patrol-standby{flex:1;display:grid;place-content:center;justify-items:center;gap:18px}
+#patrol-standby h1{margin:0}
+#choose-mission{width:auto;padding-inline:24px}
+
+.sight-header{display:contents}
+.bow-readout>span{white-space:nowrap}
+.bow-readout>span+span::before{content:"· "}
+@media (max-width:480px) and (orientation:portrait){
+ body[data-station=scope] .sight-header{
+  position:absolute;inset:9px 9px auto;display:grid;grid-template-columns:minmax(0,1fr) auto;
+  align-items:start;column-gap:8px;pointer-events:none;
+ }
+ body[data-station=scope] .sight-header :is(.view-top,.bow-readout){position:static}
+ .sight-header .bow-readout{grid-column:2;max-width:none;text-align:right}
+ .sight-header .bow-readout>span:not([hidden]){display:block}
+ .sight-header .bow-readout>span+span::before{content:none}
+ body[data-station=scope] .sight-header .compass{
+  grid-column:1/-1;position:relative;inset:auto;margin:5px 10% 0;
+ }
+ body[data-station=scope] .sight-header .look-heading{
+  grid-column:1/-1;justify-self:center;position:relative;inset:auto;transform:none;
+ }
+ body[data-station=scope] .sight-header .look-heading::before{top:-10px}
+}
