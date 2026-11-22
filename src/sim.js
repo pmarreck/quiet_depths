@@ -190,7 +190,7 @@ function tick(s,dt,input){
  }
  const done=objectiveComplete(s,dt);
  if(s.mission==='sneaky-seamen'&&done&&s.status==='patrol'){s.status='won';log(s,'Gate B reached. Patrol corridor cleared.','success');}
- if(s.status==='patrol'&&done&&s.phase==='objective'){s.phase='extract';if(!['intercept','seek-and-destroy'].includes(s.mission))log(s,'Objective complete. Return to extraction and surface for pickup.','success');}
+ if(s.status==='patrol'&&done&&s.phase==='objective'){s.phase='extract';if(!['intercept','seek-and-destroy','big-kahuna'].includes(s.mission))log(s,'Objective complete. Return to extraction and surface for pickup.','success');}
  if(s.status==='patrol'&&s.phase==='extract'&&distance(s,s.home)<400&&s.depth<=1){s.status='won';log(s,'Patrol complete. Surfaced at pickup. Boat and crew home safely.','success');}
  if(s.time>1800&&s.status==='patrol'){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
 }
@@ -246,7 +246,7 @@ export function restore(raw){try{
  for(const p of s.shells)if(!['id','x','y','depth','delay','fromX','fromY','total'].every(k=>Number.isFinite(p[k])))return null;
  for(const k of ['x','y','heading','depth','battery','speed','targetSpeed','targetDepth','targetHeading'])if(!Number.isFinite(s.drone[k]))return null;
  if(s.route&&(!Number.isFinite(s.route.x)||!Number.isFinite(s.route.y)))return null;
- for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
+ for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub','carrier'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
  for(const v of s.ships){
   for(const key of ['sinkDepth','sunkAt','nextCreak','nextSweep','neutralHitAt'])if(v[key]!==undefined&&(!Number.isFinite(v[key])||v[key]<0))return null;
   if(v.wreckMark&&(!Number.isFinite(v.wreckMark.x)||!Number.isFinite(v.wreckMark.y)||typeof v.wreckMark.observed!=='boolean'))return null;

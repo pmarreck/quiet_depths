@@ -1,3 +1,4 @@
+import {carrierFighter} from './carrier-model.js';
 import * as T from './vendor/three.module.js';
 import {rad,bottom} from './mechanics.js';
 import {surfaceHeight} from './environment.js';
@@ -15,7 +16,12 @@ export class CombatScene{
   mesh(base,new T.BoxGeometry(26,.8,500),mat(0x515650),[0,ground,0]);for(let z=-220;z<240;z+=35)mesh(base,new T.BoxGeometry(1,.05,12),mat(0xcbc8ab),[0,ground+.45,z]);
   for(let i=0;i<3;i++)mesh(base,new T.BoxGeometry(24,13,30),mat(0x686d59),[55,ground+6,-100+i*45]);base.position.set(-3200,0,-3400);base.rotation.y=-rad(45);this.root.add(base);
  }
- plane(){
+ plane(fighter=false){
+  if(fighter){
+   const jet=carrierFighter(T);
+   const fire=new T.Sprite(new T.SpriteMaterial({map:this.glow,color:0xff6c28,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));
+   fire.scale.set(7,7,1);jet.add(fire);jet.userData.fire=fire;return jet;
+  }
   const g=new T.Group(),olive=mat(0x4c5c50),gray=mat(0x919b98);const body=mesh(g,new T.SphereGeometry(1,16,10),olive);body.scale.set(.85,.95,5.5);
   mesh(g,new T.BoxGeometry(15.5,.22,2.6),gray,[0,-.1,-.4]);mesh(g,new T.BoxGeometry(5.2,.18,1.5),olive,[0,.3,4]);
   const tail=mesh(g,new T.BoxGeometry(.18,2.5,2),olive,[0,1,4.2]);tail.rotation.x=.15;
@@ -70,7 +76,7 @@ export class CombatScene{
  }
  update(s,e,orbiting=false){
   if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values())this.removeTorpedo(p);this.planes.clear();this.torpedoes.clear();this.lastState=s;}
-  const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane();this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.prop.rotation.z=s.time*40;g.userData.bombs.visible=!p.bombDropped;g.userData.fire.visible=p.hull<=0;}
+  const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane(s.mission==='big-kahuna');this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');if(g.userData.prop)g.userData.prop.rotation.z=s.time*40;if(g.userData.bombs)g.userData.bombs.visible=!p.bombDropped;g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
   const torpIds=new Set();for(const p of s.projectiles){torpIds.add(p.id);let g=this.torpedoes.get(p.id);if(!g){g=this.torpedo();this.torpedoes.set(p.id,g);this.root.add(g);}g.position.set(p.x,-p.depth,-p.y);g.rotation.set(p.pitch,-rad(p.heading),0,'YXZ');
    const [front,rear]=g.userData.screws,elapsed=p.age-(g.userData.lastAge??p.age);

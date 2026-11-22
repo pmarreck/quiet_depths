@@ -402,7 +402,7 @@ $('ticker-next').onclick=()=>{
  items.scrollLeft=items.scrollLeft+items.clientWidth<items.scrollWidth-1?items.scrollLeft+items.clientWidth:0;
 };
 function updateUI(){
- const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=(extract||['intercept','seek-and-destroy'].includes(s.mission))&&distance(s,s.home)<400,objective=objectiveState(s);
+ const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=(extract||['intercept','seek-and-destroy','big-kahuna'].includes(s.mission))&&distance(s,s.home)<400,objective=objectiveState(s);
  if(view==='scope'&&s.systems.periscope===0)view='tower';
  $('open-orbit').classList.toggle('hidden',!s.difficulty.orbitCamera||!scene);
  $('pause').textContent=(paused?'RESUME':'PAUSE')+' · '+keyLabel(bindings.Escape).toUpperCase();
@@ -414,7 +414,7 @@ function updateUI(){
  $('show-recon-chart').classList.toggle('hidden',!s.difficulty.satellite);
  $('recon-panel').classList.toggle('hidden',!s.difficulty.satellite);
  $('mission-type').textContent=m.type;$('mission-name').innerHTML=esc(m.name).replace('observation','<br>observation.').replace('home','<br>home.').replace('through','<br>through.');
- const returning=extract&&!['seek-and-destroy-sub','seek-and-destroy','intercept'].includes(s.mission);
+ const returning=extract&&!['seek-and-destroy-sub','seek-and-destroy','intercept','big-kahuna'].includes(s.mission);
  $('plot-home').textContent=s.mission==='sneaky-seamen'?'PLOT GATE B':'PLOT EXTRACTION';
  $('mission-desc').textContent=returning?'Your work is done. Bring everyone home.':m.short;
  $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':returning?'RETURN TO EXTRACTION':objective.label;
@@ -627,6 +627,7 @@ function drawScope(){
 }
 function drawGun(){const {ctx:c,w,h}=canvasContext('scope-overlay');c.clearRect(0,0,w,h);const x=w/2,y=h/2;c.strokeStyle='#e3d4ab';c.lineWidth=1;c.beginPath();c.arc(x,y,11,0,Math.PI*2);c.moveTo(x-50,y);c.lineTo(x-15,y);c.moveTo(x+15,y);c.lineTo(x+50,y);c.moveTo(x,y-35);c.lineTo(x,y-15);c.moveTo(x,y+15);c.lineTo(x,y+35);c.stroke();}
 function patrolVictory(s){
+ if(s.mission==='big-kahuna')return 'Solstice sank. You brought your boat and crew home.';
  if(s.mission==='sneaky-seamen')return 'Gate B reached. You crossed the patrol area and brought your crew through alive.';
  if(s.mission==='intercept')return 'The briefed freighter sank and your crew reached pickup.';
  if(s.mission==='seek-and-destroy')return 'All three military transports sank. The boat and crew made it home.';
@@ -666,7 +667,7 @@ function frame(now){
   if((state.operation?.rescued||0)>priorRescued)sound.tone('photo');
   if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}
   if(hadRoute&&!state.route){setRate(1);toast('Waypoint reached. All stop. Time compression disengaged.');}
-  if(wasOutsidePickup&&!['intercept','seek-and-destroy'].includes(state.mission)&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
+  if(wasOutsidePickup&&!['intercept','seek-and-destroy','big-kahuna'].includes(state.mission)&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
   if(state.alert>40&&priorAlert<=40){setRate(1);toast('Possible detection. Time compression disengaged.');sound.tone('contact');}
   if(before!==state.events[0]){const e=state.events[0];if(e.kind==='contact'||e.kind==='damage'||e.text.startsWith('Drone link')||(state.alert>40&&rate>1))setRate(1);if(e.text.startsWith('Drone link')){toast(e.text);sound.tone('contact');}if(e.kind==='damage'&&!e.text.includes('Depth charge shock'))sound.tone(e.text.includes('in the water')?'contact':'damage');if(e.kind==='contact')sound.tone('contact');if(e.kind==='success'&&lastToast!==e.text){toast(e.text);lastToast=e.text;}}
   sound.update(state,ctx);if(state.status!=='patrol')showResult();

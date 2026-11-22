@@ -1,3 +1,4 @@
+import {carrierId,carrierSize,advanceCarrierFlood,incidentalHull,registerCarrierHit} from './carrier.js';
 import {operatingFraction} from './equipment.js';
 import {recordCivilianHit,report} from './patrol-reports.js';
 import {floorSurface} from './seafloor.js';
@@ -94,7 +95,7 @@ export function aimGunAt(s,point){
 function shipHit(from,to,ship,kind=ship.kind){
  const a=rad(ship.heading),sn=Math.sin(a),cs=Math.cos(a),scale=kind==='fishing'?.38:kind==='escort'?.78:kind==='sub'?.5:1;
  const local=p=>[(p.x-ship.x)*cs-(p.y-ship.y)*sn,(p.x-ship.x)*sn+(p.y-ship.y)*cs,p.altitude+(ship.sinkDepth||0)+(kind==='sub'?ship.depth??65:0)];
- const p=local(from),q=local(to),bounds=[[-14*scale,14*scale],[-65*scale,65*scale],[-7,kind==='sub'?7:23*scale]];let enter=0,leave=1;
+ const p=local(from),q=local(to),bounds=kind==='carrier'?[[-carrierSize.halfBeam,carrierSize.halfBeam],[-carrierSize.halfLength,carrierSize.halfLength],[-7,carrierSize.deckHeight]]:[[-14*scale,14*scale],[-65*scale,65*scale],[-7,kind==='sub'?7:23*scale]];let enter=0,leave=1;
  for(let i=0;i<3;i++){const v=q[i]-p[i];if(Math.abs(v)<1e-10){if(p[i]<bounds[i][0]||p[i]>bounds[i][1])return null;continue;}let a=(bounds[i][0]-p[i])/v,b=(bounds[i][1]-p[i])/v;if(a>b)[a,b]=[b,a];enter=Math.max(enter,a);leave=Math.min(leave,b);if(enter>leave)return null;}
  return enter>=0&&enter<=1?enter:null;
 }
@@ -113,7 +114,7 @@ function updateRounds(s,dt){
   }else if(s.depth<=2){const body={x:s.x,y:s.y,altitude:2},t=sphereHit(from,r,body,8);if(t!==null){nearest=t;target=s;type='own';}}
   if(target){const point={x:from.x+(r.x-from.x)*nearest,y:from.y+(r.y-from.y)*nearest,altitude:from.altitude+(r.altitude-from.altitude)*nearest};r.age=99;impact(s,r,point,'hit');
    const damageScale=2**(s.difficulty?.damage??0);
-   if(type==='ship'){target.playerDamaged=true;target.hull=Math.max(0,target.hull-12*damageScale);if(point.altitude+(target.sinkDepth||0)<5)target.flood=(target.flood||0)+2.4*damageScale;
+   if(type==='ship'){target.playerDamaged=true;if(target.kind==='carrier')raiseCarrierAlarm(s,target);target.hull=incidentalHull(target,12*damageScale);if(point.altitude+(target.sinkDepth||0)<5)target.flood=(target.flood||0)+2.4*damageScale;
     if(!target.military)recordCivilianHit(s,target,'Deck-gun fire struck the neutral '+target.name+'.');
     if(s.time-(target.lastHitLog??-99)>2){target.lastHitLog=s.time;log(s,'Gun impact observed.','info');}
    }else if(type==='aircraft'){target.hull=Math.max(0,target.hull-38*damageScale);if(target.hull<=0)log(s,'Aircraft hit. Going down.','success');}
@@ -126,9 +127,10 @@ function shipDamage(s,dt){
  for(const v of s.ships){
   v.flood=v.flood||0;v.sinkDepth=v.sinkDepth||0;
   if(v.hull>0&&v.flood>0){
-   v.hull=Math.max(0,v.hull-v.flood*.05*dt);
+   if(v.kind==='carrier')advanceCarrierFlood(v,dt);
+   else v.hull=Math.max(0,v.hull-v.flood*.05*dt);
    if(v.hull<48||v.flood>8){if(!v.disabled)addDebrief(s,v.name+' was disabled by flooding.');v.disabled=true;v.speed=0;}
-   v.sinkDepth=Math.min(4,v.sinkDepth+dt*v.flood*.002);
+   v.sinkDepth=v.kind==='carrier'&&v.directHits>=2?Math.max(v.sinkDepth,(1-v.hull/40)*7):Math.min(4,v.sinkDepth+dt*v.flood*.002);
   }
   if(v.hull>0||v.settled)continue;
   const origin=v.kind==='sub'?v.depth:0;
@@ -136,7 +138,7 @@ function shipDamage(s,dt){
   // Keep the grounded hull against the same triangles the underwater camera displays.
   const clearance=v.kind==='sub'||v.kind==='fishing'?3:8;
   const bed=Math.max(0,-floorSurface(v.x,v.y).height-clearance-origin);
-  v.speed=0;v.sinkDepth=Math.min(bed,v.sinkDepth+dt*1.3);
+  v.speed=0;v.sinkDepth=Math.min(bed,v.sinkDepth+dt*1.3*(v.kind==='carrier'?Math.max(1,v.directHits-1):1));
   const age=s.time-v.sunkAt,depth=origin+v.sinkDepth;
   if(age>=(v.nextCreak??4)){
    emitSound(s,{type:'creak',x:v.x,y:v.y,depth,power:.65});
@@ -234,6 +236,12 @@ function torpedoStrike(s,p,from){
   addDebrief(s,'An incoming torpedo struck your boat.');
   return true;
  }
+ if(hit.kind==='carrier'){
+  registerCarrierHit(hit);
+  raiseCarrierAlarm(s,hit);
+  if(p.owner==='player'){hit.playerDamaged=true;addDebrief(s,'Your torpedo struck '+hit.name+' (direct hit '+hit.directHits+').');}
+  return true;
+ }
  if(p.owner==='enemy'){
   hit.hull=Math.max(0,hit.hull-100);
   return true;
@@ -273,17 +281,47 @@ function updateTorpedoes(s,dt){
  }
  s.projectiles=s.projectiles.filter(p=>p.age<TORPEDO_LIFE);
 }
-function requestSupport(s){
- if(s.difficulty?.airSupport===false||s.airSupport.status==='spent')return;
+function raiseCarrierAlarm(s,carrier){
+ // A strike raises the alarm at the impact site. No shooter position is known.
+  const alarm={x:carrier.x,y:carrier.y,depth:0,heading:0,speed:0,time:s.time,reason:'an explosion near the carrier'};
+  if(s.airSupport.status==='idle'&&s.difficulty.airSupport)prepareSortie(s,carrier,alarm);
+  for(const escort of s.ships)if(escort.kind==='escort'&&escort.hull>0){
+   escort.alert=Math.max(60,escort.alert);
+  }
+}
+function prepareSortie(s,carrier,report){
  const support=s.airSupport;
+ support.lastKnown={...report};support.status='arming';support.requestedAt=s.time;
+ support.launchAt=s.time+(carrier?2:45+Math.floor(hash01(s.patrol.seed,591)*15));
+ log(s,carrier?'Intercepted flight-deck alarm. Fighters scrambling.':'Intercepted radio traffic. Island aircraft are preparing to launch.','warning');
+}
+function requestSupport(s){
+ if(s.difficulty?.airSupport===false)return;
+ const support=s.airSupport,carrier=s.mission==='big-kahuna'?s.ships.find(v=>v.id===carrierId):null;
+ const deckOpen=carrier&&carrier.hull>0;
+ if(carrier)support.base=deckOpen?{x:carrier.x,y:carrier.y}:{x:-3200,y:3400};
+ if(support.status==='spent')return;
+ if(carrier&&!deckOpen&&support.status!=='airborne'){support.status='spent';return;}
  for(const v of s.ships){if(!v.military||v.hull<=0||v.alert<=55)continue;
   if(!v.report||v.report.reason==='noisemaker'||s.time-v.report.time>4||v.report.time<(support.lastKnown?.time??0))continue;
-  support.lastKnown={...v.report};
-  if(support.status==='idle'){support.status='arming';support.requestedAt=s.time;support.launchAt=s.time+45+Math.floor(hash01(s.patrol.seed,591)*15);log(s,'Intercepted radio traffic. Island aircraft are preparing to launch.','warning');}
+  if(support.status==='idle')prepareSortie(s,carrier,v.report);
+  else support.lastKnown={...v.report};
  }
- if(support.status==='arming'&&s.time>=support.launchAt){support.status='airborne';for(let i=0;i<2;i++)s.aircraft.push({id:'air-'+s.weaponSequence++,name:'Island attack aircraft '+(i+1),x:support.base.x-i*20,y:support.base.y,altitude:Math.max(8,-bottom(support.base.x,support.base.y)+8+i*12),heading:45,speed:70,hull:100,phase:'takeoff',takeoffUntil:s.time+6,attack:0,bank:0,bombDropped:false});log(s,'Aircraft airborne from Greybank. They still have to reach the patrol area.','warning');}
+ if(support.status!=='arming'||s.time<support.launchAt)return;
+ support.status='airborne';
+ const count=carrier?carrier.fighterCount:2;
+ for(let i=0;i<count;i++){
+  const heading=carrier?.heading??45,along=carrier?25-i*18:0;
+  const x=carrier?carrier.x+Math.sin(rad(heading))*along:support.base.x-i*20;
+  const y=carrier?carrier.y+Math.cos(rad(heading))*along:support.base.y;
+  s.aircraft.push({id:'air-'+s.weaponSequence++,name:(carrier?'Carrier fighter ':'Island attack aircraft ')+(i+1),x,y,
+   altitude:carrier?carrierSize.deckHeight+2:Math.max(8,-bottom(support.base.x,support.base.y)+8+i*12),
+   heading,speed:70,hull:100,phase:'takeoff',takeoffUntil:s.time+(carrier?2:6),attack:0,bank:0,bombDropped:false});
+ }
+ log(s,carrier?'Flight-deck transmission. '+(count===1?'One fighter is':count+' fighters are')+' airborne.':'Aircraft airborne from Greybank. They still have to reach the patrol area.','warning');
 }
 function dropBomb(s,plane,report){
+ if(report.reason==='an explosion near the carrier')return;
  const depth=clamp((report.depth||40),15,90),airTime=2+plane.altitude/70,delay=airTime+depth/6;
  const aim=projectedReport(report,s.time,delay),point=scatterAim(s,aim,45+aim.age*.9);
  s.blasts.push({id:s.soundSequence++,...point,depth,delay,totalDelay:delay,airTime,airHeight:plane.altitude,age:0,exploded:false,kind:'bomb'});
@@ -306,11 +344,11 @@ function updateAircraft(s,dt){
    const target=projectedReport(report,s.time),r=distance(p,target);
    if(p.phase==='takeoff'&&s.time>=p.takeoffUntil)p.phase='approach';
    if(p.phase==='approach'&&r<1300)p.phase='search';
-   if(visible&&r<1800&&p.phase!=='egress')p.phase='attack';
-   let destination=target;if(p.phase==='takeoff')destination={x:p.x+Math.sin(rad(45))*1000,y:p.y+Math.cos(rad(45))*1000};
+   if(visible&&r<1800&&p.phase!=='egress'&&(s.mission!=='big-kahuna'||p.phase!=='takeoff'))p.phase='attack';
+   let destination=target;if(p.phase==='takeoff')destination={x:p.x+Math.sin(rad(p.heading))*1000,y:p.y+Math.cos(rad(p.heading))*1000};
    if(p.phase==='search'&&!visible){const a=s.time*.06;destination={x:target.x+Math.sin(a)*650,y:target.y+Math.cos(a)*650};}
    if(p.phase==='egress'){p.egress=(p.egress||0)-dt;destination={x:p.x+Math.sin(rad(p.heading))*1000,y:p.y+Math.cos(rad(p.heading))*1000};if(p.egress<=0)p.phase='search';}
-   const turn=clamp(delta(bearing(p,destination),p.heading),-dt*22,dt*22);p.heading=wrap(p.heading+turn);p.bank=clamp(-turn/Math.max(dt,.001)*.02,-.5,.5);
+   const turn=clamp(delta(bearing(p,destination),p.heading),-dt*22,dt*22);p.heading=wrap(p.heading+turn);p.bank=turn===0?0:clamp(-turn/Math.max(dt,.001)*.02,-.5,.5);
    const desiredAltitude=p.phase==='attack'?65:180;p.altitude+=clamp(desiredAltitude-p.altitude,-dt*10,dt*5);
    if(p.phase==='attack'&&r<900&&p.attack<=0){
     if(visible&&s.depth<=2){p.attack=.45;const from={x:p.x,y:p.y,altitude:p.altitude},to={...scatterAim(s,projectedReport(report,s.time,r/500),8+r*.045),altitude:2},n=Math.hypot(to.x-from.x,to.y-from.y,to.altitude-from.altitude);s.gunRounds.push({id:s.weaponSequence++,owner:'aircraft',...from,vx:(to.x-from.x)/n*500,vy:(to.y-from.y)/n*500,vz:(to.altitude-from.altitude)/n*500,age:0,tracer:true});emitSound(s,{type:'gunfire',x:p.x,y:p.y,altitude:p.altitude,power:.5});}

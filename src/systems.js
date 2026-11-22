@@ -1,3 +1,4 @@
+import {carrierSize} from './carrier.js';
 import {SYSTEM_NAMES,SYSTEM_KEYS,DRONE_PARTS,DRONE_HIT_FACTORS,fullCondition,damagePart,repairPart,operatingFraction} from './equipment.js';
 import {updatePressure} from './pressure.js';
 import {keelLimit,pushOffShoal} from './hull-contacts.js';
@@ -155,7 +156,7 @@ export function updateDrone(s,dt,diesel){
  const desired=clamp((d.targetDepth-d.depth)*.8,-1,1)*operatingFraction(d.buoyancy)+(100-d.buoyancy)*.003;
  d.verticalSpeed+=clamp(desired-d.verticalSpeed,-dt*.6,dt*.6);d.depth=clamp(d.depth+d.verticalSpeed*dt,0,280);
  d.x+=Math.sin(rad(d.heading))*d.speed*.514444*dt;d.y+=Math.cos(rad(d.heading))*d.speed*.514444*dt;
- const objects=[{body:s,half:27.5,radius:5,own:true},...s.ships.filter(v=>v.hull>0).map(v=>({body:{...v,depth:v.depth||3},half:v.kind==='sub'?27.5:v.kind==='fishing'?19:45,radius:v.kind==='sub'?5:v.kind==='fishing'?5:9}))];
+ const objects=[{body:s,half:27.5,radius:5,own:true},...s.ships.filter(v=>v.hull>0).map(v=>({body:{...v,depth:v.depth||3},half:v.kind==='carrier'?carrierSize.halfLength-carrierSize.halfBeam:v.kind==='sub'?27.5:v.kind==='fishing'?19:45,radius:v.kind==='carrier'?carrierSize.halfBeam:v.kind==='sub'?5:v.kind==='fishing'?5:9}))];
  if(s.site)objects.push({body:s.site,half:s.site.kind==='surface'?19:27.5,radius:5});
  for(const object of objects){const hit=capsuleContact(d,object.body,object.half,object.radius);if(!hit)continue;
   d.x+=hit.nx*(hit.penetration+.001);d.y+=hit.ny*(hit.penetration+.001);d.depth=clamp(d.depth+hit.nd*(hit.penetration+.001),0,280);

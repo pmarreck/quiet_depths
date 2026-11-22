@@ -1,3 +1,4 @@
+import {carrierId,carrierGroup,validCarrier} from './carrier.js';
 import {operatingFraction} from './equipment.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanics.js';
 import {hash01,TIMES} from './environment.js';
@@ -21,6 +22,10 @@ export function parsePatrolSeed(text){
 }
 
 export function validMissionTargets(s){
+ if(s.mission==='big-kahuna'){
+  const carriers=s.ships.filter(v=>v.kind==='carrier'||v.id===carrierId);
+  return carriers.length===1&&carriers[0].kind==='carrier'&&carriers[0].id===carrierId&&carriers[0].military===true&&validCarrier(carriers[0])&&(s.phase==='objective'||carriers[0].hull===0);
+ }
  if(s.mission==='sneaky-seamen')return s.departure&&Number.isFinite(s.departure.x)&&Number.isFinite(s.departure.y)&&s.ships.some(v=>v.kind==='sub'&&v.military)&&s.ships.some(v=>v.kind==='merchant');
  if(s.mission==='intercept')return s.ships.some(ship=>ship.id==='cobalt');
  if(s.mission==='seek-and-destroy-sub')return s.ships.some(ship=>ship.id==='echo'&&ship.kind==='sub'&&ship.military===true);
@@ -99,6 +104,7 @@ export function updateOperation(s,dt){
  return o.completed;
 }
 export function objectiveState(s){
+ if(s.mission==='big-kahuna')return {label:'BIG KAHUNA',text:'Sink fleet carrier Solstice and return to extraction',progress:s.ships.find(v=>v.id===carrierId)?.wreckMark?'WRECK MARKED':'',advice:''};
  if(s.mission==='sneaky-seamen')return {label:'GATE A → GATE B',text:'Reach Gate B at any depth',progress:(distance(s,s.home)/1000).toFixed(1)+' km',advice:'The convoy is expecting you.'};
  if(s.mission==='seek-and-destroy-sub')return {label:'HUNT OR WITHDRAW',text:'Surface at extraction to survive the patrol',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
  if(s.mission==='seek-and-destroy')return {label:'SINK THE CONVOY',text:'Find and sink the military transports',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
@@ -133,6 +139,12 @@ export function randomizePatrol(s,seed){
  s.ships.push({id:'alder',name:['Alder','Seaforth','Larch'][Math.floor(h(81)*3)],kind:'merchant',military:false,x:convoy.x+400+h(82)*500,y:convoy.y+450+h(83)*300,heading,speed,hull:100,alert:0,attack:0,flood:0,disabled:false,sinkDepth:0});
  setupOperation(s,seed);
  s.events=s.events.filter(e=>!e.text.startsWith('Helm steady.'));
+ if(s.mission==='big-kahuna'){
+  s.ships=carrierGroup(convoy.x,convoy.y,heading,speed,h(981)<.5,h(982));
+  s.airSupport.base={...convoy};
+  log(s,'Fleet carrier Solstice and her escort were last reported to the northeast. No alarm has been raised.');
+  return;
+ }
  if(s.mission==='seek-and-destroy-sub'){
   s.ships=s.ships.filter(ship=>ship.kind==='fishing'||ship.id==='echo');
   const primary=s.ships.find(ship=>ship.id==='echo');

@@ -4,6 +4,7 @@ type Mission
     = Recon
     | Intercept
     | Convoy
+    | BigKahuna
     | SubHunt
     | Transit
     | Shadow
@@ -34,7 +35,7 @@ type alias Briefing =
 
 all : List Mission
 all =
-    [ Recon, Intercept, Convoy, SubHunt, Transit, Shadow, UnderseaRescue, SurfaceRescue, Survey ]
+    [ Recon, Intercept, Convoy, BigKahuna, SubHunt, Transit, Shadow, UnderseaRescue, SurfaceRescue, Survey ]
 
 
 fromId : String -> Maybe Mission
@@ -62,6 +63,12 @@ briefing mission =
                 "Find the escorted convoy and sink all three military transports. Fishing boats are neutral. Surface at extraction when the convoy is down."
                 "Find and sink three military transports"
                 (SinkShips "cobalt" [ "meridian", "alder" ])
+
+        BigKahuna ->
+            Briefing "big-kahuna" "Big Kahuna" "CARRIER HUNT" "10–16 MIN"
+                "Fleet carrier Solstice is sailing with a small escort. They are not expecting you. Two direct torpedo hits will start her sinking. Further hits shorten the wait. Her fighters can launch as soon as the alarm goes up. Surface at extraction to bring your crew home."
+                "Sink the carrier and return to extraction"
+                (SinkShips "solstice" [])
 
         SubHunt ->
             Briefing "seek-and-destroy-sub" "Seek and Destroy: Sub" "SUBMARINE HUNT" "10–18 MIN"

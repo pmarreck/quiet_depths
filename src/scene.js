@@ -1,3 +1,4 @@
+import {makeCarrier} from './carrier-model.js';
 import {damageWreck} from './wrecks.js';
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
@@ -139,6 +140,7 @@ export class OceanScene{
   }
  }
  makeShip(ship){
+  if(ship.kind==='carrier')return makeCarrier(T);
   if(ship.kind==='sub')return this.makeSub();
   const root=new T.Group(),g=new T.Group(),lights=new T.Group(),small=ship.kind==='fishing',escort=ship.kind==='escort';const scale=small?.38:escort?.78:1;root.add(g,lights);root.userData.body=g;root.userData.lights=lights;
   const hullMat=this.mat(escort?0x505f60:0x343b3b),deck=this.mat(0x737969),rust=this.mat(0x6b4633);
@@ -242,6 +244,11 @@ export class OceanScene{
    let mesh=this.ships.get(ship.id);
    if(mesh?.userData.wreck&&!sunk){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});mesh=null;}
    if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}
+   if(mesh.userData.parked){
+    const launched=s.airSupport.status==='airborne'||s.airSupport.status==='spent';
+    const vacant=launched&&s.airSupport.launchAt!==null?ship.fighterCount:0;
+    mesh.userData.parked.children.forEach((plane,i)=>plane.visible=!sunk&&i>=vacant);
+   }
    if(sunk&&!mesh.userData.wreck)damageWreck(T,mesh,sub);
    const d=Math.hypot(listener.x-ship.x,listener.y-ship.y),drop=ship.sinkDepth||0;
    mesh.visible=(drone||orbiting||!sub)&&d<(underwater?350:e.opticalRange);

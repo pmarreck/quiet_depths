@@ -182,7 +182,7 @@ test('Home Screen, favicon and manifest icons resolve to PNGs of their declared 
 });
 
 test('the mission catalog retains every historical v1 patrol ID in briefing order',()=>{
- const savedIds=['recon','intercept','seek-and-destroy','seek-and-destroy-sub','sneaky-seamen',
+ const savedIds=['recon','intercept','seek-and-destroy','big-kahuna','seek-and-destroy-sub','sneaky-seamen',
   'shadow','undersea-rescue','surface-rescue','survey'];
  assert.deepEqual(MISSIONS.map(m=>m.id),savedIds);
  for(const id of savedIds){
