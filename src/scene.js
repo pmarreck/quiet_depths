@@ -178,7 +178,7 @@ export class OceanScene{
   this.own.visible=drone||tower||gun||orbiting;this.own.position.set(s.x,hullY,-s.y);this.own.rotation.set(hull.pitch,-rad(s.heading),hull.roll,'YXZ');
   let pose;
   if(drone){
-   const d=s.drone,a=rad(d.heading),pitch=droneCameraPitch(d.verticalSpeed),reach=100*Math.cos(pitch);
+   const d=s.drone,a=rad(d.heading),pitch=droneCameraPitch(d.verticalSpeed,d.nosePitch),reach=100*Math.cos(pitch);
    this.camera.position.set(d.x,d.depth<.5?.8:-d.depth,-d.y);
    pose=cameraEuler(d.heading,pitch);
    this.light.position.copy(this.camera.position);

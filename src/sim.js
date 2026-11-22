@@ -9,6 +9,7 @@ import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from
 import {emitSound,updateAcoustics} from './acoustics.js';
 import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets} from './missions.js';
+import {maxNosePitch} from './rov-flight.js';
 import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone} from './systems.js';
 import {TORPEDO_SPEED,MAX_RUN,ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
@@ -277,6 +278,7 @@ export function restore(raw){try{
  if(s.ships.some(ship=>ship.torpedoDecoys!==undefined&&(!Number.isInteger(ship.torpedoDecoys)||ship.torpedoDecoys<0||ship.torpedoDecoys>ENEMY_DECOY_SUPPLY)))return null;
  if(!validMissionTargets(s))return null;
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k]))||c.depthEstimate!==undefined&&!Number.isFinite(c.depthEstimate)||c.courseEstimated!==undefined&&typeof c.courseEstimated!=='boolean')return null;
+ if(s.drone.nosePitch!==null&&(!Number.isFinite(s.drone.nosePitch)||Math.abs(s.drone.nosePitch)>maxNosePitch))return null;
  if(s.drone.returnStage<0||s.drone.returnStage>3||!Number.isInteger(s.drone.returnStage))return null;
  for(const c of s.contacts){
   if(c.lastSweep!==undefined&&(!Number.isFinite(c.lastSweep)||c.lastSweep<0||c.lastSweep>s.time))return null;

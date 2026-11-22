@@ -29,7 +29,7 @@ import {lossPresentation} from './loss.js';
 import {persistPatrol,resumablePatrol} from './persistence.js';
 import {SLOT_COUNT,listSlots,writeSlot,loadSlot} from './patrol-slots.js';
 import {difficultyPanel,patrolDifficulty} from './difficulty.js';
-import {allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
+import {actionForKey,shortcutConflict,allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const tubeLabels={port:$('tube-port'),starboard:$('tube-starboard')};
@@ -44,7 +44,8 @@ let previousView='scope';
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 let sonarRange=SONAR_RANGES.at(-1);
 let orbit=null,recorder=null,replay=null,returnFocus=null,lossSoundPlayed=false;
-let bindings=shortcutBindings(),remapping=null;
+let bindings=shortcutBindings(),remapping=null,invertRovPitch=false;
+try{invertRovPitch=localStorage.getItem('quiet-depths-invert-rov-pitch')==='true';}catch{}
 try{bindings=shortcutBindings(JSON.parse(localStorage.getItem('quiet-depths-shortcuts-v1')));}catch{}
 try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
 state.photoArchive=library;
@@ -52,7 +53,7 @@ try{saved=resumablePatrol(restore(localStorage.getItem('quiet-depths-v1')));}cat
 let scene=null;
 try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',e);toast('WebGL unavailable. Sonar and chart are available.');view='sonar';}
 const held=new HeldInput(),keys=held.keys,commandControls=[];let drawer=null;
-const context=()=>({view,paused:!patrolStarted||paused||!!replay,modal:!!document.querySelector('dialog[open]')});
+const context=()=>({view,invertRovPitch,paused:!patrolStarted||paused||!!replay,modal:!!document.querySelector('dialog[open]')});
 const pilotEnabled=()=>view!=='orbit'&&(view!=='drone'||state.drone.mode==='remote');
 const compactLayout=matchMedia('(max-width:1100px)');
 const sound=new SoundSystem(()=>state,context,status=>{
@@ -267,7 +268,7 @@ bindCommand('run-limit','input',e=>{state.runSetting=clamp(e.target.valueAsNumbe
 bindCommand('fire','click',launchSelected,()=>!!state.contacts.find(c=>c.id===selected)&&operatingFraction(state.systems.tubes)>0&&torpedoTubes(state).next!==null&&state.depth<=100);
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
-bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');if(!compactLayout.matches)toast('Drone helm: W/S speed, A/D heading, Space/C depth.');}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
+bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');if(!compactLayout.matches)toast(rovKeyHint());}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
 bindCommand('drone-photo','click',takePhoto,()=>feedActive(state,'drone')&&state.photoCooldown===0);
 bindCommand('approach-site','click',()=>{const p=operationApproach(state);if(!p)return;state.route={x:p.x,y:p.y,radius:p.radius};state.targetDepth=p.depth;state.targetSpeed=3;state.silent=false;toast('Approach plotted. Sub will stop beside the site. Watch clearance.');},()=>!!state.site);
 bindCommand('start-rescue','click',()=>{
@@ -369,29 +370,40 @@ vp.addEventListener('wheel',e=>{
  else if(['scope','tower','gun'].includes(view)&&feedActive(state,view)&&canIssue(state,context())){e.preventDefault();zoom=clamp(zoom-e.deltaY*.002,1,opticalZoomLimit(view));updateUI();}
 },{passive:false});
 function saveShortcuts(){missionPicker.ports.showPauseKey.send(keyLabel(bindings.Escape));try{localStorage.setItem('quiet-depths-shortcuts-v1',JSON.stringify(bindings));}catch{}}
+function rovKeyHint(){
+ const label=id=>keyLabel(bindings[id]);
+ const up=invertRovPitch?'rovPitchDown':'rovPitchUp',down=invertRovPitch?'rovPitchUp':'rovPitchDown';
+ return label(up)+'/'+label(down)+' nose up/down · '+label('rovLeft')+'/'+label('rovRight')+' turn · '+label('rovFaster')+'/'+label('rovSlower')+' thrust · '+label('rovStop')+' all stop';
+}
 function showShortcuts(){
+ $('invert-rov-pitch').checked=invertRovPitch;
  $('shortcut-list').replaceChildren(...Object.entries(shortcutActions).map(([action,label])=>{
   const button=document.createElement('button');button.type='button';button.dataset.shortcut=action;
   const name=document.createElement('span'),key=document.createElement('kbd');name.textContent=label;key.textContent=keyLabel(bindings[action]);
   button.append(name,key);return button;
  }));
 }
+function setPitchInversion(inverted){
+ invertRovPitch=inverted;
+ try{localStorage.setItem('quiet-depths-invert-rov-pitch',String(inverted));}catch{}
+}
+$('invert-rov-pitch').onchange=e=>{setPitchInversion(e.target.checked);updateUI();};
 function openSettings(){held.clear();remapping=null;showShortcuts();$('settings-dialog').showModal();}
 $('open-settings').onclick=openSettings;$('briefing-settings').onclick=openSettings;
 $('close-settings').onclick=()=>$('settings-dialog').close();
-$('reset-shortcuts').onclick=()=>{remapping=null;bindings=shortcutBindings();saveShortcuts();showShortcuts();updateUI();$('shortcut-status').textContent='Default shortcuts restored.';};
+$('reset-shortcuts').onclick=()=>{remapping=null;bindings=shortcutBindings();setPitchInversion(false);saveShortcuts();showShortcuts();updateUI();$('shortcut-status').textContent='Default shortcuts restored.';};
 $('shortcut-list').onclick=event=>{const button=event.target.closest('[data-shortcut]');if(!button)return;remapping=button.dataset.shortcut;$('shortcut-status').textContent='Press a key for '+shortcutActions[remapping]+'.';};
 $('settings-dialog').addEventListener('keydown',event=>{
  if(!remapping||event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.code==='Tab')return;
  event.preventDefault();event.stopPropagation();
  const key=event.code;if(!allowedShortcut(key)){$('shortcut-status').textContent='Choose a letter, number, arrow, Space, Esc, bracket, minus or equals.';return;}
- const other=Object.keys(bindings).find(action=>action!==remapping&&bindings[action]===key);
+ const other=shortcutConflict(bindings,remapping,key);
  if(other){$('shortcut-status').textContent=keyLabel(key)+' is already assigned to '+shortcutActions[other]+'.';return;}
  const action=remapping;bindings[action]=key;remapping=null;saveShortcuts();showShortcuts();updateUI();
  $('shortcut-list').querySelector(`[data-shortcut="${action}"]`).focus();
  $('shortcut-status').textContent=shortcutActions[action]+' set to '+keyLabel(key)+'.';
 });
-const helmKeys=new Set(['KeyW','KeyA','KeyS','KeyD','Space','KeyC','KeyJ']);
+const helmKeys=new Set(['KeyW','KeyA','KeyS','KeyD','Space','KeyC','KeyJ','rovPitchUp','rovPitchDown','rovLeft','rovRight','rovFaster','rovSlower','rovStop']);
 window.addEventListener('keydown',e=>{
  if(replay){
   if(e.code==='Escape'){e.preventDefault();exitReplay();}
@@ -400,7 +412,7 @@ window.addEventListener('keydown',e=>{
  }
  if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches('textarea,input:not([type="range"]),[contenteditable="true"]'))return;
  if(!patrolStarted||context().modal)return;
- const action=Object.keys(bindings).find(key=>bindings[key]===e.code);
+ const action=actionForKey(bindings,e.code,view);
  if(view==='orbit'){
   if(e.code==='Escape'||action==='KeyV'){e.preventDefault();if(!e.repeat)changeOrbit();}
   else if(action==='Escape'){e.preventDefault();if(!e.repeat)setPaused(!paused);}
@@ -410,7 +422,7 @@ window.addEventListener('keydown',e=>{
  if(action==='Escape'){e.preventDefault();if(!e.repeat)setPaused(!paused);return;}
  const stations={Digit1:'scope',Digit2:'sonar',Digit3:'chart',Digit4:'drone',Digit5:'tower',Digit6:'gun',Digit7:'photos'};
  if(stations[action]){e.preventDefault();if(!e.repeat)setView(stations[action]);return;}
- if(helmKeys.has(action)){e.preventDefault();if(canIssue(state,context())&&pilotEnabled()){held.press('keyboard:'+e.code,action);if(!e.repeat){applyHelmKeys(state,context(),new Set([action]),.12);updateUI();}}return;}
+ if(helmKeys.has(action)){e.preventDefault();if(canIssue(state,context())&&pilotEnabled()){held.press('keyboard:'+e.code,action);if(!e.repeat){applyHelmKeys(state,context(),keys.has('rovStop')?keys:new Set([action]),.12);updateUI();}}return;}
  if(!canIssue(state,context())||e.repeat)return;
  ({KeyP:scopeToggle,KeyF:takePhoto,KeyG:doPing,KeyR:silent})[action]?.();
 });
@@ -529,7 +541,7 @@ function updateUI(){
  $('sight-relative').textContent=`${Math.abs(rel).toFixed(0)}° ${rel<0?'PORT':'STARBOARD'}`;
  $('sight-order').hidden=s.scopeSteerBearing===null;
  $('gun-tools').classList.toggle('hidden',!gun);$('gun-trigger').disabled=!canIssue(s,context())||!active||s.gun.ammo<=0||!operatingFraction(s.systems.deckgun);$('gun-sight-status').textContent=!operatingFraction(s.systems.deckgun)?'DECK GUN OFFLINE':`${s.gun.ammo} ROUNDS · ELEV ${s.gun.elevation.toFixed(1)}°`;$('drone-photo').textContent=s.mission==='survey'?'SURVEY PHOTO':'PHOTO';
- $('drone-instruments').classList.toggle('hidden',!drone||!active);$('drone-instruments').innerHTML=`<b>ROV ${s.drone.mode.toUpperCase()}</b><span>CHARGE ${Math.round(s.drone.battery)}% · HULL ${Math.round(s.drone.hull)}%</span><span>LINK ${Math.round(separation(s,s.drone))} / 100 M</span><span>MOBILITY ${Math.round(s.drone.mobility)}% · BUOYANCY ${Math.round(s.drone.buoyancy)}%</span>`;
+ $('drone-instruments').classList.toggle('hidden',!drone||!active);$('drone-instruments').innerHTML=`<b>ROV ${s.drone.mode.toUpperCase()}</b>${s.drone.nosePitch===null?'':'<span>NOSE '+Math.abs(Math.round(s.drone.nosePitch))+'° '+(s.drone.nosePitch<0?'DOWN':'UP')+'</span>'}<span>CHARGE ${Math.round(s.drone.battery)}% · HULL ${Math.round(s.drone.hull)}%</span><span>LINK ${Math.round(separation(s,s.drone))} / 100 M</span><span>MOBILITY ${Math.round(s.drone.mobility)}% · BUOYANCY ${Math.round(s.drone.buoyancy)}%</span>`;
  const alertOn=s.pressureAlarm>0||seriousRepairs(s)||threats(s).length>0;
  $('red-beacon').classList.toggle('lit',alertOn);$('red-beacon').setAttribute('aria-label',alertOn?'Red alert':'Red alert off');
  updateTicker(patrolNotices(s,optical&&active,sound.on,view,rate,paused));
@@ -539,7 +551,8 @@ function updateUI(){
  $('hydrophones').hidden=view!=='sonar'||!operatingFraction(s.systems.sonar);
  $('chart-tools').classList.toggle('hidden',view!=='chart');$('drone-tools').classList.toggle('hidden',view!=='drone');
  $('scope-toggle').innerHTML=(s.scope?'LOWER SCOPE':'RAISE SCOPE')+' <kbd>'+esc(keyLabel(bindings.KeyP))+'</kbd>';$('scope-toggle').dataset.short=s.scope?'Lower':'Raise';
- $('view-hint').textContent=gun?'DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING':tower?'DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS':view==='scope'?(active?'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM':'NO OPTICAL SIGNAL'):view==='sonar'?'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL':view==='chart'?'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT':active?'CAMERA FIXED AHEAD · W/S SPEED · A/D HEADING':'NO DRONE SIGNAL';
+ if(drone)$('rov-key-hint').textContent=rovKeyHint();
+ $('view-hint').textContent=gun?'DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING':tower?'DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS':view==='scope'?(active?'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM':'NO OPTICAL SIGNAL'):view==='sonar'?'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL':view==='chart'?'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT':active?'CAMERA FIXED TO ROV NOSE':'NO DRONE SIGNAL';
  $('view-range').textContent=drone?(active?`HDG ${deg(v.heading)}° · ${v.speed.toFixed(1)} KN · ${v.depth.toFixed(0)} M`:''):view==='chart'?`ZOOM ${chart.zoom.toFixed(1)}×`:'VISIBILITY '+(env.opticalRange/1000).toFixed(1)+' KM';
  $('station-status').textContent=isSurfaced(s)?'SURFACED · EXPOSED':s.depth<=15?'PERISCOPE DEPTH':s.silent?'SILENT RUNNING':'SUBMERGED';
  const clock=new Date(Math.floor(env.hour*3600)*1000).toISOString().slice(11,16);
@@ -819,6 +832,7 @@ function initializeExtras(){
  bindCommand('order-number','input',e=>{if(orderAxis)order(orderAxis,orderAxis==='speed'&&view!=='drone'?throttleOrder(e.target.valueAsNumber):e.target.valueAsNumber);},pilotEnabled);
  bindOrderRange('order-slider',()=>orderAxis);
  bindOrderRange('mobile-speed',()=>'speed');
+ bindCommand('rov-stop','click',()=>applyHelmKeys(state,context(),new Set(['rovStop']),0),()=>view==='drone'&&pilotEnabled());
  all('[data-sonar-range]').forEach(button=>button.onclick=()=>{
   sonarRange=Number(button.dataset.sonarRange);
   updateUI();
@@ -843,6 +857,8 @@ function updateExtras(s,env,v){
  const compact=compactLayout.matches,ds=droneStatus(s),rov=view==='drone',below=getSoundings(s,rov&&ds.deployed).belowKeel;
  const rovTouch=rov&&compact&&!!scene;
  document.body.classList.toggle('rov-touch-helm',rovTouch);
+ $('rov-stop').hidden=!rovTouch;
+ $('rov-steering-hint').textContent=(invertRovPitch?'Swipe up to pitch down':'Swipe up to pitch up')+' · swipe sideways to turn';
  $('rov-steering-hint').hidden=!(rovTouch&&s.drone.mode==='remote');
  $('sonar-tools').classList.toggle('hidden',view!=='sonar');$('mobile-ping').textContent=s.pingCooldown>0?'PING · '+Math.ceil(s.pingCooldown)+' s':'ACTIVE PING';
  for(const button of all('[data-sonar-range]'))button.setAttribute('aria-pressed',String(Number(button.dataset.sonarRange)===sonarRange));

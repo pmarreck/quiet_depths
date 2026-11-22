@@ -44,11 +44,11 @@ Enemy hunters steer and aim from their last detection. A change of course or dep
 - **F**: take a periscope photograph. A merchant within five degrees of the reticle also earns reconnaissance mission credit. Separate silhouettes require separate framing.
 - **G**: active sonar. Range information also exposes you.
 - **R**: silent running, limited to 3 knots.
-- **W/S**: increase/decrease requested speed of the vehicle under control, including astern.
+- **W/S**: increase/decrease submarine throttle, including astern.
 - **A/D**: turn requested heading left/right. Actual heading follows with a bounded turn rate.
-- **Space/C**: change requested depth toward the surface/deeper. Actual depth follows gradually.
+- **Space/C**: change requested submarine depth toward the surface/deeper. Actual depth follows gradually.
 - **Esc**: pause or resume. Physical camera movement, helm orders, sonar pings, weapons, repairs and drone deployment are blocked while paused. Station selection and chart inspection remain available.
-- **Drone**: deploy at 280 meters or less and 3 knots or less. Stay within 100 meters in three dimensions; exceeding the radius or exhausting the drone battery loses it for this patrol. A 10% alarm warns you to return. Its camera is fixed dead ahead; the same keyboard and helm controls pilot the drone while its station is selected. Recall before its battery runs out. The submarine keeps its own orders.
+- **Drone**: deploy at 280 meters or less and 3 knots or less. Stay within 100 meters in three dimensions; exceeding the radius or exhausting the drone battery loses it for this patrol. A 10% alarm warns you to return. Its camera looks along the nose. Hold W/S to pitch up/down and A/D to turn left/right. The up/down arrow keys adjust thrust from astern through full ahead. Press Space to brake and hover. On touchscreens, swipe the feed to aim, use the throttle slider and tap **All Stop** to hover. **Invert ROV pitch** in Settings reverses vertical steering on both keyboard and touch. Recall before its battery runs out. The submarine keeps its own orders.
 - **Periscope**: angle is relative to the submarine, so turning the hull turns the view. Inactive optics are fully blank and cannot rotate or zoom. A stowed/lost drone also has no view.
 - **Sonar**: heading-up, with relative contact bearings and a rotating north indicator. True bearings remain available through navigation and the periscope.
 - Drag the chart to pan and use the wheel to zoom around the cursor. Click without dragging to order a waypoint. Requested depth stays under your control; Center Sub restores following.
@@ -123,7 +123,7 @@ Outside Big Kahuna, alerted military traffic can radio Greybank island. Aircraft
 
 On a phone, a fixed helm stays below the scene. Hold Port/Starboard or Rise/Dive to change requested orders; use the vertical speed slider for ahead/astern. Its thumb marks the request and its light tick marks actual speed. Tap a numeric readout for an exact order. Actual and requested heading/depth stay visible as the vehicle responds. Mission, Contacts and Sub open compact sheets; tap outside to close. Boat includes propulsion, silent running, repair, resources and the ROV bay. Sonar has an Active Ping action. Scope, ROV, gun and chart actions sit directly below their scene. Use ALIGN to center the scope or turn the sub to its sight bearing, and +/− for magnification. The surface binoculars reach 12×; the scope reaches 24×. The helm supports simultaneous fingers and cancels held input on release, interruption, pause or rotation. Hardware iPhone/Safari validation remains playtesting work.
 
-On a phone, drag the live ROV feed sideways to turn. Drag up to rise or down to dive. The camera tilts with the climb or dive, and the wide speed slider sets ahead or astern independently.
+On a phone, swipe the live ROV feed to aim the nose at the subject. The ROV holds that angle while hovering. Apply forward or reverse thrust to travel along the nose angle.
 
 The ROV cable runs from the submarine’s side hatch to the ROV chassis and moves with the water. Recall follows a deterministic clearance lane to an underwater docking point, including when the submarine is surfaced. Hull collisions remain active. A status strip shows deployment and range outside the ROV station; it flashes if the sub outruns the drone's damage-dependent top speed. Slow to three knots or less for pickup. Both the surfaced indication and gun availability use the same one-meter threshold, independent of individual wave crests.
 

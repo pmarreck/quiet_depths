@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three.module.js';
 import {createGame,step,deployDrone,save,restore,bearing} from '../src/sim.js';
 import {relativeBearing,scopeBearing,feedActive,setHelmOrder,applyHelmKeys,steerDrone,droneCameraPitch,cameraEuler,chartTransform,chartWorldAt,panChart,zoomChart} from '../src/controls.js';
+import {actionForKey,shortcutBindings,shortcutConflict} from '../src/shortcuts.js';
 const live={view:'scope',paused:false,modal:false};
 test('submarine keyboard orders change requests, never teleport actual controls',()=>{
  const s=createGame(),before={heading:s.heading,depth:s.depth,speed:s.speed};
@@ -22,7 +23,7 @@ test('space requests shallower water; C requests deeper; limits hold',()=>{
 test('inactive optics and drone cannot provide feeds; drone helm cannot change the sub',()=>{
  const s=createGame();s.scope=false;assert.equal(feedActive(s,'scope'),false);s.scope=true;s.depth=30;assert.equal(feedActive(s,'scope'),false);assert.equal(feedActive(s,'drone'),false);
  const ctx={...live,view:'drone'};assert.equal(setHelmOrder(s,ctx,'heading',90),false);s.speed=s.targetSpeed=0;assert.ok(deployDrone(s));assert.equal(feedActive(s,'drone'),true);
- const h=s.heading,v=s.speed,d=s.depth;applyHelmKeys(s,ctx,new Set(['KeyW','KeyD','KeyC']),.2);assert.equal(s.heading,h);assert.equal(s.speed,v);assert.equal(s.depth,d);assert.ok(s.drone.targetSpeed>0);assert.notEqual(s.drone.targetHeading,s.drone.heading);assert.ok(s.drone.targetDepth>s.drone.depth);
+ const h=s.heading,v=s.speed,d=s.depth;applyHelmKeys(s,ctx,new Set(['rovPitchDown','rovRight','rovFaster']),.2);assert.equal(s.heading,h);assert.equal(s.speed,v);assert.equal(s.depth,d);assert.ok(s.drone.targetSpeed>0);assert.notEqual(s.drone.targetHeading,s.drone.heading);assert.ok(s.drone.nosePitch<0);
  const heading=s.drone.heading;step(s,.25);assert.ok(Math.abs(relativeBearing(s.drone.heading,heading))<=3.01);assert.notEqual(s.drone.speed,s.drone.targetSpeed);
 });
 test('dragging the ROV feed steers only the ROV and keeps its separate speed order',()=>{
@@ -35,14 +36,15 @@ test('dragging the ROV feed steers only the ROV and keeps its separate speed ord
  assert.equal(setHelmOrder(s,context,'speed',2.5),true);
  steerDrone(s,context,50,40);
  assert.ok(d.targetHeading<90,'a right drag turns starboard through north');
- assert.ok(d.targetDepth>startDepth,'a down drag requests a dive');
+ assert.ok(d.nosePitch<0,'a down drag pitches the nose toward the seabed');
  assert.deepEqual([d.heading,d.depth,d.speed],[358,startDepth,0]);
  assert.equal(d.targetSpeed,2.5);
  steerDrone(s,context,-50,-40);
  assert.ok(Math.abs(d.targetHeading-358)<1e-9);
  assert.ok(Math.abs(d.targetDepth-startDepth)<1e-9);
+ assert.ok(Math.abs(d.nosePitch)<1e-9);
  steerDrone(s,context,0,-99999);
- assert.equal(d.targetDepth,0);
+ assert.equal(d.nosePitch,60);
  assert.deepEqual([s.targetHeading,s.targetDepth,s.targetSpeed],boatOrders);
  for(const blocked of [live,{...context,paused:true},{...context,modal:true}]){
   const before=save(s);
@@ -53,6 +55,35 @@ test('dragging the ROV feed steers only the ROV and keeps its separate speed ord
  const before=save(s);
  steerDrone(s,context,40,40);
  assert.equal(save(s),before);
+});
+test('ROV keyboard and swipes use the same inversion, hover attitude, thrust and all-stop',()=>{
+ for(const inverted of [false,true]){
+  const s=createGame('survey',47);s.speed=s.targetSpeed=0;assert.ok(deployDrone(s));
+  const d=s.drone,ctx={...live,view:'drone',invertRovPitch:inverted},keys=shortcutBindings();
+  const press=(...codes)=>applyHelmKeys(s,ctx,new Set(codes.map(code=>actionForKey(keys,code,'drone'))),.5);
+  const depth=d.depth,heading=d.heading,subOrders=[s.targetDepth,s.targetHeading,s.targetSpeed];
+  press('KeyW','KeyA');const up=d.nosePitch;assert.ok(inverted?up<0:up>0);assert.equal(d.targetHeading,(heading+350)%360);
+  press('KeyS','KeyD');assert.ok(Math.abs(d.nosePitch)<1e-8);assert.ok(Math.abs(d.targetHeading-heading)<1e-8);
+  steerDrone(s,ctx,0,-60);assert.ok(Math.abs(d.nosePitch-up)<1e-8);
+  step(s,.5);assert.equal(d.depth,depth);assert.equal(d.speed,0);
+  press('ArrowUp');step(s,2);assert.ok(inverted?d.depth>depth:d.depth<depth);
+  press('Space','ArrowUp');assert.equal(d.targetSpeed,0);assert.equal(d.targetHeading,d.heading);assert.equal(d.targetDepth,d.depth);assert.equal(d.nosePitch,up);
+  step(s,3);assert.equal(d.speed,0);press('ArrowDown');assert.ok(d.targetSpeed<0);
+  assert.deepEqual([s.targetDepth,s.targetHeading,s.targetSpeed],subOrders);
+  assert.equal(restore(save(s)).drone.nosePitch,up);
+  const old=JSON.parse(save(s));delete old.drone.nosePitch;assert.equal(restore(JSON.stringify(old)).drone.nosePitch,null);
+ }
+});
+test('ROV shortcuts can be remapped independently and legacy shared choices survive',()=>{
+ const base=shortcutBindings(),custom=shortcutBindings({...base,rovPitchUp:'KeyI',rovLeft:'KeyQ'});
+ assert.equal(actionForKey(custom,'KeyW','scope'),'KeyW');assert.equal(actionForKey(custom,'KeyW','drone'),undefined);
+ assert.equal(actionForKey(custom,'KeyI','drone'),'rovPitchUp');assert.equal(actionForKey(custom,'KeyQ','drone'),'rovLeft');
+ assert.equal(shortcutConflict(base,'rovFaster','KeyC'),undefined);
+ assert.equal(shortcutConflict(base,'rovFaster','KeyF'),'KeyF');
+ const migrated=shortcutBindings({KeyF:'ArrowUp',KeyW:'KeyI'});
+ for(const view of ['scope','drone'])assert.equal(actionForKey(migrated,'ArrowUp',view),'KeyF');
+ assert.equal(actionForKey(migrated,'KeyI','scope'),'KeyW');assert.equal(actionForKey(migrated,migrated.rovFaster,'drone'),'rovFaster');
+ assert.deepEqual(shortcutBindings(migrated),migrated);
 });
 test('the ROV feed tilts in the direction of vertical movement and levels out when stopped',()=>{
  const level=droneCameraPitch(0);

@@ -1,6 +1,8 @@
 import {operatingFraction} from './equipment.js';
 import {clamp,rad} from './sim.js';
 import {isSurfaced} from './vehicle-status.js';
+import {changeNosePitch} from './rov-flight.js';
+export {droneCameraPitch} from './rov-flight.js';
 
 export const wrapHeading=n=>((n%360)+360)%360;
 export const throttleDetent=knots=>Math.abs(knots)<=.5?0:knots;
@@ -17,7 +19,7 @@ export function setHelmOrder(s,context,axis,value){
  if(drone&&v.mode!=='remote')return false;
  switch(axis){
   case 'heading':v.targetHeading=wrapHeading(value);if(!drone){s.route=null;s.scopeSteerBearing=null;}break;
-  case 'depth':v.targetDepth=clamp(value,0,280);break;
+  case 'depth':v.targetDepth=clamp(value,0,280);if(drone)v.nosePitch=null;break;
   case 'speed':v.targetSpeed=clamp(value,drone?-3:-4,drone?10:17);if(!drone&&v.targetSpeed>3)s.silent=false;break;
   default:return false;
  }
@@ -36,7 +38,19 @@ export function nudgeHelm(s,context,degrees){
 
 export function applyHelmKeys(s,context,keys,dt){
  if(!canIssue(s,context))return;
- const v=helmFor(s,context.view),speed=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0),turn=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),depth=(keys.has('KeyC')?1:0)-(keys.has('Space')?1:0);
+ const drone=context.view==='drone',v=helmFor(s,context.view);
+ if(drone){
+  if(v.mode!=='remote')return;
+  if(keys.has('rovStop')){
+   v.targetSpeed=0;v.targetHeading=v.heading;v.targetDepth=v.depth;
+   return;
+  }
+  const pitch=Number(keys.has('rovPitchUp'))-Number(keys.has('rovPitchDown'));
+  if(pitch)changeNosePitch(v,pitch*30*dt,context.invertRovPitch);
+ }
+ const speed=Number(keys.has(drone?'rovFaster':'KeyW'))-Number(keys.has(drone?'rovSlower':'KeyS'));
+ const turn=Number(keys.has('KeyD')||drone&&keys.has('rovRight'))-Number(keys.has('KeyA')||drone&&keys.has('rovLeft'));
+ const depth=Number(keys.has('KeyC'))-Number(keys.has('Space'));
  // Orders change at a real-time rate. Time compression accelerates the vehicle,
  // not the keyboard. The simulation alone advances actual controls.
  if(speed)setHelmOrder(s,context,'speed',v.targetSpeed+speed*2*dt);
@@ -45,13 +59,12 @@ export function applyHelmKeys(s,context,keys,dt){
 }
 
 export function steerDrone(s,context,dx,dy){
- if(context.view!=='drone')return;
+ if(context.view!=='drone'||!canIssue(s,context)||s.drone.mode!=='remote')return;
  const d=s.drone;
  if(dx)setHelmOrder(s,context,'heading',d.targetHeading+dx*.4);
- if(dy)setHelmOrder(s,context,'depth',d.targetDepth+dy*.12);
+ if(dy)changeNosePitch(d,-dy*.25,context.invertRovPitch);
 }
 
-export const droneCameraPitch=verticalSpeed=>-rad(18)*clamp(verticalSpeed,-1,1);
 // Look along the boat from its stern quarter, below the waterline even at periscope depth.
 export const initialOrbit=boat=>({yaw:rad(boat.heading+146),pitch:-.08,distance:72});
 // Keep at least 56 degrees of the scene in view on both axes.

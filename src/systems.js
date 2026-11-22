@@ -12,7 +12,7 @@ export const DRONE_LIMITS=Object.freeze({deploySpeed:3,depth:280,range:100,speed
 export {SYSTEM_NAMES} from './equipment.js';
 export const freshSystems=()=>fullCondition(SYSTEM_KEYS);
 export const freshMotion=()=>({plantVersion:1,fuelLeak:0,fuelFire:0,cookoff:false,outerHull:100,pressureAlarm:0,criticalExposure:0,imploded:false,collisionHits:{},verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
-export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:'',returnStage:0,returnClearance:8,returnHoldSide:18,returnHoldForward:0});
+export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,nosePitch:null,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:'',returnStage:0,returnClearance:8,returnHoldSide:18,returnHoldForward:0});
 export function droneDeployReason(s){
  if(s.difficulty?.drone===false)return 'The ROV is disabled for this patrol.';
  const d=s.drone;if(d.mode==='lost')return d.lostReason||'Drone lost for this patrol.';
@@ -26,12 +26,12 @@ export function droneDeployReason(s){
 export function deployDrone(s){
  if(s.status!=='patrol'||droneDeployReason(s))return false;
  const a=rad(s.heading),x=s.x+Math.cos(a)*18,y=s.y-Math.sin(a)*18,depth=Math.min(DRONE_LIMITS.depth,s.depth+3),heading=bearing({x,y},s);
- Object.assign(s.drone,{mode:'remote',x,y,depth,targetDepth:depth,heading,targetHeading:heading,speed:0,targetSpeed:0,verticalSpeed:0,collisionCooldown:0});
+ Object.assign(s.drone,{mode:'remote',nosePitch:null,x,y,depth,targetDepth:depth,heading,targetHeading:heading,speed:0,targetSpeed:0,verticalSpeed:0,collisionCooldown:0});
  log(s,'Inspection drone deployed. Stay within 100 m; slow the sub for recovery.');return true;
 }
 export function recallDrone(s){if(s.drone.mode==='remote'){
  const d=s.drone,p=boatLocal(s,d),below=s.depth+8<Math.min(279,bottom(s.x,s.y)-1);
- Object.assign(d,{mode:'return',returnStage:p.side>=9&&Math.abs(p.forward)<24?3:0,returnClearance:below?8:s.depth>10?-8:8,returnHoldSide:p.side,returnHoldForward:p.forward});
+ Object.assign(d,{mode:'return',nosePitch:null,returnStage:p.side>=9&&Math.abs(p.forward)<24?3:0,returnClearance:below?8:s.depth>10?-8:8,returnHoldSide:p.side,returnHoldForward:p.forward});
  log(s,'Drone returning by the clearance lane to the starboard recovery hatch.');
 }}
 
@@ -196,14 +196,18 @@ export function updateDrone(s,dt,diesel){
  const order=clamp(d.targetSpeed,-3*mobility,max),change=dt*(order!==0&&Math.sign(order)===Math.sign(order-d.speed)?mobility:1);
  d.speed+=clamp(order-d.speed,-change,change);
  d.heading=(d.heading+clamp(delta(d.targetHeading,d.heading),-dt*12*mobility,dt*12*mobility)+360)%360;
- const desired=clamp((d.targetDepth-d.depth)*.8,-1,1)*operatingFraction(d.buoyancy)+(100-d.buoyancy)*.003;
+ const pitch=d.nosePitch===null?0:rad(d.nosePitch),forward=d.speed*.514444*Math.cos(pitch);
+ const flying=d.mode==='remote'&&d.nosePitch!==null&&d.targetSpeed!==0;
+ const vertical=flying?-d.speed*.514444*Math.sin(pitch):clamp((d.targetDepth-d.depth)*.8,-1,1);
+ const desired=vertical*operatingFraction(d.buoyancy)+(100-d.buoyancy)*.003;
  d.verticalSpeed+=clamp(desired-d.verticalSpeed,-dt*.6,dt*.6);d.depth=clamp(d.depth+d.verticalSpeed*dt,0,280);
- d.x+=Math.sin(rad(d.heading))*d.speed*.514444*dt;d.y+=Math.cos(rad(d.heading))*d.speed*.514444*dt;
+ if(flying)d.targetDepth=d.depth;
+ d.x+=Math.sin(rad(d.heading))*forward*dt;d.y+=Math.cos(rad(d.heading))*forward*dt;
  const objects=[{body:s,half:27.5,radius:5,own:true},...s.ships.filter(v=>v.hull>0).map(v=>({body:{...v,depth:v.depth||3},half:v.kind==='carrier'?carrierSize.halfLength-carrierSize.halfBeam:v.kind==='sub'?27.5:v.kind==='fishing'?19:45,radius:v.kind==='carrier'?carrierSize.halfBeam:v.kind==='sub'?5:v.kind==='fishing'?5:9}))];
  if(s.site)objects.push({body:s.site,half:s.site.kind==='surface'?19:27.5,radius:5});
  for(const object of objects){const hit=capsuleContact(d,object.body,object.half,object.radius);if(!hit)continue;
   d.x+=hit.nx*(hit.penetration+.001);d.y+=hit.ny*(hit.penetration+.001);d.depth=clamp(d.depth+hit.nd*(hit.penetration+.001),0,280);
-  const closing=-(Math.sin(rad(d.heading))*d.speed*.514444-Math.sin(rad(object.body.heading))*(object.body.speed||0)*.514444)*hit.nx-(Math.cos(rad(d.heading))*d.speed*.514444-Math.cos(rad(object.body.heading))*(object.body.speed||0)*.514444)*hit.ny-d.verticalSpeed*hit.nd;
+  const closing=-(Math.sin(rad(d.heading))*forward-Math.sin(rad(object.body.heading))*(object.body.speed||0)*.514444)*hit.nx-(Math.cos(rad(d.heading))*forward-Math.cos(rad(object.body.heading))*(object.body.speed||0)*.514444)*hit.ny-d.verticalSpeed*hit.nd;
   if(closing>.3&&d.collisionCooldown<=0){const damage=clamp(3+closing*closing*1.4,3,60);damageDrone(s,damage,object.own?'pressure hull':'vessel / wreck');if(object.own){replayEvent(s,{kind:'collision',point:{x:d.x,y:d.y,depth:d.depth}});hurt(s,damage*.07,'Drone struck our hull. Minor plating damage.');}d.collisionCooldown=2;}
   d.speed*=.15;d.verticalSpeed*=.2;
  }
