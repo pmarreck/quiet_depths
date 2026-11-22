@@ -1,3 +1,4 @@
+import {operatingFraction} from './equipment.js';
 import {recordCivilianHit,report} from './patrol-reports.js';
 import {floorSurface} from './seafloor.js';
 // Fictional combat tuning. Positions are meters; gun aim is compass/elevation.
@@ -77,8 +78,8 @@ export function restoreTorpedo(s,p){
   Array.isArray(p.path)&&p.path.every(v=>['x','y','depth','time'].every(k=>Number.isFinite(v[k])));
 }
 export function fireDeckGun(s,aim){
- if(s.status!=='patrol'||!isSurfaced(s)||s.gun.ammo<=0||s.gun.cooldown>0||(s.systems.deckgun??100)<=10||!Number.isFinite(aim.bearing)||!Number.isFinite(aim.elevation))return false;
- s.gun.ammo--;s.gun.shots++;s.gun.cooldown=.25;
+ if(s.status!=='patrol'||!isSurfaced(s)||s.gun.ammo<=0||s.gun.cooldown>0||!operatingFraction(s.systems.deckgun)||!Number.isFinite(aim.bearing)||!Number.isFinite(aim.elevation))return false;
+ s.gun.ammo--;s.gun.shots++;s.gun.cooldown=.25/operatingFraction(s.systems.deckgun);
  const a=rad(s.heading),b=rad(aim.bearing),e=rad(clamp(aim.elevation,-15,85)),speed=600;
  s.gunRounds.push({id:s.weaponSequence++,owner:'player',x:s.x+Math.sin(a)*16,y:s.y+Math.cos(a)*16,altitude:6-s.depth,vx:Math.sin(b)*Math.cos(e)*speed,vy:Math.cos(b)*Math.cos(e)*speed,vz:Math.sin(e)*speed,age:0,tracer:s.gun.shots%5===0});
  emitSound(s,{type:'gunfire',x:s.x,y:s.y,altitude:6,power:.6});s.gunLoudUntil=s.time+3;s.alert=clamp(s.alert+8,0,100);

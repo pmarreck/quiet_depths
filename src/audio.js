@@ -1,3 +1,4 @@
+import {operatingFraction} from './equipment.js';
 import {environmentAt} from './environment.js';
 import {engineSound,aircraftSound,perceivedSound} from './acoustics.js';
 import {CrewAmbience} from './crew-ambience.js';
@@ -69,7 +70,9 @@ export class SoundSystem{
   this.alarmLevel=level;
   this.sea.filter.frequency.setTargetAtTime(120+e.wind*6,t,.5);this.sea.gain.gain.setTargetAtTime(running?(.03+e.waveScale*.035)*wet:0,t,.3);
   this.rain.filter.frequency.setTargetAtTime(s.depth>2?330:2400,t,.3);this.rain.gain.gain.setTargetAtTime(running?e.rain*.11*wet:0,t,.3);
-  this.own.frequency.setTargetAtTime(ownFrequency(s),t,.4);this.ownGain.gain.setTargetAtTime(running?(s.engine==='diesel'?.1:.03):0,t,.25);
+  const powered=s.engine==='diesel'?s.depth<=14&&s.fuel>0:s.battery>0;
+  const motorGain=(s.engine==='diesel'?.1:.03)*operatingFraction(s.systems.engine);
+  this.own.frequency.setTargetAtTime(ownFrequency(s),t,.4);this.ownGain.gain.setTargetAtTime(running&&powered?motorGain:0,t,.25);
   let audible=0;
   const liveVoices=new Set();for(const ship of [...s.ships,...s.aircraft]){liveVoices.add(ship.id);const p=ship.altitude!==undefined?aircraftSound(ship,s):engineSound(ship,s);let voice=this.voices.get(ship.id);if(!voice){voice=this.makeVoice(ship,p);this.voices.set(ship.id,voice);}const target=running?p.gain:0;if(target>.001)audible++;
    voice.gain.gain.setTargetAtTime(target,t,.2);voice.pulseGain.gain.setTargetAtTime(target*.18,t,.2);voice.osc.frequency.setTargetAtTime(p.frequency,t,.3);voice.pulse.frequency.setTargetAtTime(p.bladeRate,t,.3);voice.filter.frequency.setTargetAtTime(p.cutoff,t,.25);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.15);

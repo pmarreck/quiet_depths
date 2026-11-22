@@ -1,3 +1,4 @@
+import {damagePart} from './equipment.js';
 import {clamp,log,rand} from './mechanics.js';
 import {addDebrief} from './debrief.js';
 
@@ -18,10 +19,10 @@ export function updatePressure(s,dt){
  const excess=s.depth/depthLimit(s)-1;
  if(rand(s)<-Math.expm1(-dt*(.012+.075*excess))){
   s.flood=clamp(s.flood+.8+rand(s)*1.8,0,25);
-  s.hull=Math.max(0,s.hull-.4);log(s,'Pressure seam leaking. Assign damage control to seal it and pump the bilge.','damage');
+  damagePart(s,s.repairLimits,'hull',.4);log(s,'Pressure seam leaking. Assign damage control to seal it and pump the bilge.','damage');
  }
  if(level===2&&s.criticalExposure>20&&rand(s)<-Math.expm1(-dt*(excess-.12)*.035)){
-  s.hull=0;s.status='lost';s.imploded=true;s.shock=2;
+  damagePart(s,s.repairLimits,'hull',100);s.status='lost';s.imploded=true;s.shock=2;
   const text='Pressure hull imploded beyond the damaged boat’s depth tolerance.';
   log(s,text,'damage');addDebrief(s,text);
  }

@@ -1,3 +1,4 @@
+import {operatingFraction} from './equipment.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanics.js';
 import {hash01,TIMES} from './environment.js';
 import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-objective.js';
@@ -69,7 +70,9 @@ export function casualtyDeadline(s){
 export function dronePhotograph(s){
  const d=s.drone,o=s.operation,site=s.site;
  if(s.mission!=='survey'||!o||!['remote','return'].includes(d.mode)||s.photoCooldown>0)return {ok:false,text:'No survey camera task available.'};
- if(separation(d,site)>85||separation(d,site)<8||Math.abs(delta(bearing(d,site),d.heading))>32)return {ok:false,text:'Aim at the wreck within 85 m. Inspect from above or beside it.'};
+ const reach=85*operatingFraction(d.camera);
+ if(!reach)return {ok:false,text:'ROV camera offline.'};
+ if(separation(d,site)>reach||separation(d,site)<8||Math.abs(delta(bearing(d,site),d.heading))>32)return {ok:false,text:`Aim at the wreck within ${Math.floor(reach)} m. Inspect from above or beside it.`};
  const angle=bearing(site,d);
  if(o.photoAngles.some(a=>Math.abs(delta(angle,a))<55))return {ok:false,text:'This side is already recorded. Move around the wreck for another angle.'};
  o.photoAngles.push(angle);s.photoCooldown=4;log(s,`Wreck photograph ${o.photoAngles.length}/3 recorded.`,'success');return {ok:true,text:`Survey image ${o.photoAngles.length}/3 recorded.`};
@@ -78,8 +81,8 @@ export function updateOperation(s,dt){
  const o=s.operation;if(!o||o.completed)return false;
  const c=operationConditions(s);o.holding=c.holding;
  if(s.mission==='survey'){
-  const scan=c.range<100&&Math.abs(s.depth-s.site.depth)<32&&Math.abs(s.speed)>=.5&&Math.abs(s.speed)<=3&&s.systems.sonar>25;
-  o.active=scan;if(scan)o.scan=Math.min(45,o.scan+dt);
+  const scan=c.range<100&&Math.abs(s.depth-s.site.depth)<32&&Math.abs(s.speed)>=.5&&Math.abs(s.speed)<=3&&operatingFraction(s.systems.sonar)>0;
+  o.active=scan;if(scan)o.scan=Math.min(45,o.scan+dt*operatingFraction(s.systems.sonar));
   if(o.scan>=45||o.photoAngles.length>=3){o.completed=true;const finds=['A brass ship’s bell, engraved ASTER · 1912. A museum will want her story.','A sealed navigation journal and ceramic cargo. The archaeology team is delighted.','Silver trade coins in a broken strongbox. Treasure, with a provenance worth preserving.'];o.find=finds[Math.floor(hash01(s.environment.seed,819)*finds.length)];log(s,o.find,'success');}
  }else{
   if(c.holding){o.active=true;o.assessment+=dt;

@@ -129,10 +129,9 @@ test('manual control still collides with the boat instead of inheriting return i
 test('condition-aware global ROV status uses three-dimensional range and available closing speed',async()=>{
  const {droneStatus}=await import('../src/vehicle-status.js');
  assert.equal(typeof droneStatus,'function');
- for(const mode of ['remote','return'])for(const mobility of [0,10,50,100]){
+ for(const mode of ['remote','return'])for(const [mobility,expectedSpeed] of [[0,0],[10,0],[19.99,0],[20,2],[50,5],[100,10]]){
   const s=launch(ocean({depth:80}),'port');
   Object.assign(s.drone,{mode,mobility,x:s.x+30,y:s.y+40,depth:s.depth+12});
-  const expectedSpeed=10*(.15+.85*mobility/100);
   for(const speed of [-10,-3,0,3,expectedSpeed,expectedSpeed+.01]){
    s.speed=s.targetSpeed=speed;
    const snapshot=structuredClone(s),status=droneStatus(s);

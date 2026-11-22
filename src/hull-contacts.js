@@ -1,3 +1,4 @@
+import {damagePart} from './equipment.js';
 import {recordCivilianHit} from './patrol-reports.js';
 import {bottom,clamp,distance,rad,log} from './mechanics.js';
 import {boatPoint} from './vehicle-status.js';
@@ -98,7 +99,7 @@ export function resolveTraffic(s,hurt){
  for(let i=0;i<ships.length;i++){
   const ship=ships[i];
   if(ship.kind!=='sub'&&s.scope&&s.depth<=15&&distance(s,ship)<48&&s.systems.periscope>0){
-   s.systems.periscope=0;s.scope=false;log(s,'Periscope sheared away under a vessel.','damage');
+   damagePart(s.systems,s.repairLimits,'periscope',100);s.scope=false;log(s,'Periscope sheared away under a vessel.','damage');
   }
   resolvePair(s,s,ship,hurt);
   if(s.site)resolvePair(s,ship,s.site,hurt);

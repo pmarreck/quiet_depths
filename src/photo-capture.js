@@ -1,3 +1,5 @@
+import {lensFilter} from './instrument-damage.js';
+import {operatingFraction} from './equipment.js';
 import {WEATHER,surfaceHeight} from './environment.js';
 
 const MAX_SIDE=640,MAX_CHARACTERS=300000;
@@ -44,9 +46,23 @@ function finish(canvas,context,{seed=1972,grayscale=.32,stamp=''}={}){
  if(stamp){context.font='10px ui-monospace,monospace';context.fillStyle='rgba(12,15,13,.76)';context.fillRect(4,canvas.height-20,Math.min(canvas.width-8,stamp.length*6.2+12),15);context.fillStyle='#deded2';context.fillText(stamp,9,canvas.height-9);}
  return encode(canvas);
 }
-export function captureOptics(o){
+export function captureOptics(o,health=100){
+ if(!operatingFraction(health))return null;
  if(!available(o))return null;const source=o.canvas||o.renderer.domElement,size=captureSize(source?.width,source?.height);if(!size)return null;
- const {canvas,context}=canvas2d(size.width,size.height);context.drawImage(source,0,0,size.width,size.height);return finish(canvas,context,{seed:source.width*31+source.height});
+ const {canvas,context}=canvas2d(size.width,size.height);
+ if(health<100&&!('filter' in context)){
+  // Older WebKit canvases lack filter. Re-enlarge a reduced exposure to
+  // retain the soft detail of the live lens in the archived photograph.
+  const scale=1/(1+(100-health)*.09);
+  const reduced=canvas2d(Math.max(1,Math.round(size.width*scale)),Math.max(1,Math.round(size.height*scale)));
+  reduced.context.drawImage(source,0,0,reduced.canvas.width,reduced.canvas.height);
+  context.drawImage(reduced.canvas,0,0,size.width,size.height);
+ }else{
+  context.filter=lensFilter(health)||'none';
+  context.drawImage(source,0,0,size.width,size.height);
+  context.filter='none';
+ }
+ return finish(canvas,context,{seed:source.width*31+source.height});
 }
 function photoEnvironment(plan){
  const preset=WEATHER[plan.weather.id]||WEATHER.clear,daylight=finite(plan.weather.daylight)?plan.weather.daylight:plan.night?0:1,hour=finite(plan.weather.hour)?plan.weather.hour:plan.night?22:12,angle=(hour-6)*Math.PI/12;

@@ -143,3 +143,23 @@ test('rudder needs flow, and changing ballast can surface the stopped boat witho
  for(const s of [slow,fast]){s.targetDepth=100;step(s,12);}
  assert.ok(fast.depth>slow.depth&&fast.pitch<slow.pitch&&slow.pitch<0);
 });
+
+test('each separate hit compounds only its repair ceiling and damage control never revives destroyed equipment',()=>{
+ const s=createGame();s.ships=[];s.speed=s.targetSpeed=0;
+ damageSystem(s,'sonar',2);assert.equal(s.systems.sonar,98);
+ assert.equal(s.repairLimits?.sonar,85);assert.equal(s.repairLimits.engine,100);
+ s.repair=120;step(s,1);assert.equal(s.systems.sonar,98,'repairs cannot lower surviving condition');
+ damageSystem(s,'sonar',27);assert.equal(s.repairLimits.sonar,72.25);
+ damageSystem(s,'sonar',0);assert.equal(s.repairLimits.sonar,72.25);
+ const resumed=restore(save(s));resumed.repair=120;step(resumed,60);assert.equal(resumed.systems.sonar,72.25);
+ damageSystem(resumed,'rudder',100);resumed.repair=120;step(resumed,60);
+ assert.equal(resumed.systems.rudder,0);assert.equal(resumed.repairLimits.rudder,0);
+});
+
+test('a flooded but intact periscope can be repaired through the 20 percent boundary',()=>{
+ const s=createGame();s.ships=[];s.speed=s.targetSpeed=0;
+ damageSystem(s,'periscope',81);
+ assert.equal(s.systems.periscope,19);assert.equal(feedActive(s,'scope'),false);
+ s.repair=120;step(s,12);assert.ok(s.systems.periscope>=20);s.scope=true;
+ assert.ok(feedActive(s,'scope'));
+});

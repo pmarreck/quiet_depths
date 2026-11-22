@@ -1,3 +1,4 @@
+import {fullCondition,BOAT_PARTS,DRONE_PARTS,readLimits,operatingFraction} from './equipment.js';
 import {report,hearWreck} from './patrol-reports.js';
 import {resolveTraffic} from './hull-contacts.js';
 // Units: meters, seconds, knots, degrees clockwise from north. No rendering here.
@@ -23,12 +24,12 @@ export function createGame(mission='recon',seed=19830604,options={}){
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
  {id:'tern',name:'Tern',kind:'fishing',military:false,x:-850,y:1350,heading:110,speed:3,hull:100,alert:0,attack:0},
  {id:'echo',name:'Unknown submarine',kind:'sub',military:true,x:3800,y:900,depth:75,heading:280,speed:4,hull:100,alert:0,attack:0}
- ]};s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
+ ]};s.repairLimits=fullCondition(BOAT_PARTS);s.drone.repairLimits=fullCondition(DRONE_PARTS);s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
 }
 export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y),v.depth,drone?.7:5+27.5*Math.abs(Math.sin(s.pitch)));}
 export function isVisible(s,ship,look=null,env=environmentAt(s)){
  if(ship.hull<=0||ship.kind==='sub'||s.depth>15||!s.scope)return false;
- return !scopeWashed(s,env)&&distance(s,ship)<env.opticalRange&&(look===null||Math.abs(delta(bearing(s,ship),look))<19);
+ return !scopeWashed(s,env)&&distance(s,ship)<env.opticalRange*operatingFraction(s.systems.periscope)&&(look===null||Math.abs(delta(bearing(s,ship),look))<19);
 }
 export function contact(s,ship,method){
  let c=s.contacts.find(c=>c.id===ship.id);
@@ -59,9 +60,9 @@ export function contact(s,ship,method){
  return c;
 }
 export function ping(s){
- if(s.pingCooldown>0||s.status!=='patrol'||s.systems.sonar<=25)return false;
+ if(s.pingCooldown>0||s.status!=='patrol'||!operatingFraction(s.systems.sonar))return false;
  s.pingAge=0;s.pingCooldown=15;
- for(const ship of s.ships)if(ship.hull>0&&distance(s,ship)<6000)contact(s,ship,'active');
+ for(const ship of s.ships)if(ship.hull>0&&distance(s,ship)<6000*operatingFraction(s.systems.sonar))contact(s,ship,'active');
  for(const ship of s.ships){
   if(!ship.military||ship.hull<=0||ship.disabled)continue;
   const chance=s.difficulty.pingDetection*clamp(1-distance(s,ship)/7500,0,1);
@@ -95,7 +96,7 @@ function patrolSweep(s,ship){
  if(ship.nextSweep===undefined||ship.disabled||s.time<ship.nextSweep)return;
  ship.nextSweep=s.time+28+rand(s)*45;
  const nearby=clamp(1-distance(ship,s)/4500,0,1);
- if(rand(s)<s.difficulty.pingDetection*nearby&&s.systems.sonar>25){
+ if(rand(s)<s.difficulty.pingDetection*nearby*operatingFraction(s.systems.sonar)){
   emitSound(s,{type:'sweep',x:ship.x,y:ship.y,depth:ship.depth??0,power:.85,vessel:ship.id});
  }
  if(rand(s)<.25*nearby*s.difficulty.detection){
@@ -104,7 +105,7 @@ function patrolSweep(s,ship){
 }
 function patrolReceipt(s,source){
  if(source.ownHit)report(s,'impact','Explosion heard. Possible torpedo hit.');
- if(source.type==='sweep'&&s.systems.sonar>25){
+ if(source.type==='sweep'&&operatingFraction(s.systems.sonar)>0){
   // The receiver gets the bearing to the emission, without a range or identity.
   const c=contact(s,{id:source.vessel,x:source.x,y:source.y},'passive');
   if(c.lastSweep!==undefined&&s.time-c.lastSweep<120){
@@ -117,7 +118,7 @@ function patrolReceipt(s,source){
  if(source.type==='collapse'||source.type==='settling'){
   if(source.type==='collapse')report(s,'collapse','Possible implosion heard');
   else report(s,'settling','Heavy breakup heard. Probable wreck.');
-  if(s.systems.sonar>25)hearWreck(s,source);
+  if(operatingFraction(s.systems.sonar)>0)hearWreck(s,source);
  }
 }
 function tick(s,dt,input){
@@ -140,7 +141,7 @@ function tick(s,dt,input){
  for(const ship of s.ships){
    if(ship.hull<=0)continue;
    const d=distance(s,ship);
-   if(s.systems.sonar>25&&(s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)*(1-env.storm*.25*Math.exp(-s.depth/80))*(.25+.75*s.systems.sonar/100)&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
+   if(operatingFraction(s.systems.sonar)>0&&(s.silent||s.speed<9)&&d<(ship.kind==='fishing'?2300:5600)*(1-env.storm*.25*Math.exp(-s.depth/80))*operatingFraction(s.systems.sonar)&&Math.floor(s.time/3)!==Math.floor((s.time-dt)/3))contact(s,ship,'passive');
    if(isVisible(s,ship,input.look??((s.heading+s.scopeAngle)%360),env))contact(s,ship,'visual');
    if(s.mission==='sneaky-seamen')patrolSweep(s,ship);
    if(ship.military&&!ship.disabled){
@@ -174,16 +175,19 @@ function tick(s,dt,input){
  updateDrone(s,dt,diesel);
  if(input.observation){
   const rov=input.observation==='drone',eye=rov?s.drone:s;
-  const optical=rov?s.drone.mode==='remote'&&s.drone.camera>25:input.observation==='scope'?s.scope&&s.depth<=15&&!scopeWashed(s,env):s.depth<=1;
+  const optical=rov?s.drone.mode==='remote'&&operatingFraction(s.drone.camera)>0:input.observation==='scope'?s.scope&&s.depth<=15&&operatingFraction(s.systems.periscope)>0&&!scopeWashed(s,env):s.depth<=1;
   if(optical)for(const v of s.ships){
    if(v.hull>0||v.wreckMark?.observed)continue;
    const depth=(v.kind==='sub'?v.depth:0)+(v.sinkDepth||0);
-   if((rov?Math.hypot(distance(eye,v),eye.depth-depth)<70:depth<5&&distance(s,v)<Math.min(1200,env.opticalRange))&&Math.abs(delta(bearing(eye,v),input.look??eye.heading))<25){
+   if((rov?Math.hypot(distance(eye,v),eye.depth-depth)<70*operatingFraction(s.drone.camera):depth<5&&distance(s,v)<Math.min(1200,env.opticalRange)*(input.observation==='scope'?operatingFraction(s.systems.periscope):1))&&Math.abs(delta(bearing(eye,v),input.look??eye.heading))<25){
     v.wreckMark={x:v.x,y:v.y,observed:true};report(s,'wreck','Wreck sighted. Position marked on chart.');
    }
   }
  }
- if(s.mission==='shadow'&&s.noise<27&&s.depth>15&&s.ships.some(c=>c.kind==='merchant'&&c.hull>0&&distance(s,c)<4000))s.trackTime+=dt;
+ if(s.mission==='shadow'&&s.noise<27&&s.depth>15){
+  const listeningRange=4000*operatingFraction(s.systems.sonar);
+  if(s.ships.some(c=>c.kind==='merchant'&&c.hull>0&&distance(s,c)<listeningRange))s.trackTime+=dt;
+ }
  const done=objectiveComplete(s,dt);
  if(s.mission==='sneaky-seamen'&&done&&s.status==='patrol'){s.status='won';log(s,'Gate B reached. Patrol corridor cleared.','success');}
  if(s.status==='patrol'&&done&&s.phase==='objective'){s.phase='extract';if(!['intercept','seek-and-destroy'].includes(s.mission))log(s,'Objective complete. Return to extraction and surface for pickup.','success');}
@@ -220,6 +224,9 @@ export function restore(raw){try{
  if(!['objective','extract'].includes(s.phase)||!['electric','diesel'].includes(s.engine)||!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y)||!s.drone||!['stowed','remote','return','lost'].includes(s.drone.mode))return null;
  if(!s.environment||!WEATHER[s.environment.startWeather]||!Number.isFinite(s.environment.startHour)||!Number.isFinite(s.environment.seed)||typeof s.environment.changing!=='boolean')return null;
  if(!s.systems||Object.keys(freshSystems()).some(k=>!Number.isFinite(s.systems[k])||s.systems[k]<0||s.systems[k]>100))return null;
+ s.repairLimits=readLimits(BOAT_PARTS,{...s.systems,hull:s.hull},s.repairLimits);
+ s.drone.repairLimits=readLimits(DRONE_PARTS,s.drone,s.drone.repairLimits);
+ if(!s.repairLimits||!s.drone.repairLimits)return null;
  if(!s.patrol||!['seed','photoGoal','trackGoal','variant'].every(k=>Number.isFinite(s.patrol[k]))||s.scopeSteerBearing!==null&&!Number.isFinite(s.scopeSteerBearing))return null;
  if(s.runSetting<100||s.runSetting>MAX_RUN||!s.reports.every(r=>r&&typeof r.id==='string'&&typeof r.text==='string'&&Number.isFinite(r.time)&&r.time<=s.time))return null;
  if(!s.gun||!['ammo','cooldown','shots','angle','elevation'].every(k=>Number.isFinite(s.gun[k])))return null;

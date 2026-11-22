@@ -80,5 +80,7 @@ test('engine oscillators start at the current pitch and smooth later speed chang
   assert.equal(propeller.frequency.targets.at(-1),changed.bladeRate);
   assert.equal(sound.ctx.oscillators[3].startFrequency,aircraftSound(plane,s).frequency);
   assert.equal(sound.ctx.oscillators[4].startFrequency,aircraftSound(plane,s).bladeRate);
+  s.systems.engine=50;sound.update();assert.equal(sound.ownGain.gain.targets.at(-1),.015);
+  s.systems.engine=19;sound.update();assert.equal(sound.ownGain.gain.targets.at(-1),0);
  }finally{if(descriptor)Object.defineProperty(globalThis,'window',descriptor);else delete globalThis.window;}
 });
