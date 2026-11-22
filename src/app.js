@@ -1,3 +1,4 @@
+import {torpedoTubes} from './torpedo-tubes.js';
 import {bindBriefingNavigation} from './briefing-navigation.js';
 import {ReplayRecorder,ReplayPlayback,replayLabels} from './instant-replay.js';
 import {seriousRepairs} from './red-alert.js';
@@ -30,6 +31,7 @@ import {difficultyPanel,patrolDifficulty} from './difficulty.js';
 import {allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
+const tubeLabels={port:$('tube-port'),starboard:$('tube-starboard')};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
@@ -259,7 +261,7 @@ bindCommand('repair','click',assignDamageControl);
 bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}},()=>state.decoys>0);
 $('run-limit').max=MAX_RUN;
 bindCommand('run-limit','input',e=>{state.runSetting=clamp(e.target.valueAsNumber,100,MAX_RUN);});
-bindCommand('fire','click',launchSelected,()=>!!state.contacts.find(c=>c.id===selected)&&state.torps>0&&state.depth<=100);
+bindCommand('fire','click',launchSelected,()=>!!state.contacts.find(c=>c.id===selected)&&torpedoTubes(state).next!==null&&state.depth<=100);
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
 bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');if(!compactLayout.matches)toast('Drone helm: W/S speed, A/D heading, Space/C depth.');}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
@@ -532,7 +534,13 @@ function updateUI(){
  const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.identified?(c.military?'MILITARY':'NEUTRAL'):c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED')+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
 
- $('torp-count').textContent=String(s.torps).padStart(2,'0');$('tubes').innerHTML=Array.from({length:6},(_,i)=>`<i class="${i>=s.torps?'spent':''}"></i>`).join('');
+ $('torp-count').textContent=s.torps+' ABOARD';
+ const tubes=torpedoTubes(s);
+ for(const [tube,status] of Object.entries(tubeLabels)){
+  const remaining=tubes[tube];
+  status.textContent=remaining===null?'Empty':remaining===0?'Ready':'Reload '+Math.ceil(remaining)+' s';
+  status.classList.toggle('ready',remaining===0);
+ }
  $('run-limit').value=s.runSetting;$('run-readout').textContent=(s.runSetting/1000).toFixed(2)+' km';
  const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(firingBearing(s,target))}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('torpedo-status').textContent=s.projectiles.filter(p=>p.owner==='player').map((p,i)=>`TORP ${i+1} · ${p.age<4?'ARMING':p.lock?'SONAR TRACK':'SEARCHING'} · ${deg(p.heading)}°`).join(' / ');$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='BOAT STOP';
  for(const id of ['battery','oxygen','fuel']){$(id+'-value').textContent=Math.round(s[id])+'%';$(id+'-bar').style.width=s[id]+'%';$(id+'-value').style.color=s[id]<20?'var(--red)':'';}
@@ -757,7 +765,7 @@ function renderSound(){
 function launchSelected(){
  const target=state.contacts.find(c=>c.id===selected);if(!target)return;
  if(state.depth>100){toast('Rise to 100 m or less to fire.');return;}if(target.identified&&!target.military){toast('Identified neutral. Firing is withheld.');return;}
- if(fire(state,selected)){sound.tone('fire');setRate(1);toast('Torpedo running. Its own sonar will arm and acquire a return.');closeDrawer();}
+ if(fire(state,selected)){sound.tone('fire');setRate(1);toast('Torpedo running. Its own sonar will arm and acquire a return.');}
 }
 function changeZoom(factor){if(!canIssue(state,context())||!feedActive(state,view))return;zoom=clamp(zoom*factor,1,opticalZoomLimit(view));zooms[view]=zoom;updateUI();}
 function responsiveTools(){

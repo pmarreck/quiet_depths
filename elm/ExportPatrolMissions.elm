@@ -47,7 +47,7 @@ encodeMission mission =
         , ( "minutes", E.string b.duration )
         , ( "desc", E.string b.description )
         , ( "short", E.string b.short )
-        , ( "torps", E.int 6 )
+        , ( "torps", E.int PatrolMission.startingTorpedoes )
         , ( "objective", encodeObjective b.objective )
         ]
 

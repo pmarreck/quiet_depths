@@ -29,3 +29,7 @@
 .weapon-instructions{font:14px/1.7 var(--sans);color:#a7bdb6}
 
 #scope-align-toggle{display:none}
+
+.tubes>span{flex:1;display:grid;gap:3px;border-left:2px solid var(--line);padding-left:7px;color:var(--muted);font:12px/1.35 var(--mono)}
+.tubes b{color:var(--cream);font-weight:500;font-variant-numeric:tabular-nums}
+.tubes b.ready{color:var(--green)}

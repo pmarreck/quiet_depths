@@ -1,3 +1,4 @@
+import {validTubeTimes} from './torpedo-tubes.js';
 import {replayEvent} from './instant-replay.js';
 import {gameEcho,observeTorpedo,validEcho,validTracks} from './torpedo-watch.js';
 import {fullCondition,BOAT_PARTS,DRONE_PARTS,readLimits,operatingFraction} from './equipment.js';
@@ -229,6 +230,7 @@ export function restore(raw){try{
  if(s.nextLightningAt===undefined)s.nextLightningAt=s.time+8;if(s.soundSequence===undefined)s.soundSequence=1;
  if(s.patrol===undefined)s.patrol={seed:s.environment.seed,photoGoal:2,trackGoal:180,variant:0};
  for(const [k,v] of Object.entries(freshCombat()))if(s[k]===undefined)s[k]=v;
+ if(!validTubeTimes(s.tubeReadyAt,s.time)||!Number.isInteger(s.torps)||s.torps<0)return null;
  if(s.outerHull===undefined)s.outerHull=s.hull;
  for(const [k,v] of Object.entries({...freshMotion(),towerAngle:0,towerPitch:0,cavitation:0,propRpm:0}))if(s[k]===undefined)s[k]=v;
  if(s.systems===undefined)s.systems=freshSystems();else if(s.systems&&s.systems.deckgun===undefined)s.systems.deckgun=100;if(s.shells===undefined)s.shells=[];

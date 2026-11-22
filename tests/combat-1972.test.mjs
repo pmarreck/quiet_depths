@@ -312,6 +312,7 @@ test('enemy submarine decoys are finite and a confirmed diversion prevents insta
  const supply=ocean();supply.ships=[vessel('hunter',0,175,{kind:'sub',depth:3})];
  supply.contacts=[{id:'hunter',bearing:0,kind:'sub',depthEstimate:3}];
  for(let i=0;i<3;i++){
+  supply.time=20*i;
   assert.ok(fire(supply,'hunter'));supply.projectiles.at(-1).age=4;
   supply.time+=.25;updateCombat(supply,.25);supply.projectiles=[];
   assert.equal(supply.ships[0].torpedoDecoys,Math.max(0,1-i));

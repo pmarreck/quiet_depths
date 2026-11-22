@@ -1,3 +1,4 @@
+import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes} from './torpedo-tubes.js';
 import {replayEvent} from './instant-replay.js';
 import {gameEcho} from './torpedo-watch.js';
 import {carrierId,carrierSize,advanceCarrierFlood,incidentalHull,registerCarrierHit} from './carrier.js';
@@ -16,7 +17,7 @@ import {SUB_DESIGN as D} from './hull-design.js';
 import {addDebrief} from './debrief.js';
 
 export const MAX_RUN=4320;
-export const freshCombat=()=>({runSetting:MAX_RUN,reports:[],gun:{ammo:240,cooldown:0,shots:0,angle:0,elevation:0},gunRounds:[],impacts:[],aircraft:[],airSupport:{status:'idle',requestedAt:null,launchAt:null,base:{x:-3200,y:3400},lastKnown:null},weaponSequence:1,gunLoudUntil:0});
+export const freshCombat=()=>({tubeReadyAt:freshTubeTimes(),runSetting:MAX_RUN,reports:[],gun:{ammo:240,cooldown:0,shots:0,angle:0,elevation:0},gunRounds:[],impacts:[],aircraft:[],airSupport:{status:'idle',requestedAt:null,launchAt:null,base:{x:-3200,y:3400},lastKnown:null},weaponSequence:1,gunLoudUntil:0});
 const wrap=n=>(n%360+360)%360;
 export const TORPEDO_SPEED=24;
 const TORPEDO_LIFE=180,ARMING_TIME=4,MAX_PITCH=Math.PI/4;
@@ -42,8 +43,11 @@ function putTorpedoInWater(s,owner,origin,heading,depth,launch){
 }
 export function launchTorpedo(s,id){
  const c=s.contacts.find(v=>v.id===id);
- if(!c||c.identified&&!c.military||s.torps<=0||s.status!=='patrol'||s.depth>100)return false;
- const tubeSide=s.torps%2?1:-1;
+ if(!c||c.identified&&!c.military||s.status!=='patrol'||s.depth>100)return false;
+ const tube=torpedoTubes(s).next;
+ if(tube===null)return false;
+ const tubeSide=tube==='port'?-1:1;
+ s.tubeReadyAt[tube]=s.time+RELOAD_SECONDS;
  s.torps--;s.alert=clamp(s.alert+20,0,100);
  const origin=boatPoint(boatSurfacePose(s),{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;

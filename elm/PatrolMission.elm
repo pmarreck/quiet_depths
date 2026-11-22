@@ -1,4 +1,9 @@
-module PatrolMission exposing (Briefing, Mission(..), Objective(..), all, briefing, fromId)
+module PatrolMission exposing (Briefing, Mission(..), Objective(..), all, briefing, fromId, startingTorpedoes)
+
+startingTorpedoes : Int
+startingTorpedoes =
+    6
+
 
 type Mission
     = Recon
@@ -84,7 +89,7 @@ briefing mission =
 
         Shadow ->
             Briefing "shadow" "Just passing through" "SURVEILLANCE" "8–12 MIN"
-                "Quietly track the convoy inside 4 km. Defensive torpedoes are aboard if the patrol turns hostile. Bring the traffic intelligence home."
+                "Quietly track the convoy inside 4 km. Bring the traffic intelligence home."
                 "Quietly track the convoy"
                 TrackQuietly
 
@@ -102,6 +107,6 @@ briefing mission =
 
         Survey ->
             Briefing "survey" "What the sea remembers" "WRECK SURVEY" "8–12 MIN"
-                "Survey an old wreck on the reef shelf. Collect 45 seconds of close sonar scanning, or photograph it from three different sides with your camera ROV. Defensive torpedoes are aboard. Stay within the 100 m cable."
+                "Survey an old wreck on the reef shelf. Collect 45 seconds of close sonar scanning, or photograph it from three different sides with your camera ROV. Stay within the 100 m cable."
                 "Scan the wreck or take 3 ROV photographs"
                 FinishOperation

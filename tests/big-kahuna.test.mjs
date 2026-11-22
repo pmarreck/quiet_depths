@@ -48,7 +48,7 @@ test('one direct hit never sinks Solstice, even with flooding, on every damage s
 });
 
 test('two hits sink the carrier over time, a third speeds it up, and pickup requires a live surfaced boat',()=>{
- const original=stage();shoot(original);until(original,()=>carrier(original).directHits===1,40);
+ const original=stage();shoot(original);until(original,()=>carrier(original).directHits===1&&original.time>=20,40);
  const two=restore(save(original)),three=restore(save(original));
  shoot(two);shoot(three,2);
  until(two,()=>carrier(two).directHits===2,40);until(three,()=>carrier(three).directHits===3,40);

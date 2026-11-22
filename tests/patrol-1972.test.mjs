@@ -67,9 +67,52 @@ test('cavitation pressure uses the radius of the rendered propeller',async()=>{
  assert.ok(Math.abs(p.sigma-expected)<1e-10);
 });
 
-test('every patrol carries defensive torpedoes, including survey and surveillance',()=>{
- for(const m of MISSIONS)assert.ok(createGame(m.id,19).torps>0,m.id);
+test('every mission starts with six torpedoes and two loaded bow tubes',()=>{
+ for(const m of MISSIONS){
+  const s=createGame(m.id,19),target=s.ships.find(v=>v.military);
+  contact(s,target,'active');
+  assert.equal(s.torps,6,m.id);
+  assert.ok(fire(s,target.id),m.id);assert.ok(fire(s,target.id),m.id);
+  assert.deepEqual(s.projectiles.map(p=>p.tubeSide),[-1,1]);
+  const before=save(s);
+  assert.equal(fire(s,target.id),false,m.id+' must wait for a reload');
+  assert.equal(save(s),before,'blocked launches cannot consume stock, move the timers, or emit events');
+ }
 });
+
+test('each tube reloads on its own patrol clock and retains its deadline in a save',()=>{
+ let s=createGame('survey',47);
+ const target=s.ships.find(v=>v.military);contact(s,target,'active');
+ assert.ok(fire(s,target.id));step(s,3);assert.ok(fire(s,target.id));
+ step(s,40,{paused:true});step(s,40,{modal:true});assert.equal(s.time,3);
+ s=restore(save(s));assert.ok(s);
+ step(s,16.75);assert.equal(fire(s,target.id),false);
+ step(s,.25);assert.ok(fire(s,target.id));assert.equal(s.projectiles.at(-1).tubeSide,-1);
+ assert.equal(fire(s,target.id),false);
+ step(s,2.75);assert.equal(fire(s,target.id),false);
+ step(s,.25);assert.ok(fire(s,target.id));assert.equal(s.projectiles.at(-1).tubeSide,1);
+ step(s,20);assert.ok(fire(s,target.id));assert.ok(fire(s,target.id));
+ step(s,20);assert.equal(s.torps,0);assert.equal(fire(s,target.id),false);
+});
+test('loaded tubes, the last spare and legacy saves all respect the remaining ammunition',async()=>{
+ const {torpedoTubes}=await import('../src/torpedo-tubes.js');
+ const s=createGame('undersea-rescue',18);
+ delete s.tubeReadyAt;
+ for(const remaining of [0,1,3,6]){
+  s.torps=remaining;const old=restore(save(s));assert.ok(old);
+  assert.equal(old.torps,remaining);
+  const tubes=torpedoTubes(old);
+  assert.equal([tubes.port,tubes.starboard].filter(t=>t===0).length,Math.min(2,remaining));
+ }
+ s.torps=1;s.time=13;s.tubeReadyAt={port:29,starboard:25};
+ const last=restore(save(s));assert.ok(last);
+ assert.deepEqual(torpedoTubes(last),{port:null,starboard:12,next:null});
+ step(last,12);assert.deepEqual(torpedoTubes(last),{port:null,starboard:0,next:'starboard'});
+ for(const malformed of [null,{},[0,0],{port:-1,starboard:0},{port:'20',starboard:0},{port:34,starboard:0}]){
+  assert.equal(restore(save({...s,tubeReadyAt:malformed})),null);
+ }
+});
+
 test('every mission gets reproducible but varied locations, traffic and extraction',()=>{
  for(const m of MISSIONS){const layouts=new Set();for(let seed=1;seed<=20;seed++){
   const s=createGame(m.id,seed),same=createGame(m.id,seed);assert.deepEqual(s,same);
