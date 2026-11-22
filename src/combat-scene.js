@@ -105,6 +105,15 @@ export class CombatScene{
    const age=s.time-p.time,torpedo=p.kind==='torpedo',surfaceBlast=torpedo&&p.altitude>-15;
    g.position.set(p.x,surfaceBlast?1:p.altitude,-p.y);
    g.userData.splash.visible=p.kind==='splash'||surfaceBlast;g.userData.flash.visible=p.kind!=='splash';
+   g.userData.flash.material.color.setHex(p.kind==='collapse'?0xb9f5ff:0xffb35b);
+   if(p.kind==='collapse'){
+    g.userData.splash.visible=true;
+    g.userData.splash.scale.set(9+age*13,2+age*10,9+age*13);
+    g.userData.splash.material.opacity=Math.max(0,.8-age*.29);
+    const flash=55*Math.exp(-age*4)+7;
+    g.userData.flash.scale.set(flash,flash,1);g.userData.flash.material.opacity=Math.max(0,.95-age*2);
+    return;
+   }
    const scale=surfaceBlast?6:1;
    g.userData.splash.scale.set(scale*(1+age),scale*(1+age*.5),scale*(1+age));
    g.userData.splash.material.opacity=Math.max(0,.8*(1-age/3));

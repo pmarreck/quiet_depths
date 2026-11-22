@@ -1,3 +1,5 @@
+import {seriousRepairs,redAlertSound} from './red-alert.js';
+import {threats} from './torpedo-watch.js';
 import {operatingFraction} from './equipment.js';
 import {environmentAt} from './environment.js';
 import {engineSound,aircraftSound,perceivedSound} from './acoustics.js';
@@ -45,9 +47,16 @@ export class SoundSystem{
   const voice={source,filter,pan,spatialGain,stop:()=>{noise.stop();rumble.stop();}};this.effectVoices.add(voice);this.effects++;noise.onended=()=>{this.effects--;this.effectVoices.delete(voice);noise.disconnect();filter.disconnect();gain.disconnect();rumble.disconnect();bass.disconnect();pan.disconnect();spatialGain.disconnect();};noise.start(t);noise.stop(t+duration);rumble.start(t);rumble.stop(t+duration);
   this.tailUntil=Math.max(this.tailUntil,t+duration);this.lastReceipt={id:source.id,type:source.type,delay:p.delay,distance:p.distance,gain:p.gain,cutoff:p.cutoff};
  }
+ replayTailActive(event){
+  if(!this.on||this.ctx?.state!=='running')return false;
+  const matches=source=>['blast','detonation','collapse'].includes(source.type)&&Math.abs(source.time-event.time)<1&&Math.hypot(source.x-event.point.x,source.y-event.point.y)<3;
+  for(const voice of this.effectVoices)if(['implosion','blast','detonation','collapse'].includes(voice.source.type))return true;
+  const state=this.getState();
+  return state.status==='patrol'&&state.acoustics.some(source=>!source.heard&&matches(source)&&perceivedSound(source,state).gain>=.002);
+ }
  update(s=this.getState(),context=this.getContext()){
   if(!this.ctx)return;
-  if(this.lastState!==s){this.lastState=s;this.played=new Set(s.acoustics.filter(e=>e.heard).map(e=>e.id));for(const v of this.voices.values()){v.osc.stop();v.pulse.stop();}for(const v of this.effectVoices)v.stop();this.effectVoices.clear();this.voices.clear();this.lastReceipt=null;this.tailUntil=0;this.alarmLevel=0;this.nextAlarm=0;}
+  if(this.lastState!==s){this.lastState=s;this.played=new Set(s.acoustics.filter(e=>e.heard).map(e=>e.id));for(const v of this.voices.values()){v.osc.stop();v.pulse.stop();}for(const v of this.effectVoices)v.stop();this.effectVoices.clear();this.voices.clear();this.lastReceipt=null;this.tailUntil=0;this.alarmLevel=0;}
   const c=this.ctx,t=c.currentTime,active=!context.paused&&!context.modal&&s.status==='patrol',e=environmentAt(s);
   for(const event of s.acoustics){if(!event.heard||this.played.has(event.id))continue;this.played.add(event.id);if(this.on&&!context.paused&&!context.modal)this.impulse(event);}
   for(const voice of this.effectVoices){const p=voice.source.type==='implosion'?voice.source.perceived:perceivedSound(voice.source,s);voice.spatialGain.gain.setTargetAtTime(p.gain,t,.1);if(!['implosion','collapse'].includes(voice.source.type))voice.filter.frequency.setTargetAtTime(p.cutoff,t,.12);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.1);if(this.lastReceipt?.id===voice.source.id){this.lastReceipt.currentGain=p.gain;this.lastReceipt.currentCutoff=p.cutoff;}}
@@ -55,19 +64,9 @@ export class SoundSystem{
   this.master.gain.setTargetAtTime(this.on&&(active||tail)?.55:0,t,.12);
   const wet=s.depth<=2?1:.18*Math.exp(-s.depth/200),running=this.on&&active;
   this.crew.update(s,e,running);
-  const level=running?s.pressureAlarm:0;
-  if(level&&(level!==this.alarmLevel||t>=this.nextAlarm)){
-   const severe=level===2;
-   for(let i=0;i<(severe?2:1);i++){
-    const when=t+i*.23,o=c.createOscillator(),g=c.createGain();
-    o.type='triangle';o.frequency.setValueAtTime(severe?760:500,when);
-    o.frequency.linearRampToValueAtTime(severe?510:410,when+.18);
-    g.gain.setValueAtTime(.001,when);g.gain.linearRampToValueAtTime(severe?.26:.12,when+.025);
-    g.gain.exponentialRampToValueAtTime(.001,when+.21);o.connect(g).connect(this.master);o.start(when);o.stop(when+.22);
-   }
-   this.nextAlarm=t+(severe?1.5:3.5);
-  }
-  this.alarmLevel=level;
+  const alarm=s.pressureAlarm>0||seriousRepairs(s)||threats(s).length>0;
+  if(running&&alarm&&!this.alarmLevel){redAlertSound(c,this.master,s.silent);this.alarmLevel=1;}
+  if(!alarm)this.alarmLevel=0;
   this.sea.filter.frequency.setTargetAtTime(120+e.wind*6,t,.5);this.sea.gain.gain.setTargetAtTime(running?(.03+e.waveScale*.035)*wet:0,t,.3);
   this.rain.filter.frequency.setTargetAtTime(s.depth>2?330:2400,t,.3);this.rain.gain.gain.setTargetAtTime(running?e.rain*.11*wet:0,t,.3);
   const powered=s.engine==='diesel'?s.depth<=14&&s.fuel>0:s.battery>0;

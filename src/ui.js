@@ -1,9 +1,15 @@
+import {DAY_SECONDS} from './environment.js';
+import {threats,etaText} from './torpedo-watch.js';
 import {bearing,delta,distance} from './mechanics.js';
 import {depthLimit,pressureLevel} from './pressure.js';
 
-export function patrolNotices(s,opticalActive,soundOn,view){
+export function patrolNotices(s,opticalActive,soundOn,view,rate=1,paused=false){
  if(s.status!=='patrol')return [];
  const notices=[],pressure=pressureLevel(s),support=s.airSupport;
+ for(const t of threats(s)){
+  const shipTime=new Date(1000*(s.environment.startHour*3600+(t.arrival%DAY_SECONDS)*86400/DAY_SECONDS)).toISOString().slice(11,16);
+  notices.push({id:'torpedo-'+t.id,text:'Torpedo likely targeting us! ETA '+shipTime+' ship · '+etaText(t.arrival,s.time,rate,paused)+' · T'+t.id,critical:true});
+ }
  if(pressure)notices.push({id:'pressure',text:(pressure===2?'Critical · implosion risk':'Pressure alarm')+' · Rise above '+depthLimit(s)+' m',critical:pressure===2});
  if(s.flood>0)notices.push({id:'flood',text:'Taking on water'});
  if(s.repair>0)notices.push({id:'repair',text:'Damage control working'});

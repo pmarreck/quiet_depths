@@ -158,19 +158,22 @@ export class OceanScene{
  resize(w,h){if(this.canvas.width!==Math.floor(w*this.renderer.getPixelRatio())||this.canvas.height!==Math.floor(h*this.renderer.getPixelRatio())){this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}}
  clear(){this.renderer.setClearColor(0x0a171b);this.renderer.clear();}
  render(s,view,zoom,time,orbit,frameSeconds=time){
-  if(!feedActive(s,view)){this.clear();return;}
-  const orbiting=view==='orbit',e=environmentAt(s),drone=view==='drone',tower=view==='tower',gun=view==='gun',listener=drone?s.drone:s;
+  if(view!=='replay'&&!feedActive(s,view)){this.clear();return;}
+  const orbiting=view==='orbit'||view==='replay',e=environmentAt(s),drone=view==='drone',tower=view==='tower',gun=view==='gun',listener=view==='replay'?orbit.focus:drone?s.drone:s;
   const hull=boatSurfacePose(s,e,time),hullY=-hull.depth;
   const motionDt=this.motionState===s?time-this.motionTime:0;
   this.motionState=s;this.motionTime=time;
   if(orbiting){
-   const offset=orbit.distance*Math.cos(orbit.pitch),x=s.x+offset*Math.sin(orbit.yaw),y=s.y+offset*Math.cos(orbit.yaw);
-   const elevation=Math.max(-bottom(x,y)+1,hullY+orbit.distance*Math.sin(orbit.pitch));
-   this.camera.position.set(x,elevation,-y);this.camera.lookAt(s.x,hullY,-s.y);
+   const focus=orbit.focus??{x:s.x,y:s.y,depth:hull.depth};
+   const offset=orbit.distance*Math.cos(orbit.pitch),x=focus.x+offset*Math.sin(orbit.yaw),y=focus.y+offset*Math.cos(orbit.yaw);
+   let elevation=-focus.depth+orbit.distance*Math.sin(orbit.pitch);
+   elevation=Math.max(-bottom(x,y)+1,elevation);
+   this.camera.position.set(x,elevation,-y);this.camera.lookAt(focus.x,-focus.depth,-focus.y);
    this.camera.fov=orbitVerticalFov(this.camera.aspect);
-   this.light.position.copy(this.camera.position);this.light.target.position.set(s.x,hullY,-s.y);this.particles.position.copy(this.camera.position);
+   this.light.position.copy(this.camera.position);this.light.target.position.set(focus.x,-focus.depth,-focus.y);this.particles.position.copy(this.camera.position);
   }
   // Keep the virtual orbit light readable as the camera moves away from the hull.
+  this.light.distance=view==='replay'?Math.max(240,orbit.distance*3):240;
   this.light.intensity=orbiting?2.8*orbit.distance**2:ROV_LAMP_INTENSITY;
   this.own.visible=drone||tower||gun||orbiting;this.own.position.set(s.x,hullY,-s.y);this.own.rotation.set(hull.pitch,-rad(s.heading),hull.roll,'YXZ');
   let pose;
@@ -227,10 +230,10 @@ export class OceanScene{
   water.origin.value.set(listener.x,listener.y);
   for(const k of ['waveScale','waveSpeed','daylight','cloud','twilight'])water[k].value=e[k];
   water.fogColor.value.copy(fog);
-  water.fogDensity.value=this.scene.fog.density=underwater?.009:1.1/e.opticalRange;
+  water.fogDensity.value=this.scene.fog.density=underwater?(view==='replay'?Math.min(.006,.60/orbit.distance):.009):1.1/e.opticalRange;
   water.sunDir.value.set(e.sunDirection.x,e.sunDirection.y,e.sunDirection.z).normalize();
   this.renderer.setClearColor(fog);
-  this.hemi.intensity=ambient+e.flash*(underwater?.2:2);
+  this.hemi.intensity=(view==='replay'&&underwater?Math.max(.52,ambient):ambient)+e.flash*(underwater?.2:2);
   this.sun.intensity=direct;
   this.sun.color.setHex(underwater?0x9ac9ff:0xffd6a0);
   this.hemi.color.setHex(underwater?0xa2c9f0:0xd4d9c8);
@@ -260,7 +263,11 @@ export class OceanScene{
    mesh.rotation.z=sunk?Math.min(1.38,.18+drop*.018):Math.sin(time*.8+ship.x)*.012*e.waveScale+Math.min(.35,(ship.flood||0)*.012);
    mesh.rotation.x=sunk?.06:Math.sin(time*.55+ship.y)*.008*e.waveScale;
    if(mesh.userData.prop)mesh.userData.prop.rotation.z=time*ship.speed*.8;
-   if(ship.kind==='sub')this.updateTubeDoors(mesh,s.projectiles,ship.id);
+   if(sub){
+    const crush=ship.collapsedAt===undefined?0:Math.min(1,Math.max(0,(time-ship.collapsedAt)*5));
+    mesh.scale.set(1-.48*crush,1-.67*crush,1-.12*crush);
+    this.updateTubeDoors(mesh,s.projectiles,ship.id);
+   }
   }
   const screw=this.own.userData.prop;
   screw.rotation.z=renderedScrewAngle(screw.rotation.z,s.propRpm,motionDt);

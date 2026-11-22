@@ -234,3 +234,19 @@ body.orbiting>.topbar,body.orbiting>.bottom-bar,body.orbiting .console>:not(.mai
  .patrol-slot{grid-template-columns:64px minmax(0,1fr)}
  .slot-actions{grid-column:2}
 }
+
+#red-beacon{position:relative;display:inline-block;flex:0 0 9px;width:9px;height:9px;margin-inline:3px;border:1px solid #7c5552;border-radius:50%;background:#3c2523;pointer-events:none}
+#red-beacon.lit{background:#ff493e;border-color:#ff9a7d;box-shadow:0 0 8px #ff3125;z-index:4}
+#red-beacon.lit::before{content:'';position:absolute;inset:-37px;border-radius:50%;background:conic-gradient(from -45deg,#ff312a77 0deg 90deg,transparent 90deg 180deg,#ff312a77 180deg 270deg,transparent 270deg);mask-image:radial-gradient(black,transparent 70%);animation:red-beacon-turn 1s linear infinite}
+@keyframes red-beacon-turn{to{transform:rotate(1turn)}}
+body.paused #red-beacon::before{animation-play-state:paused}
+#torpedo-tracks>div{padding:6px 0;border-top:1px solid var(--line);font:12px/1.55 var(--mono);color:#efd19a}
+body.replaying .viewport>#replay-overlay{visibility:visible;position:absolute;inset:0;z-index:25;touch-action:none;user-select:none;display:flex;align-items:flex-start;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left))}
+body.replaying .viewport>#world{visibility:visible;display:block!important;filter:none!important;opacity:1!important}
+body.replaying #pressure-warning,body.replaying #orbit-tools,body.replaying .viewport::after,body.replaying .viewport::before,body.replaying #toast,body.replaying #drawer-backdrop{display:none!important}
+.replay-caption{pointer-events:none;display:grid;justify-items:start;gap:5px;color:#ffe061;font:600 12px var(--mono)}
+.replay-caption strong{border:2px solid currentColor;padding:6px 10px;background:#161807de;font-size:15px;letter-spacing:1px;animation:replay-pulse 1.35s ease-in-out infinite}
+.replay-caption span{padding:3px 6px;background:#102029df;color:#eee8d0}
+#replay-exit{min-height:44px;padding:0 14px;border:1px solid #b4b0a0;background:#12222df2;color:#fff}
+@keyframes replay-pulse{50%{opacity:.6}}
+@media(prefers-reduced-motion:reduce){#red-beacon.lit::before,.replay-caption strong{animation:none}}

@@ -1,3 +1,5 @@
+import {replayEvent} from './instant-replay.js';
+import {gameEcho} from './torpedo-watch.js';
 import {carrierId,carrierSize,advanceCarrierFlood,incidentalHull,registerCarrierHit} from './carrier.js';
 import {operatingFraction} from './equipment.js';
 import {recordCivilianHit,report} from './patrol-reports.js';
@@ -16,7 +18,8 @@ import {addDebrief} from './debrief.js';
 export const MAX_RUN=4320;
 export const freshCombat=()=>({runSetting:MAX_RUN,reports:[],gun:{ammo:240,cooldown:0,shots:0,angle:0,elevation:0},gunRounds:[],impacts:[],aircraft:[],airSupport:{status:'idle',requestedAt:null,launchAt:null,base:{x:-3200,y:3400},lastKnown:null},weaponSequence:1,gunLoudUntil:0});
 const wrap=n=>(n%360+360)%360;
-const TORPEDO_SPEED=24,TORPEDO_LIFE=180,ARMING_TIME=4,MAX_PITCH=Math.PI/4;
+export const TORPEDO_SPEED=24;
+const TORPEDO_LIFE=180,ARMING_TIME=4,MAX_PITCH=Math.PI/4;
 const SURFACE_RUN_DEPTH=3;
 export const ENEMY_DECOY_SUPPLY=2;
 export function chargeAltitude(charge){
@@ -75,6 +78,7 @@ export function restoreTorpedo(s,p){
    (p.aim===null||p.aim&&Number.isFinite(p.aim.x)&&Number.isFinite(p.aim.y)))&&
   [-1,1].includes(p.searchDirection)&&[-1,0,1].includes(p.tubeSide)&&typeof p.diverted==='boolean'&&
   Array.isArray(p.decoysChecked)&&p.decoysChecked.every(id=>typeof id==='string')&&
+  (p.decoyCheckedAt===undefined||Number.isFinite(p.decoyCheckedAt)&&p.decoyCheckedAt>=0&&p.decoyCheckedAt<=s.time)&&
   (p.decoyTarget===null||['x','y','depth','expiresAt'].every(k=>Number.isFinite(p.decoyTarget[k])))&&
   Array.isArray(p.path)&&p.path.every(v=>['x','y','depth','time'].every(k=>Number.isFinite(v[k])));
 }
@@ -138,14 +142,24 @@ function shipDamage(s,dt){
   // Keep the grounded hull against the same triangles the underwater camera displays.
   const clearance=v.kind==='sub'||v.kind==='fishing'?3:8;
   const bed=Math.max(0,-floorSurface(v.x,v.y).height-clearance-origin);
+  const beforeDrop=v.sinkDepth;
   v.speed=0;v.sinkDepth=Math.min(bed,v.sinkDepth+dt*1.3*(v.kind==='carrier'?Math.max(1,v.directHits-1):1));
   const age=s.time-v.sunkAt,depth=origin+v.sinkDepth;
+  // Last visible vertex of the listed wreck at mean sea level.
+  const lastVisible=v.kind==='carrier'?40.4:v.kind==='fishing'?16.1:v.kind==='escort'?29.1:35.3;
+  if(v.kind!=='sub'&&beforeDrop<lastVisible&&v.sinkDepth>=lastVisible)
+   replayEvent(s,{kind:'sinking',enemy:true,target:v.id,point:{x:v.x,y:v.y,depth}});
+
   if(age>=(v.nextCreak??4)){
    emitSound(s,{type:'creak',x:v.x,y:v.y,depth,power:.65});
    v.nextCreak=age+9+hash01(s.patrol.seed,v.sunkAt+Math.floor(age))*20;
   }
   if(!v.collapsed&&depth>45&&v.sinkDepth>18&&(v.kind==='sub'||hash01(s.patrol.seed,v.sunkAt)>.45)){
-   v.collapsed=true;
+   v.collapsed=true;v.collapsedAt=s.time;
+   if(v.kind==='sub'){
+    s.impacts.push({id:s.weaponSequence++,x:v.x,y:v.y,altitude:-depth,time:s.time,kind:'collapse'});
+    replayEvent(s,{kind:'collapse',enemy:true,target:v.id,point:{x:v.x,y:v.y,depth}});
+   }
    emitSound(s,{type:'collapse',x:v.x,y:v.y,depth,vessel:v.id,power:1.3});
    addDebrief(s,'Compartments aboard '+v.name+' collapsed during the descent.');
   }
@@ -193,11 +207,20 @@ function torpedoCourse(s,p,dt){
  if(p.age<ARMING_TIME)return{heading:p.orderedHeading,depth:p.orderedDepth};
  if(p.pingAge>=2.4){
   p.pingAge=0;
-  emitSound(s,{type:'seeker',x:p.x,y:p.y,depth:p.depth,power:.24});
+  emitSound(s,{type:'seeker',x:p.x,y:p.y,depth:p.depth,power:.24,echo:gameEcho(s,p,s.time,TORPEDO_SPEED)});
  }
  if(p.owner==='enemy'){
   // The incoming shot knows only the launch report. Passing that point
   // starts a search even when the player has since moved somewhere else.
+  if(s.noisemaker&&p.decoyCheckedAt!==s.noisemaker.time&&distance(p,s.noisemaker)<650){
+   p.decoyCheckedAt=s.noisemaker.time;
+   if(hash01(s.patrol.seed,p.id+Math.floor(s.noisemaker.time)*19)<.25){p.diverted=true;p.aim=null;}
+  }
+  if(p.diverted){
+   const other=s.ships.find(v=>v.military&&v.id!==p.launcher&&v.hull>0&&distance(p,v)<750);
+   if(other){p.lock=other.id;return {heading:bearing(p,other),depth:targetRunDepth(other)};}
+   p.lock=null;
+  }
   if(p.aim){
    const a=rad(p.orderedHeading),ahead=(p.aim.x-p.x)*Math.sin(a)+(p.aim.y-p.y)*Math.cos(a);
    if(ahead>0)return{heading:bearing(p,p.aim),depth:p.orderedDepth};
@@ -231,6 +254,8 @@ function torpedoStrike(s,p,from){
  p.depth=-from.altitude+(p.depth+from.altitude)*fraction;p.age=TORPEDO_LIFE;
  emitSound(s,{type:'detonation',x:p.x,y:p.y,depth:p.depth,power:1,ownHit:p.owner==='player'});
  s.impacts.push({id:p.id,x:p.x,y:p.y,altitude:-p.depth,time:s.time,kind:'torpedo'});
+ replayEvent(s,{kind:'torpedo',shot:p.id,target:hit===s?undefined:hit.id,enemy:hit!==s&&p.owner!=='player',
+  point:{x:p.x,y:p.y,depth:p.depth},heading:p.heading});
  if(hit===s){
   hurt(s,36,'Torpedo struck the hull. Damage control responding.');
   addDebrief(s,'An incoming torpedo struck your boat.');

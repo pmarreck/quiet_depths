@@ -1,3 +1,4 @@
+import {replayEvent} from './instant-replay.js';
 import {carrierSize} from './carrier.js';
 import {SYSTEM_NAMES,SYSTEM_KEYS,DRONE_PARTS,DRONE_HIT_FACTORS,fullCondition,damagePart,repairPart,operatingFraction} from './equipment.js';
 import {updatePressure} from './pressure.js';
@@ -116,7 +117,7 @@ export function updateBoat(s,dt){
  if(s.depth<2)s.oxygen=clamp(s.oxygen+dt*.45,0,100);
  if(s.depth>15||!operatingFraction(s.systems.periscope))s.scope=false;
  const floor=keelLimit(s);
- if(s.depth>floor){s.depth=Math.max(0,floor);if(floor<0)pushOffShoal(s,-floor);if(s.time-(s.collisionHits.ground??-99)>4){hurt(s,2+Math.abs(s.speed)+Math.abs(s.verticalSpeed)*2,'Seafloor contact. Rise now.','planes');s.collisionHits.ground=s.time;}s.verticalSpeed=Math.min(0,s.verticalSpeed);s.speed*=Math.exp(-dt*1.5);}
+ if(s.depth>floor){s.depth=Math.max(0,floor);if(floor<0)pushOffShoal(s,-floor);if(s.time-(s.collisionHits.ground??-99)>4){replayEvent(s,{kind:'ground',point:{x:s.x,y:s.y,depth:s.depth}});hurt(s,2+Math.abs(s.speed)+Math.abs(s.verticalSpeed)*2,'Seafloor contact. Rise now.','planes');s.collisionHits.ground=s.time;}s.verticalSpeed=Math.min(0,s.verticalSpeed);s.speed*=Math.exp(-dt*1.5);}
  updatePressure(s,dt);if(s.status==='lost')return diesel;
  if(s.oxygen<=0){s.hull=Math.max(0,s.hull-dt*2);log(s,'Air exhausted. Surface immediately.','damage');}
  const crew=s.systems.crew/100;
@@ -161,7 +162,7 @@ export function updateDrone(s,dt,diesel){
  for(const object of objects){const hit=capsuleContact(d,object.body,object.half,object.radius);if(!hit)continue;
   d.x+=hit.nx*(hit.penetration+.001);d.y+=hit.ny*(hit.penetration+.001);d.depth=clamp(d.depth+hit.nd*(hit.penetration+.001),0,280);
   const closing=-(Math.sin(rad(d.heading))*d.speed*.514444-Math.sin(rad(object.body.heading))*(object.body.speed||0)*.514444)*hit.nx-(Math.cos(rad(d.heading))*d.speed*.514444-Math.cos(rad(object.body.heading))*(object.body.speed||0)*.514444)*hit.ny-d.verticalSpeed*hit.nd;
-  if(closing>.3&&d.collisionCooldown<=0){const damage=clamp(3+closing*closing*1.4,3,60);damageDrone(s,damage,object.own?'pressure hull':'vessel / wreck');if(object.own)hurt(s,damage*.07,'Drone struck our hull. Minor plating damage.');d.collisionCooldown=2;}
+  if(closing>.3&&d.collisionCooldown<=0){const damage=clamp(3+closing*closing*1.4,3,60);damageDrone(s,damage,object.own?'pressure hull':'vessel / wreck');if(object.own){replayEvent(s,{kind:'collision',point:{x:d.x,y:d.y,depth:d.depth}});hurt(s,damage*.07,'Drone struck our hull. Minor plating damage.');}d.collisionCooldown=2;}
   d.speed*=.15;d.verticalSpeed*=.2;
  }
  const floor=bottom(d.x,d.y)-.7;if(d.depth>floor){d.depth=Math.max(0,floor);if(d.collisionCooldown<=0){damageDrone(s,3+Math.abs(d.speed)*1.5,'seabed');d.collisionCooldown=2;}d.verticalSpeed=0;d.speed*=.7;}

@@ -1,3 +1,5 @@
+import {replayEvent} from './instant-replay.js';
+import {gameEcho,observeTorpedo,validEcho,validTracks} from './torpedo-watch.js';
 import {fullCondition,BOAT_PARTS,DRONE_PARTS,readLimits,operatingFraction} from './equipment.js';
 import {report,hearWreck} from './patrol-reports.js';
 import {resolveTraffic} from './hull-contacts.js';
@@ -7,7 +9,7 @@ import {emitSound,updateAcoustics} from './acoustics.js';
 import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets} from './missions.js';
 import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone} from './systems.js';
-import {MAX_RUN,ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
+import {TORPEDO_SPEED,MAX_RUN,ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
 import {freshRecon,updateRecon,validateReconState} from './recon.js';
 import {designation,fixContact,estimateAt,applyReconPacket} from './track-estimates.js';
 import {observationBias} from './contact-readings.js';
@@ -24,7 +26,7 @@ export function createGame(mission='recon',seed=19830604,options={}){
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
  {id:'tern',name:'Tern',kind:'fishing',military:false,x:-850,y:1350,heading:110,speed:3,hull:100,alert:0,attack:0},
  {id:'echo',name:'Unknown submarine',kind:'sub',military:true,x:3800,y:900,depth:75,heading:280,speed:4,hull:100,alert:0,attack:0}
- ]};s.repairLimits=fullCondition(BOAT_PARTS);s.drone.repairLimits=fullCondition(DRONE_PARTS);s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
+ ]};s.torpedoTracks=[];s.repairLimits=fullCondition(BOAT_PARTS);s.drone.repairLimits=fullCondition(DRONE_PARTS);s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);return s;
 }
 export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y),v.depth,drone?.7:5+27.5*Math.abs(Math.sin(s.pitch)));}
 export function isVisible(s,ship,look=null,env=environmentAt(s)){
@@ -62,6 +64,7 @@ export function contact(s,ship,method){
 export function ping(s){
  if(s.pingCooldown>0||s.status!=='patrol'||!operatingFraction(s.systems.sonar))return false;
  s.pingAge=0;s.pingCooldown=15;
+ for(const p of s.projectiles)if(Math.hypot(distance(s,p),s.depth-p.depth)<6000*operatingFraction(s.systems.sonar))observeTorpedo(s,gameEcho(s,p,s.time,TORPEDO_SPEED),true);
  for(const ship of s.ships)if(ship.hull>0&&distance(s,ship)<6000*operatingFraction(s.systems.sonar))contact(s,ship,'active');
  for(const ship of s.ships){
   if(!ship.military||ship.hull<=0||ship.disabled)continue;
@@ -90,7 +93,7 @@ export function decoy(s){
 export function step(s,dt,input={}){
  if(s.status!=='patrol'||dt<=0||input.paused||input.modal)return;
  // Fixed substeps make time compression obey the same collision and resource rules.
- let left=Math.min(dt,60);while(left>0&&s.status==='patrol'){const t=Math.min(.25,left);tick(s,t,input);left-=t;}
+ let left=Math.min(dt,60);while(left>0&&s.status==='patrol'){const t=Math.min(.25,left);tick(s,t,input);input.afterTick?.(s);left-=t;}
 }
 function patrolSweep(s,ship){
  if(ship.nextSweep===undefined||ship.disabled||s.time<ship.nextSweep)return;
@@ -104,6 +107,7 @@ function patrolSweep(s,ship){
  }
 }
 function patrolReceipt(s,source){
+ if(source.type==='seeker'&&source.echo&&operatingFraction(s.systems.sonar)&&source.perceived.distance<6000*operatingFraction(s.systems.sonar))observeTorpedo(s,source.echo,false);
  if(source.ownHit)report(s,'impact','Explosion heard. Possible torpedo hit.');
  if(source.type==='sweep'&&operatingFraction(s.systems.sonar)>0){
   // The receiver gets the bearing to the emission, without a range or identity.
@@ -169,9 +173,10 @@ function tick(s,dt,input){
  }}
  s.shells=s.shells.filter(p=>p.delay>-3);
  updateAcoustics(s,(source,d)=>{
-  if(d<210){hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');addDebrief(s,'An underwater explosion was close enough to damage your boat.');}
+  if(d<210){replayEvent(s,{kind:'blast',point:{x:source.x,y:source.y,depth:source.depth}});hurt(s,Math.max(3,36*(1-d/210)),'Depth charge shock. Damage control responding.');addDebrief(s,'An underwater explosion was close enough to damage your boat.');}
   else if(d<2500){log(s,'Depth charge detonation. That pattern missed.');addDebrief(s,'The boat was outside the depth-charge damage zone when it detonated.');}
  },source=>patrolReceipt(s,source));
+ s.torpedoTracks=s.torpedoTracks.filter(t=>s.time-t.time<35);
  updateDrone(s,dt,diesel);
  if(input.observation){
   const rov=input.observation==='drone',eye=rov?s.drone:s;
@@ -199,7 +204,9 @@ export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charg
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired'].includes(s.status))return null;
  // Patrols saved before the orbit option existed always used station views.
- s.difficulty=patrolDifficulty({orbitCamera:false,...s.difficulty});
+ s.difficulty=patrolDifficulty({orbitCamera:false,instantReplay:false,...s.difficulty});
+ if(s.torpedoTracks===undefined)s.torpedoTracks=[];
+ if(!validTracks(s.torpedoTracks,s.time))return null;
  s.debrief??=[];
  if(!validDebrief(s.debrief,s.time)||s.patrolId!==undefined&&(typeof s.patrolId!=='string'||!/^[a-f0-9]{32}$/.test(s.patrolId)))return null;
  if(s.noisemaker!==undefined&&!validReport(s.noisemaker,s.time))return null;
@@ -248,7 +255,7 @@ export function restore(raw){try{
  if(s.route&&(!Number.isFinite(s.route.x)||!Number.isFinite(s.route.y)))return null;
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub','carrier'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
  for(const v of s.ships){
-  for(const key of ['sinkDepth','sunkAt','nextCreak','nextSweep','neutralHitAt'])if(v[key]!==undefined&&(!Number.isFinite(v[key])||v[key]<0))return null;
+  for(const key of ['sinkDepth','sunkAt','nextCreak','collapsedAt','nextSweep','neutralHitAt'])if(v[key]!==undefined&&(!Number.isFinite(v[key])||v[key]<0))return null;
   if(v.wreckMark&&(!Number.isFinite(v.wreckMark.x)||!Number.isFinite(v.wreckMark.y)||typeof v.wreckMark.observed!=='boolean'))return null;
  }
  if(s.ships.some(ship=>ship.report!==undefined&&!validReport(ship.report,s.time)))return null;
@@ -271,6 +278,7 @@ export function restore(raw){try{
  for(const e of s.acoustics){
   if(!['id','time','x','y','power'].every(k=>Number.isFinite(e[k]))||!['thunder','blast','detonation','gunfire','seeker','creak','collapse','settling','sweep'].includes(e.type)||typeof e.heard!=='boolean')return null;
   if(['sweep','collapse','settling'].includes(e.type)&&!s.ships.some(v=>v.id===e.vessel))return null;
+  if(e.echo!==undefined&&(e.type!=='seeker'||!validEcho(e.echo,e.time)||e.echo.time!==e.time))return null;
   if(e.ownHit!==undefined&&typeof e.ownHit!=='boolean')return null;
  }
  return s;

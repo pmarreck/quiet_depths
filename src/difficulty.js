@@ -8,7 +8,9 @@ export const difficultyControls = [
   {id:'satellite', label:'Classified satellite photography', initial:true},
   {id:'drone', label:'External ROV', initial:true},
   {id:'omniscientChart', label:'Exact enemy positions on chart', initial:false},
-  {id:'orbitCamera', label:'External orbit camera (Turn off for more realism)', initial:true}
+  {id:'orbitCamera', label:'External orbit camera (Turn off for more realism)', initial:true},
+  {id:'instantReplay', label:'Instant replay', initial:true},
+  {id:'enemyReplay', label:'Also instant-replay enemy events (even less realism)', initial:false, requires:'instantReplay'}
 ];
 
 export function patrolDifficulty(input={}) {

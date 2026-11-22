@@ -1,3 +1,4 @@
+import {replayEvent} from './instant-replay.js';
 import {carrierSize,incidentalHull} from './carrier.js';
 import {damagePart} from './equipment.js';
 import {recordCivilianHit} from './patrol-reports.js';
@@ -29,7 +30,8 @@ function closestContact(a,b,heading){
  const d=Math.hypot(dx,dy,dz),overlap=a.r+b.r-d;
  if(overlap<=0)return null;
  const lateralGap=Math.sqrt(Math.max(0,(a.r+b.r)**2-dz*dz))-Math.hypot(dx,dy);
- return d>.0001?{nx:dx/d,ny:dy/d,nd:dz/d,overlap,lateralGap}:{nx:Math.cos(rad(heading)),ny:-Math.sin(rad(heading)),nd:0,overlap,lateralGap};
+ const point={x:a.a.x+t*u[0]-(d?dx/d:0)*a.r,y:a.a.y+t*u[1]-(d?dy/d:0)*a.r,depth:a.a.depth+t*u[2]-(d?dz/d:0)*a.r};
+ return d>.0001?{point,nx:dx/d,ny:dy/d,nd:dz/d,overlap,lateralGap}:{point,nx:Math.cos(rad(heading)),ny:-Math.sin(rad(heading)),nd:0,overlap,lateralGap};
 }
 export function hullContact(a,b){
  if(distance(a,b)>(a.kind==='carrier'||b.kind==='carrier'?225:145)||Math.abs((a.depth??3)-(b.depth??3))>32)return null;
@@ -74,7 +76,11 @@ function resolvePair(s,a,b,hurt){
  s.collisionHits[key]=s.time;
  const severity=clamp(2+closing*1.1,2,36);
  for(const body of [a,b]){
-  if(body===s)hurt(s,severity,b===s.site?'Hull contact with the casualty.':'Hull collision with another vessel.','planes');
+  if(body===s){
+   const other=a===s?b:a;
+   replayEvent(s,{kind:'collision',target:other.id,point:hit.point});
+   hurt(s,severity,b===s.site?'Hull contact with the casualty.':'Hull collision with another vessel.','planes');
+  }
   else{
    const before=body.hull??100;body.hull=incidentalHull(body,severity);
    if(a===s&&body.military===false&&before>0&&body.hull===0)recordCivilianHit(s,body,'Your boat collided with the neutral '+body.name+' and sank her.');
