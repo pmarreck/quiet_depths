@@ -1,4 +1,4 @@
-import {propulsion,batteryOutput,generatorOutput,throttlePercent,throttleOrder,SURFACE_KNOTS} from './power-plant.js';
+import {dieselModes,isDieselMode,dieselRoutingStatus,propulsion,batteryOutput,generatorOutput,throttlePercent,throttleOrder,SURFACE_KNOTS} from './power-plant.js';
 import {torpedoTubes} from './torpedo-tubes.js';
 import {bindBriefingNavigation} from './briefing-navigation.js';
 import {ReplayRecorder,ReplayPlayback,replayLabels} from './instant-replay.js';
@@ -247,6 +247,15 @@ bindCommand('open-gun','click',()=>setView('gun'));
 bindCommand('aim-gun','click',()=>{const id=$('gun-target').value,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range){const e=estimateAt(c,state.time);aimGunAt(state,{x:e.x,y:e.y,vx:c.fix?.vx||0,vy:c.fix?.vy||0,altitude:2});}},()=>view==='gun'&&feedActive(state,'gun')&&!!$('gun-target').value);
 bindCommand('scope-toggle','click',scopeToggle,()=>operatingFraction(state.systems.periscope)>0);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0&&operatingFraction(state.systems.sonar)>0);bindCommand('silent','click',silent,()=>view!=='drone');
 for(const axis of ['heading','depth','speed'])bindOrderRange(axis,()=>axis);
+for(const id of ['diesel-mode','mobile-diesel-mode']){
+ const select=$(id);
+ for(const [mode,label] of Object.entries(dieselModes))select.add(new Option(label,mode));
+ bindCommand(select,'change',()=>{
+  if(!isDieselMode(select.value))return;
+  state.dieselMode=select.value;
+  log(state,'Diesel power set to '+dieselModes[state.dieselMode]+'.');
+ },()=>state.engine==='diesel'&&(id==='mobile-diesel-mode'||view!=='drone'));
+}
 bindCommand('port','click',()=>nudgeHelm(state,context(),-15),pilotEnabled);bindCommand('starboard','click',()=>nudgeHelm(state,context(),15),pilotEnabled);
 all('[data-depth]').forEach(b=>bindCommand(b,'click',()=>order('depth',+b.dataset.depth),pilotEnabled));
 bindCommand('electric','click',()=>{state.engine='electric';log(state,'Electric motors engaged.');},()=>view!=='drone');
@@ -410,7 +419,7 @@ window.addEventListener('keydown',e=>{
   else if(e.code==='Tab'){e.preventDefault();$('replay-exit').focus();}
   return;
  }
- if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches('textarea,input:not([type="range"]),[contenteditable="true"]'))return;
+ if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches('select,textarea,input:not([type="range"]),[contenteditable="true"]'))return;
  if(!patrolStarted||context().modal)return;
  const action=actionForKey(bindings,e.code,view);
  if(view==='orbit'){
@@ -500,7 +509,11 @@ function updateUI(){
  $('drone-bay-mode').textContent=s.drone.mode.toUpperCase();$('drone-bay-mode').classList.toggle('damaged',s.drone.mode==='lost');$('drone-bay-metrics').innerHTML=`<span>CHARGE <b>${Math.round(s.drone.battery)}%</b></span>${DRONE_PARTS.map(key=>`<span>${key.toUpperCase()} <b>${conditionLabel(s.drone[key],s.drone.repairLimits[key],key!=='hull')}</b></span>`).join('')}`;$('drone-bay-advice').textContent=s.drone.mode==='lost'?s.drone.lostReason:s.drone.mode==='stowed'?(droneDeployReason(s)||'READY · 280 M MAX · DEPLOY ≤3 KN'):Math.round(separation(s,s.drone))+' / 100 M LINK · BUOYANCY '+Math.round(s.drone.buoyancy)+'%';
  const plant=propulsion(s);
  const sourceStatus=s.engine==='diesel'?(s.depth>14?'INTAKE SUBMERGED':!s.fuel?'NO FUEL':!plant.generator?'GENERATOR / FUEL OFFLINE':s.depth<=1?'SURFACE DIESEL':'SNORKEL DIESEL'):batteryOutput(s)?'BATTERY POWER':'BATTERY UNAVAILABLE';
- $('engine-status').textContent=sourceStatus;
+ const powerStatus=[sourceStatus,dieselRoutingStatus(s,plant)].filter(Boolean).join(' · ');
+ for(const id of ['diesel-mode','mobile-diesel-mode']){
+  const select=$(id);select.value=s.dieselMode;select.parentElement.hidden=s.engine!=='diesel'||(id==='diesel-mode'&&view==='drone');
+ }
+ $('engine-status').textContent=powerStatus;
 
  const drone=view==='drone',v=helmFor(s,view),actual={heading:v.heading,depth:v.depth,speed:v.speed},requested={heading:v.targetHeading,depth:v.targetDepth,speed:v.targetSpeed};
  $('helm-mode').textContent=drone?(v.mode==='remote'?'DRONE HELM':v.mode==='return'?'DRONE · AUTO RETURN':'DRONE · OFFLINE'):'SUBMARINE HELM';
@@ -518,7 +531,7 @@ function updateUI(){
  if(!drone)$('speed').setAttribute('aria-valuetext',Math.round(throttlePercent(v.targetSpeed))+'% throttle, actual '+v.speed.toFixed(1)+' knots');
  $('speed').setAttribute('aria-label',drone?'Requested ROV speed':'Submarine throttle');
  $('electric').classList.toggle('active',s.engine==='electric');$('diesel').classList.toggle('active',s.engine==='diesel');$('silent').classList.toggle('active',s.silent);
- $('engine-hint').textContent=drone?'Sub holds its own helm orders.':sourceStatus+' · '+(s.silent?Math.min(3,plant.ahead):plant.ahead).toFixed(1)+' kn available'+(s.depth>14&&s.engine==='diesel'?' · Rise to 14 m or select electric.':'');
+ $('engine-hint').textContent=drone?'Sub holds its own helm orders.':powerStatus+' · '+(s.silent?Math.min(3,plant.ahead):plant.ahead).toFixed(1)+' kn available'+(s.depth>14&&s.engine==='diesel'?' · Rise to 14 m or select electric.':'');
  const active=feedActive(s,view),tower=view==='tower',gun=view==='gun',absLook=drone?s.drone.heading:gun?wrapHeading(s.heading+s.gun.angle):tower?wrapHeading(s.heading+s.towerAngle):scopeBearing(s),optical=view==='scope'||drone||tower||gun;
  const labels={photos:['PHOTOGRAPHIC EVIDENCE',photoArchive(s).length+' ARCHIVED EXPOSURES'],gun:['DECK GUN',active?`DU EXPLOSIVE · ${s.gun.ammo} ROUNDS · ${s.gun.elevation.toFixed(1)}° ELEVATION`:'SURFACE TO MAN THE GUN'],tower:['CONNING TOWER',active?'OPEN BRIDGE · DRAG VERTICALLY TO LOOK DOWN':'SURFACE TO GO TOPSIDE'],scope:['OPTICAL OBSERVATION',active?`PERISCOPE · ${scopeWashed(s,env)?'LENS AWASH':deg(s.scopeAngle)+'° RELATIVE'} · ${(6*zoom).toFixed(0)}×`:'OPTICS OFFLINE'],sonar:['ACOUSTIC OBSERVATION',`BOW UP · DASHES: BEARING · DIAMONDS: RANGE`],chart:['NAVIGATION CHART',`NORTH UP · ${chart.zoom.toFixed(1)}× · ${chart.follow?'FOLLOWING SUB':'FREE PAN'}`],drone:['REMOTE INSPECTION',`ROV ${s.drone.mode.toUpperCase()} · BATTERY ${Math.round(s.drone.battery)}%`]};
  const scopeTab=document.querySelector('[data-view=scope]'),droneTab=document.querySelector('[data-view=drone]');scopeTab.classList.toggle('hidden',s.systems.periscope===0);droneTab.classList.toggle('damaged',s.drone.mode==='lost');droneTab.innerHTML='<span>04</span> '+(s.drone.mode==='lost'?'DRONE LOST':'DRONE');

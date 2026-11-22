@@ -47,6 +47,7 @@ body.loss #result-dialog{border-color:#d79377;background:#28191cf5;box-shadow:0 
 
 .sidebar-sections{display:contents}
 @media(min-width:1101px){
+ .main-panel{overflow-y:auto;scrollbar-width:thin}
  .left-panel{display:grid;grid-template-rows:auto minmax(0,1fr) minmax(0,44%) auto;overflow:hidden}
  .sidebar-sections{display:block;overflow-y:auto;scrollbar-width:thin}
  .log-panel{display:flex;flex-direction:column;min-height:0;padding-block:12px;border-top:1px solid var(--line)}

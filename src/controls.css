@@ -86,6 +86,12 @@ h1{font-size:40px;line-height:1.02;margin:16px 0}
 .depth-presets{gap:7px;margin-top:4px;flex-wrap:wrap;justify-content:flex-start}
 .depth-presets button{font-size:.875rem;line-height:1.5;padding:3px 0}
 .engine-switch{margin:14px 0 15px;padding:3px}
+.diesel-routing{display:flex;align-items:center;justify-content:space-between;gap:4px;font:12px var(--mono);color:var(--cream)}
+.diesel-routing[hidden]{display:none}
+.diesel-routing select{min-width:0;max-width:100%;flex:1;padding:3px;border:1px solid var(--line);background:#15272c;color:var(--cream);font:inherit}
+.propulsion .control-label.power-heading{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.power-heading .diesel-routing{flex:1;min-width:7em}
+.propulsion:has(.diesel-routing:not([hidden])) .engine-switch{margin-block:4px}
 .engine-switch button{font-size:.875rem;padding:7px 3px;letter-spacing:0}
 .silent-button{font-size:.875rem;letter-spacing:0;white-space:normal;text-align:left;line-height:1.5;margin-bottom:8px}
 .silent-button kbd{display:none}

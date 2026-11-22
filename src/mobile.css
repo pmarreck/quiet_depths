@@ -151,6 +151,8 @@ body[data-station=drone] .viewport{touch-action:none}
 #difficulty-options small{grid-column:1/-1;color:var(--muted)}
 #difficulty-options input[type=checkbox]{width:20px;height:20px}
 #settings-dialog{width:min(94vw,520px);max-height:85dvh;padding:24px}
+.mobile-boat-actions .diesel-routing{grid-column:1/-1}
+.mobile-boat-actions .diesel-routing select{min-height:44px}
 .rov-invert{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer}
 .rov-invert input{width:20px;height:20px}
 #shortcut-list{display:grid;gap:6px;margin:12px 0}

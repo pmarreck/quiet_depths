@@ -55,7 +55,17 @@ Enemy hunters steer and aim from their last detection. A change of course or dep
 
 The helm shows white actual ticks and gold requested ticks for heading, depth and speed. Its numeric readouts identify both values. The interface uses 16-pixel body text, 14-pixel controls and 12-pixel secondary metadata, with reflow on smaller displays. Existing patrol saves migrate to the new control fields.
 
-Full ahead gives a healthy sub 20.5 knots on surfaced diesel, 16 knots on battery power, or 9 knots while snorkeling. Actual speed changes gradually with throttle, depth and damage. Diesel requires an open intake at 14 m or shallower. It drives the generator and charges the batteries while fresh air comes down the intake. Below that depth, select electric to keep moving. The surfaced sprint is fictional and close to the 20.25 knots documented for USS *Gato*. The submerged speed follows the 1968 B-413. [USS Gato](https://www.history.navy.mil/research/histories/ship-histories/danfs/g/gato-i.html) · [Museum of the World Ocean](https://www.world-ocean.ru/voenno-morskoj-tsentr/b-413)
+Select **Diesel**, then choose **Diesel power** at the helm or in the mobile Sub drawer. The healthy sub’s full-ahead game ratings are:
+
+| Diesel setting | Surfaced | Snorkeling | What happens to the battery |
+| --- | ---: | ---: | --- |
+| Charge (default) | 18.5 kn | 9 kn | Refills the bank. As it fills, the generator progressively releases the reserved power to the motor. |
+| Drive | 20.5 kn | 13 kn | Sends available generator output to propulsion and suspends main battery charging. |
+| Battery assist | 22 kn | 17 kn | Draws from both sources when ordered thrust exceeds generator capacity. An empty or offline bank leaves generator drive available. |
+
+Battery-only propulsion can make 16 kn. Diesel needs air at 14 m or shallower. Below that depth, select electric. The speeds above are tuning for this fictional submarine. The surface rating draws on USS *Gato* and the battery-only rating on the 1968 B-413. [USS *Gato*](https://www.history.navy.mil/research/histories/ship-histories/danfs/g/gato-i.html) · [Museum of the World Ocean](https://www.world-ocean.ru/voenno-morskoj-tsentr/b-413)
+
+The 1961 commissioning booklet for HMCS *Grilse* describes generators and batteries supplying propulsion separately or together. Snorkeling also restricts intake airflow and increases exhaust back pressure. In the game, these effects reduce available diesel output even with charging switched off. [HMCS *Grilse* commissioning booklet](https://www.forposterityssake.ca/RCN-DOCS/RCND0207.pdf) · [Journal of Naval Engineering, engine operating conditions](https://library.imarest.org/record/8640/files/v32b2p07a.pdf)
 
 The diesel generator, fuel tank and feed, battery bank, and electric drive motor each have their own condition. A damaged tank or battery holds less, and damage control cannot replace lost fuel. A leaking tank can catch fire. The crew can seal the leak and contain the fire before a vapor explosion. Electric runs submerged and consumes finite battery and oxygen. The sub starts with a 220-meter depth tolerance. Impacts reduce it. Pursuing escorts drop delayed charge patterns. Repairs take time and battery. Acoustic torpedoes may acquire the wrong ship; identified neutrals are protected by the UI, but a seeker can still stray.
 

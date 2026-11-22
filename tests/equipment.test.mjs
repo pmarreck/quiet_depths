@@ -4,6 +4,7 @@ import {createGame,step,ping,restore,save,isVisible} from '../src/sim.js';
 import {environmentAt} from '../src/environment.js';
 import {damageSystem,damageDrone,hurt,deployDrone} from '../src/systems.js';
 import {feedActive} from '../src/controls.js';
+import {propulsion} from '../src/power-plant.js';
 import {fireDeckGun} from '../src/combat.js';
 import {dronePhotograph,updateOperation} from '../src/missions.js';
 import {signalOpacity,drawSonarGlass,lensFilter} from '../src/instrument-damage.js';
@@ -94,7 +95,7 @@ test('a surveillance patrol needs a working receiver within its remaining range'
 
 test('damage separates diesel generation, battery storage, electric drive and fuel supply',()=>{
  function run(engine,key,health){
-  const s=boat();s.ships=[];s.engine=engine;s.targetSpeed=17;s.systems[key]=health;
+  const s=boat();s.ships=[];s.engine=engine;s.dieselMode='drive';s.targetSpeed=17;s.systems[key]=health;
   step(s,60);return s;
  }
  assert.equal(run('diesel','diesel',100).speed,20.5);assert.equal(run('electric','diesel',100).speed,16);
@@ -106,14 +107,38 @@ test('damage separates diesel generation, battery storage, electric drive and fu
 });
 
 test('the same throttle slows while diving on diesel and the intake closes below 14 m',()=>{
- const steady=(engine,depth)=>{
-  const s=boat();Object.assign(s,{engine,depth,targetDepth:depth,targetSpeed:17,ships:[]});
+ const steady=(engine,depth,dieselMode='drive')=>{
+  const s=boat();Object.assign(s,{engine,depth,targetDepth:depth,targetSpeed:17,ships:[],dieselMode,battery:40});
   step(s,60);return s;
  };
- assert.equal(steady('diesel',0).speed,20.5);assert.equal(steady('diesel',3).speed,14.75);
- assert.equal(steady('diesel',14).speed,9);assert.equal(steady('diesel',14.1).speed,0);
+ assert.equal(steady('diesel',0).speed,20.5);assert.equal(steady('diesel',3).speed,16.75);
+ assert.equal(steady('diesel',14).speed,13);assert.equal(steady('diesel',14,'charge').speed,9);assert.equal(steady('diesel',14.1).speed,0);
  assert.equal(steady('electric',60).speed,16);
  const half=steady('diesel',0);half.targetSpeed=8.5;step(half,60);assert.equal(half.speed,10.25);
+});
+test('diesel routing trades stored charge for speed through one motor at the surface and on the snorkel',()=>{
+ for(const [depth,ratings] of [[0,[18.5,20.5,22]],[12,[9,13,17]]]){
+  for(const [index,dieselMode] of ['charge','drive','assist'].entries()){
+   const s=boat();Object.assign(s,{engine:'diesel',dieselMode,depth,targetDepth:depth,battery:40,speed:0,targetSpeed:17,ships:[]});
+   const fuel=s.fuel;assert.equal(propulsion(s).ahead,ratings[index]);
+   step(s,60);assert.equal(s.speed,ratings[index]);assert.ok(s.fuel<fuel);
+   assert.equal(Math.sign(s.battery-40),[1,0,-1][index]);
+   assert.equal(restore(save(s)).dieselMode,dieselMode);
+  }
+ }
+});
+test('assist only spends battery power above generator capacity and respects shared faults and intake loss',()=>{
+ const s=boat();Object.assign(s,{engine:'diesel',depth:12,dieselMode:'assist',targetSpeed:3,battery:50});
+ assert.equal(propulsion(s).assistDrain,0);s.targetSpeed=17;assert.ok(propulsion(s).assistDrain>0);
+ for(const key of ['engine','propeller']){
+  s.systems[key]=0;assert.equal(propulsion(s).ahead,0);assert.equal(propulsion(s).assistDrain,0);s.systems[key]=100;
+ }
+ s.systems.engine=50;assert.ok(propulsion(s).assistDrain>0);assert.equal(propulsion(s).ahead,8.5);s.systems.engine=100;
+ s.battery=0;assert.equal(propulsion(s).ahead,13);assert.equal(propulsion(s).assistDrain,0);
+ s.battery=100;s.dieselMode='charge';assert.equal(propulsion(s).ahead,13);assert.equal(propulsion(s).chargeRate,0);
+ s.dieselMode='assist';s.depth=15;assert.equal(propulsion(s).ahead,0);assert.equal(propulsion(s).assistDrain,0);
+ const old=JSON.parse(save(s));delete old.dieselMode;assert.equal(restore(JSON.stringify(old)).dieselMode,'charge');
+ old.dieselMode='bogus';assert.equal(restore(JSON.stringify(old)),null);
 });
 
 test('fuel damage loses stored fuel permanently and a crew can contain a fire and seal the leak',()=>{

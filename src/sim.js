@@ -9,6 +9,7 @@ import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from
 import {emitSound,updateAcoustics} from './acoustics.js';
 import {clamp,rad,bearing,delta,distance,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets} from './missions.js';
+import {isDieselMode} from './power-plant.js';
 import {maxNosePitch} from './rov-flight.js';
 import {freshSystems,freshMotion,freshDrone,deployDrone,recallDrone,hurt,updateBoat,updateDrone} from './systems.js';
 import {TORPEDO_SPEED,MAX_RUN,ENEMY_DECOY_SUPPLY,freshCombat,launchHostileTorpedo,launchTorpedo,restoreIncomingRun,restoreTorpedo,updateCombat} from './combat.js';
@@ -245,6 +246,7 @@ export function restore(raw){try{
  if(s.drone){for(const [k,v] of Object.entries({...freshDrone(),targetDepth:s.drone.depth,targetHeading:s.drone.heading}))if(s.drone[k]===undefined)s.drone[k]=v;}
  const template=createGame(s.mission);for(const [k,v] of Object.entries(template)){if(typeof v==='number'&&!Number.isFinite(s[k]))return null;if(typeof v==='boolean'&&typeof s[k]!=='boolean')return null;if(Array.isArray(v)&&!Array.isArray(s[k]))return null;}
  if(s.outerHull<0||s.outerHull>100||s.criticalExposure<0||![0,1,2].includes(s.pressureAlarm)||!s.collisionHits||Array.isArray(s.collisionHits)||typeof s.collisionHits!=='object'||!Object.values(s.collisionHits).every(t=>Number.isFinite(t)&&t>=0&&t<=s.time))return null;
+ if(!isDieselMode(s.dieselMode))return null;
  if(!['objective','extract'].includes(s.phase)||!['electric','diesel'].includes(s.engine)||!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y)||!s.drone||!['stowed','remote','return','lost'].includes(s.drone.mode))return null;
  if(!s.environment||!WEATHER[s.environment.startWeather]||!Number.isFinite(s.environment.startHour)||!Number.isFinite(s.environment.seed)||typeof s.environment.changing!=='boolean')return null;
  if(!s.systems||Object.keys(freshSystems()).some(k=>!Number.isFinite(s.systems[k])||s.systems[k]<0||s.systems[k]>100))return null;

@@ -11,7 +11,7 @@ import {boatPoint,boatLocal,recoveryDock,droneReturnSpeed} from './vehicle-statu
 export const DRONE_LIMITS=Object.freeze({deploySpeed:3,depth:280,range:100,speed:10,returnSpeed:10});
 export {SYSTEM_NAMES} from './equipment.js';
 export const freshSystems=()=>fullCondition(SYSTEM_KEYS);
-export const freshMotion=()=>({plantVersion:1,fuelLeak:0,fuelFire:0,cookoff:false,outerHull:100,pressureAlarm:0,criticalExposure:0,imploded:false,collisionHits:{},verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
+export const freshMotion=()=>({plantVersion:1,dieselMode:'charge',fuelLeak:0,fuelFire:0,cookoff:false,outerHull:100,pressureAlarm:0,criticalExposure:0,imploded:false,collisionHits:{},verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
 export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,nosePitch:null,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:'',returnStage:0,returnClearance:8,returnHoldSide:18,returnHoldForward:0});
 export function droneDeployReason(s){
  if(s.difficulty?.drone===false)return 'The ROV is disabled for this patrol.';
@@ -118,7 +118,7 @@ export function damageDrone(s,amount,reason){
 }
 export function updateBoat(s,dt){
  if(s.water>=70||s.hull<=0){s.status='lost';log(s,s.water>=70?'Flooding overwhelmed the sub. Buoyancy lost.':'Pressure hull lost.','damage');return false;}
- const {generator,drive,ahead,astern}=propulsion(s),diesel=generator>0;
+ const {generator,drive,ahead,astern,chargeRate,assistDrain}=propulsion(s),diesel=generator>0;
  const lever=throttlePercent(s.targetSpeed)/100;
  const order=clamp(lever*(lever<0?astern:ahead),s.silent?-3:-4,s.silent?3:ahead);
  const accelerating=Math.sign(order)===Math.sign(order-s.speed);
@@ -153,7 +153,7 @@ export function updateBoat(s,dt){
  s.x+=Math.sin(rad(s.heading))*horizontal*dt;s.y+=Math.cos(rad(s.heading))*horizontal*dt;
  const prop=propellerState(s.speed,s.depth,s.systems.propeller);s.propAngle=(s.propAngle+prop.rpm*Math.PI/30*dt)%(2*Math.PI);s.cavitation=prop.cavitation;s.propRpm=prop.rpm;
  s.noise=clamp(Math.max((diesel?65:8)+s.speed*s.speed*.39+(s.flood>0?12:0)+s.cavitation*23-(s.silent?7:0),s.time<(s.gunLoudUntil||0)?80:0),2,100);
- if(diesel){s.fuel=clamp(s.fuel-dt*.015,0,s.systems.fuelTank);s.battery=clamp(s.battery+dt*.12*generator*operatingFraction(s.systems.batteryBank),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}
+ if(diesel){s.fuel=clamp(s.fuel-dt*.015,0,s.systems.fuelTank);s.battery=clamp(s.battery+dt*(chargeRate-assistDrain),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}
  else{s.fuel=Math.min(s.fuel,s.systems.fuelTank);s.battery=clamp(s.battery-dt*(.009+s.speed*s.speed*.0007),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen-dt*(.024+(1-operatingFraction(s.systems.oxygen))*.1),0,100);}
  if(s.depth<2)s.oxygen=clamp(s.oxygen+dt*.45,0,100);
  if(s.depth>15||!operatingFraction(s.systems.periscope))s.scope=false;
