@@ -1,38 +1,45 @@
 import {hash01} from './environment.js';
-import {crewPeriod,messClips,messLine} from './mess-watch.js';
+import {crewOnAlert,crewPeriod,messClips,messLine} from './mess-watch.js';
 export {crewPeriod};
 
 const clips=[...messClips,'hit','hit-alt','leak','leak-alt','hit-quiet','leak-quiet'];
 const melodies=[[55,58,60,62,65,62,60,58,55,53,55,58,57,55],
  [60,64,67,69,67,64,62,65,67,65,62,60,57,60]];
 
-export function quietForSleep(s){
- if(s.silent||s.alert>30||s.shock>0||s.flood>0||s.pressureAlarm||s.time<(s.gunLoudUntil||0))return false;
- if(s.projectiles.length||s.shells.length||s.gunRounds.length||s.blasts.length||s.impacts.length)return false;
- if(s.airSupport.status==='arming'||s.airSupport.status==='airborne')return false;
- return !s.ships.some(v=>v.military&&v.side!=='friendly'&&v.hull>0&&(v.tracking==='tracking'||v.tracking==='searching'||Math.hypot(v.x-s.x,v.y-s.y)<850));
+export function quietForSleep(s,alert=crewOnAlert(s)){
+ return !alert&&!s.projectiles.length&&!s.shells.length&&!s.gunRounds.length&&!s.blasts.length&&!s.impacts.length&&
+  s.airSupport.status!=='arming'&&s.airSupport.status!=='airborne';
 }
 
 export class CrewAmbience {
  constructor(context,master){
   this.context=context;this.bus=context.createGain();this.bus.gain.value=0;this.bus.connect(master);
-  this.clips=new Map();this.state=null;this.slot=-1;this.nextHit=0;this.nextLeak=0;this.lastHull=100;this.lastFlood=0;
+  this.routineSources=new Set();this.clips=new Map();this.state=null;this.slot=-1;this.nextHit=0;this.nextLeak=0;this.lastHull=100;this.lastFlood=0;
   if(typeof context.decodeAudioData==='function')for(const name of clips){
    fetch(new URL(`crew/${name}.mp3`,import.meta.url)).then(response=>{
     if(!response.ok)throw Error('Crew clip unavailable');return response.arrayBuffer();
    }).then(data=>context.decodeAudioData(data)).then(buffer=>this.clips.set(name,buffer)).catch(()=>{});
   }
  }
- speak(name,volume){
+ trackRoutine(source,gain){
+  this.routineSources.add(source);
+  source.onended=()=>{this.routineSources.delete(source);source.disconnect();gain.disconnect();};
+ }
+ stopRoutine(){
+  for(const source of this.routineSources)source.stop();
+  this.routineSources.clear();
+ }
+ speak(name,volume,routine=false){
   const buffer=this.clips.get(name);if(!buffer)return;
   const source=this.context.createBufferSource(),gain=this.context.createGain();source.buffer=buffer;gain.gain.value=volume;
+  if(routine)this.trackRoutine(source,gain);
   source.connect(gain).connect(this.bus);source.start();return true;
  }
  note(frequency,when,length,volume,type='sine'){
   const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.type=type;
   oscillator.frequency.value=frequency;gain.gain.setValueAtTime(.0001,when);
   gain.gain.exponentialRampToValueAtTime(volume,when+.025);gain.gain.exponentialRampToValueAtTime(.0001,when+length);
-  oscillator.connect(gain).connect(this.bus);oscillator.start(when);oscillator.stop(when+length+.04);
+  this.trackRoutine(oscillator,gain);oscillator.connect(gain).connect(this.bus);oscillator.start(when);oscillator.stop(when+length+.04);
  }
  stopSnore(){
   if(!this.snore)return;
@@ -75,15 +82,17 @@ export class CrewAmbience {
   if(roll<.22)this.reaction={at:this.context.currentTime+1.2,line:roll<.11?'what-noise':'hear-that'};
  }
  update(s,e,active){
-  if(this.state!==s){this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=this.nextChatter=0;this.reaction=null;this.goodnightDay=-1;this.lastLine='';}
+  if(this.state!==s){this.stopRoutine();this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=this.nextChatter=0;this.reaction=null;this.goodnightDay=-1;this.lastLine='';}
   const now=this.context.currentTime,quiet=s.silent||s.alert>30;
-  const period=crewPeriod(e.hour),sleeping=active&&period==='sleep'&&quietForSleep(s);
+  const alert=crewOnAlert(s),period=crewPeriod(e.hour),sleeping=active&&period==='sleep'&&quietForSleep(s,alert);
+  if(!active||alert)this.stopRoutine();
+  const day=Math.floor((s.environment.startHour+s.time/120)/24);
+  if(period==='lights-out'&&alert)this.goodnightDay=day;
   if(!active||quiet)this.reaction=null;
   if(!sleeping)this.stopSnore();
   this.bus.gain.setTargetAtTime(active?(quiet?.08:.7):0,now,.09);
   if(active){
-   const day=Math.floor((s.environment.startHour+s.time/120)/24);
-   if(!quiet&&period==='lights-out'&&this.goodnightDay!==day&&this.speak('goodnight',.12))this.goodnightDay=day;
+   if(!alert&&period==='lights-out'&&this.goodnightDay!==day&&this.speak('goodnight',.12,true))this.goodnightDay=day;
    if(this.reaction&&now>=this.reaction.at){this.speak(this.reaction.line,.16);this.reaction=null;this.nextChatter=now+30;}
    const alternative=hash01(s.patrol.seed,Math.floor(s.time*4)+1800)<.5;
    if(s.hull<this.lastHull-1&&s.time>=this.nextHit){this.speak(quiet?'hit-quiet':alternative?'hit-alt':'hit',quiet?.34:.29);this.nextHit=s.time+16;}
@@ -93,14 +102,14 @@ export class CrewAmbience {
     this.slot=slot;
     const choice=hash01(s.patrol.seed,slot+1100);
     const line=messLine(period,hash01(s.patrol.seed,slot+1150),this.lastLine);
-    if(!quiet&&line&&choice<.72&&now>=this.nextChatter){
-     this.speak(line,.12);this.lastLine=line;this.nextChatter=now+12;this.note(1840,now+.12,.19,.023);this.note(2700,now+.29,.15,.013);
+    if(!alert&&line&&choice<.72&&now>=this.nextChatter){
+     this.speak(line,.12,true);this.lastLine=line;this.nextChatter=now+12;this.note(1840,now+.12,.19,.023);this.note(2700,now+.29,.15,.013);
     }
     if(sleeping&&choice<.12&&now>=this.nextSnore){
      this.playSnore(choice/.12);
      this.nextSnore=now+45; // Keep the cabin quiet even under time compression.
     }
-    if(!quiet&&period==='music'&&choice<.37)this.playMusic(s.patrol.seed+slot);
+    if(!alert&&period==='music'&&choice<.37)this.playMusic(s.patrol.seed+slot);
    }
   }
   this.lastHull=s.hull;this.lastFlood=s.flood;

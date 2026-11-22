@@ -1,3 +1,4 @@
+import {recordLocalLaunch} from './mess-watch.js';
 import {bearing,distance,log,rad} from './mechanics.js';
 import {hash01,scopeWashed} from './environment.js';
 import {operatingFraction} from './equipment.js';
@@ -76,6 +77,7 @@ export function updateConvoyRaid(s,dt,approaching,dropCharge){
  const hit=roll(2)<.76,damage=hit?45+Math.floor(roll(3)*21):0;
  c.shot={id:s.weaponSequence++,underwater:true,source:wolf.id,target:chosen.id,launched:s.time,arrives:s.time+12+roll(4)*14,damage,
   from:{x:wolf.x,y:wolf.y,altitude:-wolf.depth},to:{x:chosen.x+(hit?0:120),y:chosen.y,altitude:-2}};
+ recordLocalLaunch(s,wolf);
  emitSound(s,{type:'seeker',x:wolf.x,y:wolf.y,depth:wolf.depth,power:.45});
  const escort=ships.find(v=>v.kind==='escort'&&!v.disabled);
  if(escort){

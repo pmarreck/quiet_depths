@@ -1,3 +1,4 @@
+import {recordLocalLaunch} from './mess-watch.js';
 import {isOpponent} from './fleet-action.js';
 import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes} from './torpedo-tubes.js';
 import {replayEvent} from './instant-replay.js';
@@ -18,7 +19,7 @@ import {SUB_DESIGN as D} from './hull-design.js';
 import {addDebrief} from './debrief.js';
 
 export const MAX_RUN=4320;
-export const freshCombat=()=>({tubeReadyAt:freshTubeTimes(),runSetting:MAX_RUN,reports:[],gun:{ammo:240,cooldown:0,shots:0,angle:0,elevation:0},gunRounds:[],impacts:[],aircraft:[],airSupport:{status:'idle',requestedAt:null,launchAt:null,base:{x:-3200,y:3400},lastKnown:null},weaponSequence:1,gunLoudUntil:0});
+export const freshCombat=()=>({crewQuietUntil:0,tubeReadyAt:freshTubeTimes(),runSetting:MAX_RUN,reports:[],gun:{ammo:240,cooldown:0,shots:0,angle:0,elevation:0},gunRounds:[],impacts:[],aircraft:[],airSupport:{status:'idle',requestedAt:null,launchAt:null,base:{x:-3200,y:3400},lastKnown:null},weaponSequence:1,gunLoudUntil:0});
 const wrap=n=>(n%360+360)%360;
 export const TORPEDO_SPEED=24;
 const TORPEDO_LIFE=180,ARMING_TIME=4,MAX_PITCH=Math.PI/4;
@@ -55,6 +56,7 @@ export function launchTorpedo(s,id){
  const origin=boatPoint(boatSurfacePose(s),{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
  putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:s.heading,pitch:s.pitch,tubeSide});
+ recordLocalLaunch(s,s);
  log(s,`Tube away. Bearing ${Math.round(heading)}. Seeker arms after its run-out.`,'warning');return true;
 }
 export function launchHostileTorpedo(s,ship,track){
@@ -63,6 +65,7 @@ export function launchHostileTorpedo(s,ship,track){
  const aim=scatterAim(s,track,12+range*.04+track.age);
  const depth=clamp(track.depth+(rand(s)-.5)*(4+track.age*.25),SURFACE_RUN_DEPTH,220);
  putTorpedoInWater(s,'enemy',origin,bearing(origin,aim),depth,{heading:ship.heading,tubeSide,launcher:ship.id,aim});
+ recordLocalLaunch(s,ship);
  ship.lastTubeSide=tubeSide;
  log(s,'Incoming torpedo. Evade!','damage');
 }

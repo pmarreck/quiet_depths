@@ -1,3 +1,4 @@
+import {launchWatchSeconds} from './mess-watch.js';
 import {validTubeTimes} from './torpedo-tubes.js';
 import {convoyLosses,updateLamp,updateConvoyRaid,resolveConvoyCharge} from './convoy-watch.js';
 import {replayEvent} from './instant-replay.js';
@@ -300,6 +301,8 @@ export function restore(raw){try{
  if(!validTracks(s.torpedoTracks,s.time))return null;
  s.debrief??=[];
  if(!validDebrief(s.debrief,s.time)||s.patrolId!==undefined&&(typeof s.patrolId!=='string'||!/^[a-f0-9]{32}$/.test(s.patrolId)))return null;
+ const legacyCrewWatch=s.crewQuietUntil===undefined;
+ if(!legacyCrewWatch&&(!Number.isFinite(s.crewQuietUntil)||s.crewQuietUntil<0||s.crewQuietUntil>s.time+launchWatchSeconds))return null;
  if(s.noisemaker!==undefined&&!validReport(s.noisemaker,s.time))return null;
  // Migrate existing v1 patrols without discarding their progress or drone state.
  if(s.recon===undefined)s.recon=freshRecon();if(s.reconArchivedSequence===undefined)s.reconArchivedSequence=0;if(s.photoArchive===undefined)s.photoArchive=[];if(s.photoSequence===undefined)s.photoSequence=1;
@@ -373,6 +376,12 @@ export function restore(raw){try{
   if(c.fix&&!fixContact({},c.fix))return null;const old=/^Sierra (\d+)$/.exec(c.label);if(old)c.label=designation(Number(old[1]));}
  for(const e of s.events)if(!e||typeof e.text!=='string'||typeof e.kind!=='string'||!Number.isFinite(e.t))return null;
  if(!s.projectiles.every(p=>restoreTorpedo(s,p)))return null;
+ // Older saves can still date a player launch from a running torpedo.
+ if(legacyCrewWatch){
+  for(const p of s.projectiles)if(p.owner==='player'&&p.age>=0&&p.age<=s.time){
+   s.crewQuietUntil=Math.max(s.crewQuietUntil,s.time-p.age+launchWatchSeconds);
+  }
+ }
  for(const b of s.blasts){if(!['x','y','depth','delay','age'].every(k=>Number.isFinite(b[k])))return null;if(b.id===undefined)b.id=s.soundSequence++;if(b.totalDelay===undefined)b.totalDelay=Math.max(1,b.delay);if(b.exploded===undefined)b.exploded=b.age>0;if(b.exploded&&b.explodedAt===undefined)b.explodedAt=s.time-b.age;}
  s.blasts=s.blasts.filter(b=>{
   if(b.kind!=='weapon'||b.exploded)return true;

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {createGame,contact,step,fire,save,restore} from '../src/sim.js';
-import {updateCombat} from '../src/combat.js';
+import {launchHostileTorpedo,updateCombat} from '../src/combat.js';
 import {patrolNotices} from '../src/ui.js';
 import {disciplinaryFinding} from '../src/patrol-reports.js';
 import {floorSurface} from '../src/seafloor.js';
+import {crewOnAlert} from '../src/mess-watch.js';
 import {crewPeriod,quietForSleep,CrewAmbience} from '../src/crew-ambience.js';
 import {nudgeHelm,setHelmOrder} from '../src/controls.js';
 
@@ -105,4 +106,66 @@ test('night snores are infrequent, and a nearby enemy or battle cuts off an acti
  assert.ok(times.slice(1).every((t,i)=>t-times[i]>=45));
  crew.snore={gain,source:{stop(){stopped++;}}};s.ships[0].y=300;crew.update(s,{hour:3},true);
  assert.equal(stopped,1);assert.equal(crew.snore,null);
+});
+
+function crewWatch(){
+ const voices=[],notes=[],context={currentTime:0,createGain:()=>({gain:{setTargetAtTime(){}},connect(){}})};
+ const crew=new CrewAmbience(context,{});
+ crew.speak=line=>{voices.push(line);return true;};crew.note=(...args)=>notes.push(args);
+ crew.playSnore=()=>voices.push('snore');crew.playMusic=()=>voices.push('music');
+ const listen=(s,h)=>{context.currentTime=s.time;crew.update(s,{hour:h},true);};
+ return {voices,notes,listen};
+}
+
+test('combat patrols skip off-watch sounds even in empty water, while a peaceful crew can eat and sleep',()=>{
+ for(const mission of ['recon','intercept','seek-and-destroy','big-kahuna','seek-and-destroy-sub','tiebreaker']){
+  const s=quiet();s.mission=mission;const {voices,notes,listen}=crewWatch();
+  for(const hour of [7,12,14,18,20,23,3])for(let slot=0;slot<24;slot++){s.time+=19;listen(s,hour);}
+  if(mission==='recon'){for(const line of ['goodnight','snore','music'])assert.ok(voices.includes(line));assert.ok(notes.length);}
+  else{assert.deepEqual(voices,[],mission);assert.deepEqual(notes,[],mission);}
+ }
+});
+test('only live opponents within two chart kilometers interrupt routine, and a skipped goodnight is not played late',()=>{
+ for(const [kind,side,range,hull,expected] of [
+  ['ship','hostile',2000,100,false],['ship','hostile',2001,100,true],['ship','friendly',150,100,true],
+  ['ship','neutral',100,100,true],['ship','hostile',700,0,true],['aircraft','hostile',1900,100,false],
+ ]){
+  const s=quiet(),v={...target('traffic',range,side!=='neutral'),side,hull};s[kind==='aircraft'?'aircraft':'ships']=[v];
+  const {voices,listen}=crewWatch();listen(s,23);assert.equal(voices.includes('goodnight'),expected,[kind,side,range,hull].join('/'));
+  s.time+=6;v.y=6000;listen(s,23.05);assert.equal(voices.includes('goodnight'),expected);
+ }
+});
+
+test('recent successful launches keep mess quiet after the shot finishes, with range fixed at launch',()=>{
+ const s=quiet();s.time=12;const enemy=target('hostile',4000);s.ships=[enemy];contact(s,enemy,'active');
+ assert.equal(fire(s,'missing-contact'),false);assert.equal(crewOnAlert(s),false);
+ assert.ok(fire(s,enemy.id));
+ const legacy=JSON.parse(save(s));delete legacy.crewQuietUntil;
+ assert.equal(restore(JSON.stringify(legacy)).crewQuietUntil,s.crewQuietUntil);
+ s.projectiles=[];assert.equal(crewOnAlert(s),true);
+ const loaded=restore(save(s));assert.ok(loaded);loaded.time+=89.9;assert.ok(crewOnAlert(loaded));
+ loaded.time+=.2;assert.equal(crewOnAlert(loaded),false);
+ const aim={x:0,y:0,depth:40,age:0};
+ for(const [range,expected] of [[2001,false],[2000,true]]){
+  const other=quiet();other.time=31;const launcher=target('remote',range);
+  launchHostileTorpedo(other,launcher,aim);other.projectiles=[];other.y=-4000;
+  assert.equal(crewOnAlert(other),expected);
+ }
+ loaded.crewQuietUntil=loaded.time+91;assert.equal(restore(save(loaded)),null);
+});
+
+test('an alert cuts off playing mess voices and scheduled clinks without stopping damage reports',()=>{
+ const sources=[];
+ const node=()=>({connect(to){return to;},disconnect(){}});
+ const param=()=>({value:0,setTargetAtTime(){},setValueAtTime(){},exponentialRampToValueAtTime(){}});
+ const source=()=>{const n={...node(),frequency:param(),start(){},stop(at){this.stopped=at??'now';}};sources.push(n);return n;};
+ const ctx={currentTime:1,createGain:()=>({...node(),gain:param()}),createBufferSource:source,createOscillator:source};
+ const crew=new CrewAmbience(ctx,{}),s=quiet();s.time=1;
+ for(const clip of ['steak','goodnight','hit','hit-alt','leak','leak-alt'])crew.clips.set(clip,{});
+ crew.update(s,{hour:10},true);
+ crew.speak('steak',.12,true);crew.note(1840,ctx.currentTime+.12,.19,.023);
+ const [voice,clink]=sources;s.ships=[target('enemy',1700)];s.hull-=5;s.flood=1;
+ crew.update(s,{hour:23},true);
+ assert.equal(voice.stopped,'now');assert.equal(clink.stopped,'now');assert.equal(crew.routineSources.size,0);
+ assert.equal(sources.length,4);for(const urgent of sources.slice(2))assert.equal(urgent.stopped,undefined);
 });

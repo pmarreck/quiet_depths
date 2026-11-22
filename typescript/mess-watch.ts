@@ -1,3 +1,29 @@
+import {isOpponent} from './fleet-action.ts';
+import type {missions} from './mission-catalog.ts';
+
+type MissionId=(typeof missions)[number]['id'];
+type Point={x:number;y:number};
+type Vessel=Point & {military:boolean;side?:'friendly'|'hostile';hull:number;tracking?:string};
+type LaunchWatch=Point & {time:number;crewQuietUntil:number};
+interface CrewWatch extends LaunchWatch {
+  mission:MissionId;ships:Vessel[];aircraft:(Point & {hull:number;phase?:string})[];
+  silent:boolean;alert:number;shock:number;flood:number;pressureAlarm:number;gunLoudUntil:number;
+}
+const combatPatrols=new Set<MissionId>(['intercept','seek-and-destroy','seek-and-destroy-sub','big-kahuna','tiebreaker']);
+const nearby=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y)<=2000;
+export const launchWatchSeconds=90;
+
+// Remember range at launch even when the crew audio is off or the shot has ended.
+export function recordLocalLaunch(s:LaunchWatch,launcher:Point){
+  if(nearby(s,launcher))s.crewQuietUntil=s.time+launchWatchSeconds;
+}
+export function crewOnAlert(s:CrewWatch){
+  if(combatPatrols.has(s.mission)||s.silent||s.alert>30||s.shock>0||s.flood>0||s.pressureAlarm||s.time<s.gunLoudUntil)return true;
+  if(s.time<s.crewQuietUntil)return true;
+  return s.ships.some(v=>v.hull>0&&isOpponent(v)&&(nearby(s,v)||v.tracking==='tracking'||v.tracking==='searching'))
+    ||s.aircraft.some(v=>v.hull>0&&v.phase!=='gone'&&v.phase!=='down'&&nearby(s,v));
+}
+
 const breakfast=['eggs','morning','coffee','mess-a','mess-b'];
 const dinner=['steak','chicken','ice-cream','mmm','horse','elephant'];
 const coffee=['coffee','mess-a'];
