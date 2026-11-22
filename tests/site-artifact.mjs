@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {readFile,readdir} from 'node:fs/promises';
 import {join,relative} from 'node:path';
 import vm from 'node:vm';
@@ -42,16 +43,33 @@ const files=(await readdir(root,{recursive:true,withFileTypes:true})).filter(f=>
  .map(f=>relative(root,join(f.parentPath,f.name)));
 const scope='https://example.invalid/game/';
 const handlers=new Map();
-let requested;
+let requested,finishCache,activated=false,failInstall=false;
 vm.runInNewContext(await read('service-worker.js'),{
- self:{registration:{scope},addEventListener:(event,handler)=>handlers.set(event,handler)},
- URL,Request,caches:{open:async()=>({addAll:requests=>{requested=Array.from(requests,r=>r.url);}})}
+ self:{registration:{scope},skipWaiting:async()=>{activated=true;},addEventListener:(event,handler)=>handlers.set(event,handler)},
+ URL,Request,caches:{open:async()=>({addAll:requests=>{
+  requested=Array.from(requests);
+  if(failInstall)throw Error('incomplete download');
+  return new Promise(resolve=>{finishCache=resolve;});
+ }})}
 });
 let install;
 handlers.get('install')({waitUntil:result=>{install=result;}});
+await new Promise(resolve=>setImmediate(resolve));
+assert.equal(activated,false);
+finishCache();
 await install;
+assert.equal(activated,true,'a fully cached update can activate with an old tab open');
+activated=false;failInstall=true;
+handlers.get('install')({waitUntil:result=>{install=result;}});
+await assert.rejects(install,/incomplete download/);
+assert.equal(activated,false,'an incomplete update must leave the previous worker in control');
 // The browser fetches the worker itself independently of the asset cache.
-assert.deepEqual(requested.sort(),[scope,...files.filter(f=>f!=='service-worker.js').map(f=>new URL(f,scope).href)].sort());
+assert.deepEqual(requested.map(r=>r.url).sort(),[scope,...files.filter(f=>f!=='service-worker.js').map(f=>new URL(f,scope).href)].sort());
+for(const request of requested){
+ const file=decodeURIComponent(request.url.slice(scope.length))||'index.html';
+ const bytes=await readFile(join(root,file));
+ assert.equal(request.integrity,'sha256-'+createHash('sha256').update(bytes).digest('base64'),file);
+}
 for(const name of ['mission-picker.js','app.js','manifest.webmanifest','LICENSE'])assert.ok(files.includes(name),name);
 for(const entry of await readdir(new URL('../typescript/',import.meta.url))){
  if(!entry.endsWith('.ts'))continue;

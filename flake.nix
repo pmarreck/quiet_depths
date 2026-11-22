@@ -49,6 +49,7 @@
         buildPhase = ''
           runHook preBuild
           tsc --project tsconfig.json --noEmit false --outDir "$TMPDIR/typed-game"
+          tsc --project tsconfig.worker.json --noEmit false --outDir "$TMPDIR/typed-worker"
           cp "$TMPDIR/typed-game/"*.js src/
           elm make elm/MissionPicker.elm --optimize --output=mission-picker.js
           runHook postBuild
@@ -73,7 +74,7 @@
           install -m 0644 LICENSE "$out/LICENSE"
           cp mission-picker.js "$out/mission-picker.js"
           ${installElmLicenses}
-          node scripts/build-offline.mjs "$out"
+          node scripts/build-offline.mjs "$out" "$TMPDIR/typed-worker/service-worker.js"
           runHook postInstall
         '';
         doInstallCheck = true;

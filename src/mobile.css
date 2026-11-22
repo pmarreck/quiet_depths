@@ -109,6 +109,7 @@ body[data-station=drone] .viewport{touch-action:none}
 }
 
 #install-game{display:block;margin:12px 0 4px;padding:8px 12px;border:1px solid var(--line);min-height:44px}
+#update-game{display:inline-flex;align-items:center;min-height:44px;color:var(--gold)}
 #install-game[hidden],#install-help[hidden]{display:none}
 #install-help{margin:8px 0;color:var(--muted);line-height:1.45}
 

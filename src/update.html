@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a191e">
+<title>Update Quiet Depths</title>
+<style>
+  :root {color-scheme:dark;background:#0a191e;color:#e6e6d9;font:1rem/1.5 system-ui}
+  main {max-width:28rem;margin:14vh auto;padding:1.5rem} h1 {font:2rem Georgia,serif}
+  a,button {color:#e6c78f} button {font:inherit;margin-right:1rem}
+</style>
+<main>
+  <h1>Update Quiet Depths</h1>
+  <p id="update-status" role="status">Checking for the latest build. The game will reopen when it’s ready.</p>
+  <button id="retry-update" hidden>Retry</button>
+  <a href="./">Open game</a>
+</main>
+<script type="module" src="./pwa-update.js"></script>
+</html>

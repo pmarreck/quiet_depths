@@ -8,6 +8,8 @@ A browser submarine game about incomplete information and calculated exposure. T
 
 Choose **Install game** in the briefing for mobile installation. In Safari, use **Share → Add to Home Screen** and enable **Open as Web App**. The installed game works offline after its first complete online load.
 
+Open the Quiet Depths logo to see the build number. A new build downloads in the background while you play. Reopen the game to use it, or choose **Check for update** in the briefing. If an older build has no update link, open the [update page](https://pmarreck.github.io/quiet_depths/update.html). Your saved patrols and slots stay on the device.
+
 ## Build and run
 
 Nix is required to build and test the static site. Enable flakes. The pinned toolchain targets x86-64 and ARM64 Linux, including through WSL, and Apple silicon macOS. Any of those builds produces the same browser game.
