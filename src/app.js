@@ -175,7 +175,7 @@ $('difficulty-options').addEventListener('input',event=>{
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const missionPicker=globalThis.Elm.MissionPicker.init({
  node:$('patrol-briefing-controls'),
- flags:{selected:state.mission,times:conditionChoices(TIMES),weather:conditionChoices(WEATHER),missions:MISSIONS.map(({id,name,type,minutes})=>({id,name,category:type,duration:minutes}))}
+ flags:{selected:state.mission,times:conditionChoices(TIMES),weather:conditionChoices(WEATHER)}
 });
 missionPicker.ports.missionSelected.subscribe(updateMissionBriefing);
 missionPicker.ports.patrolRequested.subscribe(start);

@@ -180,3 +180,14 @@ test('Home Screen, favicon and manifest icons resolve to PNGs of their declared 
   assert.equal(png.readUInt32BE(16)+'x'+png.readUInt32BE(20),size,path);
  }
 });
+
+test('the mission catalog retains every historical v1 patrol ID in briefing order',()=>{
+ const savedIds=['recon','intercept','seek-and-destroy','seek-and-destroy-sub','sneaky-seamen',
+  'shadow','undersea-rescue','surface-rescue','survey'];
+ assert.deepEqual(MISSIONS.map(m=>m.id),savedIds);
+ for(const id of savedIds){
+  const patrol=createGame(id,37);
+  assert.equal(patrol.mission,id);
+  assert.equal(restore(save(patrol))?.mission,id);
+ }
+});

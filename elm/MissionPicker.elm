@@ -4,19 +4,11 @@ import Browser
 import Html exposing (Html, b, button, details, div, fieldset, img, input, label, legend, option, p, select, small, span, summary, text)
 import Html.Attributes exposing (alt, attribute, checked, class, classList, disabled, id, selected, src, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
-
-
-type alias Mission =
-    { id : String
-    , name : String
-    , category : String
-    , duration : String
-    }
+import PatrolMission exposing (Mission)
 
 
 type alias Flags =
-    { missions : List Mission
-    , selected : String
+    { selected : String
     , times : List Choice
     , weather : List Choice
     }
@@ -37,7 +29,7 @@ type alias Slots =
     { entries : List Slot, canSave : Bool, message : String }
 
 type alias Model =
-    { missions : List Mission, selected : String, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
+    { selected : Mission, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
 
 
 type Msg
@@ -73,7 +65,7 @@ port readSlot : { id : Int, revision : String } -> Cmd msg
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init = \flags -> ( { missions = flags.missions, selected = flags.selected, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False, times = flags.times, weather = flags.weather, conditions = { timeOfDay = "random", weather = "random", changing = True } }, Cmd.none )
+        { init = \flags -> ( { selected = PatrolMission.fromId flags.selected |> Maybe.withDefault PatrolMission.Recon, slots = { entries = [], canSave = False, message = "" }, confirm = Nothing, busy = False, times = flags.times, weather = flags.weather, conditions = { timeOfDay = "random", weather = "random", changing = True } }, Cmd.none )
         , update = update
         , subscriptions = \_ -> Sub.batch [ beginPatrol (\() -> BeginPatrol), showSlots Refresh, selectSetup SelectSetup ]
         , view = view
@@ -87,13 +79,18 @@ update msg model =
     in
     case msg of
         Choose mission ->
-            ( { model | selected = mission.id }, missionSelected mission.id )
+            ( { model | selected = mission }, missionSelected (PatrolMission.briefing mission).id )
 
         BeginPatrol ->
-            ( model, patrolRequested { mission = model.selected, conditions = conditions } )
+            ( model, patrolRequested { mission = (PatrolMission.briefing model.selected).id, conditions = conditions } )
 
         SelectSetup setup ->
-            ( { model | selected = setup.mission, conditions = setup.conditions }, missionSelected setup.mission )
+            case PatrolMission.fromId setup.mission of
+                Just mission ->
+                    ( { model | selected = mission, conditions = setup.conditions }, missionSelected setup.mission )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         SetTime time ->
             ( { model | conditions = { conditions | timeOfDay = time } }, Cmd.none )
@@ -131,7 +128,7 @@ view model =
             , div [ class "slot-list" ] (List.map (slotView model) model.slots.entries)
             , small [ attribute "role" "status" ] [ text model.slots.message ]
             ]
-        , div [ id "mission-picker" ] (List.map (missionButton model.selected) model.missions)
+        , div [ id "mission-picker" ] (List.map (missionButton model.selected) PatrolMission.all)
         , fieldset [ class "patrol-conditions" ]
             [ legend [] [ text "PATROL CONDITIONS" ]
             , conditionMenu "Time of day" "patrol-time" "Patrol time of day" model.times model.conditions.timeOfDay SetTime
@@ -181,18 +178,21 @@ slotView model slot =
         ]
 
 
-missionButton : String -> Mission -> Html Msg
-missionButton selected mission =
+missionButton : Mission -> Mission -> Html Msg
+missionButton selected choice =
     let
+        mission =
+            PatrolMission.briefing choice
+
         active =
-            selected == mission.id
+            selected == choice
     in
     button
         [ type_ "button"
         , classList [ ( "mission-option", True ), ( "active", active ) ]
         , attribute "data-mission" mission.id
         , attribute "aria-pressed" (if active then "true" else "false")
-        , onClick (Choose mission)
+        , onClick (Choose choice)
         ]
         [ span [ attribute "aria-hidden" "true" ] []
         , div [] [ b [] [ text mission.name ], small [] [ text mission.category ] ]

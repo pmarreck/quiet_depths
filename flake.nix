@@ -27,6 +27,22 @@
   in {
     packages = each (system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      elmInputs = pkgs.elmPackages.fetchElmDeps {
+        elmPackages = elmDependencies;
+        elmVersion = elmConfig.elm-version;
+        registryDat = nixpkgs.outPath + "/pkgs/development/compilers/elm/registry.dat";
+      };
+      patrolCatalog = pkgs.runCommand "quiet-depths-patrol-catalog.ts" {
+        nativeBuildInputs = [ pkgs.elmPackages.elm pkgs.nodejs ];
+      } ''
+        ${elmInputs}
+        mkdir elm
+        cp ${./elm.json} elm.json
+        cp ${./elm/PatrolMission.elm} elm/PatrolMission.elm
+        cp ${./elm/ExportPatrolMissions.elm} elm/ExportPatrolMissions.elm
+        elm make elm/ExportPatrolMissions.elm --optimize --output=export-missions.js
+        node ${./scripts/export-patrol-missions.mjs} export-missions.js > "$out"
+      '';
       build = { firstParentBase ? null, baseCommitCount ? null }: let
         hasRevision = self ? rev && firstParentBase != null && baseCommitCount != null;
         buildProvenance = {
@@ -41,13 +57,13 @@
         src = self;
         strictDeps = true;
         nativeBuildInputs = [ pkgs.nodejs pkgs.elmPackages.elm pkgs.typescript ];
-        preBuild = pkgs.elmPackages.fetchElmDeps {
-          elmPackages = elmDependencies;
-          elmVersion = elmConfig.elm-version;
-          registryDat = nixpkgs.outPath + "/pkgs/development/compilers/elm/registry.dat";
-        };
+        preBuild = elmInputs;
         buildPhase = ''
           runHook preBuild
+          diff -u typescript/mission-catalog.ts ${patrolCatalog} || {
+            echo "Refresh typescript/mission-catalog.ts from nix build .#patrol-catalog" >&2
+            exit 1
+          }
           tsc --project tsconfig.json --noEmit false --outDir "$TMPDIR/typed-game"
           tsc --project tsconfig.worker.json --noEmit false --outDir "$TMPDIR/typed-worker"
           cp "$TMPDIR/typed-game/"*.js src/
@@ -86,6 +102,7 @@
       };
     in {
       default = pkgs.lib.makeOverridable build { };
+      patrol-catalog = patrolCatalog;
     });
     checks = each (system: { site = self.packages.${system}.default; });
     devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {

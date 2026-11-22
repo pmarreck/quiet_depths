@@ -1,18 +1,7 @@
 import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanics.js';
 import {hash01,TIMES} from './environment.js';
-export const MISSIONS=[
- {id:'recon',name:'A quiet observation',type:'RECONNAISSANCE',desc:'Photograph the briefed number of different merchant ships through your periscope. Leave the escort wondering if you were ever there.',short:'Photograph the merchant convoy',minutes:'8–12 MIN',torps:6},
- {id:'intercept',name:'The long way home',type:'INTERCEPTION',desc:'Intercept the briefed military freighter. Confirm her silhouette before firing. The fishing boats are neutral.',short:'Identify and sink the military freighter',minutes:'10–15 MIN',torps:6},
- {id:'seek-and-destroy',name:'Seek and Destroy: Convoy',type:'SEEK AND DESTROY',desc:'Find the escorted convoy and sink all three military transports. Fishing boats are neutral. Surface at extraction when the convoy is down.',short:'Find and sink three military transports',minutes:'12–18 MIN',torps:6},
- {id:'seek-and-destroy-sub',name:'Seek and Destroy: Sub',type:'SUBMARINE HUNT',desc:'Find the hostile submarine. A second boat may be in the area. Sink what you can and surface at extraction to survive the patrol.',short:'Hunt enemy submarines or withdraw to extraction',minutes:'10–18 MIN',torps:6},
- {id:'sneaky-seamen',name:'Sneaky Seamen',type:'COVERT TRANSIT',desc:'Cross from Gate A to Gate B through a convoy patrol. At least one submarine is listening. Reach the far gate at any depth and bring your crew through alive.',short:'Cross the patrol area to Gate B',minutes:'10–18 MIN',torps:6},
- {id:'shadow',name:'Just passing through',type:'SURVEILLANCE',desc:'Quietly track the convoy inside 4 km. Defensive torpedoes are aboard if the patrol turns hostile. Bring the traffic intelligence home.',short:'Quietly track the convoy',minutes:'8–12 MIN',torps:6},
- {id:'undersea-rescue',name:'Someone is still knocking',type:'UNDERSEA RESCUE',desc:'A disabled submarine lies on the reef shelf. Hold 30–75 m from her at rescue depth, below 0.6 knots, while divers assess and recover survivors. Hostile patrols may still be nearby.',short:'Hold at the wreck; recover survivors',minutes:'8–14 MIN',torps:6},
- {id:'surface-rescue',name:'A light in the swell',type:'SURFACE RESCUE',desc:'A damaged research vessel is sinking. Surface and hold 30–85 m away, below 0.6 knots. Rescue launches bring survivors aboard. Enemy gunfire or ramming may force you to move.',short:'Surface beside the casualty; hold position',minutes:'7–12 MIN',torps:6},
- {id:'survey',name:'What the sea remembers',type:'WRECK SURVEY',desc:'Survey an old wreck on the reef shelf. Collect 45 seconds of close sonar scanning, or photograph it from three different sides with your camera ROV. Defensive torpedoes are aboard. Stay within the 100 m cable.',short:'Scan the wreck or take 3 ROV photographs',minutes:'8–12 MIN',torps:6}
-];
-
-const convoyTransportIds=['cobalt','meridian','alder'];
+import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-objective.js';
+export {MISSIONS};
 
 export function patrolSetup(state){
  const env=state.environment;
@@ -30,10 +19,6 @@ export function parsePatrolSeed(text){
  return seed<=0xffffffff?seed:undefined;
 }
 
-function sunkTransports(s){
- return convoyTransportIds.filter(id=>s.ships.some(ship=>ship.id===id&&ship.hull===0)).length;
-}
-
 export function validMissionTargets(s){
  if(s.mission==='sneaky-seamen')return s.departure&&Number.isFinite(s.departure.x)&&Number.isFinite(s.departure.y)&&s.ships.some(v=>v.kind==='sub'&&v.military)&&s.ships.some(v=>v.kind==='merchant');
  if(s.mission==='intercept')return s.ships.some(ship=>ship.id==='cobalt');
@@ -43,7 +28,7 @@ export function validMissionTargets(s){
   const matches=s.ships.filter(ship=>ship.id===id);
   return matches.length===1&&matches[0].kind==='merchant'&&matches[0].military===true;
  });
- return valid&&(s.phase==='objective'||sunkTransports(s)===convoyTransportIds.length);
+ return valid&&(s.phase==='objective'||allSunk(s.ships,convoyTransportIds));
 }
 export function setupOperation(s,seed){
  s.site=null;s.operation=null;
@@ -123,9 +108,7 @@ export function objectiveState(s){
  }
  return {label:s.mission==='recon'?'PHOTOGRAPH THE CONVOY':s.mission==='intercept'?'INTERCEPT '+(s.ships.find(v=>v.id==='cobalt')?.name||'MILITARY FREIGHTER').toUpperCase():'LISTEN WITHOUT BEING SEEN',text:s.mission==='recon'?`Photograph ${s.patrol.photoGoal} different merchant ships`:s.mission==='shadow'?`Track quietly for ${s.patrol.trackGoal} seconds`:MISSIONS.find(m=>m.id===s.mission).short,progress:s.mission==='recon'?s.photos.length+'/'+s.patrol.photoGoal:s.mission==='shadow'?Math.min(s.patrol.trackGoal,Math.floor(s.trackTime))+'/'+s.patrol.trackGoal:'0/1',advice:''};
 }
-const completionRules={'sneaky-seamen':s=>distance(s,s.home)<=200,recon:s=>s.photos.length>=s.patrol.photoGoal,intercept:s=>s.ships.find(v=>v.id==='cobalt')?.hull===0,'seek-and-destroy':s=>sunkTransports(s)===convoyTransportIds.length,'seek-and-destroy-sub':()=>true,shadow:s=>s.trackTime>=s.patrol.trackGoal,'undersea-rescue':updateOperation,'surface-rescue':updateOperation,survey:updateOperation};
-if(MISSIONS.length!==Object.keys(completionRules).length||MISSIONS.some(m=>!Object.hasOwn(completionRules,m.id)))throw new Error('Every mission must have an explicit completion rule.');
-export const objectiveComplete=(s,dt)=>completionRules[s.mission](s,dt);
+export const objectiveComplete=(s,dt)=>evaluateObjective(s,dt,updateOperation);
 export function randomizePatrol(s,seed){
  const h=n=>hash01(seed,n),heading=220+h(21)*65,start={x:(h(22)-.5)*500,y:(h(23)-.5)*500};
  s.patrol={seed,photoGoal:2+Math.floor(h(24)*2),trackGoal:150+30*Math.floor(h(25)*4),variant:1+Math.floor(h(26)*999)};
