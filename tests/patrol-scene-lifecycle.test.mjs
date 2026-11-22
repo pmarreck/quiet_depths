@@ -57,6 +57,23 @@ test('the orbit locator marks either side from launch and freezes with the shot'
  for(const model of combat.torpedoes.values())assert.equal(model.userData.ring.visible,false);
 });
 
+test('an actual seeker ping paints a faint smooth expanding surface and goes dark between pulses',()=>{
+ const combat=new CombatScene(new THREE.Scene(),null),s=createGame('recon',42),env=environmentAt(s);
+ s.projectiles=['player','enemy'].map((owner,id)=>({id,owner,x:id*30,y:0,depth:32,heading:12,pitch:0,age:8,pingAge:.02,path:[]}));
+ combat.update(s,env,true);
+ for(const g of combat.torpedoes.values()){
+  const r=g.userData.ring;assert.ok(r.visible&&r.material.transparent&&r.material.depthTest&&!r.material.depthWrite);
+  assert.equal(r.material.wireframe,false);assert.ok(r.geometry.parameters.widthSegments>=32);
+  assert.ok(r.material.opacity>0&&r.material.opacity<=.11);g.userData.earlySize=r.scale.x;g.userData.earlyOpacity=r.material.opacity;
+ }
+ for(const p of s.projectiles)p.pingAge=.26;combat.update(s,env,false);
+ for(const g of combat.torpedoes.values()){
+  const r=g.userData.ring;assert.ok(r.visible&&r.scale.x>g.userData.earlySize&&r.material.opacity<g.userData.earlyOpacity);
+ }
+ for(const p of s.projectiles)p.pingAge=.4;combat.update(s,env,true);
+ for(const g of combat.torpedoes.values())assert.equal(g.userData.ring.visible,false);
+});
+
 test('rain geometry is reproducible and a paused frame holds the lightning display clock',()=>{
  const make=()=>new Atmosphere(new THREE.Scene());
  const a=make(),b=make(),s=createGame('survey',712,{weather:'rain'});

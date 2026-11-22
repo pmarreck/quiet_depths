@@ -38,7 +38,15 @@ export class CombatScene{
   const wake=new T.Points(geometry,new T.PointsMaterial({map:this.glow,size:4,color:0xe3f0e8,transparent:true,opacity:.8,depthWrite:false}));this.root.add(wake);
   const bubblesGeometry=new T.BufferGeometry();bubblesGeometry.setAttribute('position',new T.Float32BufferAttribute(new Float32Array(240*3),3));
   const bubbles=new T.Points(bubblesGeometry,new T.PointsMaterial({map:this.glow,size:2,color:0xd5f0ef,transparent:true,opacity:BUBBLE_OPACITY,depthWrite:false}));this.root.add(bubbles);
-  const ring=mesh(g,new T.SphereGeometry(1,16,8),new T.MeshBasicMaterial({color:0x84c8b9,transparent:true,opacity:.1,wireframe:true,depthWrite:false}));g.userData={wake,bubbles,ring,screws};return g;
+  const shell=new T.MeshBasicMaterial({color:0xa1d2c9,transparent:true,opacity:0,depthWrite:false});
+  // A grazing view catches more of the shell. The center stays almost clear.
+  shell.onBeforeCompile=shader=>{
+   shader.vertexShader='varying float facing;\n'+shader.vertexShader.replace('#include <project_vertex>',
+    '#include <project_vertex>\nfacing = abs(dot(normalize(normalMatrix * normal), normalize(-mvPosition.xyz)));');
+   shader.fragmentShader='varying float facing;\n'+shader.fragmentShader.replace('#include <color_fragment>',
+    '#include <color_fragment>\ndiffuseColor.a *= .18 + .82 * pow(1. - clamp(facing, 0., 1.), 1.4);');
+  };
+  const ring=mesh(g,new T.SphereGeometry(1,48,32),shell);g.userData={wake,bubbles,ring,screws};return g;
  }
  dispose(group){group.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});group.parent?.remove(group);}
  removeTorpedo(group){this.dispose(group.userData.wake);this.dispose(group.userData.bubbles);this.dispose(group);}
@@ -81,13 +89,13 @@ export class CombatScene{
    const [front,rear]=g.userData.screws,elapsed=p.age-(g.userData.lastAge??p.age);
    front.rotation.z=renderedScrewAngle(front.rotation.z,720,elapsed,TORPEDO_BLADES);
    rear.rotation.z=Math.PI/TORPEDO_BLADES-front.rotation.z;g.userData.lastAge=p.age;
-   const ring=g.userData.ring,pinging=p.age>=4&&p.pingAge<.7;
-   ring.visible=pinging||orbiting;
-   if(pinging){
-    ring.scale.setScalar(1+p.pingAge*45);ring.material.opacity=.24*(1-p.pingAge/.7);
-   }else if(orbiting){
-    const pulse=(p.age%1.5)/1.5;
-    ring.scale.setScalar(1.6+1.5*pulse);ring.material.opacity=.48-.32*pulse;
+   const ring=g.userData.ring,duration=.38,pinging=p.age>=4&&p.pingAge>=0&&p.pingAge<duration;
+   const launchDuration=.7;
+   ring.visible=pinging||(orbiting&&p.age<launchDuration);
+   if(ring.visible){
+    const phase=pinging?p.pingAge/duration:p.age/launchDuration;
+    ring.scale.setScalar(pinging?1+22*phase:1.6+1.5*phase);
+    ring.material.opacity=(pinging?.105:.085)*(1-phase)**1.35;
    }
    g.userData.path=p.path;this.updateTrail(g,p.path,s.time,e);
   }
