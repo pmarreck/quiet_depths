@@ -431,6 +431,25 @@ $('ticker-next').onclick=()=>{
  const items=$('ticker-items');
  items.scrollLeft=items.scrollLeft+items.clientWidth<items.scrollWidth-1?items.scrollLeft+items.clientWidth:0;
 };
+let lastLogHead=null,logSequence=0;
+const logKeys=new WeakMap();
+function updatePatrolLog(events){
+ const list=$('log');
+ if(events[0]===lastLogHead&&list.childElementCount===events.length)return;
+ lastLogHead=events[0];
+ const atTop=list.scrollTop===0;
+ reconcileKeyedChildren(list,events,event=>{
+  if(!logKeys.has(event))logKeys.set(event,++logSequence);
+  return logKeys.get(event);
+ },event=>{
+  const row=document.createElement('div'),time=document.createElement('time'),message=document.createElement('span');
+  row.className='log-entry '+event.kind;
+  time.textContent=String(Math.floor(event.t/60)).padStart(2,'0')+':'+String(Math.floor(event.t%60)).padStart(2,'0');
+  message.textContent=event.text;row.append(time,message);return row;
+ },()=>{});
+ if(atTop)list.scrollTop=0;
+ $('log-count').textContent=String(events.length).padStart(2,'0');
+}
 function updateUI(){
  if(!patrolStarted||replay)return;
  const s=state,env=environmentAt(s),m=MISSIONS.find(m=>m.id===s.mission),extract=s.phase==='extract',pickup=(extract||['intercept','seek-and-destroy','big-kahuna'].includes(s.mission))&&distance(s,s.home)<400,objective=objectiveState(s);
@@ -464,7 +483,7 @@ function updateUI(){
  $('hull-value').innerHTML=Math.round(s.hull)+'<span>%</span>';$('hull-bar').style.width=s.hull+'%';$('hull-bar').style.background=s.hull<45?'var(--red)':'var(--green)';
  const boatStatus=s.fuelFire?'FUEL FIRE':s.fuelLeak?'FUEL TANK LEAK':s.repair>0?'DAMAGE CONTROL WORKING':s.flood>0?'FLOODING · '+s.flood.toFixed(1)+' T/MIN · '+s.water.toFixed(1)+' T ABOARD':s.hull<99.9?'PRESSURE HULL DAMAGED':s.outerHull<99.9?'OUTER HULL DAMAGED':Object.values(s.systems).some(v=>v<100)?'SUBSYSTEM DAMAGE':'ALL SYSTEMS NOMINAL';
  $('system-status').textContent=boatStatus;$('system-status').style.color=s.flood>0?'var(--red)':s.outerHull<99.9?'var(--gold)':'var(--green)';
- $('log').innerHTML=s.events.slice(0,12).map(e=>`<div class="log-entry ${esc(e.kind)}"><time>${String(Math.floor(e.t/60)).padStart(2,'0')}:${String(Math.floor(e.t%60)).padStart(2,'0')}</time><span>${esc(e.text)}</span></div>`).join('');$('log-count').textContent=String(s.events.length).padStart(2,'0');
+ updatePatrolLog(s.events);
  $('subsystems').innerHTML=Object.entries(SYSTEM_NAMES).map(([key,name])=>`<div><span>${name}</span><b class="${s.systems[key]<60?'damaged':''}">${conditionLabel(s.systems[key],s.repairLimits[key],key!=='crew')}</b></div>`).join('');$('buoyancy-readout').textContent=`BALLAST ${s.ballast>0?'FLOODING':'BLOWING'} ${Math.abs(s.ballast*100).toFixed(0)}% · VERTICAL ${s.verticalSpeed.toFixed(2)} M/S · ${s.propRpm.toFixed(0)} RPM${s.cavitation>.05?' · CAVITATING':''}`;
  $('drone-bay-mode').textContent=s.drone.mode.toUpperCase();$('drone-bay-mode').classList.toggle('damaged',s.drone.mode==='lost');$('drone-bay-metrics').innerHTML=`<span>CHARGE <b>${Math.round(s.drone.battery)}%</b></span>${DRONE_PARTS.map(key=>`<span>${key.toUpperCase()} <b>${conditionLabel(s.drone[key],s.drone.repairLimits[key],key!=='hull')}</b></span>`).join('')}`;$('drone-bay-advice').textContent=s.drone.mode==='lost'?s.drone.lostReason:s.drone.mode==='stowed'?(droneDeployReason(s)||'READY · 280 M MAX · DEPLOY ≤3 KN'):Math.round(separation(s,s.drone))+' / 100 M LINK · BUOYANCY '+Math.round(s.drone.buoyancy)+'%';
  const plant=propulsion(s);

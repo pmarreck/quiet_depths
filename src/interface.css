@@ -44,3 +44,12 @@ body.loss #result-dialog{border-color:#d79377;background:#28191cf5;box-shadow:0 
 .run-limit output{color:var(--gold);font-variant-numeric:tabular-nums}
 .report-heading{position:relative}.report-heading:has(#discipline-stamp:not([hidden])){padding-bottom:48px}
 #discipline-stamp:not([hidden]){position:absolute;right:3%;bottom:6px;transform:rotate(var(--stamp-angle));color:#ff837d;border:4px double currentColor;border-radius:4px;padding:5px 9px;letter-spacing:.08em;font:bold clamp(16px,4vw,25px)/1.2 var(--mono)}
+
+.sidebar-sections{display:contents}
+@media(min-width:1101px){
+ .left-panel{display:grid;grid-template-rows:auto minmax(0,1fr) minmax(0,44%) auto;overflow:hidden}
+ .sidebar-sections{display:block;overflow-y:auto;scrollbar-width:thin}
+ .log-panel{display:flex;flex-direction:column;min-height:0;padding-block:12px;border-top:1px solid var(--line)}
+ .log-panel .section-heading{flex:none}
+ #log{flex:1;min-height:0;max-height:none;margin-top:8px;overscroll-behavior:contain;scrollbar-gutter:stable}
+}
