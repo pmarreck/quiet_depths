@@ -1,5 +1,5 @@
 import {isOpponent} from './fleet-action.ts';
-import type {missions} from './mission-catalog.ts';
+import {missions} from './mission-catalog.ts';
 
 type MissionId=(typeof missions)[number]['id'];
 type Point={x:number;y:number};
@@ -9,7 +9,7 @@ interface CrewWatch extends LaunchWatch {
   mission:MissionId;ships:Vessel[];aircraft:(Point & {hull:number;phase?:string})[];
   silent:boolean;alert:number;shock:number;flood:number;pressureAlarm:number;gunLoudUntil:number;
 }
-const combatPatrols=new Set<MissionId>(['intercept','seek-and-destroy','seek-and-destroy-sub','big-kahuna','tiebreaker']);
+const combatPatrols=new Set<MissionId>(missions.filter(m=>m.actionStations).map(m=>m.id));
 const nearby=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y)<=2000;
 export const launchWatchSeconds=90;
 

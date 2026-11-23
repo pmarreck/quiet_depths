@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {createGame,contact,step,fire,save,restore} from '../src/sim.js';
+import {createGame,contact,step,fire,save,restore,MISSIONS} from '../src/sim.js';
 import {launchHostileTorpedo,updateCombat} from '../src/combat.js';
 import {patrolNotices} from '../src/ui.js';
 import {disciplinaryFinding} from '../src/patrol-reports.js';
@@ -118,10 +118,11 @@ function crewWatch(){
 }
 
 test('combat patrols skip off-watch sounds even in empty water, while a peaceful crew can eat and sleep',()=>{
- for(const mission of ['recon','intercept','seek-and-destroy','big-kahuna','seek-and-destroy-sub','tiebreaker']){
+ const routine=new Set(['recon','sneaky-seamen','shadow','undersea-rescue','surface-rescue','survey','wolf-in-the-henhouse']);
+ for(const {id:mission} of MISSIONS){
   const s=quiet();s.mission=mission;const {voices,notes,listen}=crewWatch();
   for(const hour of [7,12,14,18,20,23,3])for(let slot=0;slot<24;slot++){s.time+=19;listen(s,hour);}
-  if(mission==='recon'){for(const line of ['goodnight','snore','music'])assert.ok(voices.includes(line));assert.ok(notes.length);}
+  if(routine.has(mission)){for(const line of ['goodnight','snore','music'])assert.ok(voices.includes(line));assert.ok(notes.length);}
   else{assert.deepEqual(voices,[],mission);assert.deepEqual(notes,[],mission);}
  }
 });

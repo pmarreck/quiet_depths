@@ -50,6 +50,7 @@ encodeMission mission =
         [ ( "id", E.string b.id )
         , ( "name", E.string b.name )
         , ( "type", E.string b.category )
+        , ( "actionStations", E.bool (b.crewWatch == PatrolMission.ActionStations) )
         , ( "minutes", E.string (PatrolMission.estimatedMinutes False b) )
         , ( "longMinutes", E.string (PatrolMission.estimatedMinutes True b) )
         , ( "desc", E.string b.description )
