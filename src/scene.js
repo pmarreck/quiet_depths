@@ -3,6 +3,7 @@ import {lampLit,lampRange} from './signal-lamp.js';
 import {surfaceShip} from './surface-ship.js';
 import {makeCarrier} from './carrier-model.js';
 import {damageWreck} from './wrecks.js';
+import {founderingPose,wreckVisible} from './foundering.js';
 import * as T from './vendor/three.module.js';
 import {bottom,rad} from './sim.js';
 import {feedActive,cameraEuler,droneCameraPitch,orbitVerticalFov} from './controls.js';
@@ -322,16 +323,16 @@ export class OceanScene{
   this.particles.visible=underwater;this.light.visible=underwater;
   const liveShipIds=new Set(s.ships.map(v=>v.id));for(const [id,mesh] of this.ships)if(!liveShipIds.has(id)){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});this.ships.delete(id);}
   for(const ship of s.ships){
-   const sub=ship.kind==='sub',sunk=ship.hull<=0;
+   const sub=ship.kind==='sub',sunk=ship.hull<=0,wreck=wreckVisible(ship,time);
    let mesh=this.ships.get(ship.id);
-   if(mesh?.userData.wreck&&!sunk){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});mesh=null;}
+   if(mesh?.userData.wreck&&!wreck){this.scene.remove(mesh);mesh.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});mesh=null;}
    if(!mesh){mesh=this.makeShip(ship);this.ships.set(ship.id,mesh);this.scene.add(mesh);}
    if(mesh.userData.parked){
     const launched=s.airSupport.status==='airborne'||s.airSupport.status==='spent';
     const vacant=launched&&s.airSupport.launchAt!==null?ship.fighterCount:0;
-    mesh.userData.parked.children.forEach((plane,i)=>plane.visible=!sunk&&i>=vacant);
+    mesh.userData.parked.children.forEach((plane,i)=>plane.visible=!wreck&&i>=vacant);
    }
-   if(sunk&&!mesh.userData.wreck)damageWreck(T,mesh,sub);
+   if(wreck&&!mesh.userData.wreck)damageWreck(T,mesh,sub);
    const d=Math.hypot(listener.x-ship.x,listener.y-ship.y),drop=ship.sinkDepth||0;
    mesh.visible=(drone||orbiting||!sub)&&d<(underwater?350:e.opticalRange);
    if(mesh.userData.lights)mesh.userData.lights.visible=!sunk&&!underwater&&e.navigationLights&&ship.lights!==false&&!ship.blackout&&d<e.lightRange;
@@ -346,10 +347,17 @@ export class OceanScene{
     }
     mesh.visible=true;lamp.visible=lampLit(message);
    }else if(mesh.userData.signalLamp)mesh.userData.signalLamp.visible=false;
-   mesh.position.set(ship.x,(sub?-ship.depth:sunk?0:surfaceHeight(ship.x,ship.y,time,e)*.65)-drop,-ship.y);
    mesh.rotation.order='YXZ';mesh.rotation.y=-rad(ship.heading);
-   mesh.rotation.z=sunk?Math.min(1.38,.18+drop*.018):Math.sin(time*.8+ship.x)*.012*e.waveScale+Math.min(.35,(ship.flood||0)*.012);
-   mesh.rotation.x=sunk?.06:Math.sin(time*.55+ship.y)*.008*e.waveScale;
+   const swellRoll=Math.sin(time*.8+ship.x)*.012*e.waveScale,swellPitch=Math.sin(time*.55+ship.y)*.008*e.waveScale;
+   if(sub){
+    mesh.position.set(ship.x,-ship.depth-drop,-ship.y);
+    mesh.rotation.z=sunk?Math.min(1.38,.18+drop*.018):swellRoll+Math.min(.35,(ship.flood||0)*.012);
+    mesh.rotation.x=sunk?.06:swellPitch;
+   }else{
+    const {roll,pitch,wave}=founderingPose(ship.kind,drop);
+    mesh.position.set(ship.x,wave*surfaceHeight(ship.x,ship.y,time,e)*.65-drop,-ship.y);
+    mesh.rotation.z=roll+wave*swellRoll;mesh.rotation.x=pitch+wave*swellPitch;
+   }
    if(mesh.userData.prop)mesh.userData.prop.rotation.z=time*ship.speed*.8;
    if(sub){
     const crush=ship.collapsedAt===undefined?0:Math.min(1,Math.max(0,(time-ship.collapsedAt)*5));
@@ -397,7 +405,8 @@ export class OceanScene{
     if(p.z>=-1&&p.z<=1&&Math.abs(p.x)<1&&Math.abs(p.y)<1){
      const direction=position.sub(this.camera.position);
      this.lampRay.far=direction.length();this.lampRay.set(this.camera.position,direction.normalize());
-     const blocked=(tower&&this.own.userData.mast.visible&&this.lampRay.intersectObject(this.own.userData.mast).length>0)||
+     const blocked=(tower&&((this.own.userData.mast.visible&&this.lampRay.intersectObject(this.own.userData.mast).length>0)||
+      this.lampRay.intersectObject(this.own.userData.fixedMasts).length>0))||
       [...this.ships.values()].some(other=>other!==mesh&&other.visible&&other.userData.body?.visible&&this.lampRay.intersectObject(other.userData.body).length>0);
      if(!blocked)this.lampSource=id;
     }

@@ -8,6 +8,8 @@ import {floorSurface} from '../src/seafloor.js';
 import {crewOnAlert} from '../src/mess-watch.js';
 import {crewPeriod,quietForSleep,CrewAmbience} from '../src/crew-ambience.js';
 import {nudgeHelm,setHelmOrder} from '../src/controls.js';
+import {ReplayRecorder} from '../src/instant-replay.js';
+import {founderingPose,submergedDepth,wreckVisible} from '../src/foundering.js';
 
 const quiet=()=>{const s=createGame('recon',42);Object.assign(s,{x:0,y:0,speed:0,targetSpeed:0,depth:40,targetDepth:40,heading:0,targetHeading:0,scope:false,ships:[],contacts:[]});return s;};
 const text=s=>patrolNotices(s,false,false).map(n=>n.text);
@@ -89,6 +91,31 @@ test('an impact is anonymous until debrief, a later collapse yields an estimated
  for(let i=0;i<3;i++)step(loaded,60);const wreck=loaded.ships[0];
  assert.equal(wreck.settled,true);assert.ok(Math.abs(wreck.depth+wreck.sinkDepth+floorSurface(wreck.x,wreck.y).height+3)<.01);
  const savedDepth=wreck.sinkDepth;updateCombat(loaded,1);assert.equal(wreck.sinkDepth,savedDepth);
+});
+
+test('a struck merchant lists before diving and its sinking replay ends with the intact ship going under',()=>{
+ const s=quiet(),v={...target('freighter',240),kind:'merchant',depth:0};
+ s.ships=[v];s.difficulty.instantReplay=s.difficulty.enemyReplay=true;
+ const recorder=new ReplayRecorder(s);
+ contact(s,v,'active');assert.ok(fire(s,v.id));
+ for(let i=0;i<100&&v.hull>0;i++){step(s,.25);recorder.capture(s);}
+ assert.equal(v.hull,0);
+ for(let i=0;i<25*4;i++){step(s,.25);recorder.capture(s);}
+ const pose=founderingPose(v.kind,v.sinkDepth);
+ assert.ok(Math.abs(pose.pitch)>.1&&Math.abs(pose.roll)>.2);
+ assert.ok(!wreckVisible(v,s.time));
+ const loaded=restore(save(s));
+ assert.deepEqual(founderingPose('merchant',loaded.ships[0].sinkDepth),pose);
+ for(let i=0;i<55*4;i++){step(s,.25);recorder.capture(s);}
+ const sinks=recorder.pending.filter(c=>c.event.kind==='sinking');
+ assert.equal(sinks.length,1);
+ const clip=sinks[0],last=submergedDepth('merchant');
+ assert.ok(clip.frames[0].ships[0].sinkDepth<last&&clip.frames.at(-1).ships[0].sinkDepth>last);
+ assert.ok(clip.frames.every(f=>!wreckVisible(f.ships[0],f.time)));
+ for(let i=0;i<12&&!v.settled;i++)step(s,20);
+ assert.ok(v.settled&&wreckVisible(v,s.time));
+ const historical=createGame('wolf-in-the-henhouse',12).ships.find(other=>other.id==='plover');
+ assert.ok(wreckVisible(historical,0));
 });
 
 test('night snores are infrequent, and a nearby enemy or battle cuts off an active snore',()=>{

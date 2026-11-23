@@ -51,7 +51,9 @@ export function createSubmarine(T){
   box(root,[.038,1.02,.038],[x,D.bridgeRoof+.43,z],steel);
  }
  const mast=new T.Group();box(mast,[.16,6,.16],[0,D.scopeEye-3,D.scopeZ],trim);box(mast,[.4,.3,.2],[.12,D.scopeEye,D.scopeZ],trim);root.add(mast);root.userData.mast=mast;
- box(root,[.18,4,.18],[1,13,-2],trim);box(root,[.12,3,.12],[-1,12,-4],trim);
+ const fixedMasts=new T.Group();root.add(fixedMasts);root.userData.fixedMasts=fixedMasts;
+ box(fixedMasts,[.18,4,.18],[0,13,-2.6],trim).name='snorkel';
+ box(fixedMasts,[.12,3,.12],[0,12,-1.6],trim).name='aerial';
  for(const [key,y,z,span,chord] of [['foreplanes',7,-5,5.4,2.7],['aftplanes',0,27,4.8,3.3]]){
   const pivot=new T.Group();pivot.position.set(0,y,z);for(const side of [-1,1]){const fin=new T.Mesh(foil(T,span,chord,.22),bodyMat);fin.position.x=side*1.7;fin.scale.x=side;pivot.add(fin);}root.add(pivot);root.userData[key]=pivot;
  }

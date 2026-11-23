@@ -4,6 +4,10 @@ import * as T from '../vendor/three.module.js';
 import {surfaceHull} from '../src/surface-hull.js';
 import {surfaceShip} from '../src/surface-ship.js';
 import {damageWreck} from '../src/wrecks.js';
+import {makeCarrier} from '../src/carrier-model.js';
+import {createSubmarine} from '../src/submarine-model.js';
+import {SUB_DESIGN as d} from '../src/hull-design.js';
+import {founderingPose,submergedDepth,wreckVisible} from '../src/foundering.js';
 
 function mesh(kind){return new T.Mesh(surfaceHull(T,kind),new T.MeshBasicMaterial());}
 function firstHit(model,origin,direction){
@@ -33,4 +37,54 @@ test('deck fittings distinguish the three ships and a wreck buckles without alte
  assert.notDeepEqual(record(wreck),intact);assert.deepEqual(record(merchant),intact);
  assert.ok(wreck.getObjectByName('signal mast').position.y<merchant.getObjectByName('signal mast').position.y);
  assert.equal(wreck.userData.wreck,true);
+});
+
+test('both raised masts are physically aft of the hatch and clear the forward bridge view',()=>{
+ const boat=createSubmarine(T),eye=new T.Vector3(0,d.bridgeEye,d.bridgeZ);
+ boat.updateMatrixWorld(true);
+ for(const yaw of [-.4,0,.4]){
+  const ray=new T.Raycaster(eye,new T.Vector3(Math.sin(yaw),0,-Math.cos(yaw)),0,10);
+  assert.equal(ray.intersectObject(boat).length,0,'forward bridge sightline');
+ }
+ const scope=new T.Box3().setFromObject(boat.userData.mast);
+ const snorkel=new T.Box3().setFromObject(boat.getObjectByName('snorkel'));
+ assert.ok(scope.min.z>d.bridgeZ+d.bridgeRailRadius);
+ assert.ok(snorkel.min.z>scope.max.z);
+ assert.ok(Math.abs(snorkel.getCenter(new T.Vector3()).x)<.01);
+});
+
+test('each foundering surface model heels before trimming, exposes just one end, then passes completely underwater',()=>{
+ for(const kind of ['merchant','escort','fishing','carrier']){
+  const ship=kind==='carrier'?makeCarrier(T):surfaceShip(T,kind),body=ship.userData.body;
+  const point=new T.Vector3();
+  const profile=drop=>{
+   const {pitch,roll}=founderingPose(kind,drop);
+   ship.position.y=-drop;ship.rotation.set(pitch,0,roll,'YXZ');ship.updateMatrixWorld(true);
+   let top=-Infinity;const ends=[-Infinity,-Infinity],hull=ship.userData.hull;
+   body.traverseVisible(part=>{
+    const pos=part.geometry?.attributes.position;if(!pos)return;
+    for(let i=0;i<pos.count;i++){
+     point.fromBufferAttribute(pos,i).applyMatrix4(part.matrixWorld);top=Math.max(top,point.y);
+     if(part===hull&&Math.abs(pos.getZ(i))>50){
+      const end=pos.getZ(i)<0?0:1;ends[end]=Math.max(ends[end],point.y);
+     }
+    }
+   });
+   return {pitch,roll,top,ends};
+  };
+  const initial=profile(0),listing=profile(.7);
+  assert.equal(Math.abs(initial.roll)+Math.abs(initial.pitch),0,kind);
+  assert.ok(Math.abs(listing.roll)>.005&&listing.pitch===0,kind);
+  assert.ok([3,5,8,12,16,20,24].some(drop=>{
+   const {pitch,ends}=profile(drop);
+   return Math.abs(pitch)>.1&&Math.min(...ends)<-1&&Math.max(...ends)>1;
+  }),kind+' should have one end clear of mean water level');
+  const last=submergedDepth(kind);
+  assert.ok(profile(last-.1).top>0&&profile(last+.1).top<0,kind+' replay waterline');
+  const vessel={kind,hull:0,sunkAt:25,sinkDepth:last+5};
+  assert.equal(wreckVisible(vessel,45),false);
+  assert.equal(wreckVisible({...vessel,settled:true},45),false);
+  assert.equal(wreckVisible({...vessel,settled:true},150),true);
+  assert.equal(wreckVisible({...vessel,settled:true,sinkDepth:2},150),false);
+ }
 });

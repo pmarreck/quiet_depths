@@ -2,6 +2,7 @@ import {recordLocalLaunch} from './mess-watch.js';
 import {isOpponent} from './fleet-action.js';
 import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes} from './torpedo-tubes.js';
 import {replayEvent} from './instant-replay.js';
+import {descentSpeed,submergedDepth,surfaceCollapseAge} from './foundering.js';
 import {gameEcho} from './torpedo-watch.js';
 import {carrierId,carrierSize,advanceCarrierFlood,incidentalHull,registerCarrierHit} from './carrier.js';
 import {operatingFraction} from './equipment.js';
@@ -153,19 +154,18 @@ function shipDamage(s,dt){
   // Keep the grounded hull against the same triangles the underwater camera displays.
   const clearance=v.kind==='sub'||v.kind==='fishing'?3:8;
   const bed=Math.max(0,-floorSurface(v.x,v.y,s.environment.chartSeed).height-clearance-origin);
-  const beforeDrop=v.sinkDepth;
-  v.speed=0;v.sinkDepth=Math.min(bed,v.sinkDepth+dt*1.3*(v.kind==='carrier'?Math.max(1,v.directHits-1):1));
-  const age=s.time-v.sunkAt,depth=origin+v.sinkDepth;
-  // Last visible vertex of the listed wreck at mean sea level.
-  const lastVisible=v.kind==='carrier'?40.4:v.kind==='fishing'?16.1:v.kind==='escort'?29.1:35.3;
-  if(v.kind!=='sub'&&beforeDrop<lastVisible&&v.sinkDepth>=lastVisible)
+  const beforeDrop=v.sinkDepth,age=s.time-v.sunkAt,sub=v.kind==='sub';
+  const rate=sub?1.3:descentSpeed(age)*(v.kind==='carrier'?Math.max(1,v.directHits-1):1);
+  v.speed=0;v.sinkDepth=Math.min(bed,v.sinkDepth+dt*rate);
+  const depth=origin+v.sinkDepth,lastVisible=sub?0:submergedDepth(v.kind);
+  if(!sub&&beforeDrop<lastVisible&&v.sinkDepth>=lastVisible)
    replayEvent(s,{kind:'sinking',enemy:true,target:v.id,point:{x:v.x,y:v.y,depth}});
 
   if(age>=(v.nextCreak??4)){
    emitSound(s,{type:'creak',x:v.x,y:v.y,depth,power:.65});
    v.nextCreak=age+9+hash01(s.patrol.seed,v.sunkAt+Math.floor(age))*20;
   }
-  if(!v.collapsed&&depth>45&&v.sinkDepth>18&&(v.kind==='sub'||hash01(s.patrol.seed,v.sunkAt)>.45)){
+  if(!v.collapsed&&depth>45&&v.sinkDepth>18&&(sub||age>=surfaceCollapseAge&&depth>lastVisible+20&&hash01(s.patrol.seed,v.sunkAt)>.45)){
    v.collapsed=true;v.collapsedAt=s.time;
    if(v.kind==='sub'){
     s.impacts.push({id:s.weaponSequence++,x:v.x,y:v.y,altitude:-depth,time:s.time,kind:'collapse'});

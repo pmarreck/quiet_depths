@@ -6,6 +6,7 @@ import {schoolFishShape} from './school-fish.js';
 import {bottom,rad,clamp,capsuleContact} from './mechanics.js';
 import {hash01,surfaceHeight} from './environment.js';
 import {floorSurface} from './seafloor.js';
+import {founderingPose} from './foundering.js';
 
 const material=(color)=>new T.MeshStandardMaterial({color,roughness:.72});
 const up=new T.Vector3(0,1,0),groundNormal=new T.Vector3();
@@ -65,7 +66,7 @@ export class UnderseaLife{
   for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.isInstancedMesh)o.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
   this.site=null;this.lastTime=null;this.fishPositions=[];this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
   if(s.site){this.site=s.site.kind==='sub'?this.makeSub():this.makeShip({kind:s.site.kind==='wreck'?'merchant':'fishing',wreck:s.site.kind==='wreck'});this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
-   const rust=material(0x705343);this.site.traverse(o=>{if(o.isMesh){o.material=rust;}});
+   if(s.site.kind!=='surface'){const rust=material(0x705343);this.site.traverse(o=>{if(o.isMesh){o.material=rust;}});}
    if(s.site.kind==='wreck'){this.site.scale.setScalar(.5);const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}
   }
   const gravel=new T.InstancedMesh(new T.IcosahedronGeometry(1,0),material(0x73766a),140);
@@ -118,7 +119,11 @@ export class UnderseaLife{
    else animal.userData.tail.rotation.y=Math.sin(t*2.2+i)*.33;
   });
   if(this.site)this.site.position.set(s.site.x,-s.site.depth,-s.site.y);
-  if(this.site&&s.site.kind==='surface'){this.site.position.y=-s.site.depth+surfaceHeight(s.site.x,s.site.y,t,env)*.5;this.site.rotation.z=.15+s.time*.00015;}
+  if(this.site&&s.site.kind==='surface'){
+   const {pitch,roll,wave}=founderingPose('fishing',s.site.depth);
+   this.site.position.y+=wave*surfaceHeight(s.site.x,s.site.y,t,env)*.5;
+   this.site.rotation.set(pitch,-rad(s.site.heading),roll,'YXZ');
+  }
   const rescue=s.operation&&s.mission!=='survey',active=rescue&&s.operation.active,under=s.mission==='undersea-rescue';
   this.divers.forEach((d,i)=>{d.visible=!!active&&under;if(!d.visible)return;const phase=((s.operation.assessment+i*3)%18)/18,f=phase<.5?phase*2:2-phase*2,arc=Math.sin(f*Math.PI)*2;
    const start=new T.Vector3(s.x,-s.depth-5.8,-s.y),end=new T.Vector3(s.site.x,-s.site.depth+2,-s.site.y);d.position.lerpVectors(start,end,f);d.position.y-=arc;d.lookAt(phase<.5?end:start);d.rotateY(Math.PI);d.userData.passenger.visible=phase>.5&&s.operation.remaining>0;d.userData.legs.forEach((leg,j)=>leg.rotation.x=Math.sin(t*5+j*Math.PI+i)*.35);});
