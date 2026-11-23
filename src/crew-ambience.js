@@ -1,10 +1,9 @@
 import {hash01} from './environment.js';
 import {crewOnAlert,crewPeriod,messClips,messLine} from './mess-watch.js';
+import {EveningRadio} from './evening-radio.js';
 export {crewPeriod};
 
 const clips=[...messClips,'hit','hit-alt','leak','leak-alt','hit-quiet','leak-quiet'];
-const melodies=[[55,58,60,62,65,62,60,58,55,53,55,58,57,55],
- [60,64,67,69,67,64,62,65,67,65,62,60,57,60]];
 
 export function quietForSleep(s,alert=crewOnAlert(s)){
  return !alert&&!s.projectiles.length&&!s.shells.length&&!s.gunRounds.length&&!s.blasts.length&&!s.impacts.length&&
@@ -14,32 +13,32 @@ export function quietForSleep(s,alert=crewOnAlert(s)){
 export class CrewAmbience {
  constructor(context,master){
   this.context=context;this.bus=context.createGain();this.bus.gain.value=0;this.bus.connect(master);
-  this.routineSources=new Set();this.clips=new Map();this.state=null;this.slot=-1;this.nextHit=0;this.nextLeak=0;this.lastHull=100;this.lastFlood=0;
+  this.radio=new EveningRadio(context,this.bus);this.reports=new Set();this.routineSources=new Set();this.clips=new Map();this.state=null;this.slot=-1;this.nextHit=0;this.nextLeak=0;this.lastHull=100;this.lastFlood=0;
   if(typeof context.decodeAudioData==='function')for(const name of clips){
    fetch(new URL(`crew/${name}.mp3`,import.meta.url)).then(response=>{
     if(!response.ok)throw Error('Crew clip unavailable');return response.arrayBuffer();
    }).then(data=>context.decodeAudioData(data)).then(buffer=>this.clips.set(name,buffer)).catch(()=>{});
   }
  }
- trackRoutine(source,gain){
-  this.routineSources.add(source);
-  source.onended=()=>{this.routineSources.delete(source);source.disconnect();gain.disconnect();};
+ track(source,gain,group){
+  group.add(source);
+  source.onended=()=>{group.delete(source);source.disconnect();gain.disconnect();};
  }
- stopRoutine(){
-  for(const source of this.routineSources)source.stop();
-  this.routineSources.clear();
+ stopGroup(group){
+  for(const source of group)source.stop();
+  group.clear();
  }
  speak(name,volume,routine=false){
   const buffer=this.clips.get(name);if(!buffer)return;
   const source=this.context.createBufferSource(),gain=this.context.createGain();source.buffer=buffer;gain.gain.value=volume;
-  if(routine)this.trackRoutine(source,gain);
+  this.track(source,gain,routine?this.routineSources:this.reports);
   source.connect(gain).connect(this.bus);source.start();return true;
  }
  note(frequency,when,length,volume,type='sine'){
   const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.type=type;
   oscillator.frequency.value=frequency;gain.gain.setValueAtTime(.0001,when);
   gain.gain.exponentialRampToValueAtTime(volume,when+.025);gain.gain.exponentialRampToValueAtTime(.0001,when+length);
-  this.trackRoutine(oscillator,gain);oscillator.connect(gain).connect(this.bus);oscillator.start(when);oscillator.stop(when+length+.04);
+  this.track(oscillator,gain,this.routineSources);oscillator.connect(gain).connect(this.bus);oscillator.start(when);oscillator.stop(when+length+.04);
  }
  stopSnore(){
   if(!this.snore)return;
@@ -68,12 +67,7 @@ export class CrewAmbience {
   source.onended=()=>{if(this.snore?.source===source)this.snore=null;source.disconnect();gain.disconnect();};source.start();
  }
  playMusic(seed){
-  const start=this.context.currentTime,melody=melodies[Math.floor(hash01(seed,144)*melodies.length)];
-  melody.forEach((pitch,index)=>{
-   const when=start+index*.31+(index%2?.075:0),frequency=440*2**((pitch-69)/12);
-   this.note(frequency,when,.28,.022,'triangle');
-   if(index%4===0)this.note(frequency/4,when,.65,.018);
-  });
+  return this.radio.play(hash01(seed,144),hash01(seed,145));
  }
  distantSound(s,event){
   if(this.state!==s||this.reaction||s.silent||s.alert>30||this.context.currentTime<this.nextChatter)return;
@@ -82,10 +76,12 @@ export class CrewAmbience {
   if(roll<.22)this.reaction={at:this.context.currentTime+1.2,line:roll<.11?'what-noise':'hear-that'};
  }
  update(s,e,active){
-  if(this.state!==s){this.stopRoutine();this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=this.nextChatter=0;this.reaction=null;this.goodnightDay=-1;this.lastLine='';}
+  if(this.state!==s){this.radio.stop();this.stopGroup(this.routineSources);this.stopGroup(this.reports);this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=this.nextChatter=0;this.reaction=null;this.goodnightDay=-1;this.lastLine='';}
   const now=this.context.currentTime,quiet=s.silent||s.alert>30;
   const alert=crewOnAlert(s),period=crewPeriod(e.hour),sleeping=active&&period==='sleep'&&quietForSleep(s,alert);
-  if(!active||alert)this.stopRoutine();
+  if(!active||alert)this.stopGroup(this.routineSources);
+  if(!active)this.stopGroup(this.reports);
+  if(!active||alert||period!=='music')this.radio.stop();
   const day=Math.floor((s.environment.startHour+s.time/120)/24);
   if(period==='lights-out'&&alert)this.goodnightDay=day;
   if(!active||quiet)this.reaction=null;

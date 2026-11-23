@@ -283,6 +283,7 @@ export class OceanScene{
   if(pose)this.camera.rotation.set(pose.x,pose.y,pose.z,pose.order);
   const camera=this.camera.position;
   const cameraDepth=surfaceHeight(camera.x,-camera.z,time,e)-camera.y;
+  this.listener={view,depth:cameraDepth};
   const underwater=view==='scope'?cameraDepth>=-.15:cameraDepth>0;
   const light=underwater?waterColumnLight(cameraDepth,e):null;
   const fog=this.scene.fog.color;

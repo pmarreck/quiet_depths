@@ -1,4 +1,5 @@
-import {isOpponent} from './fleet-action.ts';
+import {SYSTEM_KEYS} from './equipment.ts';
+import {isOpponent,fleetShotPose,type Volley} from './fleet-action.ts';
 import {missions} from './mission-catalog.ts';
 
 type MissionId=(typeof missions)[number]['id'];
@@ -6,6 +7,9 @@ type Point={x:number;y:number};
 type Vessel=Point & {military:boolean;side?:'friendly'|'hostile';hull:number;tracking?:string};
 type LaunchWatch=Point & {time:number;crewQuietUntil:number};
 interface CrewWatch extends LaunchWatch {
+  hull:number;systems:Record<string,number>;repairLimits:Record<string,number>;
+  fuelLeak:number;fuelFire:number;water:number;projectiles:Point[];
+  convoy?:{shot:Volley|null};battle?:{volleys:Volley[]};
   mission:MissionId;ships:Vessel[];aircraft:(Point & {hull:number;phase?:string})[];
   silent:boolean;alert:number;shock:number;flood:number;pressureAlarm:number;gunLoudUntil:number;
 }
@@ -20,6 +24,11 @@ export function recordLocalLaunch(s:LaunchWatch,launcher:Point){
 export function crewOnAlert(s:CrewWatch){
   if(combatPatrols.has(s.mission)||s.silent||s.alert>30||s.shock>0||s.flood>0||s.pressureAlarm||s.time<s.gunLoudUntil)return true;
   if(s.time<s.crewQuietUntil)return true;
+  if(s.fuelLeak>0||s.fuelFire>0||s.water>4||s.hull<s.repairLimits.hull||
+     SYSTEM_KEYS.some(key=>s.systems[key]<s.repairLimits[key]))return true;
+  if(s.projectiles.some(shot=>nearby(s,shot)))return true;
+  const nearbyVolley=(shot:Volley)=>shot.underwater&&nearby(s,fleetShotPose(shot,s.time));
+  if(s.convoy?.shot&&nearbyVolley(s.convoy.shot)||s.battle?.volleys.some(nearbyVolley))return true;
   return s.ships.some(v=>v.hull>0&&isOpponent(v)&&(nearby(s,v)||v.tracking==='tracking'||v.tracking==='searching'))
     ||s.aircraft.some(v=>v.hull>0&&v.phase!=='gone'&&v.phase!=='down'&&nearby(s,v));
 }
