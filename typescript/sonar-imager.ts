@@ -118,7 +118,6 @@ export class ImagerPaper {
   private line?:Uint8Array;
   constructor(readonly mode:Instrument,readonly profile:Profile){
     const p=profiles[profile];this.width=p.width;this.height=p.height;this.pixels=new Uint8Array(this.width*this.height);
-    this.y=mode==='scribbler'?this.height-1:0;
   }
   advance(s:World,dt:number,quality:number){
     this.fraction+=dt*profiles[this.profile].rows*this.width*quality;
@@ -130,7 +129,7 @@ export class ImagerPaper {
       if(++this.x<this.width)continue;
       this.x=0;this.line=undefined;
       if(this.mode==='painter')this.y=(this.y+1)%this.height;
-      else{this.pixels.copyWithin(0,this.width);this.pixels.fill(0,this.y*this.width);}
+      else{this.pixels.copyWithin(this.width,0);this.pixels.fill(0,0,this.width);}
     }
   }
 }
@@ -155,7 +154,7 @@ export class ImagerDisplay {
       this.previous=paper;this.version=paper.version;
     }
     ctx.fillStyle='#100f0b';ctx.fillRect(0,0,w,h);
-    const margin=12,top=56,bottom=27,areaW=Math.max(1,w-margin*2),areaH=Math.max(1,h-top-bottom);
+    const margin=12,top=paper.mode==='scribbler'?68:56,bottom=27,areaW=Math.max(1,w-margin*2),areaH=Math.max(1,h-top-bottom);
     ctx.imageSmoothingEnabled=false;ctx.drawImage(this.canvas,margin,top,areaW,areaH);
     ctx.font='11px monospace';ctx.fillStyle='#dec390';ctx.textAlign='left';
     ctx.fillText(paper.mode==='scribbler'?'PORT':'PORT   /   BOW SECTOR',margin,h-8);

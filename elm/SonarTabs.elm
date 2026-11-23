@@ -42,6 +42,15 @@ main =
                         , attribute "aria-pressed" (if selected == instrument then "true" else "false")
                         ] [ text (label instrument) ]
             in
-            div [ class "sonar-tabs", attribute "role" "group", attribute "aria-label" "Sonar instruments" ]
-                (List.map tab [ Bearings, Scribbler, Painter ])
+            div []
+                [ div [ class "sonar-tabs", attribute "role" "group", attribute "aria-label" "Sonar instruments" ]
+                    (List.map tab [ Bearings, Scribbler, Painter ])
+                , case selected of
+                    Scribbler ->
+                        div [ class "scribbler-key", attribute "id" "scribbler-key" ]
+                            [ text "Dark center band shows water above the seabed." ]
+
+                    _ ->
+                        text ""
+                ]
         }

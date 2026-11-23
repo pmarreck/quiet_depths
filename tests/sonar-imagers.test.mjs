@@ -30,14 +30,19 @@ test('Painter separates up/down and port/starboard, excludes contacts aft, and u
  assert.ok(hits.length>=2);assert.ok(hits.every(p=>p.x<profiles.detail.width/2&&p.y<profiles.detail.height/2));
  s.ships=[{...v,y:-250}];assert.deepEqual(frame(),clean);
 });
-test('paper advances pixel by pixel and keeps old lines fixed when heading or position changes',()=>{
- const s=world(),p=new ImagerPaper('scribbler','survey'),w=p.width;
- const first=sampleLine(s,'scribbler','survey',0);
- p.advance(s,.1,1);assert.ok(p.x>0&&p.x<w);
- p.advance(s,.1,1);assert.deepEqual(p.pixels.slice(-2*w,-w),first);
- s.heading=120;s.x=90;p.advance(s,.2,1);
- assert.deepEqual(p.pixels.slice(-3*w,-2*w),first);assert.notDeepEqual(p.pixels.slice(-2*w,-w),first);
- const held=p.pixels.slice();p.advance(s,100,0);assert.deepEqual(p.pixels,held);
+test('Scribbler writes at the top and scrolls each completed line down without resampling history',()=>{
+ for(const profile of Object.keys(profiles)){
+  const s=world(),p=new ImagerPaper('scribbler',profile),w=p.width,lineTime=1/profiles[profile].rows;
+  const first=sampleLine(s,'scribbler',profile,0);
+  p.advance(s,lineTime/2,1);
+  assert.equal(p.y,0);assert.equal(p.x,w/2);
+  assert.deepEqual(p.pixels.slice(0,p.x),first.slice(0,p.x));assert.ok(p.pixels.slice(p.x).every(x=>x===0));
+  p.advance(s,lineTime/2,1);
+  assert.deepEqual(p.pixels.slice(w,2*w),first);assert.ok(p.pixels.slice(0,w).every(x=>x===0));
+  s.heading=120;s.x=90;p.advance(s,lineTime,1);
+  assert.deepEqual(p.pixels.slice(2*w,3*w),first);assert.notDeepEqual(p.pixels.slice(w,2*w),first);
+  const held=p.pixels.slice();p.advance(s,100,0);assert.deepEqual(p.pixels,held);
+ }
 });
 test('direct, incidental and muted scans produce ordered exposure across a fixed set of patrol seeds',()=>{
  const counts=[];

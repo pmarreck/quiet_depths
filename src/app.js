@@ -941,6 +941,8 @@ function updateExtras(s,env,v){
  $('rov-steering-hint').textContent=(invertRovPitch?'Swipe up to pitch down':'Swipe up to pitch up')+' · swipe sideways to turn';
  $('rov-steering-hint').hidden=!(rovTouch&&s.drone.mode==='remote');
  const imaging=view==='sonar'&&instrument!=='bearings';
+ if(imaging&&instrument==='scribbler')$('tactical').setAttribute('aria-describedby','scribbler-key');
+ else $('tactical').removeAttribute('aria-describedby');
  if(!operatingFraction(s.systems.sonar))transmitting=false;
  $('viewport').dataset.imaging=String(imaging);
  $('imager-controls').hidden=!imaging;
@@ -948,7 +950,7 @@ function updateExtras(s,env,v){
  $('imager-transmit').setAttribute('aria-pressed',String(transmitting));
  $('mobile-ping').hidden=imaging;$('sonar-tools').querySelector('.sonar-ranges').hidden=imaging;
  if(imaging){
-  $('view-hint').textContent=instrument==='scribbler'?'Seafloor strip · newest returns at the bottom':'Forward sweep · elevation increases upward';
+  $('view-hint').textContent=instrument==='scribbler'?'Seafloor strip · newest returns at the top':'Forward sweep · elevation increases upward';
   $('view-range').textContent='';
  }
  $('sonar-tools').classList.toggle('hidden',view!=='sonar');$('mobile-ping').textContent=s.pingCooldown>0?'PING · '+Math.ceil(s.pingCooldown)+' s':'ACTIVE PING';

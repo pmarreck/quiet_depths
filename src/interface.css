@@ -62,7 +62,8 @@ body.loss #result-dialog{border-color:#d79377;background:#28191cf5;box-shadow:0 
 #sonar-navigation{display:none}
 body[data-station=sonar] #sonar-navigation{display:block;position:absolute;top:4px;left:8px;z-index:6}
 body[data-station=sonar] .view-top,body[data-station=sonar] .view-bottom{display:none}
-.sonar-tabs{display:flex;background:#102122ee;border:1px solid #53645c;border-radius:3px;overflow:hidden}
+.sonar-tabs{display:flex;width:max-content;background:#102122ee;border:1px solid #53645c;border-radius:3px;overflow:hidden}
+.scribbler-key{margin:3px 0 0 4px;font:12px/16px var(--sans);color:#dec390}
 .sonar-tabs button{min-height:38px;padding:0 13px;color:#c8d3c5;font:12px var(--mono)}
 .sonar-tabs button[aria-pressed=true]{background:#394135;color:#ffdb94;box-shadow:inset 0 -2px #d4ad69}
 #sonar-tools [hidden],#alert-dot[hidden],#alert-label[hidden]{display:none}
