@@ -4,6 +4,7 @@ import {threats} from './torpedo-watch.js';
 import {environmentAt} from './environment.js';
 import {engineSound,aircraftSound,perceivedSound} from './acoustics.js';
 import {CrewAmbience} from './crew-ambience.js';
+import {shapeImpulse} from './impulse-sound.js';
 
 const ownFrequency=s=>31+Math.abs(s.speed)*2;
 const openBridge=(s,view)=>s.depth<=1&&(view==='tower'||view==='gun');
@@ -50,11 +51,10 @@ export class SoundSystem{
   const p=stationSound(source,this.getState(),this.getContext().view);if(p.gain<.002||this.effects>=12)return;
   const c=this.ctx,t=c.currentTime,thunder=source.type==='thunder',gun=source.type==='gunfire',seeker=['seeker','sweep'].includes(source.type),creak=source.type==='creak',loss=['implosion','collapse'].includes(source.type),duration=creak?2.8:loss?8:thunder?4.8:gun?.24:seeker?.7:3;
   const noise=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain(),pan=c.createStereoPanner(),spatialGain=c.createGain();noise.buffer=this.noise;noise.loop=true;filter.type='lowpass';filter.frequency.value=p.cutoff;filter.Q.value=.6;pan.pan.value=p.pan*.9;spatialGain.gain.value=p.gain;
-  const peak=thunder?1.2:.95;gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(creak?.08:seeker?.015:peak,t+(thunder?.08:.008));gain.gain.exponentialRampToValueAtTime(.0001,t+duration);noise.connect(filter).connect(gain).connect(pan).connect(spatialGain).connect(this.master);
-  if(loss){filter.frequency.setValueAtTime(1800,t);filter.frequency.exponentialRampToValueAtTime(110,t+1.2);filter.frequency.exponentialRampToValueAtTime(650,t+3);filter.frequency.exponentialRampToValueAtTime(90,t+duration);gain.gain.setValueAtTime(.28,t+1.5);gain.gain.linearRampToValueAtTime(.65,t+2);gain.gain.exponentialRampToValueAtTime(.001,t+duration);}
-  if(seeker)gain.gain.setValueAtTime(.0001,t);
-  const rumble=c.createOscillator(),bass=c.createGain();rumble.type=creak?'triangle':'sine';rumble.frequency.setValueAtTime(creak?112:seeker?1480:thunder?42:gun?130:85,t);rumble.frequency.exponentialRampToValueAtTime(creak?54:seeker?1180:20,t+duration);if(creak){rumble.frequency.linearRampToValueAtTime(164,t+.75);rumble.frequency.exponentialRampToValueAtTime(69,t+2);}
-  bass.gain.setValueAtTime(peak*(seeker?.45:.35),t);bass.gain.exponentialRampToValueAtTime(.0001,t+duration);if(creak){bass.gain.setValueAtTime(.001,t);bass.gain.linearRampToValueAtTime(.30,t+.8);bass.gain.exponentialRampToValueAtTime(.001,t+duration);}
+  noise.connect(filter).connect(gain).connect(pan).connect(spatialGain).connect(this.master);
+  if(loss){filter.frequency.setValueAtTime(1800,t);filter.frequency.exponentialRampToValueAtTime(110,t+1.2);filter.frequency.exponentialRampToValueAtTime(650,t+3);filter.frequency.exponentialRampToValueAtTime(90,t+duration);}
+  const rumble=c.createOscillator(),bass=c.createGain();
+  shapeImpulse(source.type,t,duration,gain.gain,rumble,bass.gain);
   rumble.connect(bass).connect(pan);
   const voice={source,filter,pan,spatialGain,stop:()=>{noise.stop();rumble.stop();}};this.effectVoices.add(voice);this.effects++;noise.onended=()=>{this.effects--;this.effectVoices.delete(voice);noise.disconnect();filter.disconnect();gain.disconnect();rumble.disconnect();bass.disconnect();pan.disconnect();spatialGain.disconnect();};noise.start(t);noise.stop(t+duration);rumble.start(t);rumble.stop(t+duration);
   this.tailUntil=Math.max(this.tailUntil,t+duration);this.lastReceipt={id:source.id,type:source.type,delay:p.delay,distance:p.distance,gain:p.gain,cutoff:p.cutoff};

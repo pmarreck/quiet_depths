@@ -363,6 +363,18 @@ test('diving prevents surface strafing while the aircraft retains only the last 
  assert.ok(deepBombing,'an attack may still drop finite-fuse ordnance near the last reported position');
 });
 
+test('each aircraft has one depth bomb for its flight, including after a reload',()=>{
+ const s=ocean();
+ s.airSupport.status='airborne';s.airSupport.lastKnown={x:0,y:0,time:0};
+ s.aircraft=['alpha','bravo','charlie'].map((id,i)=>plane(id,i*10,-100,70,{phase:'search'}));
+ step(s,.25);
+ assert.equal(s.blasts.filter(b=>b.kind==='bomb').length,3);
+ assert.ok(s.aircraft.every(p=>p.bombDropped));
+ const loaded=restore(save(s));assert.ok(loaded);
+ for(const p of loaded.aircraft)p.phase='search';
+ step(loaded,.25);assert.equal(loaded.blasts.filter(b=>b.kind==='bomb').length,3);
+});
+
 test('an expired air search ends once, survives a reload, and its aircraft leave the map',()=>{
  const s=ocean();s.depth=s.targetDepth=80;s.time=200;
  s.airSupport.status='airborne';s.airSupport.launchAt=60;s.airSupport.lastKnown={x:0,y:0,time:0};

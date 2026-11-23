@@ -126,11 +126,11 @@ export class CombatScene{
    const big=p.kind==='cookoff',collapse=p.kind==='collapse',gun=p.kind==='splash',major=big||collapse||p.kind==='torpedo'||p.kind==='vapor';
    const extent=big?34:collapse?25:major?19:5;
    g.position.set(p.x,p.altitude,-p.y);
-   animateCloud(cloud,age,extent,false,p.id);cloud.visible&&=!gun;
+   animateCloud(cloud,age,extent,false,p.id,p.kind==='torpedo');cloud.visible&&=!gun;
    splash.position.y=depth;
    animateCloud(splash,age-Math.max(0,depth)/65,extent*.95,true,p.id);
    splash.visible&&=gun||major&&depth<16;
-   flash.visible=!gun;flash.material.color.setHex(collapse?0xb9f5ff:0xffb35b);
+   flash.visible=!gun&&p.kind!=='torpedo';flash.material.color.setHex(collapse?0xb9f5ff:0xffb35b);
    flash.scale.setScalar(extent*(.4+1.8*Math.exp(-age*3)));
    flash.material.opacity=Math.exp(-age*5);
   });

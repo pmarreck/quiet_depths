@@ -30,7 +30,7 @@ const vertex = `
  }`;
 const fragment = `
  varying float density, fleck, heat;
- uniform float spray;
+ uniform float spray, ignition;
  void main(){
    vec2 uv=2.*gl_PointCoord-1.;
    float r=length(uv);
@@ -40,7 +40,9 @@ const fragment = `
    if(edge*density<.015)discard;
    vec3 tint=mix(vec3(.13,.26,.32),vec3(.66,.84,.84),clamp(fleck+.14*uv.y+relief,0.,1.));
    if(spray>.5)tint=mix(vec3(.44,.65,.70),vec3(.90,.96,.93),clamp(fleck+relief,0.,1.));
-   gl_FragColor=vec4(mix(tint,vec3(1.,.77,.44),heat),edge*density);
+   tint=mix(tint,vec3(1.,.77,.44),heat);
+   vec3 ember=mix(vec3(.65,.045,.004),vec3(1.,.25,.019),fleck);
+   gl_FragColor=vec4(mix(tint,ember,ignition),edge*density);
    #include <colorspace_fragment>
  }`;
 
@@ -65,13 +67,28 @@ export function blastCloud(T: Kit){
   geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));
   geo.setAttribute('grain',new T.Float32BufferAttribute(grain,1));
   const material=new T.ShaderMaterial({vertexShader:vertex,fragmentShader:fragment,transparent:true,depthWrite:false,
-    uniforms:{age:{value:0},extent:{value:1},spray:{value:0},seed:{value:0}}});
+    uniforms:{age:{value:0},extent:{value:1},spray:{value:0},seed:{value:0},ignition:{value:0}}});
   const cloud=new T.Points(geo,material);cloud.frustumCulled=false;
   return cloud;
 }
 
-export function animateCloud(cloud: Cloud, age:number, extent:number, spray:boolean, seed:number){
+export function animateCloud(cloud: Cloud, age:number, extent:number, spray:boolean, seed:number, ignited=false){
   const u=cloud.material.uniforms;
   cloud.visible=age>=0&&age<3;
   u.age.value=age;u.extent.value=extent;u.spray.value=spray?1:0;u.seed.value=seed*2.39996;
+  u.ignition.value=ignited?Math.max(0,Math.min(1,(.95-age)/.53)):0;
+}
+
+// Sample from the detonation time so a paused frame or replay sees the same light.
+export function detonationFlash(age:number, depth:number, underwater:boolean) {
+  const duration=1.15;
+  if(age<0||age>=duration)return null;
+  const transmission=underwater?1:Math.max(0,1-Math.max(0,depth)/16)**2;
+  if(transmission===0)return null;
+  const fade=Math.max(0,(age-.12)/(duration-.12));
+  return {
+    diameter:12+86*(1-Math.exp(-age*3.7)),
+    intensity:transmission*(1-fade*fade*(3-2*fade)),
+    lift:underwater||depth<0?0:depth+.8
+  };
 }

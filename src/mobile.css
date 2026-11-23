@@ -74,7 +74,7 @@
 /* Use the long edge for the helm on foldables, tablets and rotated phones. */
 @media (640px <= width <= 1100px), (max-width:1100px) and (orientation:landscape){
  /* Reserve usable helm space first. The safe-area padding sits outside it. */
- body{--helm-rail:calc(clamp(184px,32vw,296px) + env(safe-area-inset-right))}
+ body{--helm-rail:calc(clamp(184px,16vw + 92px,244px) + env(safe-area-inset-right))}
  .main-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) var(--helm-rail);grid-template-rows:auto auto auto minmax(0,1fr) auto}
  .stations{grid-column:1/-1;grid-row:1}
  .mobile-vitals{grid-column:1/-1;grid-row:2}

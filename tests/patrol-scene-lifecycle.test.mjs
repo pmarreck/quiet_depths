@@ -17,6 +17,33 @@ const {UnderseaLife}=await browserModule('undersea.js');
 const {CombatScene}=await browserModule('combat-scene.js');
 const {Atmosphere}=await browserModule('atmosphere.js');
 
+test('torpedoes and depth charges bloom at the impact, fade, and rewind with the patrol clock',()=>{
+ const world=new Atmosphere(new THREE.Scene()),camera=new THREE.PerspectiveCamera(),s=createGame('recon',42);
+ camera.position.set(15,-35,20);
+ s.impacts=[{id:1,x:10,y:10,altitude:-35,time:4,kind:'torpedo'},
+            {id:2,x:10,y:10,altitude:0,time:4,kind:'splash'}];
+ s.blasts=[{id:1,x:20,y:12,depth:40,kind:'charge',exploded:true,explodedAt:4,delay:0,totalDelay:6,age:0}];
+ const show=(time,underwater=true)=>{
+  s.time=time;world.update(s,environmentAt(s),camera,underwater,time);
+  return world.flashes.filter(g=>g.visible).map(g=>({
+   point:g.position.toArray(),width:g.children[0].scale.x,intensity:g.children[0].material.opacity,
+   color:g.children[0].material.color.getHex(),core:g.children[1].scale.x
+  }));
+ };
+ assert.deepEqual(show(3.9),[]);
+ const start=show(4),opening=show(4.35),tail=show(5);
+ assert.deepEqual(opening.map(x=>x.point),[[10,-35,-10],[20,-40,-12]]);
+ for(let i=0;i<2;i++){
+  assert.ok(opening[i].width>2*start[i].width&&opening[i].core<opening[i].width);
+  assert.equal(opening[i].color,0xff600b);assert.ok(tail[i].intensity<opening[i].intensity*.15);
+ }
+ assert.deepEqual(show(4.35),opening);assert.ok(world.blastLight.intensity>0);
+ assert.deepEqual(show(5.2),[]);assert.equal(world.blastLight.intensity,0);
+ assert.deepEqual(show(4.2,false),[],'deep flashes stay underwater');
+ s.impacts[0].altitude=-2;s.blasts[0].exploded=false;
+ const surface=show(4.2,false);assert.equal(surface.length,1);assert.ok(surface[0].point[1]>-2);
+});
+
 test('opening orbit frames the stern and the first seconds of an outgoing shot on phone and desktop',()=>{
  for(const heading of [0,82,219,347])for(const aspect of [382/580,393/852,669/867,16/9]){
   const boat={heading,depth:12},orbit=initialOrbit(boat);
