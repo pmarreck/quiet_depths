@@ -1,3 +1,4 @@
+import {stationLamp} from './convoy-watch.js';
 import {lampLit,lampRange} from './signal-lamp.js';
 import {surfaceShip} from './surface-ship.js';
 import {makeCarrier} from './carrier-model.js';
@@ -336,7 +337,7 @@ export class OceanScene{
    if(mesh.userData.lights)mesh.userData.lights.visible=!sunk&&!underwater&&e.navigationLights&&ship.lights!==false&&!ship.blackout&&d<e.lightRange;
    if(!underwater&&!sunk&&!sub&&d<e.lightRange&&mesh.userData.body){mesh.visible=true;mesh.userData.body.visible=d<e.opticalRange;}
    else if(mesh.userData.body)mesh.userData.body.visible=true;
-   const message=s.convoy?.message;
+   const message=stationLamp(s);
    if(message&&ship.id===message.estimate.sender&&!sunk&&!underwater&&d<=lampRange(e)){
     let lamp=mesh.userData.signalLamp;
     if(!lamp){
@@ -389,8 +390,8 @@ export class OceanScene{
    positions.needsUpdate=true;this.driftingBubbles.geometry.setDrawRange(0,count);
   }
   this.camera.updateProjectionMatrix();const blastFlash=this.atmosphere.update(s,e,this.camera,underwater,frameSeconds);this.waterUniforms.flash.value=Math.max(blastFlash*.45,e.flash*(underwater?.05:.35));this.renderer.render(this.scene,this.camera);
-  if((view==='scope'||view==='tower')&&!underwater&&s.convoy?.message){
-   const id=s.convoy.message.estimate.sender,mesh=this.ships.get(id),lamp=mesh?.userData.signalLamp;
+  if((view==='scope'||view==='tower')&&!underwater&&stationLamp(s)){
+   const id=stationLamp(s).estimate.sender,mesh=this.ships.get(id),lamp=mesh?.userData.signalLamp;
    if(mesh?.visible&&lamp){
     const position=lamp.getWorldPosition(this.lampPosition),p=this.lampScreen.copy(position).project(this.camera);
     if(p.z>=-1&&p.z<=1&&Math.abs(p.x)<1&&Math.abs(p.y)<1){

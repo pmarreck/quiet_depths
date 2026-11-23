@@ -52,7 +52,7 @@ export function launchTorpedo(s,id){
  if(tube===null)return false;
  const tubeSide=tube==='port'?-1:1;
  s.tubeReadyAt[tube]=s.time+RELOAD_SECONDS/condition;
- s.torps--;s.alert=clamp(s.alert+20,0,100);
+ s.torps--;
  const origin=boatPoint(boatSurfacePose(s),{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
  putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:s.heading,pitch:s.pitch,tubeSide});
@@ -97,7 +97,7 @@ export function fireDeckGun(s,aim){
  s.gun.ammo--;s.gun.shots++;s.gun.cooldown=.25/operatingFraction(s.systems.deckgun);
  const a=rad(s.heading),b=rad(aim.bearing),e=rad(clamp(aim.elevation,-15,85)),speed=600;
  s.gunRounds.push({id:s.weaponSequence++,owner:'player',x:s.x+Math.sin(a)*16,y:s.y+Math.cos(a)*16,altitude:6-s.depth,vx:Math.sin(b)*Math.cos(e)*speed,vy:Math.cos(b)*Math.cos(e)*speed,vz:Math.sin(e)*speed,age:0,tracer:s.gun.shots%5===0});
- emitSound(s,{type:'gunfire',x:s.x,y:s.y,altitude:6,power:.6});s.gunLoudUntil=s.time+3;s.alert=clamp(s.alert+8,0,100);
+ emitSound(s,{type:'gunfire',x:s.x,y:s.y,altitude:6,power:.6});s.gunLoudUntil=s.time+3;
  for(const ship of s.ships)if(isOpponent(ship)&&distance(s,ship)<6000)ship.alert=Math.max(ship.alert,65);
  return true;
 }

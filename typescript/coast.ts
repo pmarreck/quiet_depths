@@ -47,3 +47,13 @@ export function chartDepth(x:number,y:number,seed?:number){
   }
   return Math.max(-360,depth);
 }
+
+// Fixed landmarks shared by the wreck scenery and the acoustic recorders.
+export function shelfOutcrops(site:{x:number;y:number},seed:number){
+  return Array.from({length:12},(_,i)=>{
+    const angle=hash01(seed,19800+i)*Math.PI*2,range=65+hash01(seed,19820+i)*310;
+    return {x:site.x+Math.sin(angle)*range,y:site.y+Math.cos(angle)*range,
+      length:8+hash01(seed,19840+i)*22,width:4+hash01(seed,19860+i)*8,
+      height:3+hash01(seed,19880+i)*10,heading:angle*180/Math.PI};
+  });
+}

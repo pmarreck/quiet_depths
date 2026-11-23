@@ -85,8 +85,31 @@ export function validEstimate(p:Estimate,time:number){
     Number.isSafeInteger(p.number)&&p.number>0&&typeof p.sender==='string'&&/^SUB (N|NE|E|SE|S|SW|W|NW) [1-9][0-9]{0,4} KM$/.test(p.text);
 }
 export function validTransmission(m:Transmission,time:number){
-  if(!m||!validEstimate(m.estimate,time)||!Number.isFinite(m.elapsed)||m.elapsed<0||m.elapsed>time+.001)return false;
+  return !!m&&validEstimate(m.estimate,time)&&validCopy(m,time);
+}
+export function validCopy(m:Transmission,time:number){
+  if(!Number.isFinite(m.elapsed)||m.elapsed<0||m.elapsed>time+.001)return false;
   const full=(1<<morseScript(m.estimate.text).letters.length)-1;
   return (m.since===null||Number.isFinite(m.since)&&m.since>=0&&m.since<=m.elapsed)&&Number.isInteger(m.copied)&&m.copied>=0&&m.copied<=full&&m.delivered===(m.copied===full)&&
     (m.delivered?m.completedAt!==null&&Number.isFinite(m.completedAt)&&m.completedAt>=0&&m.completedAt<=m.elapsed:m.completedAt===null);
+}
+
+export type LampFix = Estimate & {target:string;depth:number;course:number;speed:number};
+type Ally = Ship & {side?:string;kind:string;hull:number;disabled?:boolean};
+type Sub = Ally & {depth:number;speed:number;heading:number};
+
+export function alliedFix(sender:Ally,target:Sub,time:number,number:number):LampFix {
+  // These are the chart coordinates actually spelled out by the lamp.
+  const x=10*Math.round(target.x/10),y=10*Math.round(target.y/10);
+  const depth=Math.round(target.depth),course=(Math.round(target.heading)+360)%360,speed=Math.round(target.speed);
+  const text=[(x<0?'W':'E')+Math.abs(x/10),(y<0?'S':'N')+Math.abs(y/10),'D'+depth,'C'+course,'K'+speed].join(' ');
+  return {sender:sender.id,target:target.id,x,y,radius:10,time,number,text,depth,course,speed};
+}
+export function liveTransmission(fix:LampFix):Transmission{
+  return {estimate:{...fix},elapsed:0,since:null,copied:0,delivered:false,completedAt:null};
+}
+export function validLampFix(p:LampFix,time:number){
+  return !!p&&typeof p.text==='string'&&/^[EW]\d{1,5} [NS]\d{1,5} D\d{1,3} C\d{1,3} K\d{1,2}$/.test(p.text)&&
+    [p.depth,p.course,p.speed,p.x,p.y,p.time].every(Number.isFinite)&&p.time>=0&&p.time<=time&&p.course>=0&&p.course<360&&p.depth>=0&&p.speed>=0&&
+    typeof p.target==='string'&&typeof p.sender==='string'&&p.radius===10&&Number.isSafeInteger(p.number)&&p.number>0;
 }

@@ -7,7 +7,7 @@ import {emitSound} from './acoustics.js';
 import {report} from './patrol-reports.js';
 import {replayEvent} from './instant-replay.js';
 import {floorSurface} from './seafloor.js';
-import {copyLamp,lampRange,makeTransmission,validEstimate,validTransmission} from './signal-lamp.js';
+import {alliedFix,liveTransmission,validLampFix,validCopy,copyLamp,lampRange,makeTransmission,validEstimate,validTransmission} from './signal-lamp.js';
 
 const convoyIds=['wren','dahlia','petrel','escort'];
 export const convoyLosses=s=>s.ships.filter(v=>convoyIds.includes(v.id)&&v.hull<=0).length;
@@ -102,4 +102,60 @@ export function validConvoy(s){
  const v=c.shot;
  return v===null||v&&v.source==='wolf'&&convoyIds.includes(v.target)&&v.underwater===true&&Number.isInteger(v.id)&&v.id>0&&v.id<s.weaponSequence&&
   [v.from?.x,v.from?.y,v.from?.altitude,v.to?.x,v.to?.y,v.to?.altitude,v.launched,v.arrives,v.damage].every(Number.isFinite)&&v.launched>=0&&v.launched<=s.time&&v.arrives>s.time&&v.damage>=0;
+}
+
+export function stationLamp(s){
+ return s.alliedLamp?.message??s.convoy?.message;
+}
+
+// Friendly surface units take discrete observations. A telegram freezes the
+// observation at issue, including what was known before the player surfaced.
+export function updateAlliedWatch(s,env,input,dt,recordFix){
+ if(!s.battle&&!s.convoy)return;
+ const watch=s.alliedLamp??={message:null,sequence:0,lastIssue:-1};
+ const subs=s.ships.filter(v=>v.kind==='sub'&&v.side==='hostile'&&v.hull>0);
+ const range=lampRange(env);
+ let candidate;
+ for(const [index,ship] of s.ships.entries()){
+  if(ship.kind==='sub'||ship.side!=='friendly'||ship.hull<=0||ship.disabled)continue;
+  const offset=7+index*6;
+  if(s.time>=offset&&Math.floor((s.time-offset)/36)!==Math.floor((s.time-dt-offset)/36)){
+   if(distance(s,ship)<4200&&hash01(s.patrol.seed,Math.floor(s.time)*17+index)<s.difficulty.pingDetection)
+    emitSound(s,{type:'sweep',friendly:true,x:ship.x,y:ship.y,depth:0,power:.6,vessel:ship.id});
+   const found=subs.filter(v=>distance(ship,v)<1800).sort((a,b)=>distance(ship,a)-distance(ship,b))[0];
+   if(found)ship.lampFix=alliedFix(ship,found,s.time,++watch.sequence);
+  }
+  const fix=ship.lampFix;
+  if(fix&&fix.time>watch.lastIssue&&s.time-fix.time<45&&distance(s,ship)<=range&&(!candidate||fix.time>candidate.time))candidate=fix;
+ }
+ let message=watch.message;
+ if(message){
+  const sender=s.ships.find(v=>v.id===message.estimate.sender);
+  if(sender.hull<=0||sender.disabled||message.delivered&&message.elapsed-message.completedAt>=6||!message.delivered&&s.time-message.estimate.time>180){
+   watch.message=message=null;
+  }
+ }
+ const initial=s.convoy?.message;
+ const copyingInitial=initial&&!initial.delivered&&(initial.elapsed<20||initial.copied!==0||initial.since!==null);
+ if(!message&&candidate&&s.depth<=1&&!copyingInitial){
+  watch.lastIssue=candidate.time;
+  message=watch.message=liveTransmission(candidate);
+  const sender=s.ships.find(v=>v.id===candidate.sender);
+  report(s,'allied-hail',signalHail(sender,range));
+ }
+ if(!message)return;
+ const fix=message.estimate,ship=s.ships.find(v=>v.id===fix.sender);
+ const optical=input.observation==='tower'&&s.depth<=1||input.observation==='scope'&&s.depth<=15&&s.scope&&operatingFraction(s.systems.periscope)>0&&!scopeWashed(s,env);
+ if(copyLamp(message,dt/Math.max(1,input.timeRate||1),optical&&input.lampInView===ship.id&&distance(s,ship)<=range)){
+  recordFix(s,fix);
+  report(s,'allied-fix','TELEGRAM · '+ship.name.toUpperCase()+' · '+fix.text+' · Sub contact plotted, '+fix.depth+' m deep, '+fix.course+'° at '+fix.speed+' kn. Fix age '+Math.round(s.time-fix.time)+' s.');
+ }
+}
+export function validAlliedWatch(s){
+ const w=s.alliedLamp;
+ const sender=id=>s.ships.some(v=>v.id===id&&v.side==='friendly'&&v.kind!=='sub');
+ const valid=f=>validLampFix(f,s.time)&&sender(f.sender)&&s.ships.some(v=>v.id===f.target&&v.side==='hostile'&&v.kind==='sub')&&f.number<=w.sequence;
+ if(w===undefined)return s.ships.every(v=>v.lampFix===undefined);
+ if(!w||(!s.convoy&&!s.battle)||!Number.isSafeInteger(w.sequence)||w.sequence<0||!Number.isFinite(w.lastIssue)||w.lastIssue< -1||w.lastIssue>s.time)return false;
+ return (w.message===null||w.message&&valid(w.message.estimate)&&validCopy(w.message,s.time))&&s.ships.every(v=>v.lampFix===undefined||valid(v.lampFix)&&v.lampFix.sender===v.id);
 }

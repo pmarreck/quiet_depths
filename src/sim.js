@@ -1,6 +1,7 @@
+import {imagerClue,leaveClue,searchClue} from './suspicion.js';
 import {launchWatchSeconds} from './mess-watch.js';
 import {validTubeTimes} from './torpedo-tubes.js';
-import {convoyLosses,updateLamp,updateConvoyRaid,resolveConvoyCharge} from './convoy-watch.js';
+import {updateAlliedWatch,validAlliedWatch,convoyLosses,updateLamp,updateConvoyRaid,resolveConvoyCharge} from './convoy-watch.js';
 import {replayEvent} from './instant-replay.js';
 import {gameEcho,observeTorpedo,validEcho,validTracks} from './torpedo-watch.js';
 import {fullCondition,BOAT_PARTS,DRONE_PARTS,readLimits,operatingFraction} from './equipment.js';
@@ -86,6 +87,16 @@ export function contact(s,ship,method){
  } else c.confidence=Math.max(.24,c.confidence);
  return c;
 }
+function recordLampContact(s,fix){
+ let c=s.contacts.find(v=>v.id===fix.target);
+ if(!c){
+  c={id:fix.target,label:designation(s.nextId++),identified:false,range:0,bearing:0,confidence:0,age:0,x:fix.x,y:fix.y,method:'lamp'};
+  s.contacts.push(c);
+ }
+ const speed=fix.speed*.514444,angle=rad(fix.course);
+ if(!fixContact(c,{time:fix.time,x:fix.x,y:fix.y,vx:Math.sin(angle)*speed,vy:Math.cos(angle)*speed,positionSigma:10,velocitySigma:.4,maneuverSigma:.015,source:'lamp'}))return;
+ Object.assign(c,{x:fix.x,y:fix.y,range:distance(s,fix),bearing:bearing(s,fix),age:s.time-fix.time,confidence:.92,method:'lamp',kind:'sub',probableSide:'hostile',depthEstimate:fix.depth,courseEstimated:true});
+}
 export function ping(s){
  if(s.pingCooldown>0||s.status!=='patrol'||!operatingFraction(s.systems.sonar))return false;
  s.pingAge=0;s.pingCooldown=15;
@@ -102,7 +113,7 @@ export function ping(s){
  for(const ship of s.ships){
   if(!isOpponent(ship)||ship.hull<=0||ship.disabled)continue;
   const chance=s.difficulty.pingDetection*clamp(1-distance(s,ship)/7500,0,1);
-  if(chance>0&&rand(s)<chance){ship.alert=Math.max(ship.alert,65);ship.report={...playerReport(s),reason:'an active sonar ping'};}
+  if(chance>0&&rand(s)<chance){leaveClue(s,ship,65);}
  }
  log(s,'Active ping. Ranges resolved. Nearby hunters may have heard it.','warning');return true;
 }
@@ -128,14 +139,16 @@ export function step(s,dt,input={}){
  // Fixed substeps make time compression obey the same collision and resource rules.
  let left=Math.min(dt,60);while(left>0&&s.status==='patrol'){const t=Math.min(.25,left);tick(s,t,input);input.afterTick?.(s);left-=t;}
 }
-function patrolSweep(s,ship){
- if(ship.nextSweep===undefined||ship.disabled||s.time<ship.nextSweep)return;
- ship.nextSweep=s.time+28+rand(s)*45;
+function patrolSweep(s,ship,inquiry=false){
+ if(ship.disabled||!inquiry&&(ship.nextSweep===undefined||s.time<ship.nextSweep))return;
+ if(!inquiry)ship.nextSweep=s.time+28+rand(s)*45;
  const nearby=clamp(1-distance(ship,s)/4500,0,1);
- if(rand(s)<s.difficulty.pingDetection*nearby*operatingFraction(s.systems.sonar)){
-  emitSound(s,{type:'sweep',x:ship.x,y:ship.y,depth:ship.depth??0,power:.85,vessel:ship.id});
+ const heard=rand(s)<s.difficulty.pingDetection*nearby*operatingFraction(s.systems.sonar);
+ const touched=rand(s)<.25*nearby*s.difficulty.detection;
+ if(heard){
+  emitSound(s,{type:'sweep',x:ship.x,y:ship.y,depth:ship.depth??0,power:.85,vessel:ship.id,touched});
  }
- if(rand(s)<.25*nearby*s.difficulty.detection){
+ if(touched){
   ship.report={...playerReport(s),reason:'a patrol sweep'};ship.alert=Math.max(55,ship.alert);
  }
 }
@@ -150,7 +163,7 @@ function patrolReceipt(s,source){
    c.sweepArea={x:(Math.floor(source.x/size)+.5)*size,y:(Math.floor(source.y/size)+.5)*size,size,time:s.time};
   }
   c.lastSweep=s.time;
-  report(s,'sweep','Search ping heard · bearing '+String(Math.round(c.bearing)%360).padStart(3,'0')+'°');
+  report(s,'sweep',(source.friendly?'Surface sweep heard · bearing ':source.touched?'Search ping crossed our hull · bearing ':'Search ping heard · bearing ')+String(Math.round(c.bearing)%360).padStart(3,'0')+'°');
  }
  if(source.type==='collapse'||source.type==='settling'){
   if(source.type==='collapse')report(s,'collapse','Possible implosion heard');
@@ -195,6 +208,13 @@ function tick(s,dt,input){
  // Suppress repeated damage log spam while retaining actual damage.
  if(s.events.length>1&&s.events[0].text===s.events[1].text)s.events.splice(1,1);
  if(s.hull<=0)s.status='lost';
+ const scan=input.imaging;
+ let beat=0;
+ if(scan&&operatingFraction(s.systems.sonar)>0){
+  const previous=s.imagingTime??0;
+  s.imagingTime=previous+dt;
+  if(Math.floor(s.imagingTime/5)>Math.floor(previous/5))beat=Math.floor(s.imagingTime/5);
+ }
  let danger=0;
  for(const ship of s.ships){
    if(ship.hull<=0)continue;
@@ -209,10 +229,16 @@ function tick(s,dt,input){
    if(approaching&&!s.battle&&!ship.report)ship.heading=(ship.heading+dt*.36)%360;
    if(s.mission==='sneaky-seamen')patrolSweep(s,ship);
    if(isOpponent(ship)&&!ship.disabled){
+     if(beat)imagerClue(s,ship,scan.mode,scan.profile,beat);
      const track=updateHostileTrack(s,ship,env,dt);
+     if(!track&&ship.report&&ship.alert>=12&&s.time-ship.report.time<2&&ship.report.time>(ship.clue?.time??-1)){
+      leaveClue(s,ship,0,ship.report);
+     }
      if(ship.kind==='escort'||ship.kind==='sub'){
       reportHunterState(s,ship,track);
-      if(track){pursueAndAttack(s,ship,track,dt,dropDepthCharge,launchHostileTorpedo);danger=Math.max(danger,ship.alert);}
+      if(!track&&searchClue(s,ship,dt))patrolSweep(s,ship,true);
+      if(track||ship.clue||ship.report&&s.time-ship.report.time<2)danger=Math.max(danger,ship.alert);
+      if(track)pursueAndAttack(s,ship,track,dt,dropDepthCharge,launchHostileTorpedo);
      }
    }
    if(ship.disabled)ship.speed=0;
@@ -221,7 +247,8 @@ function tick(s,dt,input){
 
  }
  if(s.mission==='tiebreaker'&&!approaching)updateFleetBattle(s);
- if(s.convoy){updateConvoyRaid(s,dt,approaching,dropDepthCharge);updateLamp(s,env,input,dt);}
+ if(s.convoy){updateConvoyRaid(s,dt,approaching,dropDepthCharge);updateLamp(s,env,s.alliedLamp?.message?{...input,lampInView:null}:input,dt);}
+ updateAlliedWatch(s,env,input,dt,recordLampContact);
  if(s.search&&!s.search.located){
   if(s.site){
    const surfaceSight=s.site.kind==='surface'&&['scope','tower','gun'].includes(input.observation)&&
@@ -237,7 +264,7 @@ function tick(s,dt,input){
   }
  }
  resolveTraffic(s,hurt);
- s.alert=clamp(Math.max(danger,s.alert-dt*.65),0,100);
+ s.alert=clamp(danger,0,100);
  for(const c of s.contacts){c.age+=dt;c.confidence=Math.max(.05,c.confidence-dt*.0006);}
  s.contacts=s.contacts.filter(c=>c.age<240||c.fix?.source==='satellite'&&s.time-c.fix.time<900);
  const packet=updateRecon(s,dt);if(packet&&applyReconPacket(s,packet))log(s,`Orbital reconnaissance received. ${packet.tracks.length} timestamped surface tracks.`,'success');
@@ -294,6 +321,7 @@ export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charg
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired','convoy-lost'].includes(s.status))return null;
  if(s.mission!=='wolf-in-the-henhouse'&&(s.convoy!==undefined||s.status==='convoy-lost'))return null;
+ if(s.imagingTime!==undefined&&(!Number.isFinite(s.imagingTime)||s.imagingTime<0||s.imagingTime>s.time+.001))return null;
  if(s.wavePhase!==undefined&&(!Number.isFinite(s.wavePhase)||s.wavePhase<0))return null;
  // Patrols saved before the orbit option existed always used station views.
  s.difficulty=patrolDifficulty({orbitCamera:false,instantReplay:false,...s.difficulty});
@@ -359,11 +387,13 @@ export function restore(raw){try{
  for(const ship of s.ships)if(!ship||typeof ship.id!=='string'||typeof ship.name!=='string'||!['merchant','fishing','escort','sub','carrier'].includes(ship.kind)||!['x','y','heading','speed','hull','alert','attack'].every(k=>Number.isFinite(ship[k])))return null;
  for(const v of s.ships){
   for(const key of ['sinkDepth','sunkAt','nextCreak','collapsedAt','nextSweep','neutralHitAt'])if(v[key]!==undefined&&(!Number.isFinite(v[key])||v[key]<0))return null;
+  if(v.clue&&(![v.clue.x,v.clue.y,v.clue.time].every(Number.isFinite)||v.clue.time<0||v.clue.time>s.time))return null;
+  if(v.nextInquiry!==undefined&&(!Number.isFinite(v.nextInquiry)||v.nextInquiry<0))return null;
   if(v.wreckMark&&(!Number.isFinite(v.wreckMark.x)||!Number.isFinite(v.wreckMark.y)||typeof v.wreckMark.observed!=='boolean'))return null;
  }
  if(s.ships.some(ship=>ship.report!==undefined&&!validReport(ship.report,s.time)))return null;
  if(s.ships.some(ship=>ship.torpedoDecoys!==undefined&&(!Number.isInteger(ship.torpedoDecoys)||ship.torpedoDecoys<0||ship.torpedoDecoys>ENEMY_DECOY_SUPPLY)))return null;
- if(!validMissionTargets(s))return null;
+ if(!validAlliedWatch(s)||!validMissionTargets(s))return null;
  if(s.difficulty.longPatrol?!validSearch(s):s.search!==undefined)return null;
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k]))||c.depthEstimate!==undefined&&!Number.isFinite(c.depthEstimate)||c.courseEstimated!==undefined&&typeof c.courseEstimated!=='boolean')return null;
  if(s.drone.nosePitch!==null&&(!Number.isFinite(s.drone.nosePitch)||Math.abs(s.drone.nosePitch)>maxNosePitch))return null;

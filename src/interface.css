@@ -58,3 +58,19 @@ body.loss #result-dialog{border-color:#d79377;background:#28191cf5;box-shadow:0 
 }
 #lamp-copy:not([hidden]){display:block;color:#f5d58f;font:12px/1.4 var(--mono);margin-top:3px}
 #lamp-copy[hidden],.extraction[hidden],#plot-home[hidden]{display:none}
+
+#sonar-navigation{display:none}
+body[data-station=sonar] #sonar-navigation{display:block;position:absolute;top:4px;left:8px;z-index:6}
+body[data-station=sonar] .view-top,body[data-station=sonar] .view-bottom{display:none}
+.sonar-tabs{display:flex;background:#102122ee;border:1px solid #53645c;border-radius:3px;overflow:hidden}
+.sonar-tabs button{min-height:38px;padding:0 13px;color:#c8d3c5;font:12px var(--mono)}
+.sonar-tabs button[aria-pressed=true]{background:#394135;color:#ffdb94;box-shadow:inset 0 -2px #d4ad69}
+#sonar-tools [hidden],#alert-dot[hidden],#alert-label[hidden]{display:none}
+#imager-controls{display:flex;align-items:stretch;justify-content:space-between;gap:4px;width:100%}
+#imager-profile{min-width:0;color:var(--cream);background:#15272a;border:1px solid #526158;font:12px var(--mono);padding:4px}
+@media (640px <= width <= 1100px) and (min-height:541px){
+ #imager-controls{flex-direction:column}
+}
+@media(max-height:500px){
+ .sonar-tabs button{min-height:30px}
+}

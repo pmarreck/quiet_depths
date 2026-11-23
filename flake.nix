@@ -67,7 +67,7 @@
           tsc --project tsconfig.json --noEmit false --outDir "$TMPDIR/typed-game"
           tsc --project tsconfig.worker.json --noEmit false --outDir "$TMPDIR/typed-worker"
           cp "$TMPDIR/typed-game/"*.js src/
-          elm make elm/MissionPicker.elm --optimize --output=mission-picker.js
+          elm make elm/MissionPicker.elm elm/SonarTabs.elm --optimize --output=mission-picker.js
           runHook postBuild
         '';
         doCheck = true;

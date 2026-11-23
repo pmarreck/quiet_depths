@@ -178,3 +178,11 @@ The built game makes no external requests. No accounts, tracking, multiplayer, o
 Quiet Depths’ original code and assets are available under the [PolyForm Noncommercial License 1.0.0](LICENSE). To release a commercial game using this work, obtain a separate license from the copyright holder.
 
 Third-party components retain their own licenses. Three.js 0.170.0 is vendored under the MIT license. DM Sans, IBM Plex Mono, and Libre Caslon Display are vendored under their included SIL Open Font Licenses. The site build includes the Elm package licenses.
+
+### Sonar imagers and signal lamps
+
+Open **Sonar** and select **Scribbler** to record a seafloor strip, or **Painter** to sweep the sector ahead. **Start scan** transmits. Leaving the station or changing instruments stops transmission. The bright dot marks the next sample. New Scribbler lines appear at the bottom. Speed changes stretch or compress the record, and turning changes which ground passes under each side. Painter builds the view one elevation at a time, so moving contacts can change shape during a sweep. Each instrument keeps its paper while you visit other stations in the same session.
+
+**Survey** has a wider range and draws a coarser image. **Detail** refreshes faster at shorter range and is easier for nearby listeners to notice. These are fictional gameplay presets. A hunter can investigate a clue and give up according to **Enemy pursuit persistence**. Turn off **Show enemy suspicion and detection** to use only the crew's observations during play.
+
+In **Tiebreaker** and **Wolf in the Henhouse**, a nearby friendly surface ship with a recent sonar fix can hail a surfaced player. Keep its flashing lamp in the tower or periscope view to copy the telegram. The E/W and N/S fields are chart coordinates in tens of meters. D gives depth in meters, C gives course in degrees and K gives speed in knots. Completed reports enter Contacts at their observation time and age on the chart. The convoy's original coarse sighting remains available in Wolf in the Henhouse.

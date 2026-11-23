@@ -1,3 +1,4 @@
+import {searchSeconds} from './suspicion.js';
 import {bearing,clamp,delta,distance,log,rad,rand} from './mechanics.js';
 import {emitSound} from './acoustics.js';
 import {addDebrief} from './debrief.js';
@@ -6,7 +7,7 @@ export function playerReport(s){
  return {x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:s.speed,time:s.time};
 }
 
-export const searchDuration=s=>100*(s.difficulty?.pursuit??1);
+export const searchDuration=s=>searchSeconds(s.difficulty?.pursuit??1);
 
 export function projectedReport(report,time,lead=0){
  const age=Math.max(0,time-report.time),travel=(age+lead)*(report.speed??0)*.514444,course=rad(report.heading??0);

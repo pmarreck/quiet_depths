@@ -1,3 +1,4 @@
+import {shelfOutcrops} from './coast.js';
 import * as T from './vendor/three.module.js';
 import {createSwimmer} from './marine-life.js';
 import {surfaceHull} from './surface-hull.js';
@@ -82,6 +83,11 @@ export class UnderseaLife{
    if(i%3===0){const kelp=new T.Group();for(let j=0;j<4;j++){const stem=new T.Mesh(new T.CylinderGeometry(.12,.3,7+j,5),material(0x426a4f));stem.position.set(j*.5,(7+j)/2,0);stem.rotation.z=(j-2)*.15;kelp.add(stem);}ground(kelp,x+4,y);this.staticRoot.add(kelp);}
   }
   this.staticRoot.add(gravel,sponges);
+  if(s.site)for(const outcrop of shelfOutcrops(s.site,seed)){
+   const rock=new T.Mesh(new T.DodecahedronGeometry(1,0),material(0x62675c));
+   rock.scale.set(outcrop.width,outcrop.height,outcrop.length);
+   ground(rock,outcrop.x,outcrop.y,-rad(outcrop.heading));this.staticRoot.add(rock);
+  }
   for(let i=0;i<3;i++){const oct=new T.Group(),m=material(0x9b657d);ellipsoid(oct,[.8,1.1,.8],[0,.6,0],m);for(let j=0;j<8;j++){const a=j*Math.PI/4,pts=[new T.Vector3(0,.3,0),new T.Vector3(Math.sin(a),.1,Math.cos(a)),new T.Vector3(Math.sin(a)*2,.15,Math.cos(a)*2)];oct.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),8,.13,4),m));}const x=this.anchor.x-25+i*28,y=this.anchor.y+25;oct.name='Octopus';ground(oct,x,y,hash01(seed,i)*Math.PI*2,-.04);this.staticRoot.add(oct);}
  }
  update(s,env){
