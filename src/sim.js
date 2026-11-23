@@ -1,4 +1,4 @@
-import {imagerClue,leaveClue,searchClue} from './suspicion.js';
+import {activeClue,imagerClue,leaveClue,searchClue} from './suspicion.js';
 import {launchWatchSeconds} from './mess-watch.js';
 import {validTubeTimes} from './torpedo-tubes.js';
 import {updateAlliedWatch,validAlliedWatch,convoyLosses,updateLamp,updateConvoyRaid,resolveConvoyCharge} from './convoy-watch.js';
@@ -234,10 +234,11 @@ function tick(s,dt,input){
      if(!track&&ship.report&&ship.alert>=12&&s.time-ship.report.time<2&&ship.report.time>(ship.clue?.time??-1)){
       leaveClue(s,ship,0,ship.report);
      }
+     const clue=activeClue(s,ship);
+     if(track||clue||ship.report&&s.time-ship.report.time<2)danger=Math.max(danger,ship.alert);
      if(ship.kind==='escort'||ship.kind==='sub'){
       reportHunterState(s,ship,track);
-      if(!track&&searchClue(s,ship,dt))patrolSweep(s,ship,true);
-      if(track||ship.clue||ship.report&&s.time-ship.report.time<2)danger=Math.max(danger,ship.alert);
+      if(!track&&clue&&searchClue(s,ship,dt,clue))patrolSweep(s,ship,true);
       if(track)pursueAndAttack(s,ship,track,dt,dropDepthCharge,launchHostileTorpedo);
      }
    }

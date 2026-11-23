@@ -86,3 +86,14 @@ test('a surfaced crew copies a dated friendly fix through the actual lamp, inclu
  assert.equal(c.depthEstimate,fix.depth);assert.ok(c.courseEstimated);assert.equal(c.kind,'sub');
  assert.ok(s.reports.some(r=>r.id==='allied-fix'));assert.ok(restore(save(s)));
 });
+
+test('a transport can suspect a nearby transmission and then forget it without becoming a hunter',()=>{
+ const s=createGame('shadow',508,{difficulty:{pursuit:.4,airSupport:false}});
+ const ship=s.ships.find(v=>v.kind==='merchant'&&v.military);
+ s.ships=[ship];s.scope=false;s.silent=true;s.speed=s.targetSpeed=0;s.depth=s.targetDepth=95;
+ Object.assign(ship,{x:s.x+6000,y:s.y+8000,speed:0});
+ leaveClue(s,ship,45);const heading=ship.heading;
+ step(s,.25);assert.ok(s.alert>30);assert.equal(ship.tracking,undefined);
+ step(s,41);assert.equal(ship.clue,undefined);assert.equal(ship.heading,heading);
+ assert.equal(s.alert,0);
+});

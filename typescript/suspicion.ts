@@ -29,12 +29,16 @@ export function imagerClue(s:Patrol,v:Watch,mode:Instrument,profile:Profile,beat
   for(const letter of v.id)key=Math.imul(key,31)+letter.charCodeAt(0);
   if(hash01(s.patrol.seed,key)<risk)leaveClue(s,v,direct?24:12);
 }
-export function searchClue(s:Patrol,v:Watch,dt:number){
-  if(!v.clue)return false;
+export function activeClue(s:Patrol,v:Watch){
+  if(!v.clue)return;
   if(s.time-v.clue.time>searchSeconds(s.difficulty.pursuit)||v.alert<1){
-    delete v.clue;delete v.nextInquiry;return false;
+    delete v.clue;delete v.nextInquiry;return;
   }
-  const dx=v.clue.x-v.x,dy=v.clue.y-v.y;
+  return v.clue;
+}
+export function searchClue(s:Patrol,v:Watch,dt:number,clue=activeClue(s,v)){
+  if(!clue)return false;
+  const dx=clue.x-v.x,dy=clue.y-v.y;
   if(Math.hypot(dx,dy)>140){
     const course=Math.atan2(dx,dy)*180/Math.PI;
     const turn=((course-v.heading+540)%360)-180;
