@@ -48,7 +48,7 @@ main =
                 , case selected of
                     Scribbler ->
                         div [ class "scribbler-key", attribute "id" "scribbler-key" ]
-                            [ text "Dark center band shows water above the seabed." ]
+                            [ text "The center shows the seabed under your keel." ]
 
                     _ ->
                         text ""

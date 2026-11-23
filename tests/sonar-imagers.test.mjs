@@ -18,8 +18,36 @@ test('Scribbler places opposite-side echoes on opposite halves of the same strip
  const bright=starboard.findIndex((p,i)=>p>clean[i]+70);
  assert.ok(bright>half);assert.ok(starboard.some((p,i)=>i>bright&&p<clean[i]/2));
  assert.ok(port.some((p,i)=>i<half&&p>clean[i]+70));
- s.ships=[];s.depth=20;
- assert.ok(row().filter(x=>x===0).length>clean.filter(x=>x===0).length);
+});
+test('Scribbler records distinct seabed texture under the keel at different heights on both profiles',()=>{
+ for(const profile of Object.keys(profiles)){
+  const s=world(),half=profiles[profile].width/2;
+  for(const depth of [20,85,190]){
+   s.depth=depth;s.y=0;
+   const center=()=>sampleLine(s,'scribbler',profile,0).slice(half-2,half+2);
+   const first=center();
+   assert.ok(first.every(v=>v>0),'Missing seabed under the keel');
+   s.y+=80;
+   assert.notDeepEqual(center(),first,'Center should record the ground the sub crosses');
+  }
+ }
+});
+test('Scribbler puts a wreck crossing the track on both sides of center and respects echo range',()=>{
+ const s=world(),{width,range}=profiles.detail,half=width/2;
+ const line=()=>sampleLine(s,'scribbler','detail',0),clean=line();
+ const wreck={x:0,y:0,depth:215,heading:90,hull:0,kind:'wreck'};
+ s.ships=[wreck];
+ const crossing=line();
+ for(const i of [half-1,half])assert.ok(crossing[i]>clean[i]+70,'Wreck should cross the center of the paper');
+ s.ships=[{...wreck,x:180}];
+ assert.ok(line()[Math.floor(half+180*half/range)]>190,'Wreck should appear at its horizontal distance');
+ s.ships=[{...wreck,x:180,depth:s.depth+range}];
+ assert.deepEqual(line(),clean,'An echo outside ping range should leave no mark or shadow');
+});
+test('Scribbler leaves the far edge empty when the bottom there is beyond ping range',()=>{
+ const s=world(),edge=()=>sampleLine(s,'scribbler','detail',0)[0];
+ s.depth=20;assert.equal(edge(),0);
+ s.depth=190;assert.ok(edge()>0);
 });
 test('Painter separates up/down and port/starboard, excludes contacts aft, and uses no affiliation data',()=>{
  const s=world(),frame=()=>Array.from({length:profiles.detail.height},(_,r)=>sampleLine(s,'painter','detail',r));

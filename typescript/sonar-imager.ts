@@ -40,6 +40,7 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):U
   const angle=s.heading*radians, sn=Math.sin(angle), cs=Math.cos(angle);
   const seed=s.environment.chartSeed;
   const altitude=Math.max(1,chartDepth(s.x,s.y,seed)-s.depth);
+  const rangeSquared=range*range;
   const vertical=(.5-(row+.5)/height)*1.25;
   const objects=s.site?[...s.ships,s.site]:s.ships;
   const echoes=objects.map(v=>{
@@ -56,12 +57,26 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):U
         halfLength:rock.length,halfWidth:rock.width,height:rock.height});
     }
   }
+  function seabedReturn(along:number,across:number){
+    const x=s.x+sn*along+cs*across,y=s.y+cs*along-sn*across;
+    const depth=chartDepth(x,y,seed),drop=depth-s.depth;
+    if(mode==='scribbler'&&(drop<0||across*across+drop*drop>rangeSquared))return 0;
+    const step=5,slope=(chartDepth(x+step*cs,y-step*sn,seed)-depth)/step;
+    const ripple=Math.sin(x*.088+Math.sin(y*.051)*1.5+y*.117);
+    const grain=hash01(s.patrol.seed,Math.floor(x/3)*7919+Math.floor(y/3));
+    const texture=52+22*ripple+32*grain+100*clamp(slope,-.4,.4)*Math.sign(across)+13*Math.sin(depth*.31);
+    if(mode==='painter')return texture;
+    // Reconstruct the bottom under the keel with less contrast at steep viewing angles.
+    const overhead=altitude/(altitude+Math.abs(across)*6);
+    return texture+(68-texture)*.5*overhead;
+  }
   for(let i=0;i<width;i++){
     const u=(i+.5)*2/width-1;
     let along=0,across=0, shade=0;
     if(mode==='scribbler'){
-      const slant=Math.abs(u)*range;
-      across=Math.sign(u)*Math.sqrt(Math.max(0,slant*slant-altitude*altitude));
+      // The paper measures horizontal distance from the track on both sides.
+      across=u*range;
+      shade=seabedReturn(0,across);
     }else{
       // A row samples one elevation looking out from the bow. Intersect
       // downward-looking rays with the same chart relief used by the scene.
@@ -71,16 +86,8 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):U
           const depth=chartDepth(s.x+sn*along+cs*across,s.y+cs*along-sn*across,seed);
           along=Math.max(0,depth-s.depth)/-vertical;across=u*1.2*along;
         }
+        if(along>0&&Math.hypot(along,across)<range)shade=seabedReturn(along,across);
       }
-    }
-    const ground=mode==='scribbler'?Math.abs(u)*range>=altitude:along>0&&Math.hypot(along,across)<range;
-    if(ground){
-      const x=s.x+sn*along+cs*across,y=s.y+cs*along-sn*across;
-      const d=chartDepth(x,y,seed), step=5;
-      const slope=(chartDepth(x+step*cs,y-step*sn,seed)-d)/step;
-      const ripple=Math.sin(x*.088+Math.sin(y*.051)*1.5+y*.117);
-      const grain=hash01(s.patrol.seed,Math.floor(x/3)*7919+Math.floor(y/3));
-      shade=52+22*ripple+32*grain+100*clamp(slope,-.4,.4)*Math.sign(across)+13*Math.sin(d*.31);
     }
     for(const e of echoes){
       if(mode==='painter'){
@@ -92,14 +99,16 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):U
         if(r<1)shade=Math.max(shade,125+100*Math.sqrt(1-r));
       }else{
         const alongRadius=Math.abs(Math.cos(e.turn))*e.halfLength+Math.abs(Math.sin(e.turn))*e.halfWidth;
-        if(Math.abs(e.along)>alongRadius||e.depth<0)continue;
+        if(Math.abs(e.along)>alongRadius||e.depth<0||e.along*e.along+e.across*e.across+e.depth*e.depth>rangeSquared)continue;
         const extent=(Math.abs(Math.sin(e.turn))*e.halfLength+Math.abs(Math.cos(e.turn))*e.halfWidth)*
           Math.sqrt(1-(e.along/alongRadius)**2);
-        const echoRange=Math.hypot(e.across,e.depth),slant=Math.abs(u)*range;
-        if(Math.sign(u)!==Math.sign(e.across))continue;
         const edge=Math.max(range/width,extent);
-        if(Math.abs(slant-echoRange)<edge)shade=205+34*Math.cos((slant-echoRange)/edge);
-        else if(slant>echoRange+edge&&slant<echoRange+edge+Math.min(140,Math.abs(e.across)*e.height/Math.max(3,altitude)))shade*=.12;
+        const offset=across-e.across;
+        if(Math.abs(offset)<=edge)shade=205+34*Math.cos(offset/edge);
+        else{
+          const pastEdge=offset*Math.sign(e.across)-edge;
+          if(pastEdge>0&&pastEdge<Math.min(140,Math.abs(e.across)*e.height/Math.max(3,altitude)))shade*=.12;
+        }
       }
     }
     result[i]=clamp(shade,0,255);
