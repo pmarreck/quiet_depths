@@ -50,9 +50,10 @@ export class Atmosphere{
    let group=this.flashes[used++];
    if(!group){
     group=new T.Group();
-    for(const color of [0xff600b,0xffd57a]){
+    // An orange halo stays legible against white spray; the smaller core adds light.
+    for(const [color,blending] of [[0xff600b,T.NormalBlending],[0xffd57a,T.AdditiveBlending]]){
      const sprite=new T.Sprite(new T.SpriteMaterial({map:this.glow,color,transparent:true,depthWrite:false,
-      toneMapped:false,fog:false,blending:T.AdditiveBlending}));
+      toneMapped:false,fog:false,blending}));
      sprite.renderOrder=2;group.add(sprite);
     }
     this.flashes.push(group);this.scene.add(group);
