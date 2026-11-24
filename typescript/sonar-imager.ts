@@ -1,16 +1,17 @@
 import {chartDepth,shelfOutcrops} from './coast.ts';
 import {hash01} from './surface-motion.ts';
+import {strips,printWreck,type WreckPlates,type WreckEcho} from './sonar-strip.ts';
 
 export type Instrument = 'scribbler' | 'painter';
 export type Profile = 'survey' | 'detail';
 // Fictional instrument presets. These control the recorder and encounter rolls.
 export const profiles = {
-  survey: {range:1600, width:80, height:44, rows:5, exposure:.24},
-  detail: {range:650, width:132, height:64, rows:12, exposure:.56},
+  survey: {range:strips.survey.range, width:80, height:44, rows:5, exposure:.24},
+  detail: {range:strips.detail.range, width:132, height:64, rows:12, exposure:.56},
 } as const;
 type Pose = {x:number; y:number; depth:number; heading:number};
-type Echo = {x:number; y:number; depth?:number; sinkDepth?:number; heading:number; kind:string; hull:number};
-type World = Pose & {time:number; patrol:{seed:number}; environment:{chartSeed?:number}; ships:Echo[]; site?:Echo|null};
+type Echo = {x:number; y:number; depth?:number; sinkDepth?:number; heading:number; kind:string; hull:number;settled?:boolean};
+type World = Pose & {time:number; speed?:number; patrol:{seed:number}; environment:{chartSeed?:number}; ships:Echo[]; site?:Echo|null};
 const radians = Math.PI/180;
 const clamp = (n:number,lo:number,hi:number) => Math.min(hi,Math.max(lo,n));
 
@@ -35,20 +36,27 @@ function cachedOutcrops(site:Echo,seed:number,chartSeed?:number){
 
 // Coordinates are tied to the patrol chart so changes of course and speed
 // change what is recorded. Old pixels are never reprojected onto the new view.
-export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):Uint8Array {
-  const {range,width,height}=profiles[profile], result=new Uint8Array(width);
+export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number,plates:WreckPlates):Uint8Array {
+  const strip=strips[profile],{range,width,height}=mode==='scribbler'?strip:profiles[profile],result=new Uint8Array(width);
   const angle=s.heading*radians, sn=Math.sin(angle), cs=Math.cos(angle);
   const seed=s.environment.chartSeed;
   const altitude=Math.max(1,chartDepth(s.x,s.y,seed)-s.depth);
   const rangeSquared=range*range;
   const vertical=(.5-(row+.5)/height)*1.25;
   const objects=s.site?[...s.ships,s.site]:s.ships;
-  const echoes=objects.map(v=>{
+  const wrecks:WreckEcho[]=[];
+  const echoes=objects.flatMap(v=>{
     const dx=v.x-s.x, dy=v.y-s.y, depth=(v.depth??0)+(v.sinkDepth??0);
     const turn=(v.heading-s.heading)*radians;
+    if(mode==='scribbler'&&(v.kind==='wreck'||v.hull<=0&&v.settled)&&Object.hasOwn(plates,v.kind)){
+      if(depth>=s.depth&&dx*dx+dy*dy+(depth-s.depth)**2<=rangeSquared){
+        wrecks.push({plate:plates[v.kind as keyof WreckPlates],along:dx*sn+dy*cs,across:dx*cs-dy*sn,sin:Math.sin(turn),cos:Math.cos(turn)});
+      }
+      return [];
+    }
     const halfLength=v.kind==='carrier'?120:v.kind==='wreck'?25:v.kind==='sub'?30:45;
-    return {along:dx*sn+dy*cs,across:dx*cs-dy*sn,depth:depth-s.depth,halfLength,turn,
-      halfWidth:Math.max(4,halfLength*.17),height:v.kind==='carrier'?18:v.kind==='sub'?6:9};
+    return [{along:dx*sn+dy*cs,across:dx*cs-dy*sn,depth:depth-s.depth,halfLength,turn,
+      halfWidth:Math.max(4,halfLength*.17),height:v.kind==='carrier'?18:v.kind==='sub'?6:9}];
   });
   if(s.site){
     for(const rock of cachedOutcrops(s.site,s.patrol.seed,seed)){
@@ -75,7 +83,7 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):U
     let along=0,across=0, shade=0;
     if(mode==='scribbler'){
       // The paper measures horizontal distance from the track on both sides.
-      across=u*range;
+      across=strip.bands[i].center;
       shade=seabedReturn(0,across);
     }else{
       // A row samples one elevation looking out from the bow. Intersect
@@ -102,7 +110,7 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):U
         if(Math.abs(e.along)>alongRadius||e.depth<0||e.along*e.along+e.across*e.across+e.depth*e.depth>rangeSquared)continue;
         const extent=(Math.abs(Math.sin(e.turn))*e.halfLength+Math.abs(Math.cos(e.turn))*e.halfWidth)*
           Math.sqrt(1-(e.along/alongRadius)**2);
-        const edge=Math.max(range/width,extent);
+        const edge=Math.max(strip.bands[i].half,extent);
         const offset=across-e.across;
         if(Math.abs(offset)<=edge)shade=205+34*Math.cos(offset/edge);
         else{
@@ -113,6 +121,7 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number):U
     }
     result[i]=clamp(shade,0,255);
   }
+  for(const wreck of wrecks)printWreck(result,strip,wreck,altitude);
   return result;
 }
 
@@ -120,23 +129,27 @@ export class ImagerPaper {
   readonly pixels:Uint8Array;
   readonly width:number;
   readonly height:number;
+  readonly rows:number;
   x=0;
   y=0;
   version=0;
+  completedLines=0;
   private fraction=0;
   private line?:Uint8Array;
-  constructor(readonly mode:Instrument,readonly profile:Profile){
-    const p=profiles[profile];this.width=p.width;this.height=p.height;this.pixels=new Uint8Array(this.width*this.height);
+  constructor(readonly mode:Instrument,readonly profile:Profile,private readonly plates:WreckPlates){
+    const p=mode==='scribbler'?strips[profile]:profiles[profile];
+    this.width=p.width;this.height=p.height;this.rows=p.rows;this.pixels=new Uint8Array(this.width*this.height);
   }
   advance(s:World,dt:number,quality:number){
-    this.fraction+=dt*profiles[this.profile].rows*this.width*quality;
+    const feed=this.mode==='scribbler'?.35+.65*Math.abs(s.speed??4)/4:1;
+    this.fraction+=dt*this.rows*feed*this.width*quality;
     const count=Math.floor(this.fraction);this.fraction-=count;
     if(count>0)this.version++;
     for(let n=0;n<count;n++){
-      this.line??=sampleLine(s,this.mode,this.profile,this.y);
+      this.line??=sampleLine(s,this.mode,this.profile,this.y,this.plates);
       this.pixels[this.y*this.width+this.x]=this.line[this.x];
       if(++this.x<this.width)continue;
-      this.x=0;this.line=undefined;
+      this.x=0;this.line=undefined;this.completedLines++;
       if(this.mode==='painter')this.y=(this.y+1)%this.height;
       else{this.pixels.copyWithin(this.width,0);this.pixels.fill(0,0,this.width);}
     }
@@ -148,6 +161,7 @@ export class ImagerDisplay {
   private image?:ImageData;
   private previous?:ImagerPaper;
   private version=-1;
+  private completedLines=-1;
   draw(ctx:CanvasRenderingContext2D,w:number,h:number,paper:ImagerPaper,writing:boolean){
     const {width,height,pixels}=paper;
     if(!this.image||width!==this.image.width||height!==this.image.height){
@@ -155,19 +169,29 @@ export class ImagerDisplay {
     }
     if(this.previous!==paper||this.version!==paper.version){
       const data=this.image.data;
-      for(let i=0;i<pixels.length;i++){
+      const rows=paper.mode==='scribbler'&&this.previous===paper&&this.completedLines===paper.completedLines?1:height;
+      for(let i=0;i<rows*width;i++){
         const v=pixels[i],p=i*4;
         data[p]=12+v*.96;data[p+1]=12+v*.63;data[p+2]=9+v*.22;data[p+3]=255;
       }
-      this.canvas.getContext('2d')!.putImageData(this.image,0,0);
-      this.previous=paper;this.version=paper.version;
+      this.canvas.getContext('2d')!.putImageData(this.image,0,0,0,0,width,rows);
+      this.previous=paper;this.version=paper.version;this.completedLines=paper.completedLines;
     }
     ctx.fillStyle='#100f0b';ctx.fillRect(0,0,w,h);
     const margin=12,top=paper.mode==='scribbler'?68:56,bottom=27,areaW=Math.max(1,w-margin*2),areaH=Math.max(1,h-top-bottom);
     ctx.imageSmoothingEnabled=false;ctx.drawImage(this.canvas,margin,top,areaW,areaH);
     ctx.font='11px monospace';ctx.fillStyle='#dec390';ctx.textAlign='left';
     ctx.fillText(paper.mode==='scribbler'?'PORT':'PORT   /   BOW SECTOR',margin,h-8);
-    ctx.textAlign='right';ctx.fillText('STBD   '+profiles[paper.profile].range+' m',w-margin,h-8);
+    ctx.textAlign='right';ctx.fillText(paper.mode==='scribbler'?'STBD':'STBD   '+profiles[paper.profile].range+' m',w-margin,h-8);
+    if(paper.mode==='scribbler'){
+      ctx.textAlign='center';
+      ctx.fillText('MAX '+strips[paper.profile].range+' m',w/2,h-8);
+      for(const side of [-1,1]){
+        const x=w/2+side*areaW/4;
+        ctx.fillRect(x,h-bottom,1,4);
+        ctx.fillText(strips[paper.profile].near+' m',x,h-8);
+      }
+    }
     if(!writing&&paper.version===0){
       ctx.textAlign='center';ctx.fillText(paper.mode==='scribbler'?'Seafloor strip · Start scan':'Forward sweep · Start scan',w/2,top+areaH/2);
     }

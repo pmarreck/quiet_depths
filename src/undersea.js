@@ -2,6 +2,7 @@ import {shelfOutcrops} from './coast.js';
 import * as T from './vendor/three.module.js';
 import {createSwimmer} from './marine-life.js';
 import {surfaceHull} from './surface-hull.js';
+import {poseSurveyWreck} from './wrecks.js';
 import {schoolFishShape} from './school-fish.js';
 import {bottom,rad,clamp,capsuleContact} from './mechanics.js';
 import {hash01,surfaceHeight} from './environment.js';
@@ -65,9 +66,11 @@ export class UnderseaLife{
   const ground=(...args)=>groundOnChart(s.environment?.chartSeed,...args);
   for(const child of [...this.staticRoot.children]){child.traverse(o=>{o.geometry?.dispose();if(o.isInstancedMesh)o.dispose();if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();});this.staticRoot.remove(child);}
   this.site=null;this.lastTime=null;this.fishPositions=[];this.anchor={x:s.site?.x??s.x,y:s.site?.y??s.y};this.lastState=s;
-  if(s.site){this.site=s.site.kind==='sub'?this.makeSub():this.makeShip({kind:s.site.kind==='wreck'?'merchant':'fishing',wreck:s.site.kind==='wreck'});this.site.position.set(s.site.x,-s.site.depth,-s.site.y);this.site.rotation.set(.04,-rad(s.site.heading),.18);this.staticRoot.add(this.site);
+  if(s.site){this.site=s.site.kind==='sub'?this.makeSub():this.makeShip({kind:s.site.kind==='wreck'?'merchant':'fishing',wreck:s.site.kind==='wreck'});this.site.position.set(s.site.x,-s.site.depth,-s.site.y);
+   if(s.site.kind==='wreck')poseSurveyWreck(this.site,rad(s.site.heading));else this.site.rotation.set(.04,-rad(s.site.heading),.18);
+   this.staticRoot.add(this.site);
    if(s.site.kind!=='surface'){const rust=material(0x705343);this.site.traverse(o=>{if(o.isMesh){o.material=rust;}});}
-   if(s.site.kind==='wreck'){this.site.scale.setScalar(.5);const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}
+   if(s.site.kind==='wreck'){const chest=new T.Mesh(new T.BoxGeometry(2,1.5,1.4),material(0xa18b53));chest.position.set(6,-1,4);this.site.add(chest);}
   }
   const gravel=new T.InstancedMesh(new T.IcosahedronGeometry(1,0),material(0x73766a),140);
   const sponges=new T.InstancedMesh(new T.CylinderGeometry(.34,.23,1,8,1,true),new T.MeshStandardMaterial({color:0xa77d60,roughness:1,side:T.DoubleSide}),35);

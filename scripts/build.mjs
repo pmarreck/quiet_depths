@@ -1,6 +1,7 @@
 import { mkdir, readdir, cp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { wreckPlateModule } from './wreck-plates.mjs';
 
 const output = process.argv[2];
 if (!output) throw new Error('A fresh output directory is required');
@@ -18,6 +19,7 @@ for (const name of await readdir('src')) {
 await mkdir(output);
 await cp('src', output, { recursive: true });
 await cp('vendor', join(output, 'vendor'), { recursive: true });
+await writeFile(join(output, 'wreck-plates.js'), wreckPlateModule(), {flag:'wx'});
 const index = join(output, 'index.html');
 const html = await readFile(index, 'utf8');
 const buildNumberElement = '<span id="briefing-build">Build number unavailable</span>';

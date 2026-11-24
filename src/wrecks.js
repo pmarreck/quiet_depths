@@ -1,3 +1,8 @@
+export function poseSurveyWreck(model,headingRadians){
+ model.scale.setScalar(.5);
+ model.rotation.set(.04,-headingRadians,.18,'YXZ');
+}
+
 // Deform only the wreck's own meshes, so a fresh patrol still gets an intact boat.
 export function damageWreck(T,model,sub){
  const hull=model.userData.hull,skin=hull.geometry.attributes.position;

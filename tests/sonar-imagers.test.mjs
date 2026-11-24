@@ -1,13 +1,56 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,step,save,restore} from '../src/sim.js';
-import {sampleLine,profiles,ImagerPaper} from '../src/sonar-imager.js';
+import {sampleLine as recordLine,profiles,ImagerPaper} from '../src/sonar-imager.js';
+import {makeWreckPlates} from '../scripts/wreck-plates.mjs';
 import {imagerClue,leaveClue,searchClue,searchSeconds} from '../src/suspicion.js';
 import {stationLamp} from '../src/convoy-watch.js';
 import {patrolNotices} from '../src/ui.js';
 import {copyPercent} from '../src/signal-lamp.js';
 
 const world=()=>({x:0,y:0,depth:85,heading:0,time:0,environment:{chartSeed:1},patrol:{seed:1},ships:[]});
+const plates=makeWreckPlates(),sampleLine=(s,mode,profile,row)=>recordLine(s,mode,profile,row,plates);
+test('a four-knot pass records the survey wreck from bow to stern with a resolved beam and deck in both profiles',()=>{
+ for(const profile of ['survey','detail']){
+  const s=createGame('survey',51972),wreck=s.site;
+  const controlSite={...wreck,kind:'surface',depth:0}; // Same outcrops, no submerged hull.
+  const paper=new ImagerPaper('scribbler',profile,plates),water=new ImagerPaper('scribbler',profile,plates);
+  Object.assign(s,{heading:wreck.heading,depth:wreck.depth-35,speed:4,ships:[]});
+  const angle=s.heading*Math.PI/180,dt=.25;
+  for(let d=-44;d<=44;d+=4*.514444*dt){
+   s.x=wreck.x+d*Math.sin(angle);s.y=wreck.y+d*Math.cos(angle);
+   paper.advance(s,dt,1);water.advance({...s,site:controlSite},dt,1);
+  }
+  const widths=[],tones=new Set(),{width,height}=paper;
+  for(let y=0;y<height;y++){
+   let breadth=0;
+   for(let x=Math.floor(width*.39);x<Math.ceil(width*.61);x++){
+    const i=y*width+x;
+    if(paper.pixels[i]>water.pixels[i]+48){breadth++;tones.add(paper.pixels[i]);}
+   }
+   widths.push(breadth);
+  }
+  const first=widths.findIndex(w=>w>0),last=widths.findLastIndex(w=>w>0);
+  assert.ok(Math.max(...widths)>=8,profile+' reduces the wreck to a line');
+  assert.ok(first>1&&last<height-1&&last-first>=12,profile+' lost one end of the wreck');
+  assert.ok(tones.size>=12,profile+' washed out all the deck relief');
+ }
+});
+test('an oblique pass follows the heading of a settled merchant wreck in either direction',()=>{
+ const s=world(),v={x:0,y:0,depth:0,sinkDepth:215,hull:0,settled:true,kind:'merchant'};
+ for(const heading of [45,-45]){
+  const centers=[-25,25].map(y=>{
+   s.y=y;s.ships=[];
+   const bare=sampleLine(s,'scribbler','detail',0);
+   s.ships=[{...v,heading}];
+   const line=sampleLine(s,'scribbler','detail',0);
+   const hits=Array.from(line.keys()).filter(i=>line[i]>bare[i]+48);
+   assert.ok(hits.length>=4);
+   return (hits[0]+hits.at(-1))/2;
+  });
+  assert.ok((centers[1]-centers[0])*Math.sign(heading)>20,'Wreck footprint should cross the paper on the correct diagonal');
+ }
+});
 test('Scribbler places opposite-side echoes on opposite halves of the same strip and leaves a shadow behind a raised object',()=>{
  const s=world(),row=()=>sampleLine(s,'scribbler','detail',0),clean=row();
  const v={x:260,y:0,depth:215,heading:0,hull:0,kind:'sub'};
@@ -21,7 +64,7 @@ test('Scribbler places opposite-side echoes on opposite halves of the same strip
 });
 test('Scribbler records distinct seabed texture under the keel at different heights on both profiles',()=>{
  for(const profile of Object.keys(profiles)){
-  const s=world(),half=profiles[profile].width/2;
+  const s=world(),half=sampleLine(s,'scribbler',profile,0).length/2;
   for(const depth of [20,85,190]){
    s.depth=depth;s.y=0;
    const center=()=>sampleLine(s,'scribbler',profile,0).slice(half-2,half+2);
@@ -33,14 +76,15 @@ test('Scribbler records distinct seabed texture under the keel at different heig
  }
 });
 test('Scribbler puts a wreck crossing the track on both sides of center and respects echo range',()=>{
- const s=world(),{width,range}=profiles.detail,half=width/2;
- const line=()=>sampleLine(s,'scribbler','detail',0),clean=line();
+ const s=world(),{range}=profiles.detail;
+ const line=()=>sampleLine(s,'scribbler','detail',0),clean=line(),width=clean.length,half=width/2;
  const wreck={x:0,y:0,depth:215,heading:90,hull:0,kind:'wreck'};
  s.ships=[wreck];
  const crossing=line();
  for(const i of [half-1,half])assert.ok(crossing[i]>clean[i]+70,'Wreck should cross the center of the paper');
- s.ships=[{...wreck,x:180}];
- assert.ok(line()[Math.floor(half+180*half/range)]>190,'Wreck should appear at its horizontal distance');
+ s.ships=[{...wreck,x:45}];
+ const tick=width*3/4;
+ assert.ok(line()[tick]>clean[tick]+70,'Wreck should appear at the starboard 45 m tick');
  s.ships=[{...wreck,x:180,depth:s.depth+range}];
  assert.deepEqual(line(),clean,'An echo outside ping range should leave no mark or shadow');
 });
@@ -60,7 +104,7 @@ test('Painter separates up/down and port/starboard, excludes contacts aft, and u
 });
 test('Scribbler writes at the top and scrolls each completed line down without resampling history',()=>{
  for(const profile of Object.keys(profiles)){
-  const s=world(),p=new ImagerPaper('scribbler',profile),w=p.width,lineTime=1/profiles[profile].rows;
+  const s=world(),p=new ImagerPaper('scribbler',profile,plates),w=p.width,lineTime=1/p.rows;
   const first=sampleLine(s,'scribbler',profile,0);
   p.advance(s,lineTime/2,1);
   assert.equal(p.y,0);assert.equal(p.x,w/2);

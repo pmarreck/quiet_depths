@@ -1,5 +1,6 @@
 import {stationLamp} from './convoy-watch.js';
 import {ImagerPaper,ImagerDisplay} from './sonar-imager.js';
+import {wreckPlates} from './wreck-plates.js';
 import {suspicionLabel} from './suspicion.js';
 import {copyPercent,matchingBearing,reportRadius} from './signal-lamp.js';
 import {chartRelief} from './chart-relief.js';
@@ -53,7 +54,7 @@ const imagerPapers=new Map(),imagerDisplay=new ImagerDisplay();
 function currentPaper(){
  if(paperPatrol!==state){imagerPapers.clear();paperPatrol=state;}
  const key=instrument+'-'+imagerProfile;
- if(!imagerPapers.has(key))imagerPapers.set(key,new ImagerPaper(instrument,imagerProfile));
+ if(!imagerPapers.has(key))imagerPapers.set(key,new ImagerPaper(instrument,imagerProfile,wreckPlates));
  return imagerPapers.get(key);
 }
 let sonarRange=SONAR_RANGES.at(-1);
