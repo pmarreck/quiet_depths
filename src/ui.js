@@ -1,3 +1,4 @@
+import {bottomCall,batteryCall} from './watch-warnings.js';
 import {suspicionLabel} from './suspicion.js';
 import {DAY_SECONDS,environmentAt} from './environment.js';
 import {lampRange} from './signal-lamp.js';
@@ -14,6 +15,9 @@ export function patrolNotices(s,opticalActive,soundOn,view,rate=1,paused=false){
   notices.push({id:'torpedo-'+t.id,text:'Torpedo likely targeting us! ETA '+shipTime+' ship · '+etaText(t.arrival,s.time,rate,paused)+' · T'+t.id,critical:true});
  }
  if(pressure)notices.push({id:'pressure',text:(pressure===2?'Critical · implosion risk':'Pressure alarm')+' · Rise above '+depthLimit(s)+' m',critical:pressure===2});
+ if(s.watchWarnings?.bottom)notices.push({id:'bottom-clearance',text:bottomCall,critical:true});
+ const battery=s.watchWarnings?.battery;
+ if(battery)notices.push({id:'battery-reserve',text:batteryCall(battery),critical:battery===2});
  if(s.fuelFire>0)notices.push({id:'fuel-fire',text:'Fuel fire · Assign damage control',critical:true});
  if(s.fuelLeak>0)notices.push({id:'fuel-leak',text:'Fuel tank leaking · Assign damage control'});
  if(s.flood>0)notices.push({id:'flood',text:'Taking on water'});

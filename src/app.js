@@ -576,8 +576,8 @@ function updateUI(){
  $('sight-order').hidden=s.scopeSteerBearing===null;
  $('gun-tools').classList.toggle('hidden',!gun);$('gun-trigger').disabled=!canIssue(s,context())||!active||s.gun.ammo<=0||!operatingFraction(s.systems.deckgun);$('gun-sight-status').textContent=!operatingFraction(s.systems.deckgun)?'DECK GUN OFFLINE':`${s.gun.ammo} ROUNDS · ELEV ${s.gun.elevation.toFixed(1)}°`;$('drone-photo').textContent=s.mission==='survey'?'SURVEY PHOTO':'PHOTO';
  $('drone-instruments').classList.toggle('hidden',!drone||!active);$('drone-instruments').innerHTML=`<b>ROV ${s.drone.mode.toUpperCase()}</b>${s.drone.nosePitch===null?'':'<span>NOSE '+Math.abs(Math.round(s.drone.nosePitch))+'° '+(s.drone.nosePitch<0?'DOWN':'UP')+'</span>'}<span>CHARGE ${Math.round(s.drone.battery)}% · HULL ${Math.round(s.drone.hull)}%</span><span>LINK ${Math.round(separation(s,s.drone))} / 100 M</span><span>MOBILITY ${Math.round(s.drone.mobility)}% · BUOYANCY ${Math.round(s.drone.buoyancy)}%</span>`;
- const alertOn=s.pressureAlarm>0||seriousRepairs(s)||threats(s).length>0;
- $('red-beacon').classList.toggle('lit',alertOn);$('red-beacon').setAttribute('aria-label',alertOn?'Red alert':'Red alert off');
+ const batteryAlert=s.watchWarnings.battery===2,alertOn=batteryAlert||s.pressureAlarm>0||seriousRepairs(s)||threats(s).length>0;
+ $('red-beacon').classList.toggle('lit',alertOn);$('red-beacon').setAttribute('aria-label',batteryAlert?'Red alert · Critical battery':alertOn?'Red alert':'Red alert off');
  updateTicker(patrolNotices(s,optical&&active,sound.on,view,rate,paused));
  reconcileKeyedChildren($('torpedo-tracks'),s.torpedoTracks,t=>String(t.id),()=>document.createElement('div'),(node,t)=>{
   node.textContent='T'+t.id+' · Torpedo · '+Math.round(distance(s,t))+' m range · '+t.depth+' m depth · '+t.speed+' kn · '+(t.course===null?'Ping again for course':deg(t.course)+'° true')+(s.time-t.time>8?' · Last heard':'');
@@ -849,7 +849,7 @@ function frame(now){
   scheduleFrame();return;
  }
  if(canIssue(state,ctx)){
-  const previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
+  const previousWatch=state.watchWarnings,previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
   applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;const observation=['scope','gun','tower','drone'].includes(view)&&feedActive(state,view)?view:null;
   const imaging=transmitting&&view==='sonar'&&instrument!=='bearings'&&operatingFraction(state.systems.sonar)>0?{mode:instrument,profile:imagerProfile}:null;
   let sampleTime=state.time;
@@ -857,6 +857,7 @@ function frame(now){
    if(imaging){currentPaper().advance(s,s.time-sampleTime,operatingFraction(s.systems.sonar));sampleTime=s.time;}
    recorder?.capture(s);
   },observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
+  if(state.watchWarnings.battery>previousWatch.battery||state.watchWarnings.bottom&&!previousWatch.bottom)sound.tone('caution');
   if(state.pressureAlarm>previousPressure)setRate(1);
   if((state.operation?.rescued||0)>priorRescued)sound.tone('photo');
   if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}

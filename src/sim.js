@@ -1,4 +1,5 @@
 import {activeClue,imagerClue,leaveClue,searchClue} from './suspicion.js';
+import {watchWarnings,validWarnings,bottomCall,batteryCall} from './watch-warnings.js';
 import {recordWake} from './surface-wake.js';
 import {sailingDay} from './patrol-calendar.js';
 import {advanceTraffic,canAttackPlayer,playerSignal,freshTraffic,resumeTraffic,validTraffic} from './cold-watch.js';
@@ -51,9 +52,19 @@ export function createGame(mission='recon',seed=19830604,options={}){
   if(s.departure)s.departure={x:s.x,y:s.y};
   log(s,'Long patrol. Search the dashed area on the chart. Its center is an estimate.');
  }
+ updateWatchWarnings(s);
  return s;
 }
 export function getSoundings(s,drone=false){const v=drone?s.drone:s;return soundings(bottom(v.x,v.y,s.environment.chartSeed),v.depth,drone?.7:5+27.5*Math.abs(Math.sin(s.pitch)));}
+function updateWatchWarnings(s){
+ const previous=s.watchWarnings;
+ const current=watchWarnings(getSoundings(s).belowKeel,s.battery,previous);
+ if(previous?.bottom&&!current.bottom)log(s,'Keel clearance restored to 20 m or more.');
+ if(previous&&current.battery<previous.battery)log(s,current.battery===1?'Battery above 10%. Critical reserve warning cleared.':'Battery reserve restored to 20% or more.');
+ if(current.bottom&&!previous?.bottom)log(s,bottomCall,'warning');
+ if(current.battery>(previous?.battery??0))log(s,batteryCall(current.battery),'warning');
+ s.watchWarnings=current;
+}
 export function isVisible(s,ship,look=null,env=environmentAt(s)){
  if(ship.hull<=0||ship.kind==='sub'||s.depth>15||!s.scope)return false;
  return !scopeWashed(s,env)&&distance(s,ship)<env.opticalRange*operatingFraction(s.systems.periscope)&&(look===null||Math.abs(delta(bearing(s,ship),look))<19);
@@ -318,6 +329,7 @@ function tick(s,dt,input){
  },source=>patrolReceipt(s,source));
  s.torpedoTracks=s.torpedoTracks.filter(t=>s.time-t.time<35);
  updateDrone(s,dt,diesel);
+ updateWatchWarnings(s);
  if(input.observation){
   const rov=input.observation==='drone',eye=rov?s.drone:s;
   const optical=rov?s.drone.mode==='remote'&&operatingFraction(s.drone.camera)>0:input.observation==='scope'?s.scope&&s.depth<=15&&operatingFraction(s.systems.periscope)>0&&!scopeWashed(s,env):s.depth<=1;
@@ -437,6 +449,8 @@ export function restore(raw){try{
  if(s.ships.some(ship=>ship.report!==undefined&&!validReport(ship.report,s.time)))return null;
  if(s.ships.some(ship=>ship.torpedoDecoys!==undefined&&(!Number.isInteger(ship.torpedoDecoys)||ship.torpedoDecoys<0||ship.torpedoDecoys>ENEMY_DECOY_SUPPLY)))return null;
  if(s.traffic===undefined)s.traffic=resumeTraffic(s.time,s.patrol.seed);
+ if(s.watchWarnings!==undefined&&!validWarnings(s.watchWarnings))return null;
+ s.watchWarnings??=watchWarnings(getSoundings(s).belowKeel,s.battery);
  if(!validTraffic(s)||!validAlliedWatch(s)||!validMissionTargets(s))return null;
  if(s.difficulty.longPatrol?!validSearch(s):s.search!==undefined)return null;
  for(const c of s.contacts)if(!c||typeof c.id!=='string'||typeof c.label!=='string'||!['bearing','range','confidence','age','x','y'].every(k=>Number.isFinite(c[k]))||c.depthEstimate!==undefined&&!Number.isFinite(c.depthEstimate)||c.courseEstimated!==undefined&&typeof c.courseEstimated!=='boolean')return null;

@@ -69,6 +69,8 @@ Select **Diesel**, then choose **Diesel power** at the helm or in the mobile Sub
 | Drive | 20.5 kn | 13 kn | Sends available generator output to propulsion and suspends main battery charging. |
 | Battery assist | 22 kn | 17 kn | Draws from both sources when ordered thrust exceeds generator capacity. An empty or offline bank leaves generator drive available. |
 
+The watch reports less than 20 m beneath the sub’s keel and main battery reserves below 20% and 10%. The critical battery warning lights the red beacon until charge rises above 10%. Active warnings stay in the status ticker while you change stations.
+
 At all stop, the selected power source still runs the lights, instruments and pumps. Propulsion adds a load proportional to the cube of actual speed. At cruising speeds, doubling speed costs roughly four times as much propulsion energy per mile. Diesel charging adds a separate demand. If the battery runs flat with fuel remaining, the emergency watch gives you one ship-clock hour to restore diesel power. [IMO speed management](https://greenvoyage2050.imo.org/technology/speed-management/)
 
 Battery-only propulsion can make 16 kn. Diesel needs air at 14 m or shallower. Below that depth, select electric. The speeds above are tuning for this fictional submarine. The surface rating draws on USS *Gato* and the battery-only rating on the 1968 B-413. [USS *Gato*](https://www.history.navy.mil/research/histories/ship-histories/danfs/g/gato-i.html) · [Museum of the World Ocean](https://www.world-ocean.ru/voenno-morskoj-tsentr/b-413)

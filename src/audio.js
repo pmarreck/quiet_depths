@@ -36,6 +36,12 @@ export class SoundSystem{
  }
  tone(type){
   if(!this.on||!this.ctx||this.getContext().paused||this.getContext().modal)return;
+  if(type==='caution'){
+   const c=this.ctx,t=c.currentTime,o=c.createOscillator(),g=c.createGain();
+   o.connect(g).connect(this.master);o.frequency.setValueAtTime(480,t);o.frequency.setValueAtTime(350,t+.16);
+   g.gain.setValueAtTime(.001,t);g.gain.linearRampToValueAtTime(this.getState().silent?.025:.10,t+.02);
+   g.gain.exponentialRampToValueAtTime(.001,t+.41);o.start(t);o.stop(t+.42);return;
+  }
   const c=this.ctx,t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.connect(g).connect(this.master);o.type=type==='damage'?'sawtooth':'sine';o.frequency.setValueAtTime(type==='ping'?1240:type==='photo'?620:type==='damage'?55:type==='fire'?95:440,t);o.frequency.exponentialRampToValueAtTime(type==='damage'?22:type==='ping'?970:200,t+1);g.gain.setValueAtTime(type==='damage'?.23:.15,t);g.gain.exponentialRampToValueAtTime(.001,t+(type==='ping'?2:1));o.start();o.stop(t+2.1);
  }
  loss(s=this.getState()){
