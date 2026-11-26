@@ -2,7 +2,7 @@ import {scopeExtension} from './periscope.js';
 import {canAttackPlayer,playerSignal} from './cold-watch.js';
 import {recordLocalLaunch} from './mess-watch.js';
 import {isOpponent} from './fleet-action.js';
-import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes} from './torpedo-tubes.js';
+import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes,exitPitch} from './torpedo-tubes.js';
 import {replayEvent} from './instant-replay.js';
 import {descentSpeed,submergedDepth,surfaceCollapseAge} from './foundering.js';
 import {gameEcho} from './torpedo-watch.js';
@@ -56,9 +56,10 @@ export function launchTorpedo(s,id){
  const tubeSide=tube==='port'?-1:1;
  s.tubeReadyAt[tube]=s.time+RELOAD_SECONDS/condition;
  s.torps--;
- const origin=boatPoint(boatSurfacePose(s),{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
+ const pose=boatSurfacePose(s);
+ const origin=boatPoint(pose,{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
- putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:s.heading,pitch:s.pitch,tubeSide});
+ putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:pose.heading,pitch:pose.pitch,tubeSide});
  const target=s.ships.find(v=>v.id===id);
  if(target&&distance(s,target)<3500)playerSignal(s,target,s.runSetting+50>=distance(origin,target));
  recordLocalLaunch(s,s);launchNoise(s,s,true);
@@ -219,7 +220,7 @@ function searchCourse(p,dt){
  return{heading:p.heading+p.searchDirection*turnRate*dt,depth:p.orderedDepth};
 }
 function torpedoCourse(s,p,dt){
- if(p.age<=.55&&p.tubeSide!==0)return{heading:p.heading,depth:p.depth-Math.tan(p.pitch)*32};
+ if(p.tubeSide!==0&&p.age<=ARMING_TIME/2)return{heading:p.heading,depth:p.orderedDepth};
  if(p.age<ARMING_TIME)return{heading:p.orderedHeading,depth:p.orderedDepth};
  if(p.pingAge>=2.4){
   p.pingAge=0;
@@ -302,8 +303,10 @@ function updateTorpedoes(s,dt){
   p.age+=flight;p.pingAge+=flight;p.traveled=Math.min(p.runLimit,p.traveled+travel);
   const course=torpedoCourse(s,p,flight);
   p.heading=wrap(p.heading+clamp(delta(course.heading,p.heading),-flight*10,flight*10));
-  const drop=course.depth-p.depth,pitch=clamp(Math.atan2(-drop,32),-MAX_PITCH,MAX_PITCH);
-  const dz=Math.sign(drop)*Math.min(Math.abs(drop),travel*Math.abs(Math.sin(pitch)));
+  const drop=course.depth-p.depth,requestedPitch=clamp(Math.atan2(-drop,32),-MAX_PITCH,MAX_PITCH);
+  const pitch=p.tubeSide?exitPitch(p.pitch,requestedPitch,p.age,flight,ARMING_TIME):requestedPitch;
+  const depthStep=-travel*Math.sin(pitch);
+  const dz=depthStep*drop>0&&Math.abs(depthStep)>Math.abs(drop)?drop:depthStep;
   const horizontal=Math.sqrt(travel**2-dz**2);
   p.pitch=dz===0?0:Math.atan2(-dz,horizontal);p.depth+=dz;
   p.x+=Math.sin(rad(p.heading))*horizontal;p.y+=Math.cos(rad(p.heading))*horizontal;

@@ -31,3 +31,16 @@ export function torpedoTubes(state: TubeState): Record<BowTube, number | null> &
     next: state.torps > 0 && state.tubeReadyAt[first] <= state.time ? first : null,
   };
 }
+
+// Use the first half of the launch animation to clear the bow. Smoothstep
+// through the bend during the second half. Reuse the fraction already played
+// so both a short frame and a restored shot continue from their current pose.
+export function exitPitch(current: number, requested: number, age: number, elapsed: number, duration: number): number {
+  if (elapsed <= 0 || age <= duration / 2) return current;
+  if (age >= duration) return requested;
+  const remaining = (time: number) => {
+    const t = Math.min(1, 2 * (duration - time) / duration);
+    return t * t * (3 - 2 * t);
+  };
+  return requested + (current - requested) * (remaining(age) / remaining(age - elapsed));
+}

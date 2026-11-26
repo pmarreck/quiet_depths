@@ -433,6 +433,13 @@ export function restore(raw){try{
  s.drone.repairLimits=readLimits(DRONE_PARTS,s.drone,s.drone.repairLimits);
  if(!s.repairLimits||!s.drone.repairLimits)return null;
  if(!s.patrol||!['seed','photoGoal','trackGoal','variant'].every(k=>Number.isFinite(s.patrol[k]))||s.scopeSteerBearing!==null&&!Number.isFinite(s.scopeSteerBearing))return null;
+ // Old fleet-action patrols left port with three. Preserve rounds already spent.
+ if(s.patrol.startingTorpedoes===undefined){
+  const oldFleetLoad=s.mission==='tiebreaker'&&s.torps<=3;
+  s.patrol.startingTorpedoes=oldFleetLoad&&s.status!=='patrol'?3:template.torps;
+  if(oldFleetLoad&&s.status==='patrol')s.torps+=template.torps-3;
+ }
+ if(!Number.isSafeInteger(s.patrol.startingTorpedoes)||s.patrol.startingTorpedoes<0)return null;
  if(s.runSetting<100||s.runSetting>MAX_RUN||!s.reports.every(r=>r&&typeof r.id==='string'&&typeof r.text==='string'&&Number.isFinite(r.time)&&r.time<=s.time))return null;
  if(!s.gun||!['ammo','cooldown','shots','angle','elevation'].every(k=>Number.isFinite(s.gun[k])))return null;
  if(!s.airSupport||!['idle','arming','airborne','spent'].includes(s.airSupport.status)||!s.airSupport.base||!['x','y'].every(k=>Number.isFinite(s.airSupport.base[k])))return null;

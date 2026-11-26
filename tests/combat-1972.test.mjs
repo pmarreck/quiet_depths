@@ -501,3 +501,26 @@ test('submarine contacts carry estimates, a player torpedo can hit, and service 
  saveServiceRecord(storage,{...s,patrolId:'b'.repeat(32)});
  assert.deepEqual(serviceRecord(storage),{ships:0,submarines:4,doubleHunts:2});
 });
+
+test('a deep bow launch clears the hull on its own axis before bending toward a surface contact',()=>{
+ for(const pitch of [0,-.12,.12]){
+  const s=ocean();Object.assign(s,{depth:90,targetDepth:90,pitch});
+  const target=vessel('transport',400,1200);s.ships=[target];contact(s,target,'active');assert.ok(fire(s,target.id));
+  const p=s.projectiles[0],origin={...p};
+  for(let i=0;i<8;i++){
+   step(s,.25);
+   assert.ok(Math.abs(p.x-origin.x)<1e-7,'still on the bow line');
+   assert.ok(Math.abs(p.depth-origin.depth+(p.y-origin.y)*Math.tan(pitch))<1e-7,'no early climb');
+  }
+  assert.ok(p.y>origin.y+30);
+  const bends=[];
+  for(let i=0;i<8;i++){
+   const before=p.pitch;step(s,.25);bends.push(p.pitch-before);
+   const a=p.path.at(-2),b=p.path.at(-1);
+   assert.ok(Math.abs(p.pitch-Math.atan2(a.depth-b.depth,separation(a,b)))<1e-7);
+  }
+  assert.ok(bends.filter(v=>v>.005).length>=4,'several successive frames show the bend');
+  assert.ok(bends.every(v=>Math.abs(v)<.2),'no single-frame jump to a steep angle');
+  assert.ok(p.depth<origin.depth);
+ }
+});

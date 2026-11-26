@@ -56,7 +56,7 @@ encodeMission mission =
         , ( "longMinutes", E.string (PatrolMission.estimatedMinutes True b) )
         , ( "desc", E.string b.description )
         , ( "short", E.string b.short )
-        , ( "torps", E.int (PatrolMission.startingTorpedoes mission) )
+        , ( "torps", E.int PatrolMission.startingTorpedoes )
         , ( "objective", encodeObjective b.objective )
         ]
 

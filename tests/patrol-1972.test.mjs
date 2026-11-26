@@ -71,9 +71,9 @@ test('every mission has its briefed ammunition and two loaded bow tubes',()=>{
  for(const m of MISSIONS){
   const s=createGame(m.id,19),target=s.ships.find(v=>v.military&&v.side!=='friendly');
   contact(s,target,'active');
-  assert.equal(s.torps,m.id==='tiebreaker'?3:6,m.id);
+  assert.equal(s.torps,6,m.id);
   assert.ok(fire(s,target.id),m.id);assert.ok(fire(s,target.id),m.id);
-  assert.deepEqual(s.projectiles.map(p=>p.tubeSide),m.id==='tiebreaker'?[1,-1]:[-1,1]);
+  assert.deepEqual(s.projectiles.map(p=>p.tubeSide),[-1,1]);
   const before=save(s);
   assert.equal(fire(s,target.id),false,m.id+' must wait for a reload');
   assert.equal(save(s),before,'blocked launches cannot consume stock, move the timers, or emit events');

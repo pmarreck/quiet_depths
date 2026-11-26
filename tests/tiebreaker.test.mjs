@@ -14,7 +14,7 @@ function ready(seed=23){
 test('an equally matched battle is already in progress at arrival and survives saves mid-exchange',()=>{
  for(let seed=1;seed<=12;seed++){
   const s=ready(seed);
-  assert.deepEqual(sidesAfloat(s.ships),{friendly:4,hostile:4});assert.equal(s.torps,3);
+  assert.deepEqual(sidesAfloat(s.ships),{friendly:4,hostile:4});assert.equal(s.torps,6);
   for(const side of ['friendly','hostile']){
    const cast=s.ships.filter(v=>v.side===side);assert.equal(cast.filter(v=>v.kind==='sub').length,1);
    assert.ok(s.battle.volleys.some(v=>cast.some(ship=>ship.id===v.source)));
@@ -36,7 +36,7 @@ test('briefed areas favor friendly recognition; passive bearings and friendly fo
  // The opt-in live enemy chart still uses observations for friendly vessels.
  s.difficulty.omniscientChart=true;assert.equal(chartContacts(s).find(v=>v.id===ally.id).exact,undefined);
  assert.equal(chartContacts(s).find(v=>v.id===enemy.id).exact,true);
- contact(s,ally,'visual');assert.equal(affiliation(a),'FRIENDLY');assert.equal(fire(s,ally.id),false);assert.equal(s.torps,3);
+ contact(s,ally,'visual');assert.equal(affiliation(a),'FRIENDLY');assert.equal(fire(s,ally.id),false);assert.equal(s.torps,6);
  ally.playerDamaged=true;ally.hull=0;assert.equal(patrolKills(s).ships,0);assert.match(disciplinaryFinding(s).reason,/Friendly fire/);
 });
 test('surface pickup stays locked at a one-vessel lead and stays open once a two-vessel lead has been earned',()=>{
@@ -61,4 +61,17 @@ test('a fleet torpedo in the water gives a separate sonar return and moves towar
  for(let seed=1;seed<50&&!v;seed++){s=ready(seed);v=s.battle.volleys.find(v=>v.underwater);}
  assert.ok(v);const a=fleetShotPose(v,v.launched),b=fleetShotPose(v,(v.launched+v.arrives)/2),c=fleetShotPose(v,v.arrives);
  assert.ok(Math.abs(b.x-(a.x+c.x)/2)<.001);assert.ok(b.depth>0);assert.ok(ping(s));assert.ok(s.torpedoTracks.some(t=>t.id===v.id&&!t.inboundRun));assert.ok(restore(save(s)));
+});
+
+test('a three-round Tiebreaker save receives the extra rounds once and keeps its tube timers',()=>{
+ for(const remaining of [0,1,2,3]){
+  const old=ready();delete old.patrol.startingTorpedoes;
+  old.torps=remaining;old.tubeReadyAt={port:3,starboard:9};
+  const loaded=restore(save(old));assert.ok(loaded);
+  assert.equal(loaded.torps,remaining+3);assert.deepEqual(loaded.tubeReadyAt,old.tubeReadyAt);
+  assert.deepEqual(restore(save(loaded)),loaded);
+  old.status='won';assert.equal(restore(save(old)).torps,remaining);
+ }
+ const current=ready();current.torps=1;
+ assert.equal(restore(save(current)).torps,1);
 });

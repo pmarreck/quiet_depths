@@ -1,11 +1,8 @@
 module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), all, briefing, estimatedMinutes, fromId, startingTorpedoes)
 
-startingTorpedoes : Mission -> Int
-startingTorpedoes mission =
-    if mission == Tiebreaker then
-        3
-    else
-        6
+startingTorpedoes : Int
+startingTorpedoes =
+    6
 
 
 type Mission
