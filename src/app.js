@@ -191,6 +191,16 @@ $('copy-seed').onclick=()=>copySeed(parsePatrolSeed($('patrol-seed').value));
 $('patrol-seed').onclick=event=>{event.target.select();copySeed(parsePatrolSeed(event.target.value));};
 $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity('');$('seed-status').textContent='';});
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
+const telegraph=globalThis.Elm.EngineTelegraph.init({node:$('telegraph-root')});
+telegraph.ports.ringTelegraph.subscribe(({lever,quiet})=>{
+ if(!pilotEnabled()||!canIssue(state,context()))return;
+ if(view==='drone'&&lever===0)applyHelmKeys(state,context(),new Set(['rovStop']),0);
+ else if(order('speed',lever)&&view!=='drone'&&quiet!==null){
+  state.silent=quiet;
+  if(quiet)state.engine='electric';
+ }
+ updateUI();
+});
 const sonarPanel=globalThis.Elm.SonarTabs.init({node:$('sonar-tab-root')});
 sonarPanel.ports.chooseSonar.subscribe(value=>{
  instrument=value;
@@ -927,6 +937,8 @@ function launchSelected(){
 }
 function changeZoom(factor){if(!canIssue(state,context())||!feedActive(state,view))return;zoom=clamp(zoom*factor,1,opticalZoomLimit(view));zooms[view]=zoom;updateUI();}
 function responsiveTools(){
+ const presets=$('speed-presets'),speedHost=$(compactLayout.matches?'speed-sheet-presets':'speed-helm-presets');
+ if(presets.parentElement!==speedHost)speedHost.appendChild(presets);
  const host=compactLayout.matches?$('station-actions'):$('viewport');
  for(const id of ['scope-tools','scope-alignment','chart-tools','drone-tools','gun-tools','zoom-tools'])if($(id).parentElement!==host)host.appendChild($(id));
 }
@@ -984,6 +996,8 @@ function updateExtras(s,env,v){
  const rovTouch=rov&&compact&&!!scene;
  document.body.classList.toggle('rov-touch-helm',rovTouch);
  $('rov-stop').hidden=!rovTouch;
+ $('speed-presets').disabled=!pilotEnabled()||!canIssue(s,context());
+ $('speed-sheet-presets').hidden=orderAxis!=='speed';
  $('rov-steering-hint').textContent=(invertRovPitch?'Swipe up to pitch down':'Swipe up to pitch up')+' · swipe sideways to turn';
  $('rov-steering-hint').hidden=!(rovTouch&&s.drone.mode==='remote');
  const imaging=view==='sonar'&&instrument!=='bearings';

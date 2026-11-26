@@ -17,6 +17,7 @@ import {createSubmarine,renderedScrewAngle} from './submarine-model.js';
 import {SUB_DESIGN as D} from './hull-design.js';
 import {CombatScene} from './combat-scene.js';
 import {tetherPoints} from './tether.js';
+import {makeRov} from './rov-model.js';
 const ROV_LAMP_INTENSITY=1100;
 const waterVertex=`
 uniform float time;uniform vec2 origin;uniform float waveScale;uniform float wavePhase;
@@ -86,6 +87,7 @@ export class OceanScene{
   this.terrain=new T.Mesh(terrainGeo,sediment);this.terrain.rotation.x=-Math.PI/2;this.scene.add(this.terrain);
   this.lampRay=new T.Raycaster();this.lampPosition=new T.Vector3();this.lampScreen=new T.Vector3();
   this.ships=new Map();this.own=this.makeSub();this.scene.add(this.own);
+  this.rov=makeRov(T);this.rov.visible=false;this.scene.add(this.rov);
   this.caustics={causticTime:{value:0},causticStrength:{value:0}};
   this.own.traverse(part=>{
    if(!part.material?.isMeshStandardMaterial)return;
@@ -384,6 +386,12 @@ export class OceanScene{
   this.bubbleUniforms.clock.value=time;this.bubbleUniforms.trailLength.value=Math.abs(s.speed)*1.4;
   this.life.update(s,e);this.updateFloodBubbles(s,time,e);this.combat.update(s,e,orbiting,time);
   const cable=tetherPoints(s,time,48,hull);this.cable.visible=!!cable.length;if(cable.length){const p=this.cable.geometry.attributes.position;cable.forEach((v,i)=>p.setXYZ(i,v.x,-v.depth,-v.y));p.needsUpdate=true;this.cable.geometry.setDrawRange(0,cable.length);this.cable.geometry.computeBoundingSphere();}
+  this.rov.visible=this.cable.visible&&!drone;
+  if(this.rov.visible){
+   const d=s.drone;
+   this.rov.position.set(d.x,-d.depth,-d.y);
+   this.rov.rotation.set(droneCameraPitch(d.verticalSpeed,d.nosePitch),-rad(d.heading),0,'YXZ');
+  }
 
   this.driftingBubbles.visible=underwater;
   if(underwater){

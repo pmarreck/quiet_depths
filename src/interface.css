@@ -83,3 +83,16 @@ body[data-station=sonar] .view-top,body[data-station=sonar] .view-bottom{display
 #imager-transmit[aria-pressed=true]{border-color:var(--gold);background:#394035;color:var(--gold)}
 #orbit-transmission{position:absolute;right:0;bottom:calc(100% + 5px);width:max-content;max-width:80vw;background:#14242de6;color:var(--gold);padding:4px 7px;font:12px var(--mono)}
 body:is([data-station=scope],[data-station=tower],[data-station=gun],[data-station=sonar],[data-station=chart]) .viewport{touch-action:none}
+
+#speed-presets{min-width:0;width:100%;padding:0;border:0;margin:0}
+#speed-sheet-presets[hidden]{display:none}
+.telegraph-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.telegraph-buttons button{min-width:0;min-height:32px;padding:3px;border:1px solid var(--button-edge);border-radius:3px;background:var(--button-face);box-shadow:var(--button-bevel);color:var(--cream);font:12px/1.1 var(--mono)}
+.telegraph-buttons button:active{color:var(--gold);border-color:var(--gold)}
+.speed-helm .ordered{min-height:0;margin-bottom:5px}
+#speed-sheet-presets .telegraph-buttons{margin-top:8px}
+#speed-sheet-presets button{min-height:44px}
+@media(max-height:540px){
+ #speed-sheet-presets .telegraph-buttons{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .order-sheet{max-height:100%;overflow-y:auto;box-sizing:border-box}
+}

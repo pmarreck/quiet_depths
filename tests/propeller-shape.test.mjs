@@ -104,3 +104,20 @@ test('the ROV cable is attached at both ends, changes with water motion, and sta
  for(let i=0;i<points.length;i++){const f=i/(points.length-1),linear=first.depth+(last.depth-first.depth)*f;assert.ok(Math.abs(points[i].depth-linear)<3.2,'no implausibly long vertical drop');}
  s.drone.mode='stowed';assert.deepEqual(module.tetherPoints(s,1),[]);s.drone.mode='lost';assert.deepEqual(module.tetherPoints(s,1),[]);
 });
+
+test('the deployed inspection vehicle has a camera, lights and a cable seated in its frame through turns and dives',async()=>{
+ const {makeRov}=await import('../src/rov-model.js'),{tetherPoints}=await import('../src/tether.js');
+ const s=createGame('survey',22),model=makeRov(THREE),d=s.drone;
+ Object.assign(d,{mode:'remote',x:35,y:12,depth:29});
+ const camera=model.getObjectByName('Camera port'),lamp=model.getObjectByName('Headlamp');
+ assert.ok(camera.isMesh&&lamp.isMesh&&camera.position.z<0&&lamp.material.isMeshBasicMaterial);
+ const bounds=new THREE.Box3().setFromObject(model);
+ assert.ok(bounds.max.x-bounds.min.x>1.5&&bounds.max.z-bounds.min.z>2);
+ for(const [heading,pitch] of [[0,0],[91,32],[248,-56]]){
+  Object.assign(d,{heading,nosePitch:pitch});
+  model.position.set(d.x,-d.depth,-d.y);
+  model.rotation.set(pitch*Math.PI/180,-heading*Math.PI/180,0,'YXZ');
+  const p=tetherPoints(s).at(-1),anchor=model.getObjectByName('Cable gland').getWorldPosition(new THREE.Vector3());
+  assert.ok(anchor.distanceTo(new THREE.Vector3(p.x,-p.depth,-p.y))<1e-7);
+ }
+});
