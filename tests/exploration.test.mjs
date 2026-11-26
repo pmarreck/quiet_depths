@@ -42,7 +42,7 @@ function hold(s){Object.assign(s,{depth:0,targetDepth:0,speed:0,targetSpeed:0,en
 test('rescue and both fleets get three real minutes at 20x, surviving pause, save, and an extended patrol clock',()=>{
  for(const mission of ['surface-rescue','undersea-rescue','tiebreaker']){
   let s=createGame(mission,47,options);hold(s);
-  const fuel=s.fuel,initial=s.ships.map(v=>({x:v.x,y:v.y}));
+  const fuel=s.fuel,initial=s.ships.map(v=>({id:v.id,x:v.x,y:v.y}));
   for(let i=0;i<30;i++)step(s,60,{timeRate:20});
   const raw=save(s);step(s,60,{paused:true,timeRate:20});assert.equal(save(s),raw);s=restore(raw);
   for(let i=0;i<30;i++)step(s,60,{timeRate:20});
@@ -51,7 +51,11 @@ test('rescue and both fleets get three real minutes at 20x, surviving pause, sav
   if(s.operation){assert.equal(s.operation.dead,0);if(s.site.kind==='surface')assert.equal(s.site.depth,2);}
   if(s.battle){
    assert.equal(s.battle.round,0);assert.deepEqual(s.battle.volleys,[]);
-   assert.ok(s.ships.every((v,i)=>Math.abs(v.x-initial[i].x)>790&&v.hull===100));
+   for(const first of initial){
+    const ship=s.ships.find(v=>v.id===first.id);assert.ok(ship);
+    assert.ok(Math.abs(ship.x-first.x)>790&&ship.hull===100);
+   }
+   assert.ok(s.ships.filter(v=>!initial.some(first=>v.id===first.id)).every(v=>v.incidental));
    step(s,.25);assert.ok(s.battle.volleys.length);
   }else{
    for(let i=0;i<10;i++)step(s,60);assert.ok(s.operation.dead>0);

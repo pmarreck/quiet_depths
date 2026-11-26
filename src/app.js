@@ -589,9 +589,9 @@ function updateUI(){
  $('view-hint').textContent=gun?'DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING':tower?'DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS':view==='scope'?(active?'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM':'NO OPTICAL SIGNAL'):view==='sonar'?'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL':view==='chart'?'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT':active?'CAMERA FIXED TO ROV NOSE':'NO DRONE SIGNAL';
  $('view-range').textContent=drone?(active?`HDG ${deg(v.heading)}° · ${v.speed.toFixed(1)} KN · ${v.depth.toFixed(0)} M`:''):view==='chart'?`ZOOM ${chart.zoom.toFixed(1)}×`:'VISIBILITY '+(env.opticalRange/1000).toFixed(1)+' KM';
  $('station-status').textContent=isSurfaced(s)?'SURFACED · EXPOSED':s.depth<=15?'PERISCOPE DEPTH':s.silent?'SILENT RUNNING':'SUBMERGED';
- const clock=new Date(Math.floor(env.hour*3600)*1000).toISOString().slice(11,16);
- $('sim-time').textContent='SKY '+clock;
- $('watch-time').textContent=clock;
+ const clock=new Date(Math.floor(env.hour*3600)*1000).toISOString().slice(11,16).replace(':','');
+ $('sim-time').textContent=env.date+' · '+clock+'Z';
+ $('watch-time').textContent=env.date+' '+clock+'Z';
  $('watch-elapsed').textContent=String(Math.floor(s.time/60)).padStart(2,'0')+':'+String(Math.floor(s.time%60)).padStart(2,'0');
  $('watch-limit').textContent=limit+' m';
  $('weather').textContent=env.phase+' · '+env.weather+' · SEA '+env.seaState;
@@ -754,6 +754,13 @@ function drawChart(){
   }
   c.setLineDash([]);c.globalAlpha=1;
  }
+ for(const note of state.soundBearings){
+  const age=state.time-note.time;if(age>90)continue;
+  const x=sx(note.x),y=sy(note.y),a=rad(note.bearing),dx=Math.sin(a),dy=-Math.cos(a),span=Math.max(w,h)*2;
+  c.save();c.globalAlpha=1-age/105;c.strokeStyle='#d5aa79';c.fillStyle=c.strokeStyle;c.setLineDash([3,6]);
+  c.beginPath();c.moveTo(x,y);c.lineTo(x+dx*span,y+dy*span);c.stroke();c.font='10px monospace';
+  c.fillText((note.kind==='launch'?'LAUNCH ':'SPLASH ')+deg(note.bearing)+'°',x+dx*56,y+dy*56);c.restore();
+ }
  if(state.convoy?.pin){
   const pin=state.convoy.pin,x=sx(pin.x),y=sy(pin.y),radius=reportRadius(pin,state.time)*k;
   const id=matchingBearing(pin,state,state.time,state.contacts),contact=state.contacts.find(q=>q.id===id);
@@ -809,6 +816,7 @@ function showResult(){
  const win=state.status==='won';
  $('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';
  $('result-body').textContent=win?patrolVictory(state):state.cookoff?'A torpedo detonated aboard the submarine. The crew lost the sub.':state.imploded?'Your pressure hull collapsed at '+Math.round(state.depth)+' m.':state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?(state.search?'The extended patrol window closed. Command recalled the sub.':'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.'):'Your sub could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';
+ if(state.status==='expired'&&state.unpoweredSince!==undefined&&(state.fuel===0||state.time-state.unpoweredSince>=120)){$('result-title').textContent='Power exhausted.';$('result-body').textContent='The sub could no longer power its systems. Command recalled the patrol.';}
  if(state.mission==='tiebreaker'&&state.status==='expired'&&sidesAfloat(state.ships).friendly<2){$('result-title').textContent='Fleet recalled.';$('result-body').textContent='Fewer than two friendly vessels survived to earn extraction clearance.';}
  if(state.convoy&&win)$('result-title').textContent='Convoy secured.';
  if(state.status==='convoy-lost'){$('result-title').textContent='Convoy broken.';$('result-body').textContent='Two more friendly ships went down after Plover.';}

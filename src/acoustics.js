@@ -41,6 +41,9 @@ export function aircraftSound(plane,listener){
 export function emitSound(s,data){
  const source={id:s.soundSequence++,time:s.time,power:1,heard:false,...data};s.acoustics.push(source);return source;
 }
+export function launchNoise(s,launcher,own=false){
+ emitSound(s,{type:'launch',x:launcher.x,y:launcher.y,depth:launcher.depth??0,power:.75,own});
+}
 export function updateAcoustics(s,onBlast,onReceipt){
  for(const source of s.acoustics){
   if(source.heard||s.time-source.time<propagationTime(source,s))continue;

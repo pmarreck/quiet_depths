@@ -1,3 +1,4 @@
+import {activeVolleys} from './fleet-action.js';
 import {fleetShotPose} from './fleet-action.js';
 import {blastCloud,animateCloud} from './blast-cloud.js';
 import {periodJet} from './carrier-model.js';
@@ -79,7 +80,7 @@ export class CombatScene{
   if(this.lastState!==s){for(const p of this.planes.values())this.dispose(p);for(const p of this.torpedoes.values())this.removeTorpedo(p);this.planes.clear();this.torpedoes.clear();this.lastState=s;}
   const ids=new Set();for(const p of s.aircraft){ids.add(p.id);let g=this.planes.get(p.id);if(!g){g=this.plane(s.mission==='big-kahuna');this.planes.set(p.id,g);this.root.add(g);}g.position.set(p.x,p.altitude,-p.y);g.rotation.set(0,-rad(p.heading),p.bank||0,'YXZ');g.userData.fire.visible=p.hull<=0;}
   for(const [id,g]of this.planes)if(!ids.has(id)){this.dispose(g);this.planes.delete(id);}
-  const volleys=s.battle?.volleys??(s.convoy?.shot?[s.convoy.shot]:[]);
+  const volleys=activeVolleys(s);
   const shots=volleys.filter(v=>v.underwater).map(v=>{
    const p=fleetShotPose(v,s.time),path=[];
    for(let i=Math.max(0,Math.ceil((p.age-10)*3));i/3<p.age;i++)path.push(fleetShotPose(v,v.launched+i/3));

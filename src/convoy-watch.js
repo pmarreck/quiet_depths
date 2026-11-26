@@ -3,7 +3,7 @@ import {bearing,distance,log,rad} from './mechanics.js';
 import {hash01,scopeWashed} from './environment.js';
 import {operatingFraction} from './equipment.js';
 import {addDebrief} from './debrief.js';
-import {emitSound} from './acoustics.js';
+import {emitSound,launchNoise} from './acoustics.js';
 import {report} from './patrol-reports.js';
 import {replayEvent} from './instant-replay.js';
 import {floorSurface} from './seafloor.js';
@@ -77,7 +77,7 @@ export function updateConvoyRaid(s,dt,approaching,dropCharge){
  const hit=roll(2)<.76,damage=hit?45+Math.floor(roll(3)*21):0;
  c.shot={id:s.weaponSequence++,underwater:true,source:wolf.id,target:chosen.id,launched:s.time,arrives:s.time+12+roll(4)*14,damage,
   from:{x:wolf.x,y:wolf.y,altitude:-wolf.depth},to:{x:chosen.x+(hit?0:120),y:chosen.y,altitude:-2}};
- recordLocalLaunch(s,wolf);
+ recordLocalLaunch(s,wolf);launchNoise(s,wolf);
  emitSound(s,{type:'seeker',x:wolf.x,y:wolf.y,depth:wolf.depth,power:.45});
  const escort=ships.find(v=>v.kind==='escort'&&!v.disabled);
  if(escort){
@@ -94,7 +94,7 @@ export function resolveConvoyCharge(s,charge){
 }
 export function validConvoy(s){
  const c=s.convoy,ids=[...convoyIds,'plover','wolf'];
- if(!c||s.ships.length!==ids.length||!ids.every(id=>s.ships.some(v=>v.id===id&&v.side===(id==='wolf'?'hostile':'friendly')&&v.kind===(id==='wolf'?'sub':id==='escort'?'escort':'merchant'))))return false;
+ if(!c||s.ships.filter(v=>!v.incidental).length!==ids.length||!ids.every(id=>s.ships.some(v=>v.id===id&&v.side===(id==='wolf'?'hostile':'friendly')&&v.kind===(id==='wolf'?'sub':id==='escort'?'escort':'merchant'))))return false;
  const wreck=s.ships.find(v=>v.id==='plover');
  if(!wreck.settled||wreck.hull!==0||!wreck.wreckMark?.observed||!Number.isInteger(c.round)||c.round<0||!Number.isSafeInteger(c.number)||c.number<0||!Number.isFinite(c.next)||c.next<0)return false;
  if(c.message!==null&&(!validTransmission(c.message,s.time)||c.message.estimate.number!==c.number||!convoyIds.includes(c.message.estimate.sender)))return false;
@@ -111,7 +111,7 @@ export function stationLamp(s){
 // Friendly surface units take discrete observations. A telegram freezes the
 // observation at issue, including what was known before the player surfaced.
 export function updateAlliedWatch(s,env,input,dt,recordFix){
- if(!s.battle&&!s.convoy)return;
+ if(!s.battle&&!s.convoy&&!s.ships.some(v=>v.incidental&&v.side==='friendly'&&v.kind!=='sub'))return;
  const watch=s.alliedLamp??={message:null,sequence:0,lastIssue:-1};
  const subs=s.ships.filter(v=>v.kind==='sub'&&v.side==='hostile'&&v.hull>0);
  const range=lampRange(env);
@@ -156,6 +156,6 @@ export function validAlliedWatch(s){
  const sender=id=>s.ships.some(v=>v.id===id&&v.side==='friendly'&&v.kind!=='sub');
  const valid=f=>validLampFix(f,s.time)&&sender(f.sender)&&s.ships.some(v=>v.id===f.target&&v.side==='hostile'&&v.kind==='sub')&&f.number<=w.sequence;
  if(w===undefined)return s.ships.every(v=>v.lampFix===undefined);
- if(!w||(!s.convoy&&!s.battle)||!Number.isSafeInteger(w.sequence)||w.sequence<0||!Number.isFinite(w.lastIssue)||w.lastIssue< -1||w.lastIssue>s.time)return false;
+ if(!w||(!s.convoy&&!s.battle&&!s.ships.some(v=>v.incidental&&v.side==='friendly'&&v.kind!=='sub'))||!Number.isSafeInteger(w.sequence)||w.sequence<0||!Number.isFinite(w.lastIssue)||w.lastIssue< -1||w.lastIssue>s.time)return false;
  return (w.message===null||w.message&&valid(w.message.estimate)&&validCopy(w.message,s.time))&&s.ships.every(v=>v.lampFix===undefined||valid(v.lampFix)&&v.lampFix.sender===v.id);
 }

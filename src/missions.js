@@ -2,7 +2,7 @@ import {recordLocalLaunch} from './mess-watch.js';
 import {carrierId,carrierGroup,validCarrier} from './carrier.js';
 import {setupHenhouse,validConvoy,convoyLosses} from './convoy-watch.js';
 import {advanceFleetAction,fleetTheater,validTheater} from './fleet-action.js';
-import {emitSound} from './acoustics.js';
+import {emitSound,launchNoise} from './acoustics.js';
 import {replayEvent} from './instant-replay.js';
 import {operatingFraction} from './equipment.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanics.js';
@@ -13,7 +13,7 @@ export {MISSIONS};
 export function updateFleetBattle(s){
  advanceFleetAction(s,(ship,v,fired)=>{
   const p=fired?v.from:v.to;
-  if(fired&&v.underwater)recordLocalLaunch(s,p);
+  if(fired&&v.underwater){recordLocalLaunch(s,p);launchNoise(s,{...p,depth:-p.altitude});}
   const type=fired?(v.underwater?'seeker':'gunfire'):'detonation';
   emitSound(s,{type,x:p.x,y:p.y,depth:Math.max(0,-p.altitude),altitude:p.altitude,power:fired?.55:.9});
   if(!fired){

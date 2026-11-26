@@ -4,7 +4,8 @@ export {wavePhaseAt,surfaceHeight,WAVE_COMPONENTS,hash01};
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const mix=(a,b,t)=>a+(b-a)*t;
 const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);};
-export const DAY_SECONDS=2880; // One environmental day in 48 simulated minutes.
+import {DAY_SECONDS,sailingDay,patrolCalendar} from './patrol-calendar.js';
+export {DAY_SECONDS};
 export const WEATHER=Object.freeze({
  clear:{name:'Clear',cloud:.12,rain:0,storm:0,waveScale:.55,waveSpeed:.75,wind:9,visibility:1},
  cloudy:{name:'Cloudy',cloud:.82,rain:0,storm:0,waveScale:1,waveSpeed:1,wind:22,visibility:.82},
@@ -13,7 +14,7 @@ export const WEATHER=Object.freeze({
 });
 export const TIMES=Object.freeze({dawn:{name:'Dawn',hour:6},day:{name:'Day',hour:12},dusk:{name:'Dusk',hour:18},night:{name:'Night',hour:22}});
 export function makeEnvironment(seed=19830604,options={}){
- return{chartSeed:seed>>>0,startHour:options.timeOfDay==='random'?Object.values(TIMES)[Math.floor(hash01(seed,750)*4)].hour:TIMES[options.timeOfDay]?.hour??18,startWeather:options.weather==='random'?Object.keys(WEATHER)[Math.floor(hash01(seed,751)*4)]:WEATHER[options.weather]?options.weather:'clear',changing:options.changing!==false,seed:seed>>>0};
+ return{startDay:sailingDay(seed),chartSeed:seed>>>0,startHour:options.timeOfDay==='random'?Object.values(TIMES)[Math.floor(hash01(seed,750)*4)].hour:TIMES[options.timeOfDay]?.hour??18,startWeather:options.weather==='random'?Object.keys(WEATHER)[Math.floor(hash01(seed,751)*4)]:WEATHER[options.weather]?options.weather:'clear',changing:options.changing!==false,seed:seed>>>0};
 }
 export function environmentAt(s){
  const cfg=s.environment||makeEnvironment(),time=s.time||0,ids=Object.keys(WEATHER),slot=Math.floor(time/300);
@@ -29,6 +30,11 @@ export function environmentAt(s){
  e.fog=mist<.46?(1-smooth(.05,.55,e.rain))*smooth(4.5,5.75,e.hour)*(1-smooth(7,9,e.hour))*(.64+.30*mist/.46):0;
  if(e.fog>.16)e.weather='Morning fog';
  e.visibility*=1-.79*e.fog;
+ Object.assign(e,patrolCalendar(cfg.startDay??sailingDay(cfg.seed),cfg.startHour,time));
+ const lunarAngle=angle-2*Math.PI*e.cycle;
+ e.moonDirection={x:Math.cos(lunarAngle),y:Math.sin(lunarAngle),z:-.32*Math.cos(2*Math.PI*e.cycle)};
+ e.clearLight=(1-e.cloud)**2*(1-e.fog);
+ e.moonLight=e.illumination*smooth(-.01,.12,e.moonDirection.y)*e.clearLight;
  e.sunDirection={x:Math.cos(angle),y:Math.sin(angle),z:-.32};
  e.opticalRange=(3900+2600*e.daylight)*e.visibility;
  e.subVisualRange=(1800+3700*e.daylight)*e.visibility;

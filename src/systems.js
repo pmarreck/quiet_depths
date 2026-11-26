@@ -1,4 +1,4 @@
-import {propulsion,throttlePercent,batteryOutput} from './power-plant.js';
+import {energyDraw,propulsion,throttlePercent,batteryOutput} from './power-plant.js';
 import {addDebrief} from './debrief.js';
 import {replayEvent} from './instant-replay.js';
 import {carrierSize} from './carrier.js';
@@ -153,8 +153,13 @@ export function updateBoat(s,dt){
  s.x+=Math.sin(rad(s.heading))*horizontal*dt;s.y+=Math.cos(rad(s.heading))*horizontal*dt;
  const prop=propellerState(s.speed,s.depth,s.systems.propeller);s.propAngle=(s.propAngle+prop.rpm*Math.PI/30*dt)%(2*Math.PI);s.cavitation=prop.cavitation;s.propRpm=prop.rpm;
  s.noise=clamp(Math.max((diesel?65:8)+s.speed*s.speed*.39+(s.flood>0?12:0)+s.cavitation*23-(s.silent?7:0),s.time<(s.gunLoudUntil||0)?80:0),2,100);
- if(diesel){s.fuel=clamp(s.fuel-dt*.015,0,s.systems.fuelTank);s.battery=clamp(s.battery+dt*(chargeRate-assistDrain),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}
- else{s.fuel=Math.min(s.fuel,s.systems.fuelTank);s.battery=clamp(s.battery-dt*(.009+s.speed*s.speed*.0007),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen-dt*(.024+(1-operatingFraction(s.systems.oxygen))*.1),0,100);}
+ const draw=energyDraw(s.speed,chargeRate,assistDrain);
+ if(diesel){s.fuel=clamp(s.fuel-dt*draw.diesel,0,s.systems.fuelTank);s.battery=clamp(s.battery+dt*(chargeRate-assistDrain),0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen+dt*.35,0,100);}
+ else{s.fuel=Math.min(s.fuel,s.systems.fuelTank);s.battery=clamp(s.battery-dt*draw.electric,0,s.systems.batteryBank);s.oxygen=clamp(s.oxygen-dt*(.024+(1-operatingFraction(s.systems.oxygen))*.1),0,100);}
+ if(!diesel&&s.battery===0){
+  if(s.unpoweredSince===undefined){s.unpoweredSince=s.time;log(s,'Battery exhausted. Restore diesel power before the emergency watch ends.','damage');}
+  if(s.fuel===0||s.time-s.unpoweredSince>=120){s.status='expired';log(s,'Ship’s power exhausted. Command recalled the patrol.','damage');return false;}
+ }else if(s.unpoweredSince!==undefined)delete s.unpoweredSince;
  if(s.depth<2)s.oxygen=clamp(s.oxygen+dt*.45,0,100);
  if(s.depth>15||!operatingFraction(s.systems.periscope))s.scope=false;
  const floor=keelLimit(s,s.environment.chartSeed);

@@ -5,16 +5,21 @@ type Point = {x:number;y:number};
 type Position = Point & {altitude:number};
 interface Vessel extends Point {
   id:string;name:string;side:Side;kind:'escort'|'sub';hull:number;speed:number;heading:number;depth:number;
-  military:true;disabled:boolean;flood:number;sinkDepth:number;alert:number;attack:number;
+  incidental?:boolean;military:true;disabled:boolean;flood:number;sinkDepth:number;alert:number;attack:number;
 }
 type Area = Point & {label:string;radius:number};
-export interface Volley {id:number;underwater:boolean;from:Position;to:Position;source:string;target:string;launched:number;arrives:number;damage:number}
+export interface Volley {id:number;underwater:boolean;from:Position;to:Position;source:string;target:string;launched:number;arrives:number;damage:number;warning?:boolean}
+interface TrafficShots {battle?:{volleys:Volley[]};convoy?:{shot:Volley|null};traffic?:{volleys:Volley[]}}
+export function activeVolleys(s:TrafficShots){
+ const mission=s.battle?.volleys??(s.convoy?.shot?[s.convoy.shot]:[]);
+ return s.traffic?.volleys.length?mission.concat(s.traffic.volleys):mission;
+}
 interface Battle {areas:Area[];volleys:Volley[];round:number;next:number}
 interface Theater {time:number;weaponSequence:number;ships:Vessel[];battle:Battle;patrol:{seed:number}}
 export const isOpponent = (v:{military?:boolean;side?:Side}) => v.military && v.side !== 'friendly';
-export function sidesAfloat(ships:readonly {side?:Side;hull:number}[]){
+export function sidesAfloat(ships:readonly {side?:Side;hull:number;incidental?:boolean}[]){
   let friendly=0,hostile=0;
-  for(const v of ships)if(v.hull>0){if(v.side==='friendly')friendly++;else if(v.side==='hostile')hostile++;}
+  for(const v of ships)if(!v.incidental&&v.hull>0){if(v.side==='friendly')friendly++;else if(v.side==='hostile')hostile++;}
   return {friendly,hostile};
 }
 export const friendlyLead=(ships:Parameters<typeof sidesAfloat>[0])=>{
@@ -58,8 +63,8 @@ export function advanceFleetAction(s:Theater, onEvent:BattleEvent){
   const round=b.round++,roll=(n:number)=>hash01(s.patrol.seed,3000+round*64+n);
   b.next=s.time+9+roll(0)*9;
   for(const [index,side] of (['friendly','hostile'] as const).entries()){
-    const team=s.ships.filter(v=>v.side===side&&v.hull>0&&!v.disabled);
-    const others=s.ships.filter(v=>v.side!==side&&v.hull>0);
+    const team=s.ships.filter(v=>!v.incidental&&v.side===side&&v.hull>0&&!v.disabled);
+    const others=s.ships.filter(v=>!v.incidental&&v.side!==side&&v.hull>0);
     if(!team.length||!others.length)continue;
     const n=index*16;
     if(team.length<others.length&&roll(n+10)>.45+.55*team.length/others.length)continue;
@@ -104,7 +109,7 @@ export function validTheater(s:Theater){
   const b=s.battle,finite=Number.isFinite;
   if(!b||!Number.isInteger(b.round)||b.round<0||!finite(b.next)||b.next<0||
     !Array.isArray(b.areas)||b.areas.length!==2||!b.areas.every(a=>a&&finite(a.x)&&finite(a.y)&&finite(a.radius)&&a.radius>0&&typeof a.label==='string'))return false;
-  if(s.ships.length!==8||!(['friendly','hostile'] as const).every(side=>names[side].every((_,i)=>s.ships.some(v=>
+  if(s.ships.filter(v=>!v.incidental).length!==8||!(['friendly','hostile'] as const).every(side=>names[side].every((_,i)=>s.ships.some(v=>
     v.id===side+'-'+(i+1)&&v.side===side&&v.military&&v.kind===(i===3?'sub':'escort')&&finite(v.depth)))))return false;
   const position=(p:Position)=>p&&finite(p.x)&&finite(p.y)&&finite(p.altitude);
   const ids=new Set<number>();

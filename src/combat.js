@@ -1,3 +1,4 @@
+import {canAttackPlayer,playerSignal} from './cold-watch.js';
 import {recordLocalLaunch} from './mess-watch.js';
 import {isOpponent} from './fleet-action.js';
 import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes} from './torpedo-tubes.js';
@@ -11,7 +12,7 @@ import {floorSurface} from './seafloor.js';
 // Fictional combat tuning. Positions are meters; gun aim is compass/elevation.
 import {clamp,rad,bearing,delta,distance,log,rand,bottom} from './mechanics.js';
 import {hash01,environmentAt,boatSurfacePose} from './environment.js';
-import {emitSound} from './acoustics.js';
+import {emitSound,launchNoise} from './acoustics.js';
 import {hurt} from './systems.js';
 import {isSurfaced,boatPoint} from './vehicle-status.js';
 import {estimateAt} from './track-estimates.js';
@@ -57,7 +58,9 @@ export function launchTorpedo(s,id){
  const origin=boatPoint(boatSurfacePose(s),{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
  putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:s.heading,pitch:s.pitch,tubeSide});
- recordLocalLaunch(s,s);
+ const target=s.ships.find(v=>v.id===id);
+ if(target&&distance(s,target)<3500)playerSignal(s,target,s.runSetting+50>=distance(origin,target));
+ recordLocalLaunch(s,s);launchNoise(s,s,true);
  log(s,`Tube away. Bearing ${Math.round(heading)}. Seeker arms after its run-out.`,'warning');return true;
 }
 export function launchHostileTorpedo(s,ship,track){
@@ -66,9 +69,9 @@ export function launchHostileTorpedo(s,ship,track){
  const aim=scatterAim(s,track,12+range*.04+track.age);
  const depth=clamp(track.depth+(rand(s)-.5)*(4+track.age*.25),SURFACE_RUN_DEPTH,220);
  putTorpedoInWater(s,'enemy',origin,bearing(origin,aim),depth,{heading:ship.heading,tubeSide,launcher:ship.id,aim});
- recordLocalLaunch(s,ship);
+ recordLocalLaunch(s,ship);launchNoise(s,ship);
  ship.lastTubeSide=tubeSide;
- log(s,'Incoming torpedo. Evade!','damage');
+ addDebrief(s,ship.name+' fired a torpedo at a reported contact.');
 }
 // Old saves kept only the blast point and countdown. Reconstruct the remaining
 // approach along the bearing from the nearest submarine when one is available.
@@ -129,13 +132,14 @@ function updateRounds(s,dt){
   }else if(s.depth<=2){const body={x:s.x,y:s.y,altitude:2},t=sphereHit(from,r,body,8);if(t!==null){nearest=t;target=s;type='own';}}
   if(target){const point={x:from.x+(r.x-from.x)*nearest,y:from.y+(r.y-from.y)*nearest,altitude:from.altitude+(r.altitude-from.altitude)*nearest};r.age=99;impact(s,r,point,'hit');
    const damageScale=2**(s.difficulty?.damage??0);
-   if(type==='ship'){target.playerDamaged=true;if(target.kind==='carrier')raiseCarrierAlarm(s,target);target.hull=incidentalHull(target,12*damageScale);if(point.altitude+(target.sinkDepth||0)<5)target.flood=(target.flood||0)+2.4*damageScale;
+   if(type==='ship'){playerSignal(s,target,true,null);target.playerDamaged=true;if(target.kind==='carrier')raiseCarrierAlarm(s,target);target.hull=incidentalHull(target,12*damageScale);if(point.altitude+(target.sinkDepth||0)<5)target.flood=(target.flood||0)+2.4*damageScale;
     if(target.side==='friendly')addDebrief(s,'Your deck gun struck the friendly '+target.name+'.');
     if(!target.military)recordCivilianHit(s,target,'Deck-gun fire struck the neutral '+target.name+'.');
     if(s.time-(target.lastHitLog??-99)>2){target.lastHitLog=s.time;log(s,'Gun impact observed.','info');}
    }else if(type==='aircraft'){target.hull=Math.max(0,target.hull-38*damageScale);if(target.hull<=0)log(s,'Aircraft hit. Going down.','success');}
    else hurt(s,3,'Aircraft strafing the surfaced hull. Dive!','deckgun');
-  }else if(r.altitude<0){const f=clamp(from.altitude/(from.altitude-r.altitude),0,1);impact(s,r,{x:from.x+(r.x-from.x)*f,y:from.y+(r.y-from.y)*f,altitude:0},'splash');r.age=99;}
+  }else if(r.altitude<0){const f=clamp(from.altitude/(from.altitude-r.altitude),0,1);const point={x:from.x+(r.x-from.x)*f,y:from.y+(r.y-from.y)*f,altitude:0};impact(s,r,point,'splash');r.age=99;
+   if(r.owner==='player')for(const v of s.ships)if(v.kind!=='sub'&&distance(v,point)<150)playerSignal(s,v,false);}
  }
  s.gunRounds=s.gunRounds.filter(r=>r.age<6);s.impacts=s.impacts.filter(p=>s.time-p.time<3).slice(-64);
 }
@@ -275,7 +279,7 @@ function torpedoStrike(s,p,from){
  if(hit.kind==='carrier'){
   registerCarrierHit(hit);
   raiseCarrierAlarm(s,hit);
-  if(p.owner==='player'){hit.playerDamaged=true;addDebrief(s,'Your torpedo struck '+hit.name+' (direct hit '+hit.directHits+').');}
+  if(p.owner==='player'){playerSignal(s,hit,true,null);hit.playerDamaged=true;addDebrief(s,'Your torpedo struck '+hit.name+' (direct hit '+hit.directHits+').');}
   return true;
  }
  if(p.owner==='enemy'){
@@ -339,7 +343,7 @@ function requestSupport(s){
  if(support.status==='spent')return;
  if(carrier&&!deckOpen&&support.status!=='airborne'){support.status='spent';return;}
  for(const v of s.ships){if(!isOpponent(v)||v.hull<=0||v.alert<=55)continue;
-  if(!v.report||v.report.reason==='noisemaker'||s.time-v.report.time>4||v.report.time<(support.lastKnown?.time??0))continue;
+  if(!canAttackPlayer(s,v)||!v.report||v.report.reason==='noisemaker'||s.time-v.report.time>4||v.report.time<(support.lastKnown?.time??0))continue;
   if(support.status==='idle')prepareSortie(s,carrier,v.report);
   else support.lastKnown={...v.report};
  }
@@ -361,7 +365,7 @@ function dropBomb(s,plane,report){
  const depth=clamp((report.depth||40),15,90),airTime=2+plane.altitude/70,delay=airTime+depth/6;
  const aim=projectedReport(report,s.time,delay),point=scatterAim(s,aim,45+aim.age*.9);
  s.blasts.push({id:s.soundSequence++,...point,depth,delay,totalDelay:delay,airTime,airHeight:plane.altitude,age:0,exploded:false,kind:'bomb'});
- plane.bombDropped=true;log(s,'Aircraft releasing ordnance over the last reported position.','damage');
+ plane.bombDropped=true;addDebrief(s,'An aircraft dropped its charge over the last reported position.');
 }
 function updateAircraft(s,dt){
  const support=s.airSupport,e=environmentAt(s);

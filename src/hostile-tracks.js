@@ -70,6 +70,7 @@ export function pursueAndAttack(s,ship,track,dt,dropCharge,launchTorpedo){
  if(range>=reach)return;
  ship.attack-=dt;
  if(ship.attack>0)return;
+ ship.lastAttackAt=s.time;
  if(guns){
   const delay=1.5+range/550,aim=projectedReport(ship.report,s.time,delay);
   const point=scatterAim(s,aim,25+range*.065+track.age*.6);
@@ -86,6 +87,6 @@ export function pursueAndAttack(s,ship,track,dt,dropCharge,launchTorpedo){
   const point=scatterAim(s,aim,70+range*.48+track.age*1.4);
   ship.attack=35;
   dropCharge(s,{...point,depth,delay,kind:'charge'});
-  log(s,'Depth charges in the water. Evade!','damage');
+  addDebrief(s,ship.name+' dropped a depth charge.');
  }
 }

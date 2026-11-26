@@ -3,7 +3,7 @@ import {crewOnAlert,crewPeriod,messClips,messLine} from './mess-watch.js';
 import {EveningRadio} from './evening-radio.js';
 export {crewPeriod};
 
-const clips=[...messClips,'hit','hit-alt','leak','leak-alt','hit-quiet','leak-quiet'];
+const clips=[...messClips,'happy-new-year','merry-christmas','hit','hit-alt','leak','leak-alt','hit-quiet','leak-quiet'];
 
 export function quietForSleep(s,alert=crewOnAlert(s)){
  return !alert&&!s.projectiles.length&&!s.shells.length&&!s.gunRounds.length&&!s.blasts.length&&!s.impacts.length&&
@@ -13,7 +13,7 @@ export function quietForSleep(s,alert=crewOnAlert(s)){
 export class CrewAmbience {
  constructor(context,master){
   this.context=context;this.bus=context.createGain();this.bus.gain.value=0;this.bus.connect(master);
-  this.radio=new EveningRadio(context,this.bus);this.reports=new Set();this.routineSources=new Set();this.clips=new Map();this.state=null;this.slot=-1;this.nextHit=0;this.nextLeak=0;this.lastHull=100;this.lastFlood=0;
+  this.radio=new EveningRadio(context,this.bus);this.reports=new Set();this.routineSources=new Set();this.holidaySources=new Set();this.clips=new Map();this.state=null;this.slot=-1;this.nextHit=0;this.nextLeak=0;this.lastHull=100;this.lastFlood=0;
   if(typeof context.decodeAudioData==='function')for(const name of clips){
    fetch(new URL(`crew/${name}.mp3`,import.meta.url)).then(response=>{
     if(!response.ok)throw Error('Crew clip unavailable');return response.arrayBuffer();
@@ -31,7 +31,7 @@ export class CrewAmbience {
  speak(name,volume,routine=false){
   const buffer=this.clips.get(name);if(!buffer)return;
   const source=this.context.createBufferSource(),gain=this.context.createGain();source.buffer=buffer;gain.gain.value=volume;
-  this.track(source,gain,routine?this.routineSources:this.reports);
+  this.track(source,gain,routine==='holiday'?this.holidaySources:routine?this.routineSources:this.reports);
   source.connect(gain).connect(this.bus);source.start();return true;
  }
  note(frequency,when,length,volume,type='sine'){
@@ -76,9 +76,11 @@ export class CrewAmbience {
   if(roll<.22)this.reaction={at:this.context.currentTime+1.2,line:roll<.11?'what-noise':'hear-that'};
  }
  update(s,e,active){
-  if(this.state!==s){this.radio.stop();this.stopGroup(this.routineSources);this.stopGroup(this.reports);this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=this.nextChatter=0;this.reaction=null;this.goodnightDay=-1;this.lastLine='';}
+  if(this.state!==s){this.radio.stop();this.stopGroup(this.holidaySources);this.stopGroup(this.routineSources);this.stopGroup(this.reports);this.stopSnore();this.state=s;this.lastHull=s.hull;this.lastFlood=s.flood;this.slot=-1;this.nextHit=this.nextLeak=this.nextSnore=this.nextChatter=0;this.reaction=null;this.goodnightDay=-1;this.lastLine='';}
   const now=this.context.currentTime,quiet=s.silent||s.alert>30;
   const alert=crewOnAlert(s),period=crewPeriod(e.hour),sleeping=active&&period==='sleep'&&quietForSleep(s,alert);
+  const holidayQuiet=e.holiday&&active&&!crewOnAlert(s,false);
+  if(!holidayQuiet)this.stopGroup(this.holidaySources);
   if(!active||alert)this.stopGroup(this.routineSources);
   if(!active)this.stopGroup(this.reports);
   if(!active||alert||period!=='music')this.radio.stop();
@@ -88,6 +90,7 @@ export class CrewAmbience {
   if(!sleeping)this.stopSnore();
   this.bus.gain.setTargetAtTime(active?(quiet?.08:.7):0,now,.09);
   if(active){
+   if(e.holiday==='new-year'&&e.hour<.08&&holidayQuiet&&s.newYearWatch!==e.day&&this.speak('happy-new-year',.17,'holiday'))s.newYearWatch=e.day;
    if(!alert&&period==='lights-out'&&this.goodnightDay!==day&&this.speak('goodnight',.12,true))this.goodnightDay=day;
    if(this.reaction&&now>=this.reaction.at){this.speak(this.reaction.line,.16);this.reaction=null;this.nextChatter=now+30;}
    const alternative=hash01(s.patrol.seed,Math.floor(s.time*4)+1800)<.5;
@@ -97,6 +100,10 @@ export class CrewAmbience {
    if(this.slot!==slot){
     this.slot=slot;
     const choice=hash01(s.patrol.seed,slot+1100);
+    const holidayWatch=e.holiday==='christmas'?e.hour>=18&&e.hour<23:e.holiday==='new-year'&&e.hour>=7&&e.hour<23;
+    if(holidayWatch&&holidayQuiet&&now>=this.nextChatter&&hash01(s.patrol.seed,slot+19372)<.065){
+     if(this.speak(e.holiday==='christmas'?'merry-christmas':'happy-new-year',.16,'holiday'))this.nextChatter=now+20;
+    }
     const line=messLine(period,hash01(s.patrol.seed,slot+1150),this.lastLine);
     if(!alert&&line&&choice<.72&&now>=this.nextChatter){
      this.speak(line,.12,true);this.lastLine=line;this.nextChatter=now+12;this.note(1840,now+.12,.19,.023);this.note(2700,now+.29,.15,.013);

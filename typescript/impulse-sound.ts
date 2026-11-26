@@ -1,6 +1,12 @@
 // Shape the source before the game's distance filter, stereo pan and master limiter.
 export function shapeImpulse(type:string, time:number, duration:number, noise:AudioParam, rumble:OscillatorNode, bass:AudioParam) {
   const pitch=rumble.frequency,end=time+duration;
+  if(type==='launch'||type==='splashdown'){
+    const splash=type==='splashdown';
+    noise.setValueAtTime(.0001,time);noise.linearRampToValueAtTime(splash?.72:.35,time+(splash?.015:.08));noise.exponentialRampToValueAtTime(.0001,end);
+    rumble.type='sine';pitch.setValueAtTime(splash?155:240,time);pitch.exponentialRampToValueAtTime(splash?85:75,end);
+    bass.setValueAtTime(splash?.065:.14,time);bass.exponentialRampToValueAtTime(.0001,end);return;
+  }
   if(type==='blast'||type==='detonation'){
     // A sharp front and a short low-mid body carry on small speakers.
     noise.setValueAtTime(.0001,time);

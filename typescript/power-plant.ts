@@ -61,3 +61,13 @@ export function dieselRoutingStatus(s: Plant & {dieselMode: DieselMode}, plant: 
       return plant.assistDrain > 0 ? 'BATTERY ASSIST ACTIVE' : 'BATTERY ASSIST READY';
   }
 }
+
+// Patrol-scale energy per simulation second. The fixed load keeps the lights,
+// pumps and instruments running. Propulsion follows a cubic speed-power curve.
+export function energyDraw(speed:number,chargeRate:number,assistDrain:number){
+ const knots=Math.abs(speed);
+ return {
+  electric:.009+.18*(knots/ELECTRIC_KNOTS)**3,
+  diesel:.004+.032*Math.max(0,(knots/SURFACE_KNOTS)**3-assistDrain/.20*(ELECTRIC_KNOTS/SURFACE_KNOTS)**3)+.10*chargeRate
+ };
+}

@@ -51,6 +51,7 @@ encodeMission mission =
         , ( "name", E.string b.name )
         , ( "type", E.string b.category )
         , ( "actionStations", E.bool (b.crewWatch == PatrolMission.ActionStations) )
+        , ( "engaged", E.bool (b.encounterOrders == PatrolMission.Engage) )
         , ( "minutes", E.string (PatrolMission.estimatedMinutes False b) )
         , ( "longMinutes", E.string (PatrolMission.estimatedMinutes True b) )
         , ( "desc", E.string b.description )

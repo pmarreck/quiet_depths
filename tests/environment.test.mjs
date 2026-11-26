@@ -102,7 +102,12 @@ test('soundings distinguish pressure depth, water depth and five-meter keel offs
  assert.deepEqual(soundings(230,12),{waterDepth:230,referenceDepth:12,belowKeel:213,keelOffset:5});const s=createGame();assert.equal(getSoundings(s).belowKeel,getSoundings(s).waterDepth-s.depth-5);
 });
 test('a full day round trips and environment queries do not mutate state',()=>{
- const s=createGame('recon',3,{timeOfDay:'night',weather:'clear',changing:false}),before=save(s),e=environmentAt(s);assert.equal(save(s),before);assert.equal(e.phase,'Night');s.time=DAY_SECONDS;assert.deepEqual(environmentAt(s),e);
+ const s=createGame('recon',3,{timeOfDay:'night',weather:'clear',changing:false}),before=save(s),e=environmentAt(s);assert.equal(save(s),before);assert.equal(e.phase,'Night');s.time=DAY_SECONDS;
+ const dailySky=({date,holiday,day,cycle,illumination,moonDirection,moonLight,...sky})=>sky;
+ const next=environmentAt(s);
+ assert.deepEqual(dailySky(next),dailySky(e));
+ assert.equal(next.day,e.day+1);assert.notEqual(next.date,e.date);assert.notEqual(next.cycle,e.cycle);
+ assert.notDeepEqual(next.moonDirection,e.moonDirection);
 });
 test('all weather/time combinations are finite and night/storms reduce visual range',()=>{
  for(const weather of Object.keys(WEATHER))for(const timeOfDay of ['day','night','dawn','dusk']){const e=environmentAt(createGame('recon',1,{weather,timeOfDay,changing:false}));for(const k of ['opticalRange','subVisualRange','waveScale','hour','cloud','rain'])assert.ok(Number.isFinite(e[k]),k);assert.ok(e.opticalRange>1000);}

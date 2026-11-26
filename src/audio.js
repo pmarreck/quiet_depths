@@ -45,7 +45,7 @@ export class SoundSystem{
  impulse(source){
   const s=this.getState(),{view,cameraDepth}=this.getContext();
   const p=stationSound(source,s,weatherMix(s,view,cameraDepth));if(p.gain<.002||this.effects>=12)return;
-  const c=this.ctx,t=c.currentTime,thunder=source.type==='thunder',gun=source.type==='gunfire',seeker=['seeker','sweep'].includes(source.type),creak=source.type==='creak',loss=['implosion','collapse'].includes(source.type),duration=creak?2.8:loss?8:thunder?4.8:gun?.24:seeker?.7:3;
+  const c=this.ctx,t=c.currentTime,thunder=source.type==='thunder',gun=source.type==='gunfire',seeker=['seeker','sweep'].includes(source.type),creak=source.type==='creak',loss=['implosion','collapse'].includes(source.type),duration=source.type==='launch'?.55:source.type==='splashdown'?.8:creak?2.8:loss?8:thunder?4.8:gun?.24:seeker?.7:3;
   const noise=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain(),pan=c.createStereoPanner(),spatialGain=c.createGain();noise.buffer=this.noise;noise.loop=true;filter.type='lowpass';filter.frequency.value=p.cutoff;filter.Q.value=.6;pan.pan.value=p.pan*.9;spatialGain.gain.value=p.gain;
   noise.connect(filter).connect(gain).connect(pan);
   // The hull-collapse sweep has its own envelope. Keep station filtering
@@ -73,7 +73,7 @@ export class SoundSystem{
   if(!this.ctx)return;
   if(this.lastState!==s){this.lastState=s;this.played=new Set(s.acoustics.filter(e=>e.heard).map(e=>e.id));for(const v of this.voices.values()){v.osc.stop();v.pulse.stop();}for(const v of this.effectVoices)v.stop();this.effectVoices.clear();this.voices.clear();this.lastReceipt=null;this.tailUntil=0;this.alarmLevel=0;}
   const c=this.ctx,t=c.currentTime,active=!context.paused&&!context.modal&&s.status==='patrol',e=environmentAt(s);
-  for(const event of s.acoustics){if(!event.heard||this.played.has(event.id))continue;this.played.add(event.id);if(this.on&&!context.paused&&!context.modal)this.impulse(event);}
+  for(const event of s.acoustics){if(!event.heard||event.missed||this.played.has(event.id))continue;this.played.add(event.id);if(this.on&&!context.paused&&!context.modal)this.impulse(event);}
   const mix=weatherMix(s,context.view,context.cameraDepth);
   for(const voice of this.effectVoices){const p=stationSound(voice.source,s,mix);voice.spatialGain.gain.setTargetAtTime(p.gain,t,.1);voice.filter.frequency.setTargetAtTime(p.cutoff,t,.12);voice.pan.pan.setTargetAtTime(p.pan*.9,t,.1);if(this.lastReceipt?.id===voice.source.id){this.lastReceipt.currentGain=p.gain;this.lastReceipt.currentCutoff=p.cutoff;}}
   const tail=s.status!=='patrol'&&t<this.tailUntil&&!context.paused;

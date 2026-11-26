@@ -1,7 +1,7 @@
 import {hash01} from './surface-motion.ts';
 
 type Point={x:number;y:number};
-type Traffic=Point & {id:string;kind:string;military:boolean;side?:string};
+type Traffic=Point & {id:string;kind:string;military:boolean;incidental?:boolean;side?:string};
 type Setup=Point & {mission:string;patrol:{seed:number};ships:Traffic[];site:Point|null};
 export interface SearchArea extends Point {
   radius:number;targets:string[];recognized:string[];located:boolean;activeSeconds:number;protectedTime:number;
@@ -45,7 +45,7 @@ export function advanceApproach(search:SearchArea,dt:number,timeRate:number){
 export const approachProgress=(a:SearchArea)=>Math.min(1,a.activeSeconds/180,a.protectedTime/1200);
 export function validSearch(s:Setup & {search?:SearchArea;time:number}){
   const a=s.search;if(!a)return false;
-  const expected=s.site?[]:objectives(s).map(v=>v.id);
+  const expected=s.site?[]:objectives({...s,ships:s.ships.filter(v=>!v.incidental)}).map(v=>v.id);
   return [a.x,a.y,a.radius,a.activeSeconds,a.protectedTime].every(Number.isFinite)&&a.radius>0&&
     a.activeSeconds>=0&&a.activeSeconds<=180&&a.protectedTime>=0&&a.protectedTime<=s.time+.001&&
     typeof a.located==='boolean'&&Array.isArray(a.targets)&&a.targets.length===expected.length&&expected.every(id=>a.targets.includes(id))&&
