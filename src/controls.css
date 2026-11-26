@@ -2,7 +2,7 @@
 html{font-size:16px}
 body{font-size:1rem;min-height:940px;height:auto;overflow:auto}
 button,input{font-size:.875rem}
-button:disabled{opacity:.4;filter:none;cursor:not-allowed}
+button:disabled{opacity:.62;box-shadow:none;filter:none;cursor:not-allowed}
 kbd{font-size:.75rem;padding:2px 4px}
 .topbar{height:88px;padding:0 22px;gap:20px}
 .brand{font-size:1.125rem;letter-spacing:2px;flex-shrink:0}

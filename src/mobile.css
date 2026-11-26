@@ -31,7 +31,7 @@
  .view-bottom{display:none}.drone-instruments{display:none!important}
  .station-actions{position:relative;display:flex;align-items:stretch;justify-content:space-between;gap:2px;height:44px;min-height:44px;padding:0 5px;background:#12292e;border-top:1px solid #526453;border-bottom:1px solid #3c5148;z-index:25;flex-shrink:0}
  .station-actions>div{position:static;display:flex;align-items:center;gap:2px;min-width:0;flex-wrap:nowrap;margin:0;padding:0;background:none;border:0}
- .station-actions button{min-height:44px;padding:0 6px;font:12px var(--mono);white-space:nowrap;color:#d6dfc6;border:0;max-width:none;background:transparent}
+ .station-actions button{min-height:44px;padding:0 6px;font:12px var(--mono);white-space:nowrap;color:#d6dfc6;max-width:none}
  .station-actions #scope-tools{flex:1;justify-content:space-around}.station-actions #scope-alignment{flex:none}.station-actions #scope-align-toggle{display:block;min-width:44px}.station-actions #scope-alignment>button:not(#scope-align-toggle){display:none}
  .station-actions #scope-toggle,.station-actions #photo{font-size:0;min-width:44px;padding:0 5px}.station-actions #scope-toggle:after{content:attr(data-short);font:12px var(--mono)}.station-actions #photo:after{content:'Photo';font:12px var(--mono)}
  .station-actions #scope-alignment.open>button:not(#scope-align-toggle){position:absolute;right:5px;bottom:44px;display:block;background:#183137f5;border:1px solid #7e8e72;padding:9px 12px;min-height:44px;z-index:30}.station-actions #scope-alignment.open #steer-scope{bottom:88px}
