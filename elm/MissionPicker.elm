@@ -51,6 +51,7 @@ type Msg
     | Confirm Slot
     | Cancel
     | Load Slot
+    | Transfer String Int String
 
 
 port difficultyChanged : { id : String, value : Encode.Value } -> Cmd msg
@@ -72,6 +73,8 @@ port showSlots : (Slots -> msg) -> Sub msg
 port saveSlot : { id : Int, revision : String } -> Cmd msg
 
 port readSlot : { id : Int, revision : String } -> Cmd msg
+
+port transferFile : { action : String, id : Int, revision : String, setup : Setup } -> Cmd msg
 
 main : Program Flags Model Msg
 main =
@@ -142,6 +145,9 @@ update msg model =
         Load slot ->
             ( { model | busy = True, confirm = Nothing }, readSlot { id = slot.id, revision = slot.revision } )
 
+        Transfer action slot revision ->
+            ( model, transferFile { action = action, id = slot, revision = revision, setup = { mission = (PatrolMission.briefing model.selected).id, conditions = conditions } } )
+
 
 view : Model -> Html Msg
 view model =
@@ -154,8 +160,13 @@ view model =
     in
     div []
         [ details [ id "patrol-slots" ]
-            [ summary [] [ text "Save slots" ]
+            [ summary [] [ text "Save slots and transfers" ]
             , div [ class "slot-list" ] (List.map (slotView model) model.slots.entries)
+            , div [ class "transfer-actions" ]
+                [ button [ type_ "button", disabled (not model.slots.canSave), onClick (Transfer "export-current" 0 "") ] [ text "Export current patrol" ]
+                , button [ type_ "button", onClick (Transfer "export-state" 0 "") ] [ text "Export entire game" ]
+                , button [ type_ "button", onClick (Transfer "import-state" 0 "") ] [ text "Import entire game" ]
+                ]
             , small [ attribute "role" "status" ] [ text model.slots.message ]
             ]
         , div [ id "mission-picker" ] (List.map (missionButton longer model.selected) PatrolMission.all)
@@ -204,7 +215,10 @@ slotView model slot =
             if model.confirm == Just slot then
                 [ span [] [ text ("Replace slot " ++ number ++ "?") ], action "Overwrite" (Confirm slot) False, action "Cancel" Cancel False ]
             else
-                [ action "Save" (Save slot) (not model.slots.canSave), action "Load" (Load slot) (slot.revision == "") ]
+                [ action "Save" (Save slot) (not model.slots.canSave), action "Load" (Load slot) (slot.revision == "")
+                , action "Export" (Transfer "export-slot" slot.id slot.revision) (slot.revision == "")
+                , action "Import" (Transfer "import-slot" slot.id slot.revision) False
+                ]
     in
     div [ class "patrol-slot" ]
         [ if slot.image == "" then

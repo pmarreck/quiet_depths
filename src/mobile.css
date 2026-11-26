@@ -324,3 +324,18 @@ body.standby #patrol-standby{flex:1;display:grid;place-content:center;justify-it
  }
  body[data-station=scope] .sight-header .look-heading::before{top:-10px}
 }
+
+.captain-entry{margin-block:15px;color:var(--cream);font:13px var(--mono)}
+.captain-entry label,.captain-entry small{display:block;margin:5px 0}
+.captain-entry>div{display:flex;align-items:center;gap:10px}
+#captain-name{width:100%;min-width:0;min-height:44px;padding:6px 9px;background:#102227;color:var(--cream);border:1px solid #526b61;font:16px var(--mono)}
+#captain-name::placeholder{color:#a6b6ad}
+.captain-entry small{color:#b6c8bb;line-height:1.5}
+.transfer-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-block:10px}
+.transfer-actions button{min-height:44px;padding:5px 10px;border:1px solid var(--button-edge);border-radius:3px;background:var(--button-face);color:var(--cream);font:12px var(--mono)}
+#transfer-confirm[hidden],#transfer-notice[hidden]{display:none}
+#transfer-confirm span{flex-basis:100%}
+#transfer-notice,#transfer-question{font:13px/1.5 var(--mono);color:var(--gold)}
+#patrol-slots .patrol-slot{grid-template-columns:64px minmax(0,1fr)}
+#patrol-slots .slot-actions{grid-column:2}
+#captain-stars,#result-captain{color:var(--gold)}

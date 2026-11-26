@@ -1,3 +1,4 @@
+import {captainName} from "./captain.js";
 import {freshTransmitters,validTransmitters} from './sonar-imager.js';
 import {activeClue,imagerClue,leaveClue,searchClue} from './suspicion.js';
 import {watchWarnings,validWarnings,bottomCall,batteryCall} from './watch-warnings.js';
@@ -373,6 +374,7 @@ export function save(s){return JSON.stringify(s);}
 export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charge={id:s.soundSequence++,x,y,depth,delay,totalDelay:delay,age:0,exploded:false,kind};s.blasts.push(charge);emitSound(s,{type:'splashdown',x,y,depth:0,power:.65});return charge;}
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired','convoy-lost'].includes(s.status))return null;
+ if(s.captain!==undefined&&(typeof s.captain!=='string'||!s.captain||s.captain!==captainName(s.captain)))return null;
  if(s.mission!=='wolf-in-the-henhouse'&&(s.convoy!==undefined||s.status==='convoy-lost'))return null;
  if(s.imagers===undefined)s.imagers=freshTransmitters();
  if(!validTransmitters(s.imagers))return null;

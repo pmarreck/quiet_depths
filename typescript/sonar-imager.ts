@@ -137,6 +137,11 @@ export function sampleLine(s:World,mode:Instrument,profile:Profile,row:number,pl
   return result;
 }
 
+interface PaperSnapshot {
+  mode:Instrument;profile:Profile;x:number;y:number;fraction:number;completedLines:number;anchor:number|null;
+  pixels:number[];line:number[]|null;archive:{pixels:number[];times:number[]}[];
+}
+const bytes=(a:unknown,size:number):a is number[]=>Array.isArray(a)&&a.length===size&&a.every(n=>Number.isInteger(n)&&n>=0&&n<=255);
 export class ImagerPaper {
   readonly pixels:Uint8Array;
   readonly width:number;
@@ -157,6 +162,33 @@ export class ImagerPaper {
     this.width=p.width;this.height=p.height;this.rows=p.rows;this.pixels=new Uint8Array(this.width*this.height);
   }
   get browsing(){return this.anchor!==null;}
+  snapshot():PaperSnapshot {
+    return {mode:this.mode,profile:this.profile,x:this.x,y:this.y,fraction:this.fraction,completedLines:this.completedLines,anchor:this.anchor,
+      pixels:Array.from(this.pixels),line:this.line?Array.from(this.line):null,archive:this.archive.map((chunk,i)=>{
+        const used=Math.min(128,this.completedLines-i*128);
+        return {pixels:Array.from(chunk.pixels.subarray(0,used*this.width)),times:Array.from(chunk.times.subarray(0,used))};
+      })};
+  }
+  static fromSnapshot(v:PaperSnapshot,plates:WreckPlates){
+    const invalid=()=>new Error('Invalid sonar recording.');
+    if(!v||!instruments.includes(v.mode)||!Object.hasOwn(profiles,v.profile))throw invalid();
+    const paper=new ImagerPaper(v.mode,v.profile,plates),{width,height}=paper;
+    if(!bytes(v.pixels,width*height)||!Number.isInteger(v.x)||v.x<0||v.x>=width||!Number.isInteger(v.y)||v.y<0||v.y>=height||
+      !Number.isSafeInteger(v.completedLines)||v.completedLines<0||!Number.isFinite(v.fraction)||v.fraction<0||v.fraction>=1||
+      !(v.x===0?v.line===null:bytes(v.line,width))||!Array.isArray(v.archive)||
+      v.archive.length!==(v.mode==='scribbler'?Math.ceil(v.completedLines/128):0)||
+      (v.mode==='scribbler'?v.y!==0:v.y!==v.completedLines%height))throw invalid();
+    if(v.anchor!==null&&(v.mode!=='scribbler'||!Number.isFinite(v.anchor)||v.anchor<height-1||v.anchor>=v.completedLines))throw invalid();
+    paper.archive=v.archive.map((chunk,i)=>{
+      const count=Math.min(128,v.completedLines-i*128);
+      if(!chunk||!bytes(chunk.pixels,width*count)||!Array.isArray(chunk.times)||chunk.times.length!==count||!chunk.times.every(Number.isFinite))throw invalid();
+      const pixels=new Uint8Array(128*width),times=new Float64Array(128);
+      pixels.set(chunk.pixels);times.set(chunk.times);return {pixels,times};
+    });
+    paper.pixels.set(v.pixels);paper.line=v.line?Uint8Array.from(v.line):undefined;
+    paper.x=v.x;paper.y=v.y;paper.completedLines=v.completedLines;paper.anchor=v.anchor;paper.fraction=v.fraction;
+    return paper;
+  }
   get topLine(){return this.anchor===null?this.completedLines:Math.floor(this.anchor);}
   showLive(){this.anchor=null;}
   scrollRows(rows:number){

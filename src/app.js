@@ -28,14 +28,16 @@ import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
-import {photoArchive,recordPhoto,recordExposure,restorePhotos} from './photos.js';
+import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
 import {requestRecon,reconStatus,reconAreaForDisplay} from './recon.js';
 import {chartContacts,estimateAt} from './track-estimates.js';
 import {sonarReading} from './contact-readings.js';
 import {lossPresentation} from './loss.js';
 import {persistPatrol,resumablePatrol} from './persistence.js';
-import {SLOT_COUNT,listSlots,writeSlot,loadSlot} from './patrol-slots.js';
+import {SLOT_COUNT,listSlots,writeSlot,readSlotEntry,allSlotEntries,unpackSlot,installBackup,importedSession} from './patrol-slots.js';
+import {captainName,humorousName,patrolCaptain,legacyPatrolId,transferFilename,captainRecords,captainPreference,starLabel} from './captain.js';
+import {readStorage,saveDocument,stateDocument,decodeFile,checkStation,downloadJson} from './patrol-transfer.js';
 import {difficultyPanel,patrolDifficulty} from './difficulty.js';
 import {actionForKey,shortcutConflict,allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
@@ -45,6 +47,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
+let installingBackup=false;
 let orderAxis=null,reconPlacement=false,photoKey='',lossStartedAt=0;const zooms={scope:1,tower:1,gun:1};let library=[];
 let difficulty=patrolDifficulty();
 try{difficulty=patrolDifficulty(JSON.parse(localStorage.getItem('quiet-depths-difficulty-v1')));}catch{}
@@ -80,7 +83,7 @@ const sound=new SoundSystem(()=>state,context,status=>{
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 let saveStatusTimer,saveWarning='';
 function persist(){
- if(!patrolStarted)return;
+ if(!patrolStarted||installingBackup)return;
  library=photoArchive(state);
  const status=$('save-status');
  clearTimeout(saveStatusTimer);
@@ -127,6 +130,21 @@ function changeOrbit(){
 function zoomOrbit(factor){orbit.distance=clamp(orbit.distance*factor,37,120);}
 function renderServiceRecord(){
  try{const record=serviceRecord(localStorage);$('service-record').textContent=`${record.ships} ships sunk · ${record.submarines} submarines sunk · ${record.doubleHunts} two-submarine patrols`;}catch{}
+ renderCaptainRecords();
+}
+let captainRoster={captains:new Map(),fleet:{completed:0,succeeded:0,failed:0}};
+function showCaptainRecord(){
+ const name=captainName($('captain-name').value)||$('captain-name').placeholder;
+ const row=captainRoster.captains.get(name.toLowerCase());
+ const counts=r=>`${r?.completed??0} completed · ${r?.succeeded??0} succeeded · ${r?.failed??0} failed`;
+ $('captain-record').textContent='Captain '+name+' · '+counts(row);
+ $('captain-stars').textContent=starLabel(row?.succeeded??0)||'First service star at 5 successes.';
+ $('fleet-record').textContent='All captains · '+counts(captainRoster.fleet);
+}
+function renderCaptainRecords(){
+ try{captainRoster=captainRecords(localStorage);}catch{}
+ $('captain-roster').replaceChildren(...Array.from(captainRoster.captains.values(),r=>new Option(r.name,r.name)));
+ showCaptainRecord();
 }
 const briefingPatrol=()=>patrolStarted?state:saved;
 let briefingVisit=0,frameRequest=null;
@@ -135,7 +153,7 @@ function openBriefing(){
  const current=briefingPatrol();
  $('current-patrol').hidden=!current;
  if(current){
-  $('current-mission').textContent=MISSIONS.find(m=>m.id===current.mission).name;
+  $('current-mission').textContent='Captain '+patrolCaptain(current)+' · '+MISSIONS.find(m=>m.id===current.mission).name;
   $('current-seed').textContent='Seed '+current.patrol.seed;
   $('current-seed').setAttribute('aria-label','Copy patrol seed '+current.patrol.seed);
  }
@@ -145,7 +163,7 @@ function openBriefing(){
  $('resume').classList.toggle('hidden',!resumablePatrol(current));
  refreshSlots();sound.update();
 }
-function start(setup=null,snapshot=null){
+function start(setup=null,snapshot=null,station=null){
  if(!$('briefing').open)return;
  const previousPatrol=state;
  if(setup===null){
@@ -160,6 +178,10 @@ function start(setup=null,snapshot=null){
   seedInput.setCustomValidity(seed===undefined?'Enter a whole number from 0 to 4294967295.':'');
   if(!seedInput.reportValidity())return;
   state=createGame(setup.mission,seed??randomSeed(),{...setup.conditions,difficulty});
+  const chosen=captainName($('captain-name').value);
+  state.captain=chosen||$('captain-name').placeholder;
+  try{localStorage.setItem(captainPreference,JSON.stringify(chosen));}catch{}
+  $('captain-name').value=chosen;$('captain-name').placeholder=humorousName(randomSeed());
   selected=null;
   newSeed();
  }
@@ -169,11 +191,20 @@ function start(setup=null,snapshot=null){
   recorder=scene&&state.difficulty.instantReplay?new ReplayRecorder(state):null;
  }
  renderClock=state.time;patrolStarted=true;document.body.classList.remove('standby');
- state.patrolId??=Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
+ state.captain=patrolCaptain(state);
+ state.patrolId??=setup===null?legacyPatrolId(state):crypto.randomUUID().replaceAll('-','');
+ if(snapshot&&library.length){
+  const images=new Set(library.map(p=>p.image)),addition=photoArchive(state).filter(p=>!images.has(p.image));
+  if(addition.length){const combined={photoArchive:library};for(const p of addition)recordPhoto(combined,p);}
+ }
  state.photoArchive=library.length?library:photoArchive(state);photoKey='';reconPlacement=false;document.body.classList.remove('loss');$('loss-layer').classList.add('hidden');
  chart={x:state.x,y:state.y,zoom:state.search&&!state.search.located?.4:1,follow:true,reconArea:state.recon.area};saved=null;resultShown=false;lastToast='';clearTimeout(toastTimer);$('toast').classList.remove('show');setRate(1);$('briefing').close();setView(scene?(isSurfaced(state)?'tower':'scope'):'sonar');setPaused(false);persist();
+ if(station)applyStation(station);
 }
 const randomSeed=()=>crypto.getRandomValues(new Uint32Array(1))[0];
+$('captain-name').placeholder=humorousName(randomSeed());
+try{$('captain-name').value=captainName(JSON.parse(localStorage.getItem(captainPreference)));}catch{}
+$('captain-name').addEventListener('input',showCaptainRecord);
 function newSeed(){
  const input=$('patrol-seed'),previous=parsePatrolSeed(input.value);
  let next=randomSeed();if(next===previous)next=(next+1)>>>0;
@@ -240,20 +271,129 @@ missionPicker.ports.saveSlot.subscribe(async({id,revision})=>{
  try{image=captureSlotPortrait(scene,current);}catch{/* A camera failure leaves the patrol save usable. */}
  const name=MISSIONS.find(m=>m.id===current.mission).name;
  const minutes=Math.floor(current.time/60),seconds=String(Math.floor(current.time)%60).padStart(2,'0');
- const label=name+' · '+minutes+':'+seconds+' · Seed '+current.patrol.seed;
- try{await writeSlot(id,revision,current,image,label);await refreshSlots('Saved to slot '+id+'.');}
+ const label='Captain '+patrolCaptain(current)+' · '+name+' · '+minutes+':'+seconds+' · Seed '+current.patrol.seed;
+ try{await writeSlot(id,revision,withPhotos(current),image,label,current===state?stationSnapshot():null);await refreshSlots('Saved to slot '+id+'.');}
  catch(error){await refreshSlots(error.message||'Could not write the slot.');}
 });
 missionPicker.ports.readSlot.subscribe(async({id,revision})=>{
  const visit=briefingVisit;
  try{
-  const loaded=await loadSlot(id,revision);
-  if($('briefing').open&&visit===briefingVisit){start(null,loaded);toast('Loaded slot '+id+'.');}
+  const loaded=await readSlotEntry(id,revision);
+  if($('briefing').open&&visit===briefingVisit){start(null,loaded.patrol,loaded.station);toast('Loaded slot '+id+'.');}
  }catch(error){await refreshSlots(error.message||'Could not load the slot.');}
 });
+function withPhotos(patrol){
+ return {...patrol,captain:patrolCaptain(patrol),photoArchive:patrol.photoArchive?.length?patrol.photoArchive:library};
+}
+function stationSnapshot(){
+ return {view,previousView,zooms:{...zooms,[view]:zoom},rate,paused,sound:sound.on,selected,chart:{...chart},orbit:orbit&&{...orbit},
+  instrument,sonarRange,profiles:{...selectedProfiles},papers:paperPatrol===state?Array.from(imagerPapers.values(),p=>p.snapshot()):[]};
+}
+function validateStation(data){checkStation(data,sheet=>ImagerPaper.fromSnapshot(sheet,wreckPlates));}
+function applyStation(data){
+ validateStation(data);
+ paperPatrol=state;imagerPapers.clear();
+ for(const sheet of data.papers)imagerPapers.set(sheet.mode+'-'+sheet.profile,ImagerPaper.fromSnapshot(sheet,wreckPlates));
+ Object.assign(selectedProfiles,data.profiles);instrument=data.instrument;sonarPanel.ports.restoreSonarTab.send(instrument);
+ sonarRange=data.sonarRange;chart=data.chart;orbit=data.orbit;previousView=data.previousView;selected=data.selected;
+ const station=!scene&&['scope','tower','gun','orbit','drone'].includes(data.view)?'sonar':data.view;
+ setView(station);Object.assign(zooms,data.zooms);zoom=zooms[view]||1;setRate(data.rate);setPaused(data.paused);
+ if(sound.on!==data.sound){sound.toggle();renderSound();}
+}
+function portableCurrent(){
+ const current=briefingPatrol();
+ if(!current)return null;
+ const patrol=withPhotos(current),label=MISSIONS.find(m=>m.id===patrol.mission).name;
+ return {patrol,station:patrolStarted?stationSnapshot():null,image:'',label};
+}
+function showTransferNotice(message){
+ const notice=$('transfer-notice');notice.hidden=!message;notice.textContent=message;
+}
+let pendingTransfer=null,transferRequest=0;
+const transferTokenKey='quiet-depths-import-tab-v1';
+function cancelTransfer(){pendingTransfer=null;$('transfer-confirm').hidden=true;}
+$('cancel-transfer').onclick=()=>{cancelTransfer();showTransferNotice('Import canceled.');};
+$('briefing').addEventListener('close',()=>{
+ if($('briefing').open)return;
+ transferRequest++;cancelTransfer();showTransferNotice('');
+});
+function describePatrol(p){return 'Captain '+patrolCaptain(p)+' · '+MISSIONS.find(m=>m.id===p.mission).name;}
+async function importSelection(file,command,request){
+ const full=command.action==='import-state';
+ const data=decodeFile(await file.text(),full?'state':'patrol',restore,validateStation,validPhoto);
+ if(request!==transferRequest||!$('briefing').open)return;
+ if(!full&&!command.revision){
+  await writeSlot(command.id,'',data.patrol,data.image,data.label,data.station);
+  await refreshSlots();showTransferNotice(describePatrol(data.patrol)+' imported into slot '+command.id+'.');return;
+ }
+ pendingTransfer={command,data};
+ const question=full?'Replace this game’s current patrol, six slots, settings, photos and service records with this backup?':
+  'Replace slot '+command.id+' with '+describePatrol(data.patrol)+'?';
+ showTransferNotice('');$('transfer-question').textContent=question;$('transfer-confirm').hidden=false;
+ $('cancel-transfer').focus();
+}
+$('apply-transfer').onclick=async()=>{
+ if(!pendingTransfer)return;
+ const {command,data}=pendingTransfer;cancelTransfer();
+ try{
+  if(command.action==='import-state'){
+   installingBackup=true;
+   const token='import:'+crypto.randomUUID();sessionStorage.setItem(transferTokenKey,token);
+   await installBackup(localStorage,data,token);
+   location.reload();return;
+  }
+  await writeSlot(command.id,command.revision,data.patrol,data.image,data.label,data.station);
+  await refreshSlots();showTransferNotice('Imported into slot '+command.id+'.');
+ }catch(error){
+  if(installingBackup)try{sessionStorage.removeItem(transferTokenKey);}catch{}
+  installingBackup=false;showTransferNotice(error.message);
+ }
+};
+missionPicker.ports.transferFile.subscribe(async command=>{
+ const request=++transferRequest;
+ cancelTransfer();showTransferNotice('');
+ try{
+  if(command.action==='import-slot'||command.action==='import-state'){
+   const input=$('transfer-input');input.value='';input.accept=command.action==='import-state'?'.qdstate.json,.json,application/json':'.qdsave.json,.json,application/json';
+   input.onchange=()=>{const file=input.files[0];if(file)importSelection(file,command,request).catch(error=>showTransferNotice(error.message));};input.click();return;
+  }
+  if(command.action==='export-state'){
+   const current=portableCurrent(),setup={...command.setup,seed:$('patrol-seed').value,captain:$('captain-name').value,defaultCaptain:$('captain-name').placeholder};
+   const name=current?patrolCaptain(current.patrol):captainName(setup.captain)||setup.defaultCaptain;
+   const slots=(await allSlotEntries()).map(unpackSlot),storage=readStorage(localStorage);
+   downloadJson(transferFilename(name),stateDocument({slots,localStorage:storage,current,started:patrolStarted,setup}));
+  }else{
+   const entry=command.action==='export-slot'?await readSlotEntry(command.id,command.revision):portableCurrent();
+   if(!entry||entry.patrol.status!=='patrol')throw new Error('Choose an active patrol to export.');
+   const {patrol,image,label,station}=entry,mission=MISSIONS.find(m=>m.id===patrol.mission).name;
+   downloadJson(transferFilename(patrolCaptain(patrol),mission),saveDocument({patrol,image,label,station}));
+  }
+  showTransferNotice('JSON file ready to save.');
+ }catch(error){showTransferNotice(error.message);}
+});
+async function resumeImportedBackup(){
+ let token;
+ try{token=sessionStorage.getItem(transferTokenKey);}catch{return;}
+ if(!token?.startsWith('import:'))return;
+ try{
+  const backup=await importedSession(token);
+  if(!backup){sessionStorage.removeItem(transferTokenKey);return;}
+  const {setup,current,started}=backup;
+  if(started&&current){
+   start(null,current.patrol,current.station);
+   openBriefing();
+  }else if(current){saved=current.patrol;openBriefing();}
+  missionPicker.ports.selectSetup.send(setup);
+  $('patrol-seed').value=setup.seed;$('captain-name').value=setup.captain;$('captain-name').placeholder=setup.defaultCaptain;
+  renderServiceRecord();showTransferNotice('Game backup restored.');
+  await importedSession(token,true);sessionStorage.removeItem(transferTokenKey);
+ }catch(error){showTransferNotice('Could not reopen the imported session. '+error.message);}
+}
+
 bindBriefingNavigation($('briefing'),()=>missionPicker.ports.beginPatrol.send(null),()=>start(),()=>{
  if(!patrolStarted)$('choose-mission').focus();
  else if(resultShown)$('result-dialog').showModal();
+ else if(state.status!=='patrol')showResult();
 });
 $('choose-mission').onclick=openBriefing;
 $('another-patrol').onclick=()=>{$('result-dialog').close();openBriefing();};
@@ -851,6 +991,9 @@ function showResult(){
  if(state.status==='lost'){lossStartedAt=performance.now();document.body.classList.add('loss');$('loss-layer').classList.remove('hidden');if(!lossSoundPlayed)sound.loss(state);}
  persist();
  const win=state.status==='won';
+ renderCaptainRecords();
+ const captain=patrolCaptain(state),stars=starLabel(captainRoster.captains.get(captain.toLowerCase())?.succeeded??0);
+ $('result-captain').textContent=['Captain '+captain,stars].filter(Boolean).join(' · ');
  $('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';
  $('result-body').textContent=win?patrolVictory(state):state.cookoff?'A torpedo detonated aboard the submarine. The crew lost the sub.':state.imploded?'Your pressure hull collapsed at '+Math.round(state.depth)+' m.':state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?(state.search?'The extended patrol window closed. Command recalled the sub.':'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.'):'Your sub could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';
  if(state.status==='expired'&&state.unpoweredSince!==undefined&&(state.fuel===0||state.time-state.unpoweredSince>=120)){$('result-title').textContent='Power exhausted.';$('result-body').textContent='The sub could no longer power its systems. Command recalled the patrol.';}
@@ -1056,3 +1199,4 @@ function captureEvidence(){
 
 initializeExtras();
 openBriefing();
+resumeImportedBackup();

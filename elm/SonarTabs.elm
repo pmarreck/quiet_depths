@@ -27,13 +27,19 @@ label instrument =
 
 port chooseSonar : String -> Cmd msg
 
+port restoreSonarTab : (String -> msg) -> Sub msg
+
 
 main : Program () Instrument Instrument
 main =
     Browser.element
         { init = \_ -> ( Bearings, Cmd.none )
         , update = \instrument _ -> ( instrument, chooseSonar (String.toLower (label instrument)) )
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = \_ -> restoreSonarTab (\name -> case name of
+                "scribbler" -> Scribbler
+                "painter" -> Painter
+                _ -> Bearings
+            )
         , view = \selected ->
             let
                 tab instrument =

@@ -1,6 +1,7 @@
 import {save} from './sim.js';
 import {photoArchive} from './photos.js';
 import {saveServiceRecord} from './service-record.js';
+import {recordOutcome} from './captain.js';
 
 export function resumablePatrol(saved,current){
  if(saved?.status==='patrol')return saved;
@@ -15,5 +16,6 @@ export function persistPatrol(storage,state,started){
  let photosSaved=true,recordSaved=true;
  try{storage.setItem('quiet-depths-photos-v1',JSON.stringify(photoArchive(state)));}catch{photosSaved=false;}
  try{if(state.status!=='patrol')saveServiceRecord(storage,state);}catch{recordSaved=false;}
+ try{recordOutcome(storage,state);}catch{recordSaved=false;}
  return {photosSaved,recordSaved};
 }
