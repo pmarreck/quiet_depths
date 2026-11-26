@@ -1,6 +1,7 @@
 import {shelfOutcrops} from './coast.js';
 import * as T from './vendor/three.module.js';
 import {createSwimmer} from './marine-life.js';
+import {swimWhale} from './whale-swim.js';
 import {surfaceHull} from './surface-hull.js';
 import {poseSurveyWreck} from './wrecks.js';
 import {schoolFishShape} from './school-fish.js';
@@ -52,6 +53,7 @@ export class UnderseaLife{
   };
   this.fish=new T.InstancedMesh(fishGeo,fishSkin,count);this.fish.instanceMatrix.setUsage(T.DynamicDrawUsage);this.root.add(this.fish);this.dummy=new T.Object3D();this.fish.frustumCulled=false;
   this.animals=Array.from({length:4},(_,i)=>{const a=createSwimmer(T,i===3);this.root.add(a);return a;});
+  this.previousSwimPoint=new T.Vector3();
   this.divers=Array.from({length:3},()=>{const d=diver();this.root.add(d);return d;});
   this.launches=Array.from({length:2},()=>{
    const g=new T.Group();
@@ -118,8 +120,13 @@ export class UnderseaLife{
    };
    place(animal.position,t);const ahead=this.dummy.position;place(ahead,t+.15);ahead.sub(animal.position);
    animal.rotation.set(Math.atan2(ahead.y,Math.hypot(ahead.x,ahead.z)),Math.atan2(-ahead.x,-ahead.z),0,'YXZ');
-   if(whale)animal.userData.tail.rotation.x=Math.sin(t*.85)*.22;
-   else animal.userData.tail.rotation.y=Math.sin(t*2.2+i)*.33;
+   if(whale){
+    // Follow the preceding stretch of the swimming path through a turn.
+    const previous=this.previousSwimPoint;place(previous,t-5);
+    const dx=animal.position.x-previous.x,dz=animal.position.z-previous.z;
+    const turn=Math.atan2(dx*ahead.z-dz*ahead.x,dx*ahead.x+dz*ahead.z);
+    swimWhale(animal.userData.spine,t,turn);
+   }else animal.userData.tail.rotation.y=Math.sin(t*2.2+i)*.33;
   });
   if(this.site)this.site.position.set(s.site.x,-s.site.depth,-s.site.y);
   if(this.site&&s.site.kind==='surface'){

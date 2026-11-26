@@ -200,3 +200,26 @@ test('octopus arms sit against the sloping triangles of the displayed seabed',as
   }
  }
 });
+
+test('the humpback stroke travels through its visible torso before reaching the tail',()=>{
+ const world=new THREE.Scene(),life=new UnderseaLife(world,()=>new THREE.Group(),()=>new THREE.Group());
+ const s=createGame('recon',73);s.x=450;s.y=-900;
+ const whale=life.animals.find(a=>a.name==='Humpback whale');
+ let torso;whale.traverse(o=>{if(o.isMesh&&o.material.vertexColors&&(!torso||o.geometry.attributes.position.count>torso.geometry.attributes.position.count))torso=o;});
+ const positions=torso.geometry.attributes.position;
+ const samples=[-.41,.08,.24,.31].map(z=>{
+  let closest=0;for(let i=1;i<positions.count;i++)if(Math.abs(positions.getZ(i)-z)<Math.abs(positions.getZ(closest)-z))closest=i;
+  return closest;
+ });
+ function shape(time){
+  s.time=time;life.update(s,environmentAt(s));world.updateMatrixWorld(true);
+  return samples.map(i=>{const p=torso.getVertexPosition(i,new THREE.Vector3());return whale.worldToLocal(torso.localToWorld(p)).y*whale.scale.y;});
+ }
+ const frames=Array.from({length:49},(_,i)=>shape(i*.18));
+ const span=col=>Math.max(...frames.map(f=>f[col]))-Math.min(...frames.map(f=>f[col]));
+ assert.ok(span(0)<.10,'head should stay steady');
+ assert.ok(span(1)>.12&&span(2)>.65&&span(3)>1.2,'the back must flex over the stroke, even excluding the separate tail mesh');
+ const peak=col=>frames.slice(0,24).reduce((best,f,i)=>f[col]>frames[best][col]?i:best,0);
+ assert.notEqual(peak(1),peak(3),'maximum flex should travel down the torso');
+ const sample=shape(3.5);assert.deepEqual(shape(3.5),sample);shape(7);assert.deepEqual(shape(3.5),sample);
+});
