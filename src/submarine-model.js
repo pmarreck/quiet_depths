@@ -42,7 +42,7 @@ export function createSubmarine(T){
  const box=(parent,size,pos,mat=bodyMat)=>{const m=new T.Mesh(new T.BoxGeometry(...size),mat);m.position.set(...pos);parent.add(m);return m;};
  const hull=new T.Mesh(new T.LatheGeometry(D.stations.map(p=>new T.Vector2(p.radius,p.z)),48),bodyMat);hull.geometry.rotateX(Math.PI/2);root.add(hull);root.userData.hull=hull;
  box(root,[3.8,.3,34],[0,4.9,-1],trim);
- const sail=new T.Mesh(new T.CapsuleGeometry(2.1,7,7,24),bodyMat);sail.scale.set(1,1,2.5);sail.position.set(0,D.bridgeRoof-5.6,D.bridgeZ);root.add(sail);
+ const sail=new T.Mesh(new T.CapsuleGeometry(D.sailRadius,D.sailBarrel,7,24),bodyMat);sail.scale.set(1,1,D.sailStretch);sail.position.set(0,D.bridgeRoof-D.sailRadius-D.sailBarrel/2,D.bridgeZ);root.add(sail);
  const steel=new T.MeshStandardMaterial({color:0x8d9a9d,roughness:.65,metalness:.25});
  const bridgeHatch=new T.Mesh(new T.CircleGeometry(.41,24),trim);bridgeHatch.rotation.x=-Math.PI/2;bridgeHatch.position.set(0,D.bridgeRoof+.01,D.bridgeZ);root.add(bridgeHatch);
  const rail=new T.Mesh(new T.TorusGeometry(D.bridgeRailRadius,.027,8,32),steel);rail.rotation.x=Math.PI/2;rail.position.set(0,D.bridgeRoof+.94,D.bridgeZ);root.add(rail);

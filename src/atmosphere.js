@@ -1,5 +1,6 @@
 import {blastCloud,animateCloud,detonationFlash} from './blast-cloud.js';
 import * as T from './vendor/three.module.js';
+import {WakeRibbons} from './surface-wake.js';
 import {hash01,surfaceHeight} from './environment.js';
 import {chargeAltitude} from './combat.js';
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -30,31 +31,21 @@ function cloudTexture(){
 // A strip of foam on either side of each old surface crossing. The samples
 // stay in world coordinates after a turn, stop or dive.
 function wakeMesh(){
- const capacity=28*6,geometry=new T.BufferGeometry(),indices=[];
- for(const [key,n] of [['position',3],['foam',1]])geometry.setAttribute(key,new T.BufferAttribute(new Float32Array(capacity*n),n).setUsage(T.DynamicDrawUsage));
- for(let row=1;row<28;row++)for(const start of [0,3])for(let j=0;j<2;j++){
-  const a=(row-1)*6+start+j,b=a+6;indices.push(a,b,a+1,a+1,b,b+1);
- }
- geometry.setIndex(indices);geometry.setDrawRange(0,0);
+ const ribbons=new WakeRibbons(),geometry=new T.BufferGeometry();
+ geometry.setAttribute('position',new T.BufferAttribute(ribbons.positions,3).setUsage(T.DynamicDrawUsage));
+ geometry.setAttribute('foam',new T.BufferAttribute(ribbons.foam,1).setUsage(T.DynamicDrawUsage));
+ geometry.setIndex(new T.BufferAttribute(ribbons.indices,1).setUsage(T.DynamicDrawUsage));
+ geometry.setDrawRange(0,0);
  const material=new T.ShaderMaterial({transparent:true,side:T.DoubleSide,depthWrite:false,uniforms:{light:{value:1}},
   vertexShader:'attribute float foam; varying float alpha; varying vec2 at; void main(){alpha=foam;at=position.xz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
   fragmentShader:'varying float alpha; varying vec2 at; uniform float light; void main(){float ripples=.65+.35*sin(at.x*2.3+sin(at.y*1.8));gl_FragColor=vec4(vec3(.58,.78,.80)*light,alpha*ripples);}'});
- const mesh=new T.Mesh(geometry,material);mesh.frustumCulled=false;return mesh;
+ const mesh=new T.Mesh(geometry,material);mesh.frustumCulled=false;mesh.userData.ribbons=ribbons;return mesh;
 }
 function updateWake(mesh,s,e,underwater){
- const trail=s.wake??[],g=mesh.geometry,points=g.attributes.position,foam=g.attributes.foam;
- mesh.visible=!underwater&&trail.length>1;if(!mesh.visible)return;
- let n=0;
- for(let i=0;i<trail.length;i++){
-  const p=trail[i],age=Math.max(0,s.time-p.time),a=p.heading*Math.PI/180;
-  const spread=p.width*(.8+age*.17),fade=Math.max(0,1-age/26);
-  for(const side of [-1,1])for(const f of [.48,1,1.4]){
-   const offset=side*spread*f,x=p.x+Math.cos(a)*offset,y=p.y-Math.sin(a)*offset;
-   points.setXYZ(n,x,surfaceHeight(x,y,s.time,e)+.105,-y);
-   foam.setX(n++,f===1&&(!i||p.time-trail[i-1].time<2)&&(!trail[i+1]||trail[i+1].time-p.time<2)?Math.sqrt(p.strength)*fade*.9:0);
-  }
- }
- g.setDrawRange(0,(trail.length-1)*24);points.needsUpdate=foam.needsUpdate=true;
+ const g=mesh.geometry,count=underwater?0:mesh.userData.ribbons.update(s,e);
+ g.setDrawRange(0,count);mesh.visible=count>0;
+ if(!mesh.visible)return;
+ g.index.needsUpdate=g.attributes.position.needsUpdate=g.attributes.foam.needsUpdate=true;
  mesh.material.uniforms.light.value=.12+.83*e.daylight+.2*e.moonLight;
 }
 export class Atmosphere{

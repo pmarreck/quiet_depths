@@ -223,3 +223,69 @@ test('the humpback stroke travels through its visible torso before reaching the 
  assert.notEqual(peak(1),peak(3),'maximum flex should travel down the torso');
  const sample=shape(3.5);assert.deepEqual(shape(3.5),sample);shape(7);assert.deepEqual(shape(3.5),sample);
 });
+
+test('the rendered wake meets at the leading waterline and opens on both sides of the traveled course',async()=>{
+ const {recordWake}=await import('../src/surface-wake.js');
+ const {createSubmarine}=await import('../src/submarine-model.js');
+ const {boatSurfacePose}=await import('../src/environment.js');
+ const {applyScopePose}=await import('../src/periscope.js');
+ const model=createSubmarine(THREE),atmosphere=new Atmosphere(new THREE.Scene()),camera=new THREE.PerspectiveCamera();
+ for(const [heading,speed,depth,pitch=0] of [[0,18,0],[79,18,0],[226,-8,0],[137,16,0,.23],[95,9,1,-.12],[300,8,9],[45,8,16]]){
+  const s=createGame('recon',171);Object.assign(s,{heading,pitch,speed,depth,scope:true,wake:[]});
+  const sea={...environmentAt(s),waveScale:0},a=heading*Math.PI/180;
+  const along=new THREE.Vector3(Math.sin(a),0,-Math.cos(a)).multiplyScalar(Math.sign(speed));
+  const across=new THREE.Vector3(-along.z,0,along.x);
+  const place=t=>{s.time=t;s.x=along.x*t*Math.abs(speed)*.514444;s.y=-along.z*t*Math.abs(speed)*.514444;};
+  for(let t=0;t<=20;t++){place(t);recordWake(s,sea);}
+  place(20.875); // Between stored samples, the foam still meets the moving bow.
+  atmosphere.update(s,sea,camera,false,s.time);
+  const pose=boatSurfacePose(s,sea);
+  model.position.set(s.x,-pose.depth,-s.y);model.rotation.set(pose.pitch,-a,pose.roll,'YXZ');
+  applyScopePose(model.userData.mast,s);model.updateMatrixWorld(true);
+  const center=new THREE.Vector3(s.x,0,-s.y),ray=new THREE.Raycaster(center.clone().addScaledVector(along,60),along.clone().negate());
+  const hit=ray.intersectObject(model,true)[0];assert.ok(hit,'fixture cuts an exposed mesh');
+  const tip=hit.point.clone().sub(center).dot(along);
+  const g=atmosphere.wake.geometry,points=g.attributes.position,foam=g.attributes.foam;
+  const rows=[];
+  for(const id of new Set(g.index.array.slice(0,g.drawRange.count))){
+   if(foam.getX(id)<.01)continue;
+   const v=new THREE.Vector3().fromBufferAttribute(points,id).sub(center);
+   rows.push({aft:tip-v.dot(along),side:v.dot(across)});
+  }
+  const nearest=Math.min(...rows.map(p=>p.aft));
+  assert.ok(Math.abs(nearest)<.85,'waterline offset '+nearest+' at speed '+speed+', depth '+depth);
+  assert.ok(rows.filter(p=>p.aft<nearest+.01).every(p=>Math.abs(p.side)<.35),'both arms meet at the tip');
+  const widthAt=f=>Math.max(...rows.filter(p=>Math.abs(p.aft-f)<Math.abs(speed)*.514444*.6).map(p=>Math.abs(p.side)));
+  const distance=Math.abs(speed)*.514444;
+  const near=widthAt(distance*3),far=widthAt(distance*12);
+  assert.ok(near>0&&far>near+distance*1.6,'a visible V opening along the track');
+  assert.ok(rows.some(p=>p.side>far*.9)&&rows.some(p=>p.side< -far*.9));
+ }
+});
+
+test('surface foam keeps its original heading through a turn and leaves a gap across a dive',async()=>{
+ const {recordWake}=await import('../src/surface-wake.js');
+ const s=createGame('recon',171),atmosphere=new Atmosphere(new THREE.Scene()),camera=new THREE.PerspectiveCamera();
+ Object.assign(s,{x:0,y:0,heading:0,pitch:0,speed:12,depth:0,scope:false});
+ const sea={...environmentAt(s),waveScale:0};
+ const tick=()=>{s.time++;recordWake(s,sea);};
+ for(let i=0;i<4;i++){s.y+=6;tick();}
+ s.heading=75;s.x+=6;tick();
+ s.depth=40;
+ for(let i=0;i<7;i++){s.x+=6;tick();}
+ s.depth=0;s.heading=90;
+ for(let i=0;i<4;i++){s.x+=6;tick();}
+ const history=structuredClone(s.wake);
+ const draw=()=>{atmosphere.update(s,sea,camera,false,s.time);return atmosphere.wake.geometry;};
+ const g=draw(),pos=g.attributes.position,indices=g.index.array.slice(0,g.drawRange.count);
+ const first=s.wake[0],oldZ=-first.y;
+ const old=Array.from(new Set(indices)).filter(i=>Math.abs(pos.getZ(i)-oldZ)<.01);
+ assert.ok(old.some(i=>pos.getX(i)<-10)&&old.some(i=>pos.getX(i)>10),'old foam still spreads either side of the original northbound track');
+ for(let i=0;i<indices.length;i+=3){
+  const xs=[pos.getX(indices[i]),pos.getX(indices[i+1]),pos.getX(indices[i+2])];
+  assert.ok(!(Math.min(...xs)<45&&Math.max(...xs)>70),'no foam triangle bridges the dive');
+ }
+ s.speed=0;s.depth=50;s.time+=27;
+ assert.equal(draw().drawRange.count,0);
+ assert.deepEqual(s.wake,history,'drawing or rewinding does not change saved crossings');
+});
