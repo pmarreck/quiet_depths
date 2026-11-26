@@ -178,3 +178,11 @@ test('loss effects cover every station and remain absent for a successful extrac
  for(const station of ['scope','sonar','chart','drone','tower','gun','photos']){const e=loss.lossPresentation({status:'lost',depth:100},2,station);assert.equal(e.active,true);assert.ok(e.red>0);assert.equal(e.cracks,true);assert.ok(e.bubbles>0);}
  for(const status of ['patrol','won','expired','compromised'])assert.equal(loss.lossPresentation({status},2,'scope').active,false);
 });
+
+test('the desktop helm can grow to its orders and keeps station navigation pinned',async()=>{
+ const css=await readFile(new URL('../src/interface.css',import.meta.url),'utf8');
+ const desktop=css.match(/@media\s*\(min-width:\s*1101px\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/g)?.join('\n')??'';
+ assert.match(desktop,/\.helm\s*\{[^}]*\bheight:\s*auto\b/);
+ assert.match(desktop,/\.stations\s*\{[^}]*position:\s*sticky\b[^}]*\btop:\s*0\b/);
+ assert.match(css,/@container\s*\([^{}]+\)\s*\{\s*#speed-helm-presets\s+\.telegraph-buttons\s*\{[^}]*grid-template-columns:\s*repeat\(4\s*,/);
+});
