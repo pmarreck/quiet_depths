@@ -1,3 +1,4 @@
+import {scopeExtension} from './periscope.ts';
 import {boatLocal} from './surface-motion.ts';
 // The recorder owns only pictures of the renderable world. Neither playback
 // nor its camera can advance a patrol, expend ammunition or write a game save.
@@ -16,7 +17,7 @@ type World=Pose & {
   airSupport:object;environment:object;patrol:object;systems:object;gun:object;drone:Pose;
   site:(Pose & {kind:string})|null;operation:object|null;
   planes:number;rudder:number;cavitation:number;propRpm:number;propAngle:number;scopeAngle:number;
-  towerAngle:number;towerPitch:number;verticalSpeed:number;scope:boolean;
+  towerAngle:number;towerPitch:number;verticalSpeed:number;scope:boolean;scopeTravel?:number;
 };
 export type ReplayEvent={kind:'ground'|'collision'|'blast'|'torpedo'|'near-miss'|'collapse'|'sinking';
   point:Point; heading?:number; target?:string; shot?:number; enemy?:boolean};
@@ -27,7 +28,7 @@ const copies=<T extends object>(items:T[])=>items.map(item=>({...item}));
 function picture(s:World){
   return {time:s.time,wavePhase:s.wavePhase,wake:s.wake?.slice()??[],flood:s.flood,imploded:s.imploded,x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:s.speed,pitch:s.pitch,
     verticalSpeed:s.verticalSpeed,planes:s.planes,rudder:s.rudder,propRpm:s.propRpm,propAngle:s.propAngle,
-    scopeAngle:s.scopeAngle,towerAngle:s.towerAngle,towerPitch:s.towerPitch,scope:s.scope,cavitation:s.cavitation,
+    scopeAngle:s.scopeAngle,towerAngle:s.towerAngle,towerPitch:s.towerPitch,scope:s.scope,scopeTravel:scopeExtension(s),cavitation:s.cavitation,
     mission:s.mission,environment:s.environment,patrol:s.patrol,difficulty:s.difficulty,systems:{...s.systems},
     drone:{...s.drone},gun:{...s.gun},site:s.site?{...s.site}:null,operation:s.operation?{...s.operation}:null,airSupport:{...s.airSupport},
     ships:copies(s.ships),aircraft:copies(s.aircraft),projectiles:s.projectiles.map(p=>({...p,path:p.path.slice(-32)})),
@@ -102,7 +103,7 @@ const blend=(a:number,b:number,f:number)=>a+(b-a)*f;
 function tween<T extends {x:number;y:number}>(a:T,b:T|undefined,f:number):T{
   if(!b)return a;
   const out={...a,x:blend(a.x,b.x,f),y:blend(a.y,b.y,f)};
-  for(const key of ['wavePhase','depth','pitch','altitude','age','sinkDepth','propAngle','pingAge','bank'] as const){
+  for(const key of ['wavePhase','scopeTravel','depth','pitch','altitude','age','sinkDepth','propAngle','pingAge','bank'] as const){
     const left=Reflect.get(a,key),right=Reflect.get(b,key);
     if(typeof left==='number'&&typeof right==='number')Reflect.set(out,key,blend(left,right,f));
   }

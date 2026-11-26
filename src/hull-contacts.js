@@ -1,3 +1,4 @@
+import {scopeExtension} from './periscope.js';
 import {replayEvent} from './instant-replay.js';
 import {carrierSize,incidentalHull} from './carrier.js';
 import {damagePart} from './equipment.js';
@@ -107,8 +108,8 @@ export function resolveTraffic(s,hurt){
  if(s.site)resolvePair(s,s,s.site,hurt);
  for(let i=0;i<ships.length;i++){
   const ship=ships[i];
-  if(ship.kind!=='sub'&&s.scope&&s.depth<=15&&distance(s,ship)<48&&s.systems.periscope>0){
-   damagePart(s.systems,s.repairLimits,'periscope',100);s.scope=false;log(s,'Periscope sheared away under a vessel.','damage');
+  if(ship.kind!=='sub'&&scopeExtension(s)>0&&s.depth<=15&&distance(s,ship)<48&&s.systems.periscope>0){
+   damagePart(s.systems,s.repairLimits,'periscope',100);s.scope=false;delete s.scopeTravel;log(s,'Periscope sheared away under a vessel.','damage');
   }
   resolvePair(s,s,ship,hurt);
   if(s.site)resolvePair(s,ship,s.site,hurt);

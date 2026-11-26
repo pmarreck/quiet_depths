@@ -1,3 +1,4 @@
+import {scopeExtension} from './periscope.js';
 import {canAttackPlayer,playerSignal} from './cold-watch.js';
 import {recordLocalLaunch} from './mess-watch.js';
 import {isOpponent} from './fleet-action.js';
@@ -379,7 +380,7 @@ function updateAircraft(s,dt){
    continue;
   }
   let report=support.lastKnown;
-  if(report){const d=distance(p,s),sensitivity=s.difficulty?.detection??1,visible=s.depth<=2&&d<Math.min(2600,e.subVisualRange)*sensitivity||s.scope&&s.depth<=15&&d<400*sensitivity;
+  if(report){const d=distance(p,s),sensitivity=s.difficulty?.detection??1,visible=s.depth<=2&&d<Math.min(2600,e.subVisualRange)*sensitivity||s.depth<=15&&s.systems.periscope>0&&d<400*sensitivity*scopeExtension(s);
    if(visible){support.lastKnown=playerReport(s);report=support.lastKnown;}
    const target=projectedReport(report,s.time),r=distance(p,target);
    if(p.phase==='takeoff'&&s.time>=p.takeoffUntil)p.phase='approach';

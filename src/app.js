@@ -1,3 +1,4 @@
+import {orderScope} from './periscope.js';
 import {stationLamp} from './convoy-watch.js';
 import {bindTwoFinger} from './view-gestures.js';
 import {ImagerPaper,ImagerDisplay,instruments,transmissionNotice} from './sonar-imager.js';
@@ -402,7 +403,7 @@ all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI()
 all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
 $('open-orbit').onclick=changeOrbit;$('orbit-exit').onclick=changeOrbit;$('orbit-pause').onclick=()=>setPaused(!paused);
 $('orbit-in').onclick=()=>zoomOrbit(1/1.2);$('orbit-out').onclick=()=>zoomOrbit(1.2);
-function scopeToggle(){if(!canIssue(state,context())||!operatingFraction(state.systems.periscope))return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}state.scope=!state.scope;if(!state.scope)scene?.clear();updateUI();}
+function scopeToggle(){if(!canIssue(state,context())||!operatingFraction(state.systems.periscope))return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}orderScope(state,!state.scope);if(!state.scope)scene?.clear();updateUI();}
 function takePhoto(){
  if(!canIssue(state,context())||state.photoCooldown>0)return;
  if(view==='drone'&&feedActive(state,'drone')){if(state.mission==='survey'){const result=dronePhotograph(state);toast(result.text);}state.photoCooldown=4;expose({source:'drone',takenAt:state.time,bearing:state.drone.heading,depth:state.drone.depth,caption:state.mission==='survey'?'ROV survey exposure':'ROV camera exposure',seed:state.patrol.seed,mission:state.mission});sound.tone('photo');updateUI();return;}

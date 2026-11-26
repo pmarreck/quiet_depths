@@ -1,3 +1,4 @@
+import {scopeEyeHeight} from './periscope.js';
 import {surfaceMotion,wavePhaseAt,surfaceHeight,WAVE_COMPONENTS,hash01,boatPoint} from './surface-motion.js';
 import {SUB_DESIGN as D} from './hull-design.js';
 export {wavePhaseAt,surfaceHeight,WAVE_COMPONENTS,hash01};
@@ -61,9 +62,11 @@ export function waterColumnLight(depth,e){
 export const SEA_GLSL='float sea(vec2 p){return waveScale*('+WAVE_COMPONENTS.map(w=>`sin(p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+wavePhase*${w.omega.toFixed(3)})*${w.amplitude.toFixed(3)}`).join('+')+');}';
 export const SEA_SAMPLE_GLSL='vec3 seaSample(vec2 p){vec3 s=vec3(0.);'+WAVE_COMPONENTS.map((w,i)=>`float phase${i}=p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+wavePhase*${w.omega.toFixed(3)};s+=${w.amplitude.toFixed(3)}*vec3(sin(phase${i}),cos(phase${i})*${w.kx.toFixed(3)},cos(phase${i})*${w.ky.toFixed(3)});`).join('')+'return s*waveScale;}';
 export function boatSurfacePose(s,e=environmentAt(s),time=s.time){return surfaceMotion(s,e,time);}
-export function scopePosition(pose){return boatPoint(pose,{forward:-D.scopeZ,down:-D.scopeEye});}
+export function scopePosition(pose,s={scope:true}){
+ return boatPoint(pose,{forward:-D.scopeZ,down:-scopeEyeHeight(s)});
+}
 export function scopeWashed(s,e=environmentAt(s)){
- const eye=scopePosition(boatSurfacePose(s,e));
+ const eye=scopePosition(boatSurfacePose(s,e),s);
  return -eye.depth<=surfaceHeight(eye.x,eye.y,s.time,e)+.15;
 }
 export function soundings(waterDepth,referenceDepth,keelOffset=5){return{waterDepth,referenceDepth,belowKeel:waterDepth-referenceDepth-keelOffset,keelOffset};}

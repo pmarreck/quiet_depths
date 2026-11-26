@@ -1,3 +1,4 @@
+import {scopeEyeHeight,scopeExtension} from './periscope.ts';
 import {boatPoint,surfaceHeight,surfaceMotion} from './surface-motion.ts';
 import {SUB_DESIGN as D} from './hull-design.ts';
 type Sea=Parameters<typeof surfaceMotion>[1];
@@ -19,6 +20,6 @@ export function recordWake(s:Boat,sea:Sea){
  }
  exposed(s.speed>=0?-21:21,4.5,4.5);exposed(s.speed>=0?21:-21,4.5,4.5);exposed(0,5,5);
  exposed(-D.bridgeZ,D.bridgeEye,1.4);
- if(s.scope)exposed(-D.scopeZ,D.scopeEye,.32);
+ if(scopeExtension(s)>0)exposed(-D.scopeZ,scopeEyeHeight(s),.32);
  if(width>0)s.wake.push({...origin,heading:s.heading,time:s.time,width:width*(.3+.7*Math.min(1,speed/12)),strength:Math.min(1,speed/10)*Math.sqrt(width/5)});
 }

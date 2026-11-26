@@ -1,3 +1,4 @@
+import {orderScope,advanceScope} from './periscope.js';
 import {energyDraw,propulsion,throttlePercent,batteryOutput} from './power-plant.js';
 import {addDebrief} from './debrief.js';
 import {replayEvent} from './instant-replay.js';
@@ -60,7 +61,10 @@ export function damageSystem(s,key,amount){
   if(s.fuel>0){s.fuelLeak=Math.min(1,s.fuelLeak+(old-health)/100);log(s,'Fuel tank leaking. Assign damage control.','damage');}
  }
  if(key==='batteryBank')s.battery=Math.min(s.battery,health);
- if(key==='periscope'&&!operatingFraction(health))s.scope=false;
+ if(key==='periscope'&&!operatingFraction(health)){
+  orderScope(s,false);
+  if(health===0)delete s.scopeTravel;
+ }
  if(old>0&&health===0)log(s,SYSTEM_NAMES[key]+' destroyed. Beyond onboard repair.','damage');
  else if(old>=20&&health<20&&key!=='crew')log(s,SYSTEM_NAMES[key]+' offline.','damage');
  else if(old>=60&&health<60)log(s,SYSTEM_NAMES[key]+' damaged. Performance reduced.','damage');
@@ -161,7 +165,8 @@ export function updateBoat(s,dt){
   if(s.fuel===0||s.time-s.unpoweredSince>=120){s.status='expired';log(s,'Ship’s power exhausted. Command recalled the patrol.','damage');return false;}
  }else if(s.unpoweredSince!==undefined)delete s.unpoweredSince;
  if(s.depth<2)s.oxygen=clamp(s.oxygen+dt*.45,0,100);
- if(s.depth>15||!operatingFraction(s.systems.periscope))s.scope=false;
+ if(s.depth>15||!operatingFraction(s.systems.periscope))orderScope(s,false);
+ advanceScope(s,dt);
  const floor=keelLimit(s,s.environment.chartSeed);
  if(s.depth>floor){s.depth=Math.max(0,floor);if(floor<0)pushOffShoal(s,-floor,s.environment.chartSeed);if(s.time-(s.collisionHits.ground??-99)>4){replayEvent(s,{kind:'ground',point:{x:s.x,y:s.y,depth:s.depth}});hurt(s,2+Math.abs(s.speed)+Math.abs(s.verticalSpeed)*2,'Seafloor contact. Rise now.','planes');s.collisionHits.ground=s.time;}s.verticalSpeed=Math.min(0,s.verticalSpeed);s.speed*=Math.exp(-dt*1.5);}
  updatePressure(s,dt);if(s.status==='lost')return diesel;

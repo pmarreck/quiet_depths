@@ -197,3 +197,18 @@ test('an alert cuts off playing mess voices and scheduled clinks without stoppin
  assert.equal(voice.stopped,'now');assert.equal(clink.stopped,'now');assert.equal(crew.routineSources.size,0);
  assert.equal(sources.length,4);for(const urgent of sources.slice(2))assert.equal(urgent.stopped,undefined);
 });
+
+test('lowering the periscope reduces visual suspicion while a surfaced hull remains visible',async()=>{
+ const {updateHostileTrack}=await import('../src/hostile-tracks.js');
+ function observe(depth,scope,noise=0){
+  const s=createGame('recon',12);Object.assign(s,{depth,scope,noise});
+  const observer={kind:'escort',depth:0,x:s.x+500,y:s.y,alert:0};
+  updateHostileTrack(s,observer,{subVisualRange:2000,storm:0},1);
+  return observer;
+ }
+ assert.equal(observe(12,true).report.reason,'raised periscope');
+ assert.equal(observe(12,false).report,undefined);
+ assert.equal(observe(0,false).report.reason,'surfaced hull');
+ assert.ok(observe(0,false).alert<observe(0,true).alert);
+ assert.equal(observe(12,false,50).report.reason,'propulsion noise');
+});

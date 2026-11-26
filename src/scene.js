@@ -1,3 +1,4 @@
+import {applyScopePose} from './periscope.js';
 import {stationLamp} from './convoy-watch.js';
 import {lampLit,lampRange} from './signal-lamp.js';
 import {surfaceShip} from './surface-ship.js';
@@ -276,7 +277,7 @@ export class OceanScene{
     this.own.localToWorld(this.camera.position.set(0,6,-16));
     yaw=s.gun.angle;pitch=rad(s.gun.elevation);this.camera.fov=55/zoom;
    }else{
-    const eye=scopePosition(hull);this.camera.position.set(eye.x,-eye.depth,-eye.y);
+    const eye=scopePosition(hull,s);this.camera.position.set(eye.x,-eye.depth,-eye.y);
     yaw=s.scopeAngle;pitch=0;this.camera.fov=38/zoom;
    }
    this.camera.rotation.set(pitch,-rad(yaw),0,'YXZ');
@@ -379,7 +380,9 @@ export class OceanScene{
    for(const attribute of Object.values(this.spray.geometry.attributes))attribute.needsUpdate=true;
    this.spray.material.uniforms.brightness.value=.2+.8*e.daylight+e.flash;
   }
-  this.own.userData.foreplanes.rotation.x=-s.planes;this.own.userData.aftplanes.rotation.x=s.planes;this.own.userData.rudder.rotation.y=s.rudder*.5;this.own.userData.mast.visible=s.systems.periscope>0;this.own.userData.gun.visible=!gun;this.own.userData.gun.rotation.y=-rad(s.gun.angle);this.own.userData.gunElevation.rotation.x=rad(s.gun.elevation);
+  this.own.userData.foreplanes.rotation.x=-s.planes;this.own.userData.aftplanes.rotation.x=s.planes;this.own.userData.rudder.rotation.y=s.rudder*.5;
+  applyScopePose(this.own.userData.mast,s);
+  this.own.userData.gun.visible=!gun;this.own.userData.gun.rotation.y=-rad(s.gun.angle);this.own.userData.gunElevation.rotation.x=rad(s.gun.elevation);
   this.updateTubeDoors(this.own,s.projectiles,null);
   this.own.userData.rescueHatch.rotation.z=s.mission==='undersea-rescue'&&s.operation?.active?1.1:0;
   this.bubbles.visible=s.cavitation>.01;this.bubbleUniforms.strength.value=s.cavitation;

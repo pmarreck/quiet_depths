@@ -1,3 +1,4 @@
+import {scopeExtension} from './periscope.js';
 import {searchSeconds} from './suspicion.js';
 import {bearing,clamp,delta,distance,log,rad,rand} from './mechanics.js';
 import {emitSound} from './acoustics.js';
@@ -26,7 +27,9 @@ export function scatterAim(s,target,radius){
 }
 
 export function updateHostileTrack(s,ship,env,dt){
- const range=distance(s,ship),exposure=s.depth<3?95:s.scope&&s.depth<=15?23:0;
+ const range=distance(s,ship);
+ const mast=s.depth<=15&&s.systems.periscope>0?scopeExtension(s):0;
+ const exposure=s.depth<3?90+5*mast:23*mast;
  const visual=ship.kind==='sub'&&ship.depth>15?0:clamp(1-range/env.subVisualRange,0,1)*exposure;
  const depthStealth=s.difficulty?.depthStealth??1;
  const noise=s.noise*(1-.45*depthStealth*clamp(s.depth/120,0,1));

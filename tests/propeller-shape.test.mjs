@@ -121,3 +121,25 @@ test('the deployed inspection vehicle has a camera, lights and a cable seated in
   assert.ok(anchor.distanceTo(new THREE.Vector3(p.x,-p.depth,-p.y))<1e-7);
  }
 });
+
+test('the external scope travels into the sail, reverses in place and survives a mid-travel save',async()=>{
+ const {orderScope,applyScopePose}=await import('../src/periscope.js');
+ const {step,save,restore}=await import('../src/sim.js');
+ const {SUB_DESIGN}=await import('../src/hull-design.js');
+ const sub=createGame('recon',24),model=createSubmarine(THREE);
+ Object.assign(sub,{scope:true,depth:12,targetDepth:12,speed:0,targetSpeed:0});
+ const {mast,fixedMasts}=model.userData;
+ const fixedBox=new THREE.Box3().setFromObject(fixedMasts);
+ const tip=s=>{applyScopePose(mast,s);return new THREE.Box3().setFromObject(mast).max.y;};
+ const raised=tip(sub);
+ orderScope(sub,false);step(sub,.75);
+ const lowering=tip(sub);assert.ok(lowering<raised&&lowering>SUB_DESIGN.bridgeRoof);
+ const restored=restore(save(sub));assert.ok(restored);assert.equal(tip(restored),lowering);
+ orderScope(restored,true);assert.equal(tip(restored),lowering);
+ step(restored,.25);assert.ok(tip(restored)>lowering);
+ step(sub,5);assert.ok(tip(sub)<=SUB_DESIGN.bridgeRoof);assert.equal(mast.visible,false);
+ orderScope(sub,true);step(sub,5);assert.equal(tip(sub),raised);assert.equal(mast.visible,true);
+ assert.deepEqual(new THREE.Box3().setFromObject(fixedMasts),fixedBox);
+ sub.systems.periscope=0;tip(sub);assert.equal(mast.visible,false);
+ assert.equal(restore(save({...sub,scopeTravel:1.1})),null);
+});

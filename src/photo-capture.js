@@ -1,3 +1,4 @@
+import {applyScopePose} from './periscope.js';
 import {lensFilter} from './instrument-damage.js';
 import {operatingFraction} from './equipment.js';
 import {WEATHER,surfaceHeight} from './environment.js';
@@ -86,7 +87,7 @@ export function captureSlotPortrait(o,s){
  try{
   world.background=new T.Color(s.depth<5?0x375d68:0x183c4b);
   boat.rotation.x=s.pitch;
-  boat.userData.mast.visible=s.systems.periscope>0;
+  applyScopePose(boat.userData.mast,s);
   boat.userData.gun.rotation.y=-s.gun.angle*Math.PI/180;
   boat.userData.foreplanes.rotation.x=-s.planes;boat.userData.aftplanes.rotation.x=s.planes;
   const sun=new T.DirectionalLight(0xffe8bf,3.2);sun.position.set(28,50,-36);
