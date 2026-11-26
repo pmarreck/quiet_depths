@@ -174,3 +174,61 @@ test('a transport can suspect a nearby transmission and then forget it without b
  step(s,41);assert.equal(ship.clue,undefined);assert.equal(ship.heading,heading);
  assert.equal(s.alert,0);
 });
+
+test('all stop holds the Scribbler at the exact pixel and astern movement resumes it',()=>{
+ const s={...world(),speed:4},paper=new ImagerPaper('scribbler','survey',plates);
+ paper.advance(s,.25,1);
+ const before={x:paper.x,lines:paper.completedLines,pixels:paper.pixels.slice()};
+ s.speed=0;s.time+=60;paper.advance(s,60,1);
+ assert.equal(paper.completedLines,before.lines);assert.equal(paper.x,before.x);assert.deepEqual(paper.pixels,before.pixels);
+ s.speed=-4;s.time++;paper.advance(s,1,1);assert.ok(paper.completedLines>before.lines);
+});
+
+test('a patrol keeps a running Scribbler transmitting at other stations and at all stop',()=>{
+ const s=createGame('survey',33);s.ships=[];s.speed=s.targetSpeed=0;s.imagers.scribbler='detail';
+ step(s,6,{observation:'tower'});assert.equal(s.imagingTime,6);
+ assert.ok(patrolNotices(s,false,false,'chart').some(n=>n.id==='sonar-transmission'));
+ const r=restore(save(s));assert.equal(r.imagers.scribbler,'detail');step(r,3,{paused:true});assert.equal(r.imagingTime,6);
+ r.systems.sonar=0;step(r,1);assert.equal(r.imagers.scribbler,'detail');assert.equal(r.imagingTime,6);
+ assert.match(patrolNotices(r,false,false,'chart').find(n=>n.id==='sonar-transmission').text,/offline/);
+ r.systems.sonar=100;step(r,1);assert.equal(r.imagingTime,7);
+ r.imagers.scribbler=null;step(r,1);assert.equal(r.imagingTime,7);
+ assert.ok(!patrolNotices(r,false,false,'chart').some(n=>n.id==='sonar-transmission'));
+});
+
+test('browsing fixes the archived row and timestamp while live paper crosses chunk boundaries',()=>{
+ const s={...world(),speed:4},p=new ImagerPaper('scribbler','survey',plates),dt=1/p.rows;
+ const advance=n=>{for(let i=0;i<n;i++){s.time+=dt;s.y+=2;p.advance(s,dt,1);}};
+ advance(150);
+ const reference=p.visibleRow(15).slice(),timestamp=p.recordedAt(135);
+ p.scrollRows(15);assert.ok(p.browsing);assert.equal(p.topLine,135);assert.deepEqual(p.visibleRow(0),reference);
+ advance(150);assert.equal(p.topLine,135);assert.equal(p.recordedAt(p.topLine),timestamp);assert.deepEqual(p.visibleRow(0),reference);
+ assert.ok(Math.abs(timestamp-136*dt)<.001);
+ p.scrollRows(1000);assert.equal(p.topLine,p.height-1);assert.ok(p.visibleRow(p.height-1).some(Boolean));
+ p.showLive();assert.equal(p.topLine,300);assert.ok(!p.browsing);
+ s.speed=0;s.time+=90;p.advance(s,90,1);assert.equal(p.topLine,300);
+ s.speed=4;advance(1);assert.ok(p.recordedAt(300)-p.recordedAt(299)>90);
+ p.scrollRows(8);p.clear();assert.ok(!p.browsing);assert.equal(p.completedLines,0);assert.equal(p.recordedAt(0),undefined);assert.ok(p.pixels.every(v=>v===0));
+ advance(1);assert.equal(p.completedLines,1);assert.ok(p.recordedAt(0)>s.time-1);
+});
+
+test('Painter and Scribbler switches are independent, survive saves, and reset for a new patrol',()=>{
+ const s=createGame('survey',4);s.ships=[];s.imagers={scribbler:'survey',painter:'detail'};
+ step(s,5);assert.match(patrolNotices(s,false,false,'orbit').find(n=>n.id==='sonar-transmission').text,/Scribbler \+ Painter transmitting/);
+ const r=restore(save(s));assert.deepEqual(r.imagers,s.imagers);r.imagers.painter=null;step(r,1);assert.equal(r.imagingTime,6);
+ r.imagers.scribbler=null;step(r,1);assert.equal(r.imagingTime,6);
+ const legacy=structuredClone(s);delete legacy.imagers;
+ assert.deepEqual(restore(save(legacy)).imagers,createGame('survey',4).imagers);
+ s.imagers.painter='bad';assert.equal(restore(save(s)),null);
+});
+
+test('two fingers distinguish a parallel scroll from an off-center pinch',async()=>{
+ const {TwoFingerMotion}=await import('../src/view-gestures.js');
+ const finger=(x,y)=>({clientX:x,clientY:y});
+ const scroll=new TwoFingerMotion(finger(0,30),finger(100,30));
+ assert.equal(scroll.move(finger(0,32),finger(100,32)),null);
+ const up=scroll.move(finger(0,10),finger(100,10));assert.equal(up.kind,'scroll');assert.equal(up.scroll,20);assert.ok(up.factor>1);
+ const down=scroll.move(finger(0,30),finger(100,30));assert.ok(Math.abs(down.factor*up.factor-1)<1e-8);
+ const pinch=new TwoFingerMotion(finger(0,0),finger(0,100));
+ const spread=pinch.move(finger(0,0),finger(0,125));assert.equal(spread.kind,'pinch');assert.equal(spread.factor,1.25);
+});

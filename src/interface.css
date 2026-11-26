@@ -75,3 +75,11 @@ body[data-station=sonar] .view-top,body[data-station=sonar] .view-bottom{display
 @media(max-height:500px){
  .sonar-tabs button{min-height:30px}
 }
+
+#imager-transmit,#imager-clear,#imager-live{
+ border:1px solid var(--button-edge);border-radius:3px;background:var(--button-face);
+ box-shadow:var(--button-bevel);padding-inline:10px;white-space:nowrap
+}
+#imager-transmit[aria-pressed=true]{border-color:var(--gold);background:#394035;color:var(--gold)}
+#orbit-transmission{position:absolute;right:0;bottom:calc(100% + 5px);width:max-content;max-width:80vw;background:#14242de6;color:var(--gold);padding:4px 7px;font:12px var(--mono)}
+body:is([data-station=scope],[data-station=tower],[data-station=gun],[data-station=sonar],[data-station=chart]) .viewport{touch-action:none}

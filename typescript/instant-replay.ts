@@ -168,6 +168,7 @@ export class ReplayPlayback {
     return this.cursor<=this.clip.event.time+aftermath;
   }
   camera(){return replayCamera(this.world,this.clip.event,this.rotation);}
+  resetPointers(){this.points.clear();}
   press(id:number,x:number,y:number){this.points.set(id,{x,y});}
   release(id:number){this.points.delete(id);}
   zoomBy(factor:number){this.rotation.zoom=Math.max(.45,Math.min(2.4,this.rotation.zoom*factor));}

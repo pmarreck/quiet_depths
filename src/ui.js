@@ -1,3 +1,5 @@
+import {transmissionNotice} from './sonar-imager.js';
+import {operatingFraction} from './equipment.js';
 import {bottomCall,batteryCall} from './watch-warnings.js';
 import {suspicionLabel} from './suspicion.js';
 import {DAY_SECONDS,environmentAt} from './environment.js';
@@ -18,6 +20,8 @@ export function patrolNotices(s,opticalActive,soundOn,view,rate=1,paused=false){
  if(s.watchWarnings?.bottom)notices.push({id:'bottom-clearance',text:bottomCall,critical:true});
  const battery=s.watchWarnings?.battery;
  if(battery)notices.push({id:'battery-reserve',text:batteryCall(battery),critical:battery===2});
+ const sonar=transmissionNotice(s.imagers,operatingFraction(s.systems.sonar)>0);
+ if(sonar)notices.push({id:'sonar-transmission',text:sonar});
  if(s.fuelFire>0)notices.push({id:'fuel-fire',text:'Fuel fire · Assign damage control',critical:true});
  if(s.fuelLeak>0)notices.push({id:'fuel-leak',text:'Fuel tank leaking · Assign damage control'});
  if(s.flood>0)notices.push({id:'flood',text:'Taking on water'});

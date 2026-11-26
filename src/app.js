@@ -1,5 +1,6 @@
 import {stationLamp} from './convoy-watch.js';
-import {ImagerPaper,ImagerDisplay} from './sonar-imager.js';
+import {bindTwoFinger} from './view-gestures.js';
+import {ImagerPaper,ImagerDisplay,instruments,transmissionNotice} from './sonar-imager.js';
 import {wreckPlates} from './wreck-plates.js';
 import {suspicionLabel} from './suspicion.js';
 import {copyPercent,matchingBearing,reportRadius} from './signal-lamp.js';
@@ -49,12 +50,13 @@ let difficulty=patrolDifficulty();
 try{difficulty=patrolDifficulty(JSON.parse(localStorage.getItem('quiet-depths-difficulty-v1')));}catch{}
 let previousView='scope';
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
-let instrument='bearings',transmitting=false,imagerProfile='survey',paperPatrol=null;
+let instrument='bearings',paperPatrol=null;
+const selectedProfiles={scribbler:'survey',painter:'survey'};
 const imagerPapers=new Map(),imagerDisplay=new ImagerDisplay();
-function currentPaper(){
+function currentPaper(mode=instrument,profile=selectedProfiles[mode]){
  if(paperPatrol!==state){imagerPapers.clear();paperPatrol=state;}
- const key=instrument+'-'+imagerProfile;
- if(!imagerPapers.has(key))imagerPapers.set(key,new ImagerPaper(instrument,imagerProfile,wreckPlates));
+ const key=mode+'-'+profile;
+ if(!imagerPapers.has(key))imagerPapers.set(key,new ImagerPaper(mode,profile,wreckPlates));
  return imagerPapers.get(key);
 }
 let sonarRange=SONAR_RANGES.at(-1);
@@ -115,7 +117,7 @@ function bindOrderRange(id,axisForInput){
 function closeDrawer(){drawer=null;document.body.removeAttribute('data-drawer');$('drawer-backdrop').classList.add('hidden');all('[data-panel]').forEach(b=>b.setAttribute('aria-expanded','false'));}
 function setRate(r){rate=r;all('[data-time]').forEach(b=>b.classList.toggle('active',+b.dataset.time===r));$('mobile-time').textContent=r+'×';$('mobile-time').setAttribute('aria-label','Time compression '+r+' times');}
 function setPaused(p){paused=p;held.clear();drag=null;document.body.classList.toggle('paused',p);$('pause').setAttribute('aria-label',p?'Resume patrol':'Pause patrol');updateUI();sound.update();persist();}
-function setView(v){if(v==='drone'&&!state.difficulty.drone)return;zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';if(v!=='sonar')transmitting=false;view=v;document.body.classList.toggle('orbiting',v==='orbit');held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();sound.update();}
+function setView(v){if(v==='drone'&&!state.difficulty.drone)return;zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;document.body.classList.toggle('orbiting',v==='orbit');held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();sound.update();}
 function changeOrbit(){
  if(view==='orbit'){setView(previousView);$('open-orbit').focus();return;}
  if(!scene||!state.difficulty.orbitCamera||context().modal||!patrolStarted)return;
@@ -162,6 +164,7 @@ function start(setup=null,snapshot=null){
   newSeed();
  }
  if(state!==previousPatrol||!patrolStarted){
+  for(const mode of instruments)selectedProfiles[mode]=state.imagers[mode]??'survey';
   orbit=null;lossSoundPlayed=false;
   recorder=scene&&state.difficulty.instantReplay?new ReplayRecorder(state):null;
  }
@@ -190,7 +193,7 @@ $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const sonarPanel=globalThis.Elm.SonarTabs.init({node:$('sonar-tab-root')});
 sonarPanel.ports.chooseSonar.subscribe(value=>{
- if(value!==instrument){transmitting=false;instrument=value;}
+ instrument=value;
  updateUI();
 });
 const missionPicker=globalThis.Elm.MissionPicker.init({
@@ -314,6 +317,7 @@ $('center-chart').onclick=()=>{chart.follow=true;updateUI();};
  all('[data-key]').forEach(button=>{button.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!canIssue(state,context())||button.dataset.key!=='KeyJ'&&!pilotEnabled())return;button.setPointerCapture(e.pointerId);held.press('touch:'+e.pointerId,button.dataset.key);applyHelmKeys(state,context(),new Set([button.dataset.key]),.12);button.classList.add('held');updateUI();});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,e=>{held.release('touch:'+e.pointerId);button.classList.remove('held');});});
 const vp=$('viewport');let drag=null;
 const replayOverlay=$('replay-overlay');
+const replayGesture=bindTwoFinger(replayOverlay,()=>!!replay,()=>replay.resetPointers(),g=>replay.zoomBy(1/g.factor));
 function beginReplay(clip){
  replay=new ReplayPlayback(clip);returnFocus=document.activeElement;
  held.clear();drag=null;sound.update();persist();
@@ -332,7 +336,7 @@ function exitReplay(){
 $('replay-exit').onclick=exitReplay;
 for(const type of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture']){
  replayOverlay.addEventListener(type,e=>{
-  e.stopPropagation();if(!replay||e.target.closest('button'))return;
+  e.stopPropagation();if(!replay||replayGesture()||e.target.closest('button'))return;
   if(type==='pointerdown'){e.preventDefault();replayOverlay.setPointerCapture(e.pointerId);replay.press(e.pointerId,e.clientX,e.clientY);}
   else if(type==='pointermove')replay.move(e.pointerId,e.clientX,e.clientY);
   else replay.release(e.pointerId);
@@ -344,6 +348,25 @@ replayOverlay.addEventListener('wheel',e=>{
 
 let shaking=false;
 const isDragControl=target=>target.closest('button,input,select,.photo-card,.order-sheet');
+let sonarZoomDelta=0;
+function zoomStation(factor,x,y){
+ if(view==='orbit'){zoomOrbit(1/factor);return;}
+ if(view==='chart'){const r=vp.getBoundingClientRect();zoomChart(chart,factor,x-r.left,y-r.top,r.width,r.height,state);updateUI();return;}
+ if(view==='sonar'&&instrument==='bearings'){
+  sonarZoomDelta+=Math.log(factor);
+  const steps=Math.trunc(sonarZoomDelta/.17);
+  if(steps){const index=SONAR_RANGES.indexOf(sonarRange);sonarRange=SONAR_RANGES[clamp(index-steps,0,SONAR_RANGES.length-1)];sonarZoomDelta-=steps*.17;updateUI();}
+ }else if(['scope','tower','gun'].includes(view))changeZoom(factor);
+}
+function scrollPaper(pixels){
+ const paper=currentPaper(),height=vp.getBoundingClientRect().height;
+ paper.scrollRows(pixels*paper.height/Math.max(1,height-95));updateUI();
+}
+const viewGesture=bindTwoFinger(vp,()=>!replay&&(['scope','tower','gun','chart','orbit'].includes(view)||view==='sonar'&&instrument!=='painter'),
+ ()=>{drag=null;sonarZoomDelta=0;},g=>{
+  if(view==='sonar'&&instrument==='scribbler'){if(g.kind==='scroll')scrollPaper(g.scroll);}
+  else zoomStation(g.factor,g.x,g.y);
+ });
 const canSteerDrone=()=>scene&&pilotEnabled()&&canIssue(state,context());
 function beginViewDrag(pointer,x,y){drag={pointer,x,y,startX:x,startY:y,moved:false};}
 function steerFromDrag(x,y){
@@ -353,7 +376,7 @@ function steerFromDrag(x,y){
  drag.x=x;drag.y=y;drag.moved=true;
 }
 vp.addEventListener('pointerdown',e=>{
- if(drag||isDragControl(e.target))return;
+ if(viewGesture()||drag||isDragControl(e.target))return;
  if(view==='drone'){
   if(e.pointerType==='touch'||!compactLayout.matches||!canSteerDrone())return;
  }else if(!['chart','orbit'].includes(view)&&(!['scope','tower','gun'].includes(view)||!feedActive(state,view)||!canIssue(state,context())))return;
@@ -394,9 +417,13 @@ for(const event of ['touchend','touchcancel'])vp.addEventListener(event,e=>{
  if(drag&&Array.from(e.changedTouches).some(t=>`touch:${t.identifier}`===drag.pointer)){drag=null;updateUI();}
 });
 vp.addEventListener('wheel',e=>{
- if(view==='orbit'){e.preventDefault();zoomOrbit(Math.exp(e.deltaY*.001));return;}
- if(view==='chart'){e.preventDefault();const r=vp.getBoundingClientRect();zoomChart(chart,Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top,r.width,r.height,state);updateUI();}
- else if(['scope','tower','gun'].includes(view)&&feedActive(state,view)&&canIssue(state,context())){e.preventDefault();zoom=clamp(zoom*Math.exp(-e.deltaY*.002),1,opticalZoomLimit(view));updateUI();}
+ if(isDragControl(e.target))return;
+ const dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?vp.clientHeight:1);
+ if(view==='sonar'&&instrument==='scribbler'){e.preventDefault();scrollPaper(dy);return;}
+ if(['chart','orbit','scope','tower','gun'].includes(view)||view==='sonar'&&instrument==='bearings'){
+  e.preventDefault();const sensitivity=view==='orbit'?.001:view==='chart'?.0015:.002;
+  zoomStation(Math.exp(-dy*sensitivity),e.clientX,e.clientY);
+ }
 },{passive:false});
 function saveShortcuts(){missionPicker.ports.showPauseKey.send(keyLabel(bindings.Escape));try{localStorage.setItem('quiet-depths-shortcuts-v1',JSON.stringify(bindings));}catch{}}
 function rovKeyHint(){
@@ -639,11 +666,11 @@ function drawSonar(id,mini,time){
  const {ctx:c,w,h}=canvasContext(id);if(!w||!h)return;const layout=sonarLayout(w,h,mini),{cx,cy,radius:R}=layout,shortLabels=w<600||h<420;
  const scale=mini?SONAR_RANGES.at(-1):sonarRange;
  const health=state.systems.sonar;
- if(!operatingFraction(health)){c.fillStyle='#102321';c.fillRect(0,0,w,h);c.fillStyle='#db8075';c.font='14px IBM Plex Mono,monospace';c.textAlign='center';c.fillText(health===0?'ARRAY DESTROYED':'ARRAY OFFLINE · BELOW 20%',w/2,h/2);drawSonarGlass(c,w,h,health);return;}
  if(!mini&&instrument!=='bearings'){
-  imagerDisplay.draw(c,w,h,currentPaper(),transmitting);
+  imagerDisplay.draw(c,w,h,currentPaper(),!!state.imagers[instrument]&&operatingFraction(health)>0,state.time);
   drawSonarGlass(c,w,h,health);return;
  }
+ if(!operatingFraction(health)){c.fillStyle='#102321';c.fillRect(0,0,w,h);c.fillStyle='#db8075';c.font='14px IBM Plex Mono,monospace';c.textAlign='center';c.fillText(health===0?'ARRAY DESTROYED':'ARRAY OFFLINE · BELOW 20%',w/2,h/2);drawSonarGlass(c,w,h,health);return;}
  c.fillStyle=mini?'#102321':'#0e1f21';c.fillRect(0,0,w,h);const glow=c.createRadialGradient(cx,cy,0,cx,cy,R);glow.addColorStop(0,'#1c3930');glow.addColorStop(1,'#102320');c.fillStyle=glow;c.beginPath();c.arc(cx,cy,R,0,Math.PI*2);c.fill();
  c.lineWidth=.7;c.strokeStyle='#547c6050';for(let i=1;i<=4;i++){c.beginPath();c.arc(cx,cy,R*i/4,0,Math.PI*2);c.stroke();}for(let a=0;a<360;a+=30){c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.sin(rad(a))*R,cy-Math.cos(rad(a))*R);c.stroke();}
  c.fillStyle='#9cb794';c.font=(mini?'12':'14')+'px IBM Plex Mono, monospace';c.textAlign='center';for(let a=0;a<360;a+=30)c.fillText(deg(a),cx+Math.sin(rad(a))*(R+19),cy-Math.cos(rad(a))*(R+19)+4);
@@ -851,10 +878,13 @@ function frame(now){
  if(canIssue(state,ctx)){
   const previousWatch=state.watchWarnings,previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
   applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;const observation=['scope','gun','tower','drone'].includes(view)&&feedActive(state,view)?view:null;
-  const imaging=transmitting&&view==='sonar'&&instrument!=='bearings'&&operatingFraction(state.systems.sonar)>0?{mode:instrument,profile:imagerProfile}:null;
   let sampleTime=state.time;
-  step(state,realDt*rate,{timeRate:rate,imaging,lampInView:scene?.lampView===view?scene.lampSource:null,afterTick:s=>{
-   if(imaging){currentPaper().advance(s,s.time-sampleTime,operatingFraction(s.systems.sonar));sampleTime=s.time;}
+  step(state,realDt*rate,{timeRate:rate,lampInView:scene?.lampView===view?scene.lampSource:null,afterTick:s=>{
+   const quality=operatingFraction(s.systems.sonar);
+   if(quality>0)for(const mode of instruments){
+    const profile=s.imagers[mode];if(profile)currentPaper(mode,profile).advance(s,s.time-sampleTime,quality);
+   }
+   sampleTime=s.time;
    recorder?.capture(s);
   },observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
   if(state.watchWarnings.battery>previousWatch.battery||state.watchWarnings.bottom&&!previousWatch.bottom)sound.tone('caution');
@@ -921,10 +951,16 @@ function initializeExtras(){
  bindOrderRange('order-slider',()=>orderAxis);
  bindOrderRange('mobile-speed',()=>'speed');
  bindCommand('rov-stop','click',()=>applyHelmKeys(state,context(),new Set(['rovStop']),0),()=>view==='drone'&&pilotEnabled());
- $('imager-profile').onchange=e=>{imagerProfile=e.target.value;updateUI();};
- bindCommand('imager-transmit','click',()=>{transmitting=!transmitting;},()=>instrument!=='bearings'&&operatingFraction(state.systems.sonar)>0);
+ $('imager-profile').onchange=e=>{
+  selectedProfiles[instrument]=e.target.value;
+  if(state.imagers[instrument])state.imagers[instrument]=e.target.value;
+  updateUI();
+ };
+ $('imager-clear').onclick=()=>{currentPaper().clear();updateUI();};
+ $('imager-live').onclick=()=>{currentPaper().showLive();updateUI();};
+ bindCommand('imager-transmit','click',()=>{state.imagers[instrument]=state.imagers[instrument]?null:selectedProfiles[instrument];persist();},()=>instrument!=='bearings'&&(state.imagers[instrument]||operatingFraction(state.systems.sonar)>0));
  all('[data-sonar-range]').forEach(button=>button.onclick=()=>{
-  sonarRange=Number(button.dataset.sonarRange);
+  sonarRange=Number(button.dataset.sonarRange);sonarZoomDelta=0;
   updateUI();
  });
  bindCommand('mobile-ping','click',doPing,()=>state.pingCooldown===0&&operatingFraction(state.systems.sonar)>0);
@@ -953,7 +989,12 @@ function updateExtras(s,env,v){
  const imaging=view==='sonar'&&instrument!=='bearings';
  if(imaging&&instrument==='scribbler')$('tactical').setAttribute('aria-describedby','scribbler-key');
  else $('tactical').removeAttribute('aria-describedby');
- if(!operatingFraction(s.systems.sonar))transmitting=false;
+ const transmitting=!!s.imagers[instrument];
+ const orbitalNotice=transmissionNotice(s.imagers,operatingFraction(s.systems.sonar)>0);
+ $('orbit-transmission').textContent=orbitalNotice;$('orbit-transmission').hidden=!orbitalNotice;
+ if(imaging)$('imager-profile').value=selectedProfiles[instrument];
+ $('imager-clear').hidden=instrument!=='scribbler';
+ $('imager-live').hidden=instrument!=='scribbler'||!imaging||!currentPaper().browsing;
  $('viewport').dataset.imaging=String(imaging);
  $('imager-controls').hidden=!imaging;
  $('imager-transmit').textContent=transmitting?'Stop scan':'Start scan';

@@ -1,9 +1,21 @@
+import {DAY_SECONDS} from './patrol-calendar.ts';
 import {chartDepth,shelfOutcrops} from './coast.ts';
 import {hash01} from './surface-motion.ts';
 import {strips,printWreck,type WreckPlates,type WreckEcho} from './sonar-strip.ts';
 
 export type Instrument = 'scribbler' | 'painter';
 export type Profile = 'survey' | 'detail';
+export const instruments:readonly Instrument[]=['scribbler','painter'];
+export type Transmitters=Record<Instrument,Profile|null>;
+export const freshTransmitters=():Transmitters=>({scribbler:null,painter:null});
+export function validTransmitters(t:Transmitters){
+  return !!t&&instruments.every(mode=>t[mode]===null||t[mode]==='survey'||t[mode]==='detail');
+}
+export function transmissionNotice(t:Transmitters,online:boolean){
+  const names=instruments.filter(mode=>t[mode]).map(mode=>mode==='scribbler'?'Scribbler':'Painter');
+  return names.length?names.join(' + ')+(online?' transmitting · Increased detection risk':' armed · Sonar offline'):'';
+}
+const shipMinute=DAY_SECONDS/(24*60);
 // Fictional instrument presets. These control the recorder and encounter rolls.
 export const profiles = {
   survey: {range:strips.survey.range, width:80, height:44, rows:5, exposure:.24},
@@ -134,14 +146,41 @@ export class ImagerPaper {
   y=0;
   version=0;
   completedLines=0;
+  // Completed lines are appended once in chunks. The live raster also holds
+  // the partial line being written. Browsing never moves the write head.
+  private archive:{pixels:Uint8Array;times:Float64Array}[]=[];
+  private anchor:number|null=null;
   private fraction=0;
   private line?:Uint8Array;
   constructor(readonly mode:Instrument,readonly profile:Profile,private readonly plates:WreckPlates){
     const p=mode==='scribbler'?strips[profile]:profiles[profile];
     this.width=p.width;this.height=p.height;this.rows=p.rows;this.pixels=new Uint8Array(this.width*this.height);
   }
+  get browsing(){return this.anchor!==null;}
+  get topLine(){return this.anchor===null?this.completedLines:Math.floor(this.anchor);}
+  showLive(){this.anchor=null;}
+  scrollRows(rows:number){
+    if(this.mode!=='scribbler'||rows===0)return;
+    const next=clamp((this.anchor??this.completedLines)-rows,Math.min(this.height-1,this.completedLines),this.completedLines);
+    this.anchor=next===this.completedLines?null:next;
+  }
+  recordedAt(line:number){
+    if(line<0||line>=this.completedLines)return undefined;
+    return this.archive[Math.floor(line/128)].times[line%128];
+  }
+  visibleRow(row:number){
+    if(!this.browsing)return this.pixels.subarray(row*this.width,(row+1)*this.width);
+    const line=this.topLine-row,offset=(line%128)*this.width;
+    return this.archive[Math.floor(line/128)].pixels.subarray(offset,offset+this.width);
+  }
+  clear(){
+    this.archive=[];this.anchor=null;this.x=this.y=this.completedLines=this.fraction=0;
+    this.line=undefined;this.pixels.fill(0);this.version++;
+  }
   advance(s:World,dt:number,quality:number){
-    const feed=this.mode==='scribbler'?.35+.65*Math.abs(s.speed??4)/4:1;
+    const speed=Math.abs(s.speed??4);
+    if(this.mode==='scribbler'&&speed===0)return;
+    const feed=this.mode==='scribbler'?Math.min(1,speed)*(.35+.65*speed/4):1;
     this.fraction+=dt*this.rows*feed*this.width*quality;
     const count=Math.floor(this.fraction);this.fraction-=count;
     if(count>0)this.version++;
@@ -149,6 +188,13 @@ export class ImagerPaper {
       this.line??=sampleLine(s,this.mode,this.profile,this.y,this.plates);
       this.pixels[this.y*this.width+this.x]=this.line[this.x];
       if(++this.x<this.width)continue;
+      if(this.mode==='scribbler'){
+        const offset=this.completedLines%128;
+        if(offset===0)this.archive.push({pixels:new Uint8Array(128*this.width),times:new Float64Array(128)});
+        const chunk=this.archive[this.archive.length-1];
+        chunk.pixels.set(this.line,offset*this.width);
+        chunk.times[offset]=s.time-dt+dt*(n+1)/count;
+      }
       this.x=0;this.line=undefined;this.completedLines++;
       if(this.mode==='painter')this.y=(this.y+1)%this.height;
       else{this.pixels.copyWithin(this.width,0);this.pixels.fill(0,0,this.width);}
@@ -162,18 +208,25 @@ export class ImagerDisplay {
   private previous?:ImagerPaper;
   private version=-1;
   private completedLines=-1;
-  draw(ctx:CanvasRenderingContext2D,w:number,h:number,paper:ImagerPaper,writing:boolean){
-    const {width,height,pixels}=paper;
+  private topLine=-1;
+  private browsing=false;
+  draw(ctx:CanvasRenderingContext2D,w:number,h:number,paper:ImagerPaper,writing:boolean,now:number){
+    const {width,height}=paper;
     if(!this.image||width!==this.image.width||height!==this.image.height){
       this.canvas.width=width;this.canvas.height=height;this.image=new ImageData(width,height);
     }
-    if(this.previous!==paper||this.version!==paper.version){
+    const moved=this.topLine!==paper.topLine||this.browsing!==paper.browsing;
+    if(this.previous!==paper||moved||!paper.browsing&&this.version!==paper.version){
       const data=this.image.data;
-      const rows=paper.mode==='scribbler'&&this.previous===paper&&this.completedLines===paper.completedLines?1:height;
-      for(let i=0;i<rows*width;i++){
-        const v=pixels[i],p=i*4;
-        data[p]=12+v*.96;data[p+1]=12+v*.63;data[p+2]=9+v*.22;data[p+3]=255;
+      const rows=paper.mode==='scribbler'&&this.previous===paper&&!moved&&!paper.browsing&&this.completedLines===paper.completedLines?1:height;
+      for(let row=0;row<rows;row++){
+        const line=paper.visibleRow(row);
+        for(let col=0;col<width;col++){
+          const v=line[col],p=(row*width+col)*4;
+          data[p]=12+v*.96;data[p+1]=12+v*.63;data[p+2]=9+v*.22;data[p+3]=255;
+        }
       }
+      this.topLine=paper.topLine;this.browsing=paper.browsing;
       this.canvas.getContext('2d')!.putImageData(this.image,0,0,0,0,width,rows);
       this.previous=paper;this.version=paper.version;this.completedLines=paper.completedLines;
     }
@@ -184,6 +237,21 @@ export class ImagerDisplay {
     ctx.fillText(paper.mode==='scribbler'?'PORT':'PORT   /   BOW SECTOR',margin,h-8);
     ctx.textAlign='right';ctx.fillText(paper.mode==='scribbler'?'STBD':'STBD   '+profiles[paper.profile].range+' m',w-margin,h-8);
     if(paper.mode==='scribbler'){
+      // Mark every recorded ship minute. Label as many as the screen can fit.
+      ctx.textAlign='left';let lastLabel=-Infinity;
+      for(let row=0;row<height;row++){
+        const line=paper.topLine-row,at=paper.recordedAt(line);
+        if(at===undefined)continue;
+        const before=paper.recordedAt(line-1);
+        if(row!==0&&before!==undefined&&Math.floor(at/shipMinute)===Math.floor(before/shipMinute))continue;
+        const y=top+(row+.5)*areaH/height;
+        ctx.fillStyle='#efd399';ctx.fillRect(margin-6,y,6,1);
+        if(y-lastLabel>=14&&y+12<top+areaH){
+          const label=Math.max(0,Math.round((now-at)/shipMinute))+'m ago';
+          ctx.fillStyle='#17150cdd';ctx.fillRect(margin,y,ctx.measureText(label).width+5,13);
+          ctx.fillStyle='#efd399';ctx.fillText(label,margin+2,y+10);lastLabel=y;
+        }
+      }
       ctx.textAlign='center';
       ctx.fillText('MAX '+strips[paper.profile].range+' m',w/2,h-8);
       for(const side of [-1,1]){
@@ -192,9 +260,10 @@ export class ImagerDisplay {
         ctx.fillText(strips[paper.profile].near+' m',x,h-8);
       }
     }
-    if(!writing&&paper.version===0){
+    if(!writing&&!paper.completedLines&&!paper.x){
       ctx.textAlign='center';ctx.fillText(paper.mode==='scribbler'?'Seafloor strip · Start scan':'Forward sweep · Start scan',w/2,top+areaH/2);
     }
+    if(paper.browsing)return;
     const x=margin+(paper.x+.5)*areaW/width,y=top+(paper.y+.5)*areaH/height;
     ctx.save();ctx.shadowColor='#ffc15c';ctx.shadowBlur=writing?7:3;ctx.fillStyle=writing?'#fff6c2':'#e6c789';ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();ctx.restore();
   }

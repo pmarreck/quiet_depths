@@ -1,3 +1,4 @@
+import {freshTransmitters,validTransmitters} from './sonar-imager.js';
 import {activeClue,imagerClue,leaveClue,searchClue} from './suspicion.js';
 import {watchWarnings,validWarnings,bottomCall,batteryCall} from './watch-warnings.js';
 import {recordWake} from './surface-wake.js';
@@ -39,7 +40,7 @@ export function createGame(mission='recon',seed=19830604,options={}){
  {id:'kestrel',name:'Kestrel',kind:'escort',military:true,x:2300,y:2050,heading:255,speed:7,hull:100,alert:0,attack:0},
  {id:'tern',name:'Tern',kind:'fishing',military:false,x:-850,y:1350,heading:110,speed:3,hull:100,alert:0,attack:0},
  {id:'echo',name:'Unknown submarine',kind:'sub',military:true,x:3800,y:900,depth:75,heading:280,speed:4,hull:100,alert:0,attack:0}
- ]};s.traffic=freshTraffic();s.wake=[];s.soundBearings=[];s.torpedoTracks=[];s.repairLimits=fullCondition(BOAT_PARTS);s.drone.repairLimits=fullCondition(DRONE_PARTS);s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);
+ ]};s.imagers=freshTransmitters();s.traffic=freshTraffic();s.wake=[];s.soundBearings=[];s.torpedoTracks=[];s.repairLimits=fullCondition(BOAT_PARTS);s.drone.repairLimits=fullCondition(DRONE_PARTS);s.debrief=[];s.difficulty=patrolDifficulty(options.difficulty);s.recon=freshRecon();s.reconArchivedSequence=0;s.photoArchive=[];s.photoSequence=1;randomizePatrol(s,seed);
  if(s.difficulty.longPatrol){
   Object.assign(s,longPatrol(s));
   if(s.battle){
@@ -252,8 +253,10 @@ function tick(s,dt,input){
  if(s.events.length>1&&s.events[0].text===s.events[1].text)s.events.splice(1,1);
  if(s.hull<=0)s.status='lost';
  const scan=input.imaging;
+ const scribbler=s.imagers.scribbler??(scan?.mode==='scribbler'?scan.profile:null);
+ const painter=s.imagers.painter??(scan?.mode==='painter'?scan.profile:null);
  let beat=0;
- if(scan&&operatingFraction(s.systems.sonar)>0){
+ if((scribbler||painter)&&operatingFraction(s.systems.sonar)>0){
   const previous=s.imagingTime??0;
   s.imagingTime=previous+dt;
   if(Math.floor(s.imagingTime/5)>Math.floor(previous/5))beat=Math.floor(s.imagingTime/5);
@@ -272,7 +275,10 @@ function tick(s,dt,input){
    if(approaching&&!s.battle&&!ship.incidental&&!ship.report)ship.heading=(ship.heading+dt*.36)%360;
    if(s.mission==='sneaky-seamen')patrolSweep(s,ship);
    if(isOpponent(ship)&&!ship.disabled){
-     if(beat)imagerClue(s,ship,scan.mode,scan.profile,beat);
+     if(beat){
+      if(scribbler)imagerClue(s,ship,'scribbler',scribbler,beat);
+      if(painter)imagerClue(s,ship,'painter',painter,beat);
+     }
      const track=updateHostileTrack(s,ship,env,dt);
      if(!track&&ship.report&&ship.alert>=12&&s.time-ship.report.time<2&&ship.report.time>(ship.clue?.time??-1)){
       leaveClue(s,ship,0,ship.report);
@@ -368,6 +374,8 @@ export function dropDepthCharge(s,{x,y,depth,delay=7,kind='charge'}){const charg
 export function restore(raw){try{
  const s=JSON.parse(raw);if(!s||s.version!==1||!MISSIONS.some(m=>m.id===s.mission)||!['patrol','won','lost','compromised','expired','convoy-lost'].includes(s.status))return null;
  if(s.mission!=='wolf-in-the-henhouse'&&(s.convoy!==undefined||s.status==='convoy-lost'))return null;
+ if(s.imagers===undefined)s.imagers=freshTransmitters();
+ if(!validTransmitters(s.imagers))return null;
  if(s.imagingTime!==undefined&&(!Number.isFinite(s.imagingTime)||s.imagingTime<0||s.imagingTime>s.time+.001))return null;
  if(s.newYearWatch!==undefined&&(!Number.isSafeInteger(s.newYearWatch)||s.newYearWatch<0))return null;
  if(s.unpoweredSince!==undefined&&(!Number.isFinite(s.unpoweredSince)||s.unpoweredSince<0||s.unpoweredSince>s.time))return null;

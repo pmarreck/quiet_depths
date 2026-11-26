@@ -48,7 +48,7 @@ main =
                 , case selected of
                     Scribbler ->
                         div [ class "scribbler-key", attribute "id" "scribbler-key" ]
-                            [ text "The center magnifies the seabed under your keel." ]
+                            [ text "The center magnifies the seabed under your keel. Scroll to review." ]
 
                     _ ->
                         text ""
