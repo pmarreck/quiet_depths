@@ -125,3 +125,7 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Patrol upgrades] Make the game installable on mobile as a PWA (context: docs/plan_context/patrol-upgrades.md) (done 2026-11-20 12:11 EST, commit a5acb1c).
 - [x] [Patrol upgrades] Improve torpedo, depth-charge, blast, and underwater motion effects across stations, and use the finite acoustic decoys in enemy search (done 2026-11-20 12:11 EST, commit a5acb1c).
 - [x] [Patrol upgrades] Add onboard ambience, music and crew reactions, with quiet mixes during silent running and detection (context: docs/plan_context/patrol-upgrades.md) (done 2026-11-20 12:11 EST, commit a5acb1c).
+
+## Retired 2026-11-25
+
+- [x] [Future features] Add portable patrol and complete-game export and import using versioned cleartext JSON (done 2026-11-25 23:36 EST, commit 794084b).

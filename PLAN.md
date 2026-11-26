@@ -11,4 +11,3 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 ## Future features
 
 - [ ] Explore co-op patrols across devices, including shared crew roles and who hosts the mission.
-- [ ] Add portable patrol export and import using compressed Base64 and an explicitly versioned save schema.
