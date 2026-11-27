@@ -39,6 +39,11 @@ export function incidentalHull(ship: {kind?: string; hull?: number; directHits?:
   return Math.max(floor, (ship.hull ?? 100) - damage);
 }
 
+// Once doomed she settles as buoyancy goes, and each hit past the fatal one
+// speeds her descent after she slips under.
+export const carrierDoomed = (ship: {directHits: number}, fatal = fatalHits) => ship.directHits >= fatal;
+export const carrierDescentFactor = (ship: {directHits: number}, fatal = fatalHits) => Math.max(1, ship.directHits - fatal + 1);
+
 export function advanceCarrierFlood(ship: Carrier, dt: number, fatal = fatalHits) {
   if (ship.directHits >= fatal) ship.hull = Math.max(0, ship.hull - dt * (ship.directHits - fatal + 1));
 }

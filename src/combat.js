@@ -6,7 +6,7 @@ import {freshTubeTimes,RELOAD_SECONDS,torpedoTubes,exitPitch} from './torpedo-tu
 import {replayEvent} from './instant-replay.js';
 import {descentSpeed,submergedDepth,surfaceCollapseAge} from './foundering.js';
 import {gameEcho} from './torpedo-watch.js';
-import {carrierId,carrierSize,advanceCarrierFlood,incidentalHull,registerCarrierHit} from './carrier.js';
+import {carrierId,carrierSize,advanceCarrierFlood,carrierDescentFactor,carrierDoomed,incidentalHull,registerCarrierHit} from './carrier.js';
 import {operatingFraction} from './equipment.js';
 import {recordCivilianHit,report} from './patrol-reports.js';
 import {floorSurface} from './seafloor.js';
@@ -156,7 +156,7 @@ function shipDamage(s,dt){
    if(v.kind==='carrier')advanceCarrierFlood(v,dt);
    else v.hull=Math.max(0,v.hull-v.flood*.05*dt);
    if(v.hull<48||v.flood>8){if(!v.disabled)addDebrief(s,v.name+' was disabled by flooding.');v.disabled=true;v.speed=0;}
-   v.sinkDepth=v.kind==='carrier'&&v.directHits>=2?Math.max(v.sinkDepth,(1-v.hull/40)*7):Math.min(4,v.sinkDepth+dt*v.flood*.002);
+   v.sinkDepth=v.kind==='carrier'&&carrierDoomed(v)?Math.max(v.sinkDepth,(1-v.hull/40)*7):Math.min(4,v.sinkDepth+dt*v.flood*.002);
   }
   if(v.hull>0||v.settled)continue;
   const origin=v.kind==='sub'?v.depth:0;
@@ -165,7 +165,7 @@ function shipDamage(s,dt){
   const clearance=v.kind==='sub'||v.kind==='fishing'?3:8;
   const bed=Math.max(0,-floorSurface(v.x,v.y,s.environment.chartSeed).height-clearance-origin);
   const beforeDrop=v.sinkDepth,age=s.time-v.sunkAt,sub=v.kind==='sub';
-  const rate=sub?1.3:descentSpeed(age)*(v.kind==='carrier'?Math.max(1,v.directHits-1):1);
+  const rate=sub?1.3:descentSpeed(age)*(v.kind==='carrier'?carrierDescentFactor(v):1);
   v.speed=0;v.sinkDepth=Math.min(bed,v.sinkDepth+dt*rate);
   const depth=origin+v.sinkDepth,lastVisible=sub?0:submergedDepth(v.kind);
   if(!sub&&beforeDrop<lastVisible&&v.sinkDepth>=lastVisible)

@@ -125,3 +125,15 @@ test('the Elm mission definition supplies the carrier’s fatal hits to the rule
  const doomed=three.hull;advanceCarrierFlood(three,10,3);assert.equal(three.hull,doomed-10);
  const two=carrier();registerCarrierHit(two);registerCarrierHit(two);assert.equal(two.disabled,true);
 });
+
+test('the carrier settles and sinks according to the catalog’s fatal hits, not a fixed count',async()=>{
+ const {carrierDescentFactor,carrierDoomed,fatalHits}=await import('../src/carrier.js');
+ const {readFile}=await import('node:fs/promises');
+ assert.equal(carrierDoomed({directHits:fatalHits-1}),false);assert.equal(carrierDoomed({directHits:fatalHits}),true);
+ assert.equal(carrierDescentFactor({directHits:fatalHits}),1);assert.equal(carrierDescentFactor({directHits:fatalHits+2}),3);
+ assert.equal(carrierDoomed({directHits:2},3),false,'two hits are not fatal when three are');
+ assert.equal(carrierDescentFactor({directHits:4},3),2);assert.equal(carrierDescentFactor({directHits:1},3),1);
+ // The simulation must ask the carrier rules rather than restate the threshold.
+ const combat=await readFile(new URL('../src/combat.js',import.meta.url),'utf8');
+ assert.doesNotMatch(combat,/directHits\s*(>=|<|-)\s*\d/);
+});
