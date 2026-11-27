@@ -442,3 +442,16 @@ draw falls below the event's odds. Both sides go through JSON, as saves do.
 Lesson: run `elm-review --fix-all` only on code whose callers exist. Run
 over modules written ahead of their users, it deleted their unused
 constructors and functions; fix specific rules with `--rules` instead.
+
+Mutation check of the systems port: 43 mutants, 42 killed, one equivalent
+(`|turn| < |yaw|` against `<=` in the yaw overshoot: equality with matching
+signs means `turn` and `yaw` are the same number, so either choice gives the
+same heading). The first pass left 15 survivors, every one a test-input gap,
+not a port difference: thresholds no case sat near (flooding at its cap,
+the recall clearance, the power watch, the flood alarm, the scrape log, the
+link alarm, pressure-wave reach, the hatch stage, a slow hull contact), seeds
+on only one side of each fire's odds, and, worst, ship and casualty
+collision cases that never reached the collision code, because those hulls
+lay beyond the drone's 100 m link and the drone was lost first. Each gap got
+a case placed on its threshold, the boat now sits 40 m from every collision
+test point, and a guard asserts a drone does strike a ship.

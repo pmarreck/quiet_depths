@@ -79,6 +79,8 @@ test('deploying, recalling and losing the drone match', async () => {
       recalls.push(runTypeScript(withDrone({...s, depth}, drone), recallDrone));
     }
     recalls.push(runTypeScript(withDrone(s, {mode: 'stowed'}), recallDrone));
+    const limit = Math.min(279, bottom(s.x, s.y, s.environment.chartSeed) - 1);
+    if (limit - 8.5 > 0) recalls.push(runTypeScript(withDrone({...s, depth: limit - 8.5}, {mode: 'remote', x: s.x, y: s.y, depth: limit - 8}), recallDrone));
     for (const mode of ['remote', 'return', 'lost', 'stowed']) losses.push(runTypeScript(withDrone(s, {mode, speed: 2, targetSpeed: 3}), w => loseDrone(w, 'Link severed.')));
   }
   assert.ok(deploys.some(r => r.result) && deploys.some(r => !r.result), 'deploys succeed and fail');
@@ -107,7 +109,7 @@ test('hurting the boat matches: hull, flooding, section hits, cook-offs and loss
   for (const s of bases) for (const amount of [0, -3, NaN, 1, 1.9, 2, 10, 30, 60]) for (const subsystem of [null, 'sonar']) for (const at of [null, 20, 0, -20]) {
     n++;
     const a = s.heading * Math.PI / 180, point = at === null ? null : {x: s.x + Math.sin(a) * at, y: s.y + Math.cos(a) * at, depth: s.depth};
-    const state = {...s, rng: (n * 2654435761) | 0, difficulty: {...s.difficulty, damage: [undefined, 1, -1][n % 3]}, status: n % 17 === 0 ? 'won' : s.status, hull: n % 11 === 0 ? 4 : s.hull};
+    const state = {...s, rng: (n * 2654435761) | 0, difficulty: {...s.difficulty, damage: [undefined, 1, -1][n % 3]}, status: n % 17 === 0 ? 'won' : s.status, hull: n % 11 === 0 ? 4 : s.hull, flood: n % 5 === 0 ? 24.5 : s.flood};
     runs.push({args: [amount, 'Test impact.', subsystem, point], ...runTypeScript(state, w => hurt(w, amount, 'Test impact.', subsystem, point))});
   }
   // Cook-offs are rare (2.5% of large bow hits), so draw many.
@@ -131,6 +133,11 @@ test('damage to the drone matches, through to its loss', async () => {
 });
 
 // Seeds whose first draw falls below a threshold, for rare random events.
+const seedsBetween = (low, high, count = 2) => {
+  const found = [];
+  for (let seed = 1; found.length < count; seed++) { const r = rand({rng: seed}); if (low <= r && r < high) found.push(seed); }
+  return found;
+};
 const seedsBelow = (threshold, count) => {
   const found = [];
   for (let seed = 1; found.length < count; seed++) if (rand({rng: seed}) < threshold) found.push(seed);
@@ -141,6 +148,9 @@ test("the boat's tick matches: motion, plant, seabed, pressure, emergencies, flo
   const runs = [];
   const tick = (state, dt = .25) => runs.push({dt, ...runTypeScript(state, w => updateBoat(w, dt))});
   const vapor = seedsBelow(-Math.expm1(-.25 * .0015), 6), ignition = seedsBelow(-Math.expm1(-.25 * .85 * .012), 6);
+  // With repairs idle the leak does not shrink before the draw, so these seeds sit just either side of each event's exact odds.
+  const near = threshold => [seedsBetween(threshold * .9, threshold), seedsBetween(threshold, threshold * 1.4)].flat();
+  const vaporEdge = near(-Math.expm1(-.25 * .0015)), ignitionEdge = near(-Math.expm1(-.25 * .9 * .012));
   const all = restorable();
   for (const s of all) tick(s);
   for (const [i, s] of all.filter((_, i) => i % 4 === 0).entries()) {
@@ -156,7 +166,12 @@ test("the boat's tick matches: motion, plant, seabed, pressure, emergencies, flo
     tick({...s, water: 75}); tick({...s, hull: 0}); tick({...s, water: 69.99, flood: 25, repair: 0}); tick({...s, water: 5, flood: 8, repair: 0, floodAlarm: false});
     tick({...s, oxygen: 0}); tick({...s, scope: true, scopeTravel: 1, depth: 20}); tick({...s, silent: true, gunLoudUntil: s.time + 5, targetSpeed: 12});
     tick({...s, targetHeading: (s.heading + 170) % 360, speed: 6}); tick({...s, targetSpeed: -3, speed: 1}); tick({...s, systems: {...s.systems, crew: 0, rudder: 0, ballast: 0, planes: 0}});
-    tick({...s, repair: 20, hull: 60, systems: {...s.systems, sonar: 40, crew: 70}, repairLimits: {...s.repairLimits, hull: 80, sonar: 90}});
+    tick({...s, repair: 20, hull: 60, flood: 5, systems: {...s.systems, sonar: 40, crew: 70}, repairLimits: {...s.repairLimits, hull: 80, sonar: 90}});
+    if (s.time > 121) tick({...s, engine: 'electric', depth: 50, battery: 0, fuel: 20, unpoweredSince: s.time - 120.1});
+    tick({...s, water: 4.5, flood: 8, repair: 0, floodAlarm: false});
+    tick({...s, depth: floor + .2, verticalSpeed: .2, bottomed: true, speed: 6, targetSpeed: 6, collisionHits: {...s.collisionHits, scrape: Math.max(0, s.time - 25)}});
+    for (const seed of vaporEdge) tick({...s, fuelFire: 10, fuelLeak: 0, fuel: 40, repair: 0, rng: seed});
+    for (const seed of ignitionEdge) tick({...s, fuelLeak: .9, fuel: 60, fuelFire: 0, repair: 0, rng: seed});
   }
   const before = runs.map(r => r.input), after = runs.map(r => r.output);
   for (const [what, ok] of [['a vapor explosion', (b, a) => a.impacts.length > b.impacts.length], ['a fuel fire starts', (b, a) => !b.fuelFire && a.fuelFire > 0],
@@ -174,18 +189,28 @@ test("the drone's tick matches: link, battery, the return lane, collisions, the 
   for (const s of all.filter((_, i) => i % 4 === 2)) {
     const a = s.heading * Math.PI / 180, at = (side, forward, down = 0) => ({x: s.x + Math.cos(a) * side + Math.sin(a) * forward, y: s.y - Math.sin(a) * side + Math.cos(a) * forward, depth: s.depth + down});
     const out = drone => withDrone(s, {mode: 'remote', collisionCooldown: 0, ...drone});
-    tick(out({...at(0, 75)})); tick(out({...at(0, 101)})); tick(out({...at(0, 55), rangeAlarm: true})); tick(out({...at(30, 0), battery: 10.01, speed: 4})); tick(out({...at(30, 0), battery: .001}));
+    tick(out({...at(0, 75)})); tick(out({...at(0, 70.5)})); tick(out({...at(4, 0), heading: (s.heading + 270) % 360, speed: 1})); tick(out({...at(0, 101)})); tick(out({...at(0, 55), rangeAlarm: true})); tick(out({...at(30, 0), battery: 10.01, speed: 4})); tick(out({...at(30, 0), battery: .001}));
     tick(out({...at(4, 0), heading: (s.heading + 270) % 360, speed: 8})); tick(out({...at(4, 0), heading: (s.heading + 270) % 360, speed: 8, collisionCooldown: 1}));
     tick(out({...at(30, 0), nosePitch: 30, targetSpeed: 5, speed: 4})); tick(out({...at(30, 0), nosePitch: -45, targetSpeed: 0, targetDepth: s.depth + 20}));
     const p = at(30, 0), floor = bottom(p.x, p.y, s.environment.chartSeed);
     tick(out({...p, depth: Math.min(280, floor - .5), speed: 3})); tick(out({...p, depth: Math.min(280, floor - .5), collisionCooldown: 1}));
     const blast = (dx, extra = {}) => ({id: s.soundSequence, time: s.time - 5, type: 'blast', x: p.x + dx, y: p.y, depth: p.depth, power: 1, heard: false, ...extra});
-    tick({...out(p), acoustics: [...s.acoustics, blast(50), blast(200, {id: s.soundSequence + 1}), blast(20, {id: s.soundSequence + 2, droneHit: true})], soundSequence: s.soundSequence + 3});
+    tick({...out(p), acoustics: [...s.acoustics, blast(50), blast(200, {id: s.soundSequence + 1}), blast(135, {id: s.soundSequence + 3}), blast(20, {id: s.soundSequence + 2, droneHit: true})], soundSequence: s.soundSequence + 4});
     tick({...out(p), acoustics: [...s.acoustics, blast(5, {depth: undefined})], soundSequence: s.soundSequence + 1});
-    for (const v of s.ships.filter(v => v.hull > 0).slice(0, 2)) tick(out({x: v.x, y: v.y, depth: v.depth || 3, heading: (v.heading + 180) % 360, speed: 6}));
-    if (s.site) tick(out({x: s.site.x, y: s.site.y, depth: s.site.depth, speed: 5}));
+    const beside = (state, p) => ({...state, x: p.x + 40, y: p.y});
+    for (const v of s.ships.filter(v => v.hull > 0).slice(0, 2)) tick(beside(out({x: v.x, y: v.y, depth: v.depth || 3, heading: (v.heading + 180) % 360, speed: 6}), v));
+    // Just past each hull's capsule end, where its length and radius decide contact.
+    for (const v of s.ships.filter(v => v.hull > 0)) {
+      const [half, radius] = v.kind === 'carrier' ? [92, 16] : v.kind === 'sub' ? [27.5, 5] : v.kind === 'fishing' ? [19, 5] : [45, 9], h = v.heading * Math.PI / 180;
+      for (const along of [half + radius + .2, half + radius + 6]) { const q = {x: v.x + Math.sin(h) * along, y: v.y + Math.cos(h) * along}; tick(beside(out({...q, depth: v.depth || 3, speed: 0}), q)); }
+    }
+    if (s.site) {
+      tick(beside(out({x: s.site.x, y: s.site.y, depth: s.site.depth, speed: 5}), s.site));
+      const half = s.site.kind === 'surface' ? 19 : 27.5, h = s.site.heading * Math.PI / 180;
+      for (const along of [half + 5.2, half + 6]) { const q = {x: s.site.x + Math.sin(h) * along, y: s.site.y + Math.cos(h) * along}; tick(beside(out({...q, depth: s.site.depth, speed: 0}), q)); }
+    }
     const ret = drone => out({mode: 'return', returnClearance: 8, returnHoldSide: 20, returnHoldForward: 0, ...drone});
-    tick(ret({...at(20, 0, 8), returnStage: 0})); tick(ret({...at(14, 0, 8.5), returnStage: 1})); tick(ret({...at(14, 1, 2.5), returnStage: 2}));
+    tick(ret({...at(20, 0, 8), returnStage: 0})); tick(ret({...at(14, 0, 8.5), returnStage: 1})); tick(ret({...at(14, 1, 2.5), returnStage: 2})); tick(ret({...at(14, 1, 3.1), returnStage: 2}));
     tick({...ret({...at(14, 0, 2.5), returnStage: 3}), speed: 1}); tick({...ret({...at(14, 0, 2.5), returnStage: 3}), speed: 5, targetHeading: (s.heading + 60) % 360});
     const dock = recoveryDock({...s, roll: s.roll ?? 0});
     tick({...ret({...dock, returnStage: 3}), speed: 1}); tick({...ret({...dock, returnStage: 3}), speed: 3.5});
@@ -194,6 +219,7 @@ test("the drone's tick matches: link, battery, the return lane, collisions, the 
   }
   const pairs = runs.map(r => [r.input, r.output]);
   for (const [what, ok] of [['the link is lost', (b, a) => b.drone.mode !== 'lost' && a.drone.mode === 'lost'], ['the drone strikes our hull', (b, a) => a.replay.some(e => e.event.kind === 'collision')],
+    ['the drone strikes a ship', (b, a) => a.events.some(e => e.text.includes('vessel / wreck'))],
     ['the drone is recovered', (b, a) => b.drone.mode === 'return' && a.drone.mode === 'stowed'], ['a pressure wave strikes', (b, a) => a.events.some(e => e.text.includes('pressure wave'))],
     ['the drone hits the seabed', (b, a) => a.events.some(e => e.text.includes('Drone impact: seabed'))], ['the range alarm sounds', (b, a) => !b.drone.rangeAlarm && a.drone.rangeAlarm],
     ['the low battery alarm sounds', (b, a) => !b.drone.lowAlarm && a.drone.lowAlarm], ['the return lane advances', (b, a) => a.drone.returnStage > b.drone.returnStage]])

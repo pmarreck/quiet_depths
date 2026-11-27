@@ -136,3 +136,15 @@ problem, then the WASM measurement. Decisions routed to the owner: the fork's
 version scheme, binary or decimal exponent, dedicated `Num` operators first
 (the fork's recommendation) or overloaded standard operators, and how number
 literals type.
+
+## The crash fix landed (elm-compiler `7c40401b`, 2026-11-27 18:11)
+
+The fork reports the let-annotation case as a TYPE MISMATCH with a hint
+(remove the type variable, or annotate the enclosing definition with it);
+quiet_depths' Coast.elm shape is its regression test. Using it means the flake
+input `github:pmarreck/elm-compiler/7c40401b5101de0c7615771e7b1e05cb93a7dafb`,
+`"elm-version": "0.19.3"` in both elm.json files, and a 0.19.3 package
+cache; only x86_64-linux is built and tested so far. quiet_depths already
+works around the one case it met, so adoption can wait for `Num` or wider
+platform coverage. Next in the fork: the `? [rank = 1]` crashes that swallow
+an ordinary type error (#2153, #2066, #2013).
