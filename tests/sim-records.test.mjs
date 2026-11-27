@@ -159,3 +159,43 @@ test('the Elm sound decoder rejects what restore rejects', async () => {
   assert.deepEqual(cases.filter((c, i) => decoded[i] !== c.restores).map(c => ({verdict: c.verdict, type: c.sound.type})), []);
   assert.ok(cases.every(c => (c.verdict === 'rejected') !== c.restores), 'each mutation does what it claims');
 });
+
+const BOAT_KEYS = ['x', 'y', 'depth', 'heading', 'pitch', 'roll', 'speed', 'targetSpeed', 'targetHeading', 'targetDepth', 'verticalSpeed', 'hull', 'outerHull', 'flood', 'shock', 'fuel',
+  'fuelLeak', 'fuelFire', 'battery', 'oxygen', 'water', 'ballast', 'planes', 'rudder', 'propAngle', 'cavitation', 'propRpm', 'noise', 'silent', 'gunLoudUntil', 'unpoweredSince', 'repair',
+  'floodAlarm', 'collisionCooldown', 'collisionHits', 'bottomed', 'torps', 'cookoff', 'engine', 'dieselMode', 'pressureAlarm', 'criticalExposure', 'imploded', 'scope', 'scopeTravel',
+  'systems', 'repairLimits', 'drone', 'plantVersion'];
+// The boat's fields as restore leaves them, normalizations included.
+const boatOf = s => { const r = JSON.parse(JSON.stringify(restore(JSON.stringify(s)))); return Object.fromEntries(BOAT_KEYS.filter(k => r[k] !== undefined).map(k => [k, r[k]])); };
+
+test('saved boats round-trip through the Elm boat and drone records', async () => {
+  const states = savedPatrols().filter(s => restore(JSON.stringify(s)) !== null);
+  assert.ok(states.length > 100, 'restorable patrols');
+  // A destroyed sonar still holding a limit, which restore zeroes, and a drone on its way home.
+  states.push(Object.assign(structuredClone(states[0]), {systems: {...states[0].systems, sonar: 0}, repairLimits: {...states[0].repairLimits, sonar: 50}}),
+    Object.assign(structuredClone(states[1]), {drone: {...states[1].drone, mode: 'return', returnStage: 2}}));
+  sameResults(await elm('boat.roundTrip', states.map(s => [s, s.time])), states.map(boatOf));
+});
+
+test('the Elm boat decoder rejects what restore rejects in current saves, and refuses older saves pending their migrations', async () => {
+  const bases = savedPatrols().filter(s => restore(JSON.stringify(s)) !== null).filter((s, i) => i % 9 === 4).slice(0, 10);
+  assert.ok(bases.length >= 8, 'restorable patrols');
+  const rejected = [s => { s.plantVersion = 2; }, s => { s.fuelLeak = 1.5; }, s => { s.fuelFire = 25; }, s => { s.torps = -1; }, s => { s.torps = 1.5; }, s => { s.outerHull = 101; },
+    s => { s.pressureAlarm = 3; }, s => { s.collisionHits = {boat: s.time + 1}; }, s => { s.collisionHits = {boat: -1}; }, s => { s.dieselMode = 'turbo'; }, s => { s.engine = 'nuclear'; },
+    s => { s.systems.sonar = 101; }, s => { s.systems.crew = null; }, s => { s.scopeTravel = 1.5; }, s => { s.unpoweredSince = s.time + 1; }, s => { s.drone.mode = 'gone'; },
+    s => { s.drone.nosePitch = 61; }, s => { s.drone.returnStage = 4; }, s => { s.drone.hull = 120; }, s => { s.repairLimits.hull = 120; }, s => { s.x = null; }, s => { s.silent = 'no'; },
+    s => { s.hull = 101; }, s => { s.criticalExposure = -1; }, s => { s.drone.repairLimits.camera = -1; }];
+  const accepted = [s => { s.fuelLeak = 1; }, s => { s.fuelFire = 24; }, s => { s.torps = 0; }, s => { s.pressureAlarm = 2; }, s => { s.scopeTravel = 1; }, s => { s.drone.nosePitch = null; },
+    s => { s.drone.nosePitch = 60; }, s => { s.drone.returnStage = 3; }, s => { s.collisionHits = {}; }, s => { s.unpoweredSince = s.time; }, s => { delete s.gunLoudUntil; }];
+  // Restore migrates these; the Elm decoder refuses them until the migrations are ported.
+  const migrations = [s => { delete s.plantVersion; }, s => { delete s.outerHull; }, s => { delete s.cavitation; }, s => { delete s.systems.deckgun; }, s => { delete s.drone.lostReason; }];
+  const cases = [];
+  for (const [verdict, mutations] of [['rejected', rejected], ['accepted', accepted], ['migration', migrations]])
+    for (const base of bases) for (const mutate of mutations) {
+      const state = structuredClone(base); mutate(state);
+      cases.push({verdict, state, restores: restore(JSON.stringify(state)) !== null});
+    }
+  const decoded = (await elm('boat.roundTrip', cases.map(c => [c.state, c.state.time]))).map(r => r !== null);
+  assert.deepEqual(cases.map((c, i) => [c, decoded[i]]).filter(([c, d]) => c.verdict !== 'migration' && d !== c.restores).map(([c]) => c.verdict), []);
+  assert.ok(cases.every(c => (c.verdict === 'rejected') !== c.restores), 'each mutation does what it claims');
+  assert.ok(cases.every((c, i) => c.verdict !== 'migration' || !decoded[i]), 'older saves are refused until their migrations are ported');
+});

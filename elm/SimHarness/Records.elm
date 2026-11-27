@@ -4,6 +4,7 @@ module SimHarness.Records exposing (function)
 
 import Json.Decode as D
 import Json.Encode as E
+import Sim.Boat as Boat
 import Sim.Contact as Contact
 import Sim.Ship as Ship
 import Sim.Sound as Sound
@@ -96,6 +97,9 @@ function name =
                     (arg 0 D.value)
                     (arg 1 D.float)
                 )
+
+        "boat.roundTrip" ->
+            Just (D.map2 (\raw now -> D.decodeValue (Boat.decoder now) raw |> Result.map (Boat.encode >> E.object) |> Result.withDefault E.null) (arg 0 D.value) (arg 1 D.float))
 
         "sound.roundTrip" ->
             Just (D.map2 (\raw ships -> D.decodeValue (Sound.decoder ships) raw |> Result.map Sound.encode |> Result.withDefault E.null) (arg 0 D.value) (arg 1 (D.list D.string)))
