@@ -27,7 +27,12 @@ test('widescreen keeps the helm on Periscope & Controls and the ROV, with a stat
 });
 
 test('the widescreen band centers heading between depth and speed sliders',()=>{
- assert.match(page,/<div class="helm-group depth-helm"><div class="control-label">DEPTH /);
+ // The depth group is drawn by the Elm helm axis view, titled DEPTH.
+ assert.match(page,/<div class="helm-group depth-helm"><div id="depth-axis-root"><\/div><\/div>/);
+ assert.match(app,/Elm\.HelmAxis\.init\(\{node:\$\('depth-axis-root'\),flags:\{axis:'depth',title:'DEPTH',unit:'METERS',presetsClass:'depth-presets'\}\}\)/);
+ // Its children sit in the group's grid through the view's display:contents wrapper.
+ assert.ok(helmCss.includes('.propulsion-controls,.axis-controls{display:contents}'));
+ for(const part of ['control-label','big-value','ordered','dual-range'])assert.ok(helmCss.includes('.helm>:is(.depth-helm,.speed-helm)>.axis-controls>.'+part),part+' keeps its grid area');
  const band=helmCss.slice(helmCss.indexOf('@media (min-width:1101px)'));
  // Propulsion, depth, heading, then speed with its orders.
  const order=Object.fromEntries([...band.matchAll(/\.helm>\.(propulsion|depth-helm|course-control|speed-helm)\{order:(\d)\}/g)].map(m=>[m[1],+m[2]]));
