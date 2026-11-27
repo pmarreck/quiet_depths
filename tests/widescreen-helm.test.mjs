@@ -29,7 +29,11 @@ test('widescreen keeps the helm on Periscope & Controls and the ROV, with a stat
 test('the widescreen band centers heading between depth and speed sliders',()=>{
  // The depth group is drawn by the Elm helm axis view, titled DEPTH.
  assert.match(page,/<div class="helm-group depth-helm"><div id="depth-axis-root"><\/div><\/div>/);
- assert.match(app,/Elm\.HelmAxis\.init\(\{node:\$\('depth-axis-root'\),flags:\{axis:'depth',title:'DEPTH',unit:'METERS',presetsClass:'depth-presets'\}\}\)/);
+ assert.match(app,/Elm\.HelmAxis\.init\(\{node:\$\(axis\+'-axis-root'\),flags:\{axis,\.\.\.flags\}\}\)/);
+ assert.match(app,/const depthAxis=mountAxis\('depth',\{title:'DEPTH',unit:'METERS',presetsClass:'depth-presets',sublabelId:'depth-label'\}\);/);
+ // Speed keeps its telegraph presets beside the Elm axis view inside the group.
+ assert.match(page,/<div class="helm-group speed-helm"><div id="speed-axis-root"><\/div><div id="speed-helm-presets">/);
+ assert.match(app,/const speedAxis=mountAxis\('speed',\{title:'SPEED',unit:'KNOTS',presetsClass:'speed-presets',sublabelId:'noise-label'\}\);/);
  // Its children sit in the group's grid through the view's display:contents wrapper.
  assert.ok(helmCss.includes('.propulsion-controls,.axis-controls{display:contents}'));
  for(const part of ['control-label','big-value','ordered','dual-range'])assert.ok(helmCss.includes('.helm>:is(.depth-helm,.speed-helm)>.axis-controls>.'+part),part+' keeps its grid area');

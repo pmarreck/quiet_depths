@@ -8,10 +8,10 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## Elm migration
 
-- [x] Make the carrier's flooding settle and sinking rate follow the catalog's fatal hits instead of a fixed count of two, with a guard against restating the threshold (done 2026-11-27 03:55 EST; commit 175c79c).
 - [x] Render the helm's propulsion group (electric, diesel, routing, silent running) from Elm, with a test that every order it sends has a guarded handler (done 2026-11-27 04:29 EST; commit 81b23a6).
-- [x] Render the helm's depth axis (readout, slider, presets) from a reusable Elm HelmAxis view whose slider orders carry sequence numbers, matching the previous build's pointer, keyboard and orbit behavior in Chromium (done 2026-11-27 04:38 EST).
-- [ ] Move the remaining helm controls (speed and heading sliders, turn buttons) into Elm HelmAxis instances, keeping the telegraph and compass programs as sibling mounts from JavaScript-wired markup into the Elm helm.
+- [x] Render the helm's depth axis (readout, slider, presets) from a reusable Elm HelmAxis view whose slider orders carry sequence numbers, matching the previous build's pointer, keyboard and orbit behavior in Chromium (done 2026-11-27 04:38 EST; commit e836965).
+- [x] Render the helm's speed axis from the shared Elm HelmAxis view beside the telegraph, matching the previous build's telegraph, keyboard, pointer detent, silent, drone and orbit behavior in Chromium apart from live actual speed (done 2026-11-27 04:42 EST).
+- [ ] Move the remaining helm controls (heading slider and turn buttons) into Elm HelmAxis instances, keeping the telegraph and compass programs as sibling mounts from JavaScript-wired markup into the Elm helm.
 - [ ] Move simulation and the remaining game UI to Elm in stages, preserving existing patrol saves.
 - [x] Convert combat to strict TypeScript, split into torpedo runs, air support, hit geometry and the combat core, checked identical to the original through combat-heavy patrols and 94,544 mutated torpedo saves (done 2026-11-27 04:02 EST; commit a0edb00).
 - [x] Convert the simulation to strict TypeScript as creation, contacts, tick and save modules over a world type derived from every module's slice, with a compile-time check that slices agree; checked identical to the original across every mission, 600 save round trips and 105,670 mutated saves (done 2026-11-27 04:15 EST; commit 25cf289).

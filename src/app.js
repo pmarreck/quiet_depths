@@ -250,16 +250,22 @@ const telegraph=globalThis.Elm.EngineTelegraph.init({node:$('telegraph-root')});
 const compass=globalThis.Elm.HelmCompass.init({node:$('helm-compass-root')});
 const propulsionPanel=globalThis.Elm.HelmPropulsion.init({node:$('propulsion-root')});
 const dieselModeOptions=Object.entries(dieselModes).map(([value,label])=>({value,label}));
-const depthAxis=globalThis.Elm.HelmAxis.init({node:$('depth-axis-root'),flags:{axis:'depth',title:'DEPTH',unit:'METERS',presetsClass:'depth-presets'}});
+// Elm helm axes. Slider moves and presets arrive as orders checked as clicks
+// were before. Every order counts as handled, refused or not, so a view stops
+// holding the player's value once a reading reports it.
+function mountAxis(axis,flags){
+ const app=globalThis.Elm.HelmAxis.init({node:$(axis+'-axis-root'),flags:{axis,...flags}});
+ let handled=0;
+ app.ports.axisOrder.subscribe(({value,detent,seq})=>{
+  handled=Math.max(handled,seq);
+  if(view!=='orbit'&&canIssue(state,context())&&pilotEnabled())order(axis,axis==='speed'&&detent?throttleDetent(value):value);
+  updateUI();
+ });
+ return {send:reading=>app.ports.axisReading.send({...reading,handled})};
+}
+const depthAxis=mountAxis('depth',{title:'DEPTH',unit:'METERS',presetsClass:'depth-presets',sublabelId:'depth-label'});
+const speedAxis=mountAxis('speed',{title:'SPEED',unit:'KNOTS',presetsClass:'speed-presets',sublabelId:'noise-label'});
 const depthPresets=[{label:'SURFACE',value:0},{label:'SCOPE',value:12},{label:'DIVE',value:90}];
-// Slider moves and presets arrive from Elm and are checked as the clicks were before.
-// Every order counts as handled, refused or not, so the view stops holding it.
-let depthOrderSeq=0;
-depthAxis.ports.axisOrder.subscribe(({value,seq})=>{
- depthOrderSeq=Math.max(depthOrderSeq,seq);
- if(view==='orbit'||!canIssue(state,context())||!pilotEnabled()){updateUI();return;}
- order('depth',value);updateUI();
-});
 let engineHint='';
 attachCompassSteering($('helm-compass'),()=>helmFor(state,view).heading,heading=>{if(view==='orbit'||!canIssue(state,context())||!pilotEnabled())return;order('heading',heading);updateUI();});
 telegraph.ports.ringTelegraph.subscribe(({lever,quiet})=>{
@@ -459,7 +465,7 @@ bindCommand('steer-scope','click',()=>{alignScope(state,context(),'helm-to-scope
 bindCommand('open-gun','click',()=>setView('gun'));
 bindCommand('aim-gun','click',()=>{const id=$('gun-target').value,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range){const e=estimateAt(c,state.time);aimGunAt(state,{x:e.x,y:e.y,vx:c.fix?.vx||0,vy:c.fix?.vy||0,altitude:2});}},()=>view==='gun'&&feedActive(state,'gun')&&!!$('gun-target').value);
 bindCommand('scope-toggle','click',scopeToggle,()=>operatingFraction(state.systems.periscope)>0);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0&&operatingFraction(state.systems.sonar)>0);
-for(const axis of ['heading','speed'])bindOrderRange(axis,()=>axis);
+bindOrderRange('heading',()=>'heading');
 function routeDieselPower(mode){
  if(!isDieselMode(mode))return;
  state.dieselMode=mode;
@@ -769,20 +775,21 @@ function updateUI(){
  updateFollowButtons(s);
  compass.ports.compassReading.send({heading:v.heading,requested:v.targetHeading});
  $('helm-mode').textContent=drone?(v.mode==='remote'?'DRONE HELM':v.mode==='return'?'DRONE · AUTO RETURN':'DRONE · OFFLINE'):'SUBMARINE HELM';
- $('heading-value').textContent=deg(v.heading);$('speed-value').textContent=v.speed.toFixed(1);
+ $('heading-value').textContent=deg(v.heading);
  $('heading-order').innerHTML=`<span>ACT ${deg(v.heading)}°</span><span>REQ ${deg(v.targetHeading)}°</span>`;
- $('speed-order').innerHTML=`<span>ACT ${v.speed.toFixed(1)} kn</span><span>${drone?'REQ '+v.targetSpeed.toFixed(1)+' kn':'THR '+Math.round(throttlePercent(v.targetSpeed))+'%'}</span>`;
- depthAxis.ports.axisReading.send({value:String(Math.round(v.depth)),sublabel:isSurfaced(v)?'SURFACED':drone?'ROV':v.depth<=15?'SCOPE':v.depth>220?'STRAIN':'SUBMERGED',
+ depthAxis.send({value:String(Math.round(v.depth)),sublabelColor:'',sublabel:isSurfaced(v)?'SURFACED':drone?'ROV':v.depth<=15?'SCOPE':v.depth>220?'STRAIN':'SUBMERGED',
   min:0,max:280,step:1,requested:v.targetDepth,actual:v.depth,actualPercent:clamp(v.depth/280*100,0,100),valueText:`Actual ${v.depth.toFixed(1)}; requested ${v.targetDepth.toFixed(1)}`,
-  ariaLabel:'Requested depth',act:`ACT ${v.depth.toFixed(0)} m`,req:`REQ ${v.targetDepth.toFixed(0)} m`,enabled:canIssue(s,context())&&pilotEnabled(),presets:depthPresets,handled:depthOrderSeq});
- $('noise-label').textContent=drone?(v.speed<0?'ASTERN':'ROV'):s.noise<28?'QUIET':s.noise<55?'AUDIBLE':'LOUD';$('noise-label').style.color=!drone&&s.noise>55?'var(--red)':'var(--green)';
- for(const axis of ['heading','speed']){
+  ariaLabel:'Requested depth',act:`ACT ${v.depth.toFixed(0)} m`,req:`REQ ${v.targetDepth.toFixed(0)} m`,enabled:canIssue(s,context())&&pilotEnabled(),presets:depthPresets});
+ {const lo=drone?-3:-4,hi=drone?10:17,throttle=Math.round(throttlePercent(v.targetSpeed));
+  speedAxis.send({value:v.speed.toFixed(1),sublabel:drone?(v.speed<0?'ASTERN':'ROV'):s.noise<28?'QUIET':s.noise<55?'AUDIBLE':'LOUD',sublabelColor:!drone&&s.noise>55?'var(--red)':'var(--green)',
+   min:lo,max:hi,step:.1,requested:v.targetSpeed,actual:v.speed,actualPercent:clamp(((!drone&&v.speed>0?v.speed*17/SURFACE_KNOTS:v.speed)-lo)/(hi-lo)*100,0,100),
+   valueText:drone?`Actual ${v.speed.toFixed(1)}; requested ${v.targetSpeed.toFixed(1)}`:throttle+'% throttle, actual '+v.speed.toFixed(1)+' knots',ariaLabel:drone?'Requested ROV speed':'Submarine throttle',
+   act:`ACT ${v.speed.toFixed(1)} kn`,req:drone?'REQ '+v.targetSpeed.toFixed(1)+' kn':'THR '+throttle+'%',enabled:canIssue(s,context())&&pilotEnabled(),presets:[]});}
+ for(const axis of ['heading']){
   const el=$(axis);el.min=axis==='speed'?(drone?-3:-4):0;el.max=axis==='heading'?359.9:axis==='depth'?280:(drone?10:17);el.step=axis==='heading'?.1:axis==='speed'?.1:1;
   el.value=requested[axis];el.dataset.actual=actual[axis];el.dataset.requested=requested[axis];el.setAttribute('aria-valuetext',`Actual ${actual[axis].toFixed(1)}; requested ${requested[axis].toFixed(1)}`);
   const track=el.closest('.dual-range');track.style.setProperty('--actual',clamp(((axis==='speed'&&!drone&&v.speed>0?v.speed*17/SURFACE_KNOTS:actual[axis])-Number(el.min))/(Number(el.max)-Number(el.min))*100,0,100)+'%');
  }
- if(!drone)$('speed').setAttribute('aria-valuetext',Math.round(throttlePercent(v.targetSpeed))+'% throttle, actual '+v.speed.toFixed(1)+' knots');
- $('speed').setAttribute('aria-label',drone?'Requested ROV speed':'Submarine throttle');
  engineHint=drone?'Sub holds its own helm orders.':powerStatus+' · '+(s.silent?Math.min(3,plant.ahead):plant.ahead).toFixed(1)+' kn available'+(s.depth>14&&s.engine==='diesel'?' · Rise to 14 m or select electric.':'');
  {const able=enabled=>canIssue(s,context())&&enabled();
   propulsionPanel.ports.propulsionReading.send({engine:s.engine,silent:s.silent,dieselMode:s.dieselMode,modes:dieselModeOptions,routing:s.engine==='diesel'&&!drone,hint:engineHint,

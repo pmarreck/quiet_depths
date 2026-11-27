@@ -31,11 +31,15 @@ test('a helm axis holds the player’s slider value until the app reports that o
  // view keeps its value until a reading has handled >= the order's sequence.
  assert.match(elm,/if reading\.handled >= model\.seq then/);
  assert.match(elm,/axisOrder \{axis = model\.flags\.axis, value = amount, detent = detent, seq = seq\}/);
- // The app counts every order as handled, including one it refuses, before any
- // guard can return, and reports the count in each reading.
- const handler=app.match(/depthAxis\.ports\.axisOrder\.subscribe\(\(\{value,seq\}\)=>\{\n([^\n]*)\n([^\n]*)\n/);
- assert.ok(handler,'the depth axis order handler is present');
- assert.equal(handler[1],' depthOrderSeq=Math.max(depthOrderSeq,seq);');
- assert.match(handler[2],/^ if\(view==='orbit'\|\|!canIssue\(state,context\(\)\)\|\|!pilotEnabled\(\)\)\{updateUI\(\);return;\}$/);
- assert.match(app,/presets:depthPresets,handled:depthOrderSeq\}\);/);
+ // The app counts every order as handled, including one it refuses, before the
+ // guard, and every reading the axis receives carries that count.
+ const handler=app.match(/app\.ports\.axisOrder\.subscribe\(\(\{value,detent,seq\}\)=>\{\n([^\n]*)\n([^\n]*)\n([^\n]*)\n \}\);/);
+ assert.ok(handler,'the shared axis order handler is present');
+ assert.equal(handler[1],'  handled=Math.max(handled,seq);');
+ assert.equal(handler[2],"  if(view!=='orbit'&&canIssue(state,context())&&pilotEnabled())order(axis,axis==='speed'&&detent?throttleDetent(value):value);");
+ assert.equal(handler[3],'  updateUI();');
+ assert.match(app,/return \{send:reading=>app\.ports\.axisReading\.send\(\{\.\.\.reading,handled\}\)\};/);
+ // Every helm axis goes through that helper; none talks to its ports directly.
+ assert.equal([...app.matchAll(/ports\.axis(Reading|Order)/g)].length,2);
+ for(const axis of ['depth','speed'])assert.match(app,new RegExp(`const ${axis}Axis=mountAxis\\('${axis}',`));
 });

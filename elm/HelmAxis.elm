@@ -8,13 +8,13 @@ a reading each frame and carries out the orders this view sends back.
 
 import Browser
 import Html exposing (Html, b, button, div, i, input, span, text)
-import Html.Attributes exposing (attribute, class, disabled, id, step, type_, value)
+import Html.Attributes exposing (attribute, class, disabled, id, step, style, type_, value)
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
 
 
 type alias Flags =
-    { axis : String, title : String, unit : String, presetsClass : String }
+    { axis : String, title : String, unit : String, presetsClass : String, sublabelId : String }
 
 
 type alias Preset =
@@ -24,6 +24,7 @@ type alias Preset =
 type alias Reading =
     { value : String
     , sublabel : String
+    , sublabelColor : String
     , min : Float
     , max : Float
     , step : Float
@@ -124,7 +125,7 @@ view model =
             in
             div [ class "axis-controls" ]
                 ([ div [ class "control-label" ] [ text (model.flags.title ++ " "), span [] [ text model.flags.unit ] ]
-                 , div [ class "big-value" ] [ b [ id (axis ++ "-value") ] [ text r.value ], span [ id (axis ++ "-label") ] [ text r.sublabel ] ]
+                 , div [ class "big-value" ] [ b [ id (axis ++ "-value") ] [ text r.value ], span [ id model.flags.sublabelId, style "color" r.sublabelColor ] [ text r.sublabel ] ]
                  , div [ class "dual-range", attribute "style" ("--actual:" ++ number r.actualPercent ++ "%") ]
                     [ input
                         [ attribute "aria-label" r.ariaLabel
