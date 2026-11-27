@@ -58,7 +58,7 @@ test('the simulation reaches exp, expm1, tanh and cbrt only through the shared m
 // recorders, and Elm has neither, so they count as display code too.
 test('the simulation reaches no Three.js, DOM, canvas, browser storage, class or typed array code', () => {
   const modules = simulationModules();
-  for (const display of ['sonar-imager', 'stern-spray', 'wake-ribbons', 'instant-replay'])
+  for (const display of ['sonar-imager', 'stern-spray', 'wake-ribbons', 'instant-replay', 'sea-shading'])
     assert.ok(!modules.has(display), display + ' stays outside the simulation');
   assert.ok(modules.has('sonar-transmitters') && modules.has('replay-events'), 'the simulation halves are reached');
   const display = [...modules].flatMap(([name, code]) =>

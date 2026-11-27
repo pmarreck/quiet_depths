@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Environment.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {exp} from './sim-math.ts';
 import {scopeEyeHeight} from './periscope.ts';
 import {surfaceMotion, wavePhaseAt, surfaceHeight, WAVE_COMPONENTS, hash01, boatPoint} from './surface-motion.ts';
@@ -89,23 +90,6 @@ export function environmentAt(s: Sky): Environment {
   }
   return e;
 }
-
-// Visual approximation of clear seawater. Attenuation is exponential in
-// meters, with blue retaining about 1% of surface daylight at 200 m.
-export function waterColumnLight(depth: number, e: {daylight: number; cloud: number; sunAltitude: number}) {
-  const meters = Math.max(0, depth), diffuse = e.daylight * (1 - .52 * e.cloud);
-  return {
-    red: diffuse * exp(-.12 * meters),
-    green: diffuse * exp(-.045 * meters),
-    blue: diffuse * exp(-.023 * meters),
-    direct: e.daylight * Math.sqrt(Math.max(0, e.sunAltitude)) * (1 - e.cloud) ** 2,
-  };
-}
-
-export const SEA_GLSL = 'float sea(vec2 p){return waveScale*(' + WAVE_COMPONENTS.map(w =>
-  `sin(p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+wavePhase*${w.omega.toFixed(3)})*${w.amplitude.toFixed(3)}`).join('+') + ');}';
-export const SEA_SAMPLE_GLSL = 'vec3 seaSample(vec2 p){vec3 s=vec3(0.);' + WAVE_COMPONENTS.map((w, i) =>
-  `float phase${i}=p.x*${w.kx.toFixed(3)}+p.y*${w.ky.toFixed(3)}+wavePhase*${w.omega.toFixed(3)};s+=${w.amplitude.toFixed(3)}*vec3(sin(phase${i}),cos(phase${i})*${w.kx.toFixed(3)},cos(phase${i})*${w.ky.toFixed(3)});`).join('') + 'return s*waveScale;}';
 
 type Boat = {x: number; y: number; depth: number; heading: number; pitch: number; roll?: number; time: number};
 type Pose = {x: number; y: number; depth: number; heading: number; pitch: number; roll?: number};

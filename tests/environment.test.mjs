@@ -1,7 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,step,isVisible,dropDepthCharge,save,restore,getSoundings} from '../src/sim.js';
-import {environmentAt,DAY_SECONDS,WEATHER,TIMES,surfaceHeight,scopeWashed,soundings,waterColumnLight} from '../src/environment.js';
+import {environmentAt,DAY_SECONDS,WEATHER,TIMES,surfaceHeight,scopeWashed,soundings} from '../src/environment.js';
+import {waterColumnLight} from '../src/sea-shading.js';
 import {AIR_SOUND_SPEED,WATER_SOUND_SPEED,airWaterPath,propagationTime,perceivedSound,engineSound,emitSound,updateAcoustics} from '../src/acoustics.js';
 import * as sea from '../src/environment.js';
 import {SUB_DESIGN as design} from '../src/hull-design.js';

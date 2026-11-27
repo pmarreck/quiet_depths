@@ -267,3 +267,12 @@ without a literal on its right.
 default ]` treat a present but malformed field as missing. The harness uses
 them on well-formed test data; the Elm save decoder must instead fall back
 only when a field is absent, as the TypeScript validation does.
+
+**Environment (2026-11-27).** The sea shader's wave sum and the underwater
+daylight moved to `typescript/sea-shading.ts`: only the renderer uses them,
+so they stay TypeScript after the cutover. The unused `SEA_GLSL` was removed.
+The mutation check of `Sim.Environment` was stopped by the session's
+low-memory guard after 26 of 50 mutants: 23 failed the tests, two were
+equivalent (the first front's blend guard, now removed from the Elm, and the
+dawn/dusk hour threshold, where no hour between 11 and 12 has mid daylight),
+and `weather-order` reported nothing. The other 24 have not run.
