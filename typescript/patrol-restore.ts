@@ -151,6 +151,7 @@ export function restore(raw: string): World | null {
     for (const p of s.shells) if (!allFinite(p, ['id', 'x', 'y', 'depth', 'delay', 'fromX', 'fromY', 'total'])) return null;
     if (!allFinite(s.drone, ['x', 'y', 'heading', 'depth', 'battery', 'speed', 'targetSpeed', 'targetDepth', 'targetHeading'])) return null;
     if (s.route && (!finite(s.route.x) || !finite(s.route.y))) return null;
+    // These ship checks are mirrored in elm/Sim/Ship.elm's decoder until the simulation moves to Elm: change both.
     for (const ship of s.ships) if (!ship || typeof ship.id !== 'string' || typeof ship.name !== 'string' || !['merchant', 'fishing', 'escort', 'sub', 'carrier'].includes(ship.kind) ||
       !allFinite(ship, ['x', 'y', 'heading', 'speed', 'hull', 'alert', 'attack'])) return null;
     for (const v of s.ships) {

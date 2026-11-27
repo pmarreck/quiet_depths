@@ -1,3 +1,4 @@
+// Ship, with restore's checks on a saved ship, is mirrored in elm/Sim/Ship.elm until the simulation moves to Elm: change both.
 // The whole patrol, derived from the slice each typed module declares for the
 // functions the simulation hands it. A slice that drifts out of agreement with
 // another stops compiling here instead of failing during play.
