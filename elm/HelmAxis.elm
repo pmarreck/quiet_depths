@@ -1,9 +1,11 @@
 port module HelmAxis exposing (main)
 
-{-| One axis of the helm (for example depth): its readout, a slider whose
-gold thumb is the requested value with a white tick at the actual value,
-the actual and requested text, and optional preset orders. JavaScript sends
-a reading each frame and carries out the orders this view sends back.
+{-| One axis of the helm (heading, depth or speed): its readout, optional
+turn buttons beside it, a slider whose gold thumb is the requested value with
+a white tick at the actual value, the actual and requested text, and optional
+preset orders. JavaScript sends a reading each frame and carries out the
+orders this view sends back: "set" an absolute value, or "nudge" the
+requested value by a relative amount.
 -}
 
 import Browser
@@ -14,7 +16,13 @@ import Json.Decode as Decode
 
 
 type alias Flags =
-    { axis : String, title : String, unit : String, presetsClass : String, sublabelId : String }
+    { axis : String, title : String, unit : String, presetsClass : String, sublabelId : String, nudges : List Nudge }
+
+
+{-| A button beside the readout that moves the requested value by `by`.
+-}
+type alias Nudge =
+    { id : String, label : String, aria : String, by : Float, before : Bool }
 
 
 type alias Preset =
@@ -42,7 +50,7 @@ type alias Reading =
 
 
 type alias Order =
-    { axis : String, value : Float, detent : Bool, seq : Int }
+    { axis : String, kind : String, value : Float, detent : Bool, seq : Int }
 
 
 port axisReading : (Reading -> msg) -> Sub msg
@@ -65,6 +73,7 @@ type Msg
     | Dragging Bool
     | Slide Float
     | Choose Float
+    | Turn Float
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -92,6 +101,10 @@ update msg model =
         Choose amount ->
             give amount False model
 
+        Turn by ->
+            -- Relative to whatever the app holds as requested, so nothing to hold here.
+            ( model, axisOrder {axis = model.flags.axis, kind = "nudge", value = by, detent = False, seq = model.seq} )
+
 
 give : Float -> Bool -> Model -> ( Model, Cmd Msg )
 give amount detent model =
@@ -102,7 +115,7 @@ give amount detent model =
     -- Elm reapplies an input's value on every render; hold the player's value
     -- so a render before the app answers cannot snap the slider back a step.
     ( {model | seq = seq, pending = Just amount, reading = Maybe.map (\r -> {r | requested = amount}) model.reading}
-    , axisOrder {axis = model.flags.axis, value = amount, detent = detent, seq = seq}
+    , axisOrder {axis = model.flags.axis, kind = "set", value = amount, detent = detent, seq = seq}
     )
 
 
@@ -122,10 +135,25 @@ view model =
             let
                 axis =
                     model.flags.axis
+
+                nudgeButtons reading before =
+                    model.flags.nudges
+                        |> List.filter (\n -> n.before == before)
+                        |> List.map (\n -> button [ id n.id, attribute "aria-label" n.aria, disabled (not reading.enabled), onClick (Turn n.by) ] [ text n.label ])
             in
             div [ class "axis-controls" ]
                 ([ div [ class "control-label" ] [ text (model.flags.title ++ " "), span [] [ text model.flags.unit ] ]
-                 , div [ class "big-value" ] [ b [ id (axis ++ "-value") ] [ text r.value ], span [ id model.flags.sublabelId, style "color" r.sublabelColor ] [ text r.sublabel ] ]
+                 , div [ class "big-value" ]
+                    (nudgeButtons r True
+                        ++ b [ id (axis ++ "-value") ] [ text r.value ]
+                        :: (if model.flags.sublabelId == "" then
+                                []
+
+                            else
+                                [ span [ id model.flags.sublabelId, style "color" r.sublabelColor ] [ text r.sublabel ] ]
+                           )
+                        ++ nudgeButtons r False
+                    )
                  , div [ class "dual-range", attribute "style" ("--actual:" ++ number r.actualPercent ++ "%") ]
                     [ input
                         [ attribute "aria-label" r.ariaLabel

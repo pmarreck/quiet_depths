@@ -37,7 +37,7 @@ test('the compass replaces the widescreen heading slider without removing the ac
  assert.match(page,/<div id="helm-compass" class="helm-compass-frame" aria-hidden="true"><div id="helm-compass-root"><\/div><\/div>/);
  assert.ok(css.startsWith('.wide-label,.helm-status,.helm-compass-frame{display:none}'),'compact layouts keep the existing heading controls');
  const band=css.slice(css.indexOf('@media (min-width:1101px)'));
- assert.ok(band.includes('.helm>.course-control>.dual-range{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}'),
+ assert.ok(band.includes('.helm>.course-control>.axis-controls>.dual-range{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}'),
   'keyboard and screen-reader users keep the native heading slider');
  assert.ok(band.includes('.helm>.course-control .helm-compass-frame{display:block;grid-area:compass;justify-self:center;align-self:center;position:relative;width:146px;height:146px;overflow:hidden;'));
 });
