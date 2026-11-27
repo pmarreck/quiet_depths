@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Hull contacts | about 20 min | identity became roles, mutation a threaded fold, `hurt` a parameter; three modules to stay under 500 lines; the Carrier port's `Int` hits met the ship record's `Maybe Float` |
 | Track estimates | about 15 min | first port on the shared records; the omniscient chart's exact marks became their own type, since they are not contacts |
 
 The early leaf ports ran about 10 to 20 minutes each for 30 to 150 lines.
@@ -353,3 +354,33 @@ the state, only the outbound half crosses each frame, and a snapshot of what
 the renderer draws would be far smaller still. Part two, the same in a
 browser with real ticks, needs headless Chromium, which the session's
 low-memory guard stopped; restarting it waits for the owner.
+
+## The large sample: hull contacts and systems (plan, 2026-11-27)
+
+Chosen because `systems` is the largest module (350 lines) and depends only
+on `hull-contacts` (166) and the replay channel, while `combat` and the
+patrol tick sit on long chains of unported modules. What makes it hard:
+
+- `resolveTraffic` compares bodies by identity (`a === s`, `body === s.site`)
+  across the player's boat, the site, ships and throwaway wreck copies. The
+  Elm port names each body's role instead (boat, site, ship by index,
+  wreck copy) and threads one state through the pairs in the same order,
+  since a ship pushed in one pair is the ship the next pair sees. Hits on a
+  wreck copy are discarded, as the TypeScript discards the copy.
+- It calls back into `systems`' `hurt`, which the Elm takes as a function
+  parameter so its effect lands at the same moment; replay moments become
+  returned events.
+- `systems` owns the player's `Boat` record, the third shared shape, which
+  the port takes as an extensible record naming the fields each function
+  uses, as the TypeScript slices do.
+
+**Hull contacts, done.** Differential tests cover 6,000 hull pairs, keel
+limits and shoal pushes over real shoals, and 1,200 traffic scenes resolved
+pair by pair: the boat among ships of every kind, sites (one of them
+drifting), settled wrecks, collisions on cooldown, sheared periscopes,
+groundings and civilian losses with and without the boat to blame. Of 31
+mutants, two survive by explanation: the near-parallel determinant guard
+(both branches reach the same closest points) and the tie-break between two
+equally deep part pairs (an exact floating tie needs a measure-zero
+arrangement). The TypeScript's `a !== s.site` in the vertical push is
+redundant, since a site weighs nothing unless it floats; the Elm drops it.

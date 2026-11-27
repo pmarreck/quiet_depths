@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/HullContacts.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its geometry is mirrored in elm/Sim/HullGeometry.elm and its roles in elm/Sim/HullTraffic.elm.
 import {scopeExtension} from './periscope.ts';
 import {replayEvent} from './replay-events.ts';
 import {carrierSize, incidentalHull} from './carrier.ts';
