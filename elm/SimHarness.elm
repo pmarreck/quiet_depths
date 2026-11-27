@@ -10,7 +10,12 @@ in order.
 import Json.Decode as D
 import Json.Encode as E
 import Platform
+import Sim.Debrief as Debrief
 import Sim.Equipment as Equipment
+import Sim.HullDesign as HullDesign
+import Sim.SeabedRest as SeabedRest
+import Sim.TorpedoTubes as TorpedoTubes
+import Sim.WatchWarnings as WatchWarnings
 
 
 port calls : ({ id : Int, fn : String, batch : List D.Value } -> msg) -> Sub msg
@@ -36,6 +41,116 @@ call1 a encode f =
 call2 : D.Decoder a -> D.Decoder b -> (r -> E.Value) -> (a -> b -> r) -> D.Decoder E.Value
 call2 a b encode f =
     D.map2 (\x y -> encode (f x y)) (arg 0 a) (arg 1 b)
+
+
+call3 : D.Decoder a -> D.Decoder b -> D.Decoder c -> (r -> E.Value) -> (a -> b -> c -> r) -> D.Decoder E.Value
+call3 a b c encode f =
+    D.map3 (\x y z -> encode (f x y z)) (arg 0 a) (arg 1 b) (arg 2 c)
+
+
+call5 : D.Decoder a -> D.Decoder b -> D.Decoder c -> D.Decoder d -> D.Decoder e -> (r -> E.Value) -> (a -> b -> c -> d -> e -> r) -> D.Decoder E.Value
+call5 a b c d e encode f =
+    D.map5 (\v w x y z -> encode (f v w x y z)) (arg 0 a) (arg 1 b) (arg 2 c) (arg 3 d) (arg 4 e)
+
+
+maybe : (a -> E.Value) -> Maybe a -> E.Value
+maybe encode =
+    Maybe.map encode >> Maybe.withDefault E.null
+
+
+battery : D.Decoder WatchWarnings.Battery
+battery =
+    D.int
+        |> D.andThen
+            (\level ->
+                case level of
+                    0 ->
+                        D.succeed WatchWarnings.Charged
+
+                    1 ->
+                        D.succeed WatchWarnings.Low
+
+                    2 ->
+                        D.succeed WatchWarnings.Critical
+
+                    _ ->
+                        D.fail ("unknown battery warning " ++ String.fromInt level)
+            )
+
+
+batteryLevel : WatchWarnings.Battery -> Int
+batteryLevel level =
+    case level of
+        WatchWarnings.Charged ->
+            0
+
+        WatchWarnings.Low ->
+            1
+
+        WatchWarnings.Critical ->
+            2
+
+
+warnings : D.Decoder WatchWarnings.Warnings
+warnings =
+    D.map2 WatchWarnings.Warnings (D.field "bottom" D.bool) (D.field "battery" battery)
+
+
+encodeWarnings : WatchWarnings.Warnings -> E.Value
+encodeWarnings w =
+    E.object [ ( "bottom", E.bool w.bottom ), ( "battery", E.int (batteryLevel w.battery) ) ]
+
+
+entry : D.Decoder Debrief.Entry
+entry =
+    D.map2 Debrief.Entry (D.field "time" D.float) (D.field "text" D.string)
+
+
+encodeEntry : Debrief.Entry -> E.Value
+encodeEntry e =
+    E.object [ ( "time", E.float e.time ), ( "text", E.string e.text ) ]
+
+
+tubeState : D.Decoder { time : Float, torps : Int, portReadyAt : Float, starboardReadyAt : Float }
+tubeState =
+    D.map4 (\time torps portAt starboardAt -> { time = time, torps = torps, portReadyAt = portAt, starboardReadyAt = starboardAt })
+        (D.field "time" D.float)
+        (D.field "torps" D.int)
+        (D.at [ "tubeReadyAt", "port" ] D.float)
+        (D.at [ "tubeReadyAt", "starboard" ] D.float)
+
+
+tubeName : TorpedoTubes.Tube -> String
+tubeName tube =
+    case tube of
+        TorpedoTubes.Port ->
+            "port"
+
+        TorpedoTubes.Starboard ->
+            "starboard"
+
+
+encodeTubes : TorpedoTubes.Tubes -> E.Value
+encodeTubes t =
+    E.object [ ( "port", maybe E.float t.port_ ), ( "starboard", maybe E.float t.starboard ), ( "next", maybe (tubeName >> E.string) t.next ) ]
+
+
+encodeDesign : E.Value
+encodeDesign =
+    let
+        d =
+            HullDesign.design
+    in
+    E.object
+        [ ( "year", E.int d.year ), ( "hullRadius", E.float d.hullRadius ), ( "propellerRadius", E.float d.propellerRadius )
+        , ( "propellerPitch", E.float d.propellerPitch ), ( "propellerZ", E.float d.propellerZ ), ( "propellerBlades", E.int d.propellerBlades )
+        , ( "shaftRadius", E.float d.shaftRadius ), ( "sailRadius", E.float d.sailRadius ), ( "sailBarrel", E.float d.sailBarrel )
+        , ( "sailStretch", E.float d.sailStretch ), ( "bridgeZ", E.float d.bridgeZ ), ( "bridgeRoof", E.float d.bridgeRoof )
+        , ( "bridgeEye", E.float d.bridgeEye ), ( "bridgeRailRadius", E.float d.bridgeRailRadius ), ( "scopeZ", E.float d.scopeZ )
+        , ( "scopeEye", E.float d.scopeEye ), ( "tubeSide", E.float d.tubeSide ), ( "tubeDown", E.float d.tubeDown )
+        , ( "tubeForward", E.float d.tubeForward )
+        , ( "stations", E.list (\s -> E.object [ ( "z", E.float s.z ), ( "radius", E.float s.radius ) ]) d.stations )
+        ]
 
 
 part : D.Decoder Equipment.Part
@@ -121,6 +236,45 @@ function name =
 
         "equipment.hitSystem" ->
             Just (call2 (D.nullable section) D.float (Equipment.systemKey >> E.string) Equipment.hitSystem)
+
+        "watchWarnings.warnings" ->
+            Just (call3 D.float D.float (D.nullable warnings) encodeWarnings WatchWarnings.warnings)
+
+        "watchWarnings.batteryCall" ->
+            Just (call1 battery (maybe E.string) WatchWarnings.batteryCall)
+
+        "watchWarnings.bottomCall" ->
+            Just (D.succeed (E.string WatchWarnings.bottomCall))
+
+        "debrief.add" ->
+            Just (call3 D.float D.string (D.list entry) (E.list encodeEntry) Debrief.add)
+
+        "seabedRest.touchdownImpact" ->
+            Just (call2 D.float D.float E.float SeabedRest.touchdownImpact)
+
+        "seabedRest.touchdownChance" ->
+            Just (call1 D.float E.float SeabedRest.touchdownChance)
+
+        "seabedRest.touchdownDamage" ->
+            Just (call1 D.float E.float SeabedRest.touchdownDamage)
+
+        "seabedRest.seabedWear" ->
+            Just (call2 D.float D.float E.float SeabedRest.seabedWear)
+
+        "seabedRest.restingStealth" ->
+            Just (call2 D.bool D.float E.float SeabedRest.restingStealth)
+
+        "seabedRest.sweepClutter" ->
+            Just (call2 D.bool D.float E.float SeabedRest.sweepClutter)
+
+        "torpedoTubes.tubes" ->
+            Just (call1 tubeState encodeTubes TorpedoTubes.tubes)
+
+        "torpedoTubes.exitPitch" ->
+            Just (call5 D.float D.float D.float D.float D.float E.float TorpedoTubes.exitPitch)
+
+        "hullDesign.design" ->
+            Just (D.succeed encodeDesign)
 
         _ ->
             Nothing
