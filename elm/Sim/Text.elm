@@ -27,10 +27,10 @@ surrogate, which no character function reads, is found by bisection.
 -}
 unitOf : String -> Int
 unitOf unit =
-    if unit >= fromUnit 0xD800 && unit <= fromUnit 0xDFFF then
+    if fromUnit 0xD800 <= unit && unit <= fromUnit 0xDFFF then
         let
             search low high =
-                if low >= high then
+                if high <= low then
                     low
 
                 else
@@ -117,7 +117,7 @@ toFixed digits x =
                 toFloat (floor p)
 
             up =
-                p - below - 0.5 >= negate err
+                negate err <= p - below - 0.5
 
             n =
                 whole

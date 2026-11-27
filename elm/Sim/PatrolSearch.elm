@@ -172,7 +172,7 @@ protectedTransit =
 -}
 advanceApproach : Float -> Float -> SearchArea -> ( Bool, SearchArea )
 advanceApproach dt timeRate search =
-    if search.activeSeconds >= searchSeconds && search.protectedTime >= protectedTransit then
+    if searchSeconds <= search.activeSeconds && protectedTransit <= search.protectedTime then
         ( False, search )
 
     else
@@ -183,7 +183,7 @@ advanceApproach dt timeRate search =
         ( True
         , { search
             | activeSeconds =
-                if active > searchSeconds - 1.0e-8 then
+                if searchSeconds - 1.0e-8 < active then
                     searchSeconds
 
                 else

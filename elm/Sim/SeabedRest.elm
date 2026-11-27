@@ -55,7 +55,7 @@ seabedWear effortKnots dt =
         effort =
             M.abs effortKnots
     in
-    if effort > restingKnots then
+    if restingKnots < effort then
         wearPerKnotSecond * effort * dt
 
     else

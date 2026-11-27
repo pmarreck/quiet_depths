@@ -158,7 +158,7 @@ chartDepth chart x y =
                         old + (shelf - old) * blend
 
                     ashore =
-                        if y > coast.mainland - 5600 then
+                        if coast.mainland - 5600 < y then
                             let
                                 shore =
                                     coast.mainland + 2500 * sin (x / 5200 + coast.phase) + 1300 * sin (x / 1900 + coast.second) + 440 * sin (x / 670 + coast.phase)
@@ -179,7 +179,7 @@ chartDepth chart x y =
                             reach =
                                 i.length * 2.5 + i.width
                         in
-                        if M.abs dx > reach || M.abs dy > reach then
+                        if reach < M.abs dx || reach < M.abs dy then
                             depth
 
                         else

@@ -120,7 +120,7 @@ surfaceCrossing s sea =
                     along =
                         (px - s.x) * east + (py - s.y) * north
                 in
-                if along > found.leading then
+                if found.leading < along then
                     { found | leading = along, x = px, y = py }
 
                 else
@@ -253,7 +253,7 @@ recordWake s sea wake =
         trimmed =
             case wake of
                 first :: _ ->
-                    if s.time - first.time > wakeLifetime then
+                    if wakeLifetime < s.time - first.time then
                         List.filter (\p -> s.time - p.time <= wakeLifetime) wake
 
                     else

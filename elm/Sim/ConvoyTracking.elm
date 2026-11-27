@@ -30,7 +30,7 @@ convoy.
 -}
 trackingConvoy : Listener a b -> TrackingCriteria -> Bool
 trackingConvoy s c =
-    if not (s.noise < c.quieterThan && s.depth > c.deeperThan) then
+    if not (s.noise < c.quieterThan && c.deeperThan < s.depth) then
         False
 
     else

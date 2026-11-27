@@ -57,7 +57,7 @@ registerCarrierHit ship =
                 , flood = M.max ship.flood (toFloat (hits * 2))
             }
     in
-    if hits >= fatalHits then
+    if fatalHits <= hits then
         { hit | disabled = True, speed = 0 }
 
     else
@@ -82,7 +82,7 @@ incidentalHull ship damage =
 
 carrierDoomed : { a | directHits : Int } -> Bool
 carrierDoomed ship =
-    ship.directHits >= fatalHits
+    fatalHits <= ship.directHits
 
 
 {-| Each hit past the fatal one speeds her descent after she slips under. -}
@@ -94,7 +94,7 @@ carrierDescentFactor ship =
 {-| Once doomed she settles as buoyancy goes. -}
 advanceCarrierFlood : Float -> Carrier a -> Carrier a
 advanceCarrierFlood dt ship =
-    if ship.directHits >= fatalHits then
+    if fatalHits <= ship.directHits then
         { ship | hull = M.max 0 (ship.hull - dt * toFloat (ship.directHits - fatalHits + 1)) }
 
     else
@@ -115,4 +115,4 @@ validCarrier ship =
         && ship.directHits >= 0
         && ship.hull >= 0
         && ship.hull <= 100
-        && (ship.hull > 0 || ship.directHits >= fatalHits)
+        && (ship.hull > 0 || fatalHits <= ship.directHits)

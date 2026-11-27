@@ -21,7 +21,7 @@ test('Elm sinking poses, depths and descent match the TypeScript for every surfa
 test('Elm wreck visibility matches the TypeScript for charted, settled, collapsed and sinking vessels', async () => {
   const random = seeded(42), cases = [];
   for (const kind of [...surface, 'sub']) for (const hull of [0, 10]) for (const settled of [undefined, false, true]) for (const collapsed of [undefined, true])
-    for (const sunkAt of [undefined, 0, 30]) for (const observed of [undefined, true]) for (const sinkDepth of [undefined, 10, 60]) for (const now of [40, 110, 200]) {
+    for (const sunkAt of [undefined, 0, 30, NaN]) for (const observed of [undefined, true]) for (const sinkDepth of [undefined, 10, 60, NaN]) for (const now of [40, 110, 200]) {
       const v = {kind, hull};
       if (settled !== undefined) v.settled = settled;
       if (collapsed !== undefined) v.collapsed = collapsed;

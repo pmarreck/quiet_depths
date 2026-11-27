@@ -31,7 +31,7 @@ add time text entries =
 
 keepLatest : List Entry -> List Entry
 keepLatest entries =
-    if List.length entries > limit then
+    if limit < List.length entries then
         List.drop 1 entries
 
     else

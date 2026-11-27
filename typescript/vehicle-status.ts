@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/VehicleStatus.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {operatingFraction} from './equipment.ts';
 import {boatPoint} from './surface-motion.ts';
 import {clamp, separation} from './mechanics.ts';

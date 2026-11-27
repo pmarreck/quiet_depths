@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Pressure.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {expm1} from './sim-math.ts';
 import {damagePart} from './equipment.ts';
 import {clamp, log, rand, type LogEntry} from './mechanics.ts';

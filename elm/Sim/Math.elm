@@ -74,10 +74,10 @@ max a b =
     if isNaN a || isNaN b then
         0 / 0
 
-    else if a > b then
+    else if b < a then
         a
 
-    else if b > a then
+    else if a < b then
         b
 
     else if isNegativeZero a then

@@ -123,7 +123,7 @@ scanSector eye object mode reach =
         dz =
             Maybe.withDefault 0 object.depth - eye.depth
     in
-    if M.hypot3 dx dy dz > reach then
+    if reach < M.hypot3 dx dy dz then
         False
 
     else

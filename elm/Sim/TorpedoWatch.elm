@@ -97,7 +97,7 @@ observe boat echo active tracks =
             else
                 let
                     secondFix =
-                        active && track.fixes == 1 && echo.time > track.activeAt
+                        active && track.fixes == 1 && track.activeAt < echo.time
 
                     ( previousX, previousY, previousAt ) =
                         if secondFix then
@@ -113,7 +113,7 @@ observe boat echo active tracks =
                         echo.y - previousY
 
                     fixed =
-                        if active && echo.time > track.activeAt then
+                        if active && track.activeAt < echo.time then
                             { track | fixes = 2, activeAt = echo.time, activeX = echo.x, activeY = echo.y }
 
                         else
@@ -172,7 +172,7 @@ threats now =
         (\t ->
             case t.arrival of
                 Just arrival ->
-                    arrival >= now && now - t.time <= 8
+                    now <= arrival && now - t.time <= 8
 
                 Nothing ->
                     False

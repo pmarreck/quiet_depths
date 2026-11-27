@@ -108,5 +108,5 @@ wreckVisible v now =
 
             Surface ship ->
                 (v.collapsed || v.settled)
-                    && now - Maybe.withDefault now v.sunkAt >= surfaceCollapseAge
-                    && Maybe.withDefault 0 v.sinkDepth > submergedDepth ship
+                    && surfaceCollapseAge <= now - Maybe.withDefault now v.sunkAt
+                    && submergedDepth ship < Maybe.withDefault 0 v.sinkDepth

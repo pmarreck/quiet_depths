@@ -252,3 +252,18 @@ binary value half up, so `(0.15).toFixed(1)` is "0.1"; rounding `x * 10` gets
 such cases wrong. Five simulation modules format numbers with it, so
 `Sim.Text.toFixed` reproduces it exactly with Dekker's error-free product,
 checked on 80,000 values and 42,000 near-ties.
+
+**Porting trap: comparisons.** Elm emits JavaScript's `<`, `>`, `<=` and
+`>=` only when one side is a literal. Between two variables it calls
+`_Utils_cmp`, which counts NaN as greater, so `a > b` and `a >= b` come out
+true when either is NaN, where JavaScript says false. `<` and `<=` keep
+JavaScript's meaning. Found by a surviving mutant in the weapon geometry;
+34 comparisons were flipped (`b < a` for `a > b`), NaN cases now cover the
+ones a NaN state could reach (pressure level, wreck visibility, survey
+completion), and a test fails the build on any `>` or `>=` in `elm/Sim`
+without a literal on its right.
+
+**For the save decoder.** `Json.Decode.maybe` and `oneOf [ field, succeed
+default ]` treat a present but malformed field as missing. The harness uses
+them on well-formed test data; the Elm save decoder must instead fall back
+only when a field is absent, as the TypeScript validation does.

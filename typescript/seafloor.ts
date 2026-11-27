@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Seafloor.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {bottom} from './mechanics.ts';
 
 export const FLOOR_WIDTH = 16000, FLOOR_SEGMENTS = 140;

@@ -239,7 +239,7 @@ equipment already at its limit stay as they are.
 -}
 repair : Float -> Part -> Part
 repair amount part =
-    if part.condition <= 0 || part.condition >= part.limit then
+    if part.condition <= 0 || part.limit <= part.condition then
         part
 
     else

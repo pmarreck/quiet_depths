@@ -23,7 +23,7 @@ scanRate pass c =
             M.abs pass.speed
 
         inside =
-            pass.range < c.horizontalRange && pass.vertical < c.verticalRange && speed >= c.slowestKnots && speed <= c.fastestKnots
+            pass.range < c.horizontalRange && pass.vertical < c.verticalRange && c.slowestKnots <= speed && speed <= c.fastestKnots
     in
     if inside then
         Equipment.operatingFraction pass.sonar
@@ -39,4 +39,4 @@ addScan scan rate dt c =
 
 surveyComplete : { a | scan : Float, photoAngles : List Float } -> SurveyCriteria -> Bool
 surveyComplete op c =
-    op.scan >= c.scanSeconds || List.length op.photoAngles >= c.photographs
+    c.scanSeconds <= op.scan || c.photographs <= List.length op.photoAngles

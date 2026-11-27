@@ -80,7 +80,7 @@ exitPitch current requested age elapsed duration =
     if elapsed <= 0 || age <= duration / 2 then
         current
 
-    else if age >= duration then
+    else if duration <= age then
         requested
 
     else

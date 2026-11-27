@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/CombatGeometry.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {clamp, rad} from './mechanics.ts';
 import {carrierSize} from './carrier.ts';
 import type {Aloft, Point} from './combat-types.ts';

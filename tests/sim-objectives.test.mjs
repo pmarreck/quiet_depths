@@ -50,7 +50,7 @@ test('Elm wreck survey scanning and completion match the TypeScript', async () =
   const scans = [[44, 1, 1], [44.9, .5, .2], [45, 1, 1], [0, 0, 0], [10, NaN, 1], ...Array.from({length: 500}, () => [random() * 50, random(), random() * 3])];
   assert.deepEqual(await elm('wreckSurvey.addScan', scans), scans.map(([scan, rate, dt]) => addScan(scan, rate, dt, surveyCriteria)));
   const ops = [];
-  for (const scan of [0, 44.999, 45, 60]) for (const n of [0, 2, 3, 4]) ops.push([{scan, photoAngles: Array.from({length: n}, (_, i) => i * 60)}]);
+  for (const scan of [0, 44.999, 45, 60, NaN]) for (const n of [0, 2, 3, 4]) ops.push([{scan, photoAngles: Array.from({length: n}, (_, i) => i * 60)}]);
   assert.deepEqual(await elm('wreckSurvey.surveyComplete', ops), ops.map(([op]) => surveyComplete(op, surveyCriteria)));
 });
 

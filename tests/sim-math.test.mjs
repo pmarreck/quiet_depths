@@ -141,3 +141,17 @@ test('Elm writes numbers exactly as JavaScript toFixed does, rounding the binary
   }
   assert.deepEqual(await elm('text.toFixed', cases), cases.map(([d, v]) => v.toFixed(d)));
 });
+
+// Elm compiles <, >, <= and >= to JavaScript's operators only when one side
+// is a literal. Between two variables it calls _Utils_cmp, which counts NaN
+// as greater, so `a > b` and `a >= b` are true when either is NaN, where
+// JavaScript says false. `<` and `<=` keep JavaScript's meaning, so the
+// simulation writes `b < a` for `a > b`, and `>` or `>=` only before a literal.
+test('Elm simulation modules compare two values only with < and <=, which NaN cannot fool', () => {
+  const dir = new URL('../elm/Sim/', import.meta.url), offenders = [];
+  for (const file of readdirSync(dir).filter(f => f.endsWith('.elm'))) {
+    const code = readFileSync(new URL(file, dir), 'utf8').replace(/\{-[\s\S]*?-\}/g, '').replace(/--.*$/gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''");
+    for (const m of code.matchAll(/(?<![-|>=<])>=?(?!>)\s+(?!\(?-?\d)(\S+)/g)) offenders.push(`${file}: ${m[0].trim().slice(0, 30)}`);
+  }
+  assert.deepEqual(offenders, []);
+});

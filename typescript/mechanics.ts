@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Mechanics.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {operatingFraction} from './equipment.ts';
 import {SUB_DESIGN} from './hull-design.ts';
 // Simulation coordinates: x east, y north, depth down. SI units except knots/degrees.

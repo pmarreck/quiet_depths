@@ -57,6 +57,6 @@ stationKeeping : Float -> Float -> Float -> RescueCriteria -> StationKeeping
 stationKeeping range speed depthError c =
     let
         onStation =
-            range >= c.closestRange && range <= c.farthestRange && M.abs speed <= c.fastestKnots
+            c.closestRange <= range && range <= c.farthestRange && M.abs speed <= c.fastestKnots
     in
     { onStation = onStation, holding = onStation && M.abs depthError < c.depthTolerance }
