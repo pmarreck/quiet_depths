@@ -55,17 +55,23 @@ finish.
 running and the prompt returns only after leaving and re-entering. Missions
 that already succeed by extraction (Sub Hunt) are unaffected.
 
-**Decision (2026-11-27).** Partial credit: an early end is a success when
-some measurable part of the objective was met, otherwise a failure. Each
-mission needs its own partial rule, which belongs with the objective in the
-Elm mission definition. Proposed starting rules, open to owner review: at
-least one required photograph (A quiet observation), at least one of the three
-transports (Convoy), irreversible flooding started on Solstice (Big Kahuna), at
-least one survivor aboard (both rescues), half the scan time or one ROV
-photograph (survey), and half the required tracking time (Just passing
-through). A single-target interception with no sinking is a failure. Check how
-Tiebreaker, Wolf in the Henhouse and Sneaky Seamen use extraction before
-choosing their rules.
+**Decision (2026-11-27).** Partial credit: an early end is a partial success
+when some measurable part of the objective was met, otherwise a failure. A
+partial success is distinct from a full success in the service record. Each
+captain’s record tracks partial successes separately, and each counts as half
+a success toward service stars (one star per five successes). The half-credit
+accounting is tracked but not displayed. Each mission needs its own partial
+rule, which belongs with the objective in the Elm mission definition.
+
+**Open before implementation.** The owner reviews the per-mission partial
+rules. Draft rules, not yet approved: at least one required photograph (A
+quiet observation), at least one of the three transports (Convoy),
+irreversible flooding started on Solstice (Big Kahuna), at least one survivor
+aboard (both rescues), half the scan time or one ROV photograph (survey), and
+half the required tracking time (Just passing through). A single-target
+interception with no sinking is a failure. Check how Tiebreaker, Wolf in the
+Henhouse and Sneaky Seamen use extraction before drafting their rules. Also
+confirm how the debrief labels a partial success.
 
 ## 6, 7, 4 and 10. Desktop helm redesign
 

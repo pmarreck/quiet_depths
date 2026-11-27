@@ -143,9 +143,9 @@ On a narrow phone the helm sits under the scene. Hold **Port**, **Starboard**, *
 | Deck gun | Drag to aim and hold **Fire** | Hold **J** to fire |
 | Orbit and replay | Drag to rotate. Wheel, pinch or slide two fingers to zoom. Use the on-screen exit. | **V** toggles Orbit. **Esc** exits an external view or pauses/resumes a normal patrol. |
 
-Open **Settings** to rebind shortcuts, restore their defaults, or invert vertical ROV steering for both keyboard and touch. Preferences persist in the browser.
+Open **Settings** to rebind shortcuts, restore their defaults, or invert vertical ROV steering for both keyboard and touch. On a touch-only phone or tablet, keyboard hints and shortcut remapping stay hidden until you press a key on a hardware keyboard. Preferences persist in the browser.
 
-Choose **Install game** in the briefing. On an iPhone or iPad, open the game in Safari, choose **Share → Add to Home Screen**, then enable **Open as Web App** if offered. Give the game one complete online load to cache its assets for offline use. The **Quiet Depths** logo shows the build number. A new build downloads in the background. Reopen the game or choose **Check for update** in the briefing to switch versions with your patrol saves intact. Older installations can use the [update page](https://pmarreck.github.io/quiet_depths/update.html).
+On a phone or tablet, choose **Install game** in the briefing. Desktop browsers offer installation from their own menus. On an iPhone or iPad, open the game in Safari, choose **Share → Add to Home Screen**, then enable **Open as Web App** if offered. Give the game one complete online load to cache its assets for offline use. The **Quiet Depths** logo shows the build number. A new build downloads in the background. Reopen the game or choose **Check for update** in the briefing to switch versions with your patrol saves intact. Older installations can use the [update page](https://pmarreck.github.io/quiet_depths/update.html).
 
 ## Captains, service records and portable saves
 

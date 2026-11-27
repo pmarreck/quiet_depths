@@ -4,10 +4,10 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## Playtest fixes (owner feedback 2026-11-27)
 
-- [x] Fix torpedoes that veer off and search instead of running to a selected target; debug from the exported convoy save with a regression that fails on r83 (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:03 EST).
-- [ ] Show Install Game only on installable touch devices and never on desktop (context: docs/plan_context/owner-feedback-2026-11-27.md).
-- [ ] Hide keyboard hints and shortcut remapping on touch-only devices, keeping the touch ROV inversion setting (context: docs/plan_context/owner-feedback-2026-11-27.md).
-- [ ] Ask “End mission?” on entering extraction surfaced before the objective is complete, scoring per-mission partial credit (context: docs/plan_context/owner-feedback-2026-11-27.md).
+- [x] Fix torpedoes that veer off and search instead of running to a selected target; debug from the exported convoy save with a regression that fails on r83 (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:03 EST; commit ba09d65).
+- [x] Show Install Game only on installable touch devices and never on desktop (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:13 EST).
+- [x] Hide keyboard hints and shortcut remapping on touch-only devices, keeping the touch ROV inversion setting (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:13 EST).
+- [ ] Ask “End mission?” on entering extraction surfaced before the objective is complete, scoring per-mission partial credit after owner review of the draft rules (context: docs/plan_context/owner-feedback-2026-11-27.md).
 
 ## Elm migration
 

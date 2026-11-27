@@ -1,3 +1,5 @@
+import {appleTouchDevice, offersInstall, TOUCH_FIRST_QUERY} from './device-profile.ts';
+
 interface InstallPrompt extends Event {
   prompt(): Promise<void>;
   userChoice: Promise<unknown>;
@@ -7,15 +9,24 @@ const install = document.querySelector<HTMLButtonElement>('#install-game')!;
 const instructions = document.querySelector<HTMLElement>('#install-help')!;
 const updateLink = document.querySelector<HTMLAnchorElement>('#update-game')!;
 let offer: InstallPrompt | undefined;
+const touchFirst = matchMedia(TOUCH_FIRST_QUERY);
+const standalone = matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && navigator.standalone === true);
+const appleTouch = appleTouchDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
 
-if (matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && navigator.standalone)) {
-  install.hidden = true;
+function showInstall() {
+  install.hidden = !offersInstall({standalone, touchFirst: touchFirst.matches, appleTouch});
+  if (install.hidden) {
+    instructions.hidden = true;
+    install.setAttribute('aria-expanded', 'false');
+  }
 }
+showInstall();
+touchFirst.addEventListener('change', showInstall);
 
 window.addEventListener('beforeinstallprompt', event => {
   event.preventDefault();
   offer = event as InstallPrompt;
-  install.hidden = false;
+  showInstall();
 });
 
 window.addEventListener('appinstalled', () => {
