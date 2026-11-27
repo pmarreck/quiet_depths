@@ -39,7 +39,7 @@ export const underseaRescue: RescueCriteria = missions.find(m => m.id === 'under
 export const surfaceRescue: RescueCriteria = missions.find(m => m.id === 'surface-rescue')!.objective;
 
 // A surface casualty uses the surface rules; any other site uses the undersea rules.
-export const rescueCriteriaFor = (siteKind: string): RescueCriteria => siteKind === 'surface' ? surfaceRescue : underseaRescue;
+export const rescueCriteriaFor = (siteKind?: string): RescueCriteria => siteKind === 'surface' ? surfaceRescue : underseaRescue;
 
 export function initialSurvivors(emptyRoll: number, countRoll: number, c: RescueCriteria): number {
   return emptyRoll < c.emptySiteChance ? 0 : c.fewestSurvivors + Math.floor(countRoll * c.survivorSpread);
