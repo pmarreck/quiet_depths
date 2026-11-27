@@ -126,3 +126,11 @@ test('the operation range reads unconfirmed until the site is located, then adds
  const r=operationReading({...base,mission:'survey',operation:{active:1,completed:1}},'Advice.');
  assert.deepEqual([r.operation,r.survey,r.completed,r.underway,r.advice],[true,true,true,true,'Advice.']);
 });
+
+test('the footer reading words suspicion, noise and clearance as the bar showed them',async()=>{
+ const {footerReading}=await import('../src/panel-readings.js');
+ const {suspicionLabel}=await import('../src/suspicion.js');
+ const s={difficulty:{showSuspicion:true},alert:30.4,ships:[],noise:68.5};
+ assert.deepEqual(footerReading(s,213.6),{show:true,alert:30.4,alertText:suspicionLabel(30.4,[]).toUpperCase()+' 30%',noiseText:'SELF NOISE 69 dB',clearanceText:'KEEL CLEARANCE 214 m'});
+ assert.equal(footerReading({...s,difficulty:{}},0).show,false);
+});

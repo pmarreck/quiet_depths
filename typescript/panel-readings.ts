@@ -7,6 +7,7 @@ import {wrapHeading} from './controls.ts';
 import {isSurfaced} from './vehicle-status.ts';
 import {conditionLabel, SYSTEM_NAMES, DRONE_PARTS} from './equipment.ts';
 import {droneDeployReason} from './systems.ts';
+import {suspicionLabel} from './suspicion.ts';
 import {throttlePercent, SURFACE_KNOTS} from './power-plant.ts';
 import type {World} from './sim.ts';
 
@@ -138,4 +139,11 @@ export function operationReading(s: {mission: string; x: number; y: number; oper
   const range = s.site ? (s.search && !s.search.located ? 'POSITION UNCONFIRMED' : Math.round(distance(s, s.site)) + ' M') : '';
   return {operation: !!s.operation, survey: s.mission === 'survey', completed: !!s.operation?.completed, underway: !!s.operation?.active,
     range: range + (s.site && (!s.search || s.search.located) ? ' · Hull ' + Math.ceil(s.site.hull) + '%' : ''), advice: String(advice)};
+}
+
+export interface FooterReading {show: boolean; alert: number; alertText: string; noiseText: string; clearanceText: string}
+
+export function footerReading(s: {difficulty: {showSuspicion?: unknown}; alert: number; ships: readonly {tracking?: string | null}[]; noise: number}, belowKeel: number): FooterReading {
+  return {show: !!s.difficulty.showSuspicion, alert: Number(s.alert), alertText: suspicionLabel(s.alert, s.ships).toUpperCase() + ' ' + Math.round(s.alert) + '%',
+    noiseText: 'SELF NOISE ' + Math.round(s.noise) + ' dB', clearanceText: 'KEEL CLEARANCE ' + Math.round(belowKeel) + ' m'};
 }
