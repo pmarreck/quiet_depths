@@ -6,13 +6,14 @@ import {carrierSize} from './carrier.js';
 import {SYSTEM_NAMES,SYSTEM_KEYS,hitSystem,hitSection,DRONE_PARTS,DRONE_HIT_FACTORS,fullCondition,damagePart,repairPart,operatingFraction} from './equipment.js';
 import {updatePressure} from './pressure.js';
 import {keelLimit,pushOffShoal} from './hull-contacts.js';
+import {seabedWear,touchdownChance,touchdownDamage,touchdownImpact} from './seabed-rest.js';
 import {clamp,rad,bearing,delta,distance,separation,rand,log,bottom,capsuleContact,propellerState} from './mechanics.js';
 import {propagationTime,emitSound} from './acoustics.js';
 import {boatPoint,boatLocal,recoveryDock,droneReturnSpeed} from './vehicle-status.js';
 export const DRONE_LIMITS=Object.freeze({deploySpeed:3,depth:280,range:100,speed:10,returnSpeed:10});
 export {SYSTEM_NAMES} from './equipment.js';
 export const freshSystems=()=>fullCondition(SYSTEM_KEYS);
-export const freshMotion=()=>({plantVersion:1,dieselMode:'charge',fuelLeak:0,fuelFire:0,cookoff:false,outerHull:100,pressureAlarm:0,criticalExposure:0,imploded:false,collisionHits:{},verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
+export const freshMotion=()=>({plantVersion:1,dieselMode:'charge',fuelLeak:0,fuelFire:0,cookoff:false,outerHull:100,bottomed:false,pressureAlarm:0,criticalExposure:0,imploded:false,collisionHits:{},verticalSpeed:0,ballast:0,planes:0,rudder:0,pitch:0,propAngle:0,water:0,collisionCooldown:0,floodAlarm:false});
 export const freshDrone=()=>({mode:'stowed',x:0,y:0,depth:25,heading:0,battery:100,hull:100,mobility:100,buoyancy:100,camera:100,nosePitch:null,verticalSpeed:0,speed:0,targetSpeed:0,targetDepth:25,targetHeading:0,collisionCooldown:0,lowAlarm:false,rangeAlarm:false,lostReason:'',returnStage:0,returnClearance:8,returnHoldSide:18,returnHoldForward:0});
 export function droneDeployReason(s){
  if(s.difficulty?.drone===false)return 'The ROV is disabled for this patrol.';
@@ -68,6 +69,20 @@ export function damageSystem(s,key,amount){
  if(old>0&&health===0)log(s,SYSTEM_NAMES[key]+' destroyed. Beyond onboard repair.','damage');
  else if(old>=20&&health<20&&key!=='crew')log(s,SYSTEM_NAMES[key]+' offline.','damage');
  else if(old>=60&&health<60)log(s,SYSTEM_NAMES[key]+' damaged. Performance reduced.','damage');
+}
+function touchdown(s,impact){
+ s.bottomed=true;
+ // Only an uncertain landing draws from the shared patrol random stream.
+ const chance=touchdownChance(impact),struck=chance>=1||chance>0&&rand(s)<chance;
+ if(!struck){log(s,'Resting on the seabed. Stop the screw to stay quiet.');return;}
+ replayEvent(s,{kind:'ground',point:{x:s.x,y:s.y,depth:s.depth}});
+ hurt(s,touchdownDamage(impact),'Hard landing on the seabed. Check the hull.','planes');s.collisionHits.ground=s.time;
+}
+function scrapeSeabed(s,dt){
+ const wear=seabedWear(Math.max(Math.abs(s.speed),Math.abs(s.targetSpeed)),dt)*2**-(s.difficulty?.damage??0);
+ if(wear<=0)return;
+ s.outerHull=clamp(s.outerHull-wear,0,100);
+ if(s.time-(s.collisionHits.scrape??-99)>20){log(s,'Hull scraping the seabed. All stop or rise to stop the wear.','damage');s.collisionHits.scrape=s.time;}
 }
 export function hurt(s,amount,text,subsystem=null,point=null){
  if(amount<=0||s.status!=='patrol')return;
@@ -168,7 +183,13 @@ export function updateBoat(s,dt){
  if(s.depth>15||!operatingFraction(s.systems.periscope))orderScope(s,false);
  advanceScope(s,dt);
  const floor=keelLimit(s,s.environment.chartSeed);
- if(s.depth>floor){s.depth=Math.max(0,floor);if(floor<0)pushOffShoal(s,-floor,s.environment.chartSeed);if(s.time-(s.collisionHits.ground??-99)>4){replayEvent(s,{kind:'ground',point:{x:s.x,y:s.y,depth:s.depth}});hurt(s,2+Math.abs(s.speed)+Math.abs(s.verticalSpeed)*2,'Seafloor contact. Rise now.','planes');s.collisionHits.ground=s.time;}s.verticalSpeed=Math.min(0,s.verticalSpeed);s.speed*=Math.exp(-dt*1.5);}
+ if(s.depth>floor){
+  const impact=touchdownImpact(Math.max(0,s.verticalSpeed),s.speed);
+  s.depth=Math.max(0,floor);if(floor<0)pushOffShoal(s,-floor,s.environment.chartSeed);
+  if(!s.bottomed)touchdown(s,impact);
+  scrapeSeabed(s,dt);
+  s.verticalSpeed=Math.min(0,s.verticalSpeed);s.speed*=Math.exp(-dt*1.5);
+ }else if(s.bottomed&&s.depth<floor-1){s.bottomed=false;log(s,'Off the bottom.');}
  updatePressure(s,dt);if(s.status==='lost')return diesel;
  if(s.oxygen<=0){s.hull=Math.max(0,s.hull-dt*2);log(s,'Air exhausted. Surface immediately.','damage');}
  const crew=s.systems.crew/100;

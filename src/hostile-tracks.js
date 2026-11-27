@@ -3,6 +3,7 @@ import {searchSeconds} from './suspicion.js';
 import {bearing,clamp,delta,distance,log,rad,rand} from './mechanics.js';
 import {emitSound} from './acoustics.js';
 import {addDebrief} from './debrief.js';
+import {restingStealth} from './seabed-rest.js';
 
 export function playerReport(s){
  return {x:s.x,y:s.y,depth:s.depth,heading:s.heading,speed:s.speed,time:s.time};
@@ -33,7 +34,7 @@ export function updateHostileTrack(s,ship,env,dt){
  const visual=ship.kind==='sub'&&ship.depth>15?0:clamp(1-range/env.subVisualRange,0,1)*exposure;
  const depthStealth=s.difficulty?.depthStealth??1;
  const noise=s.noise*(1-.45*depthStealth*clamp(s.depth/120,0,1));
- const acoustic=clamp(1-range/5500,0,1)*noise*.7*(1-env.storm*.38*Math.exp(-s.depth/70));
+ const acoustic=clamp(1-range/5500,0,1)*noise*.7*(1-env.storm*.38*Math.exp(-s.depth/70))*restingStealth(s.bottomed,Math.max(Math.abs(s.speed),Math.abs(s.targetSpeed??s.speed)));
  const pursuit=s.difficulty?.pursuit??1,sensitivity=s.difficulty?.detection??1;
  const canSee=visual*sensitivity>=9;
  const decoyRange=s.noisemaker?distance(ship,s.noisemaker):Infinity;

@@ -128,6 +128,18 @@ hull damage in proportion to speed. The watch announces touchdown and lift-off.
 The existing seabed collision and keel-clearance rules remain the source of
 contact.
 
+**As built (2026-11-27), adjustable after playtesting.** Touchdown damage is a
+chance that rises linearly from 0 at 0.4 m/s to certain at 2 m/s. Impact speed
+is the larger of the descent rate and 0.2 × knots, so running into a bank at
+10 kn hits like a 2 m/s landing. Damage is 4 to 22 hull points with severity.
+While bottomed, effort is the larger of actual and ordered speed. Above 0.3 kn
+of effort, the outer hull wears 0.06 points per knot-second, scaled by the
+damage difficulty. At or below 0.3 kn, passive acoustic detection is
+multiplied by 0.25 and the chance that a search sweep finds the hull by 0.5.
+Lifting more than 1 m off the floor ends the resting state. The old
+seafloor test only exercised test-depth damage through seabed contact. It now
+proves pressure damage in open water and a hard landing separately.
+
 ## 9. TorpedoCam
 
 **Request.** A new unrealism option that requires Orbit. In Orbit, number keys

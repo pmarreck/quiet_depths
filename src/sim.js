@@ -17,6 +17,7 @@ import {resolveTraffic} from './hull-contacts.js';
 // Units: meters, seconds, knots, degrees clockwise from north. No rendering here.
 import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from './environment.js';
 import {emitSound,launchNoise,updateAcoustics} from './acoustics.js';
+import {sweepClutter} from './seabed-rest.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets,updateFleetBattle} from './missions.js';
 import {isDieselMode} from './power-plant.js';
@@ -160,7 +161,7 @@ function patrolSweep(s,ship,inquiry=false){
  if(!inquiry)ship.nextSweep=s.time+28+rand(s)*45;
  const nearby=clamp(1-distance(ship,s)/4500,0,1);
  const heard=rand(s)<s.difficulty.pingDetection*nearby*operatingFraction(s.systems.sonar);
- const touched=rand(s)<.25*nearby*s.difficulty.detection;
+ const touched=rand(s)<.25*nearby*s.difficulty.detection*sweepClutter(s.bottomed,Math.max(Math.abs(s.speed),Math.abs(s.targetSpeed)));
  if(heard){
   emitSound(s,{type:'sweep',x:ship.x,y:ship.y,depth:ship.depth??0,power:.85,vessel:ship.id,touched});
  }
@@ -421,7 +422,7 @@ export function restore(raw){try{
  if(s.site===undefined)s.site=null;if(s.operation===undefined)s.operation=null;
  if(s.drone){for(const [k,v] of Object.entries({...freshDrone(),targetDepth:s.drone.depth,targetHeading:s.drone.heading}))if(s.drone[k]===undefined)s.drone[k]=v;}
  const template=createGame(s.mission);for(const [k,v] of Object.entries(template)){if(typeof v==='number'&&!Number.isFinite(s[k]))return null;if(typeof v==='boolean'&&typeof s[k]!=='boolean')return null;if(Array.isArray(v)&&!Array.isArray(s[k]))return null;}
- if(s.outerHull<0||s.outerHull>100||s.criticalExposure<0||![0,1,2].includes(s.pressureAlarm)||!s.collisionHits||Array.isArray(s.collisionHits)||typeof s.collisionHits!=='object'||!Object.values(s.collisionHits).every(t=>Number.isFinite(t)&&t>=0&&t<=s.time))return null;
+ if(typeof s.bottomed!=='boolean'||s.outerHull<0||s.outerHull>100||s.criticalExposure<0||![0,1,2].includes(s.pressureAlarm)||!s.collisionHits||Array.isArray(s.collisionHits)||typeof s.collisionHits!=='object'||!Object.values(s.collisionHits).every(t=>Number.isFinite(t)&&t>=0&&t<=s.time))return null;
  if(!isDieselMode(s.dieselMode))return null;
  if(!['objective','extract'].includes(s.phase)||!['electric','diesel'].includes(s.engine)||!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y)||!s.drone||!['stowed','remote','return','lost'].includes(s.drone.mode))return null;
  s.environment.startDay??=sailingDay(s.environment.seed);
