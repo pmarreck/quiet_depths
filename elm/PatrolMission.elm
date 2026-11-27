@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), all, briefing, estimatedMinutes, fromId, startingTorpedoes)
+module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), SurveyCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
@@ -27,8 +27,76 @@ type Objective
     | ReachGate Float
     | TrackQuietly
     | FinishOperation
+    | SurveyWreck SurveyCriteria
     | FleetLead Int
     | ProtectConvoy String Int
+
+
+{-| A scanning pass counts while the sub is closer than both ranges, its speed
+is within the inclusive knot band and its sonar works. The ROV route needs
+the given number of photographs taken at least photoSeparation degrees apart
+around the wreck.
+-}
+type alias SurveyCriteria =
+    { scanSeconds : Float
+    , horizontalRange : Float
+    , verticalRange : Float
+    , slowestKnots : Float
+    , fastestKnots : Float
+    , photographs : Int
+    , photoSeparation : Float
+    }
+
+
+surveyCriteria : SurveyCriteria
+surveyCriteria =
+    { scanSeconds = 45
+    , horizontalRange = 100
+    , verticalRange = 32
+    , slowestKnots = 0.5
+    , fastestKnots = 3
+    , photographs = 3
+    , photoSeparation = 55
+    }
+
+
+countWord : Int -> String
+countWord count =
+    case count of
+        1 ->
+            "one"
+
+        2 ->
+            "two"
+
+        3 ->
+            "three"
+
+        4 ->
+            "four"
+
+        5 ->
+            "five"
+
+        _ ->
+            String.fromInt count
+
+
+surveyDescription : SurveyCriteria -> String
+surveyDescription c =
+    "Survey an old wreck on the reef shelf. Pass within "
+        ++ String.fromFloat c.horizontalRange
+        ++ " m horizontally and "
+        ++ String.fromFloat c.verticalRange
+        ++ " m vertically at "
+        ++ String.fromFloat c.slowestKnots
+        ++ "–"
+        ++ String.fromFloat c.fastestKnots
+        ++ " knots. Your sub scans automatically. Collect "
+        ++ String.fromFloat c.scanSeconds
+        ++ " seconds across as many passes as you need, or take "
+        ++ countWord c.photographs
+        ++ " ROV photos from different sides. The cable reaches 100 m."
 
 
 type CrewWatch
@@ -145,9 +213,9 @@ briefing mission =
         Survey ->
             Briefing "survey" "What the sea remembers" "WRECK SURVEY" RoutineWatch Observe
                 { standard = ( 8, 12 ), longer = ( 16, 26 ) }
-                "Survey an old wreck on the reef shelf. Pass within 100 m horizontally and 32 m vertically at 0.5–3 knots. Your sub scans automatically. Collect 45 seconds across as many passes as you need, or take three ROV photos from different sides. The cable reaches 100 m."
-                "Scan the wreck or take 3 ROV photographs"
-                FinishOperation
+                (surveyDescription surveyCriteria)
+                ("Scan the wreck or take " ++ String.fromInt surveyCriteria.photographs ++ " ROV photographs")
+                (SurveyWreck surveyCriteria)
 
         Tiebreaker ->
             Briefing "tiebreaker" "Tiebreaker" "FLEET ACTION" ActionStations Engage

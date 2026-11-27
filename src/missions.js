@@ -8,6 +8,7 @@ import {operatingFraction} from './equipment.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanics.js';
 import {hash01,TIMES} from './environment.js';
 import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-objective.js';
+import {addScan,scanRate,surveyComplete,surveyCriteria} from './wreck-survey.js';
 export {MISSIONS};
 
 export function updateFleetBattle(s){
@@ -100,28 +101,33 @@ export function dronePhotograph(s){
  if(!reach)return {ok:false,text:'ROV camera offline.'};
  if(separation(d,site)>reach||separation(d,site)<8||Math.abs(delta(bearing(d,site),d.heading))>32)return {ok:false,text:`Aim at the wreck within ${Math.floor(reach)} m. Inspect from above or beside it.`};
  const angle=bearing(site,d);
- if(o.photoAngles.some(a=>Math.abs(delta(angle,a))<55))return {ok:false,text:'This side is already recorded. Move around the wreck for another angle.'};
- o.photoAngles.push(angle);s.photoCooldown=4;log(s,`Wreck photograph ${o.photoAngles.length}/3 recorded.`,'success');return {ok:true,text:`Survey image ${o.photoAngles.length}/3 recorded.`};
+ const c=surveyCriteria;
+ if(o.photoAngles.some(a=>Math.abs(delta(angle,a))<c.photoSeparation))return {ok:false,text:'This side is already recorded. Move around the wreck for another angle.'};
+ o.photoAngles.push(angle);s.photoCooldown=4;log(s,`Wreck photograph ${o.photoAngles.length}/${c.photographs} recorded.`,'success');return {ok:true,text:`Survey image ${o.photoAngles.length}/${c.photographs} recorded.`};
 }
-export function updateOperation(s,dt){
+const SURVEY_FINDS=['A brass ship’s bell, engraved ASTER · 1912. A museum will want her story.','A sealed navigation journal and ceramic cargo. The archaeology team is delighted.','Silver trade coins in a broken strongbox. Treasure, with a provenance worth preserving.'];
+export function updateSurvey(s,dt,criteria=surveyCriteria){
  const o=s.operation;if(!o||o.completed)return false;
  const c=operationConditions(s);o.holding=c.holding;
- if(s.mission==='survey'){
-  const scan=c.range<100&&Math.abs(s.depth-s.site.depth)<32&&Math.abs(s.speed)>=.5&&Math.abs(s.speed)<=3&&operatingFraction(s.systems.sonar)>0;
-  o.active=scan;if(scan)o.scan=Math.min(45,o.scan+dt*operatingFraction(s.systems.sonar));
-  if(o.scan>=45||o.photoAngles.length>=3){o.completed=true;const finds=['A brass ship’s bell, engraved ASTER · 1912. A museum will want her story.','A sealed navigation journal and ceramic cargo. The archaeology team is delighted.','Silver trade coins in a broken strongbox. Treasure, with a provenance worth preserving.'];o.find=finds[Math.floor(hash01(s.environment.seed,819)*finds.length)];log(s,o.find,'success');}
- }else{
-  if(c.holding){o.active=true;o.assessment+=dt;
-   if(o.assessment>=22&&!o.known){o.known=true;log(s,`Rescue team report: ${o.remaining} survivors still awaiting transfer.`,'success');}
-   if(o.remaining>0){o.boarding+=dt;if(o.boarding>=9){o.boarding-=9;o.remaining--;o.rescued++;log(s,`Survivor aboard. ${o.rescued} rescued.`,'success');}}
-   if(o.known&&o.remaining===0){o.diverReturn+=dt;if(o.diverReturn>=9){o.completed=true;o.active=false;log(s,o.rescued?`Rescue team recovered. ${o.rescued} survivors safe aboard.`:'Rescue search complete. No survivors found. Team recovered.',o.rescued?'success':'warning');}}
-  }else{o.active=false;o.boarding=0;o.diverReturn=0;}
-  if(s.time>casualtyDeadline(s)&&o.remaining>0){o.lastCasualty=s.time;o.remaining--;o.dead++;if(o.known)log(s,'A survivor’s signal has stopped. Rescue window is narrowing.','warning');}
-  if(s.site.kind==='surface'){
-   const age=s.time-(s.search?.protectedTime??0);
-   s.site.depth=Math.min(bottom(s.site.x,s.site.y,s.environment.chartSeed)-5,2+age/500+Math.max(0,age-(860+hash01(s.patrol.seed,820)*220))*.35);
-   if(s.site.depth>15&&o.remaining>0){o.dead+=o.remaining;o.remaining=0;log(s,'The casualty has gone under. No further survivor signals. Recover the rescue team.','damage');}
-  }
+ const rate=scanRate({range:c.range,vertical:Math.abs(s.depth-s.site.depth),speed:s.speed,sonar:s.systems.sonar},criteria);
+ o.active=rate>0;if(o.active)o.scan=addScan(o.scan,rate,dt,criteria);
+ if(surveyComplete(o,criteria)){o.completed=true;o.find=SURVEY_FINDS[Math.floor(hash01(s.environment.seed,819)*SURVEY_FINDS.length)];log(s,o.find,'success');}
+ return o.completed;
+}
+export function updateOperation(s,dt){
+ if(s.mission==='survey')return updateSurvey(s,dt);
+ const o=s.operation;if(!o||o.completed)return false;
+ const c=operationConditions(s);o.holding=c.holding;
+ if(c.holding){o.active=true;o.assessment+=dt;
+  if(o.assessment>=22&&!o.known){o.known=true;log(s,`Rescue team report: ${o.remaining} survivors still awaiting transfer.`,'success');}
+  if(o.remaining>0){o.boarding+=dt;if(o.boarding>=9){o.boarding-=9;o.remaining--;o.rescued++;log(s,`Survivor aboard. ${o.rescued} rescued.`,'success');}}
+  if(o.known&&o.remaining===0){o.diverReturn+=dt;if(o.diverReturn>=9){o.completed=true;o.active=false;log(s,o.rescued?`Rescue team recovered. ${o.rescued} survivors safe aboard.`:'Rescue search complete. No survivors found. Team recovered.',o.rescued?'success':'warning');}}
+ }else{o.active=false;o.boarding=0;o.diverReturn=0;}
+ if(s.time>casualtyDeadline(s)&&o.remaining>0){o.lastCasualty=s.time;o.remaining--;o.dead++;if(o.known)log(s,'A survivor’s signal has stopped. Rescue window is narrowing.','warning');}
+ if(s.site.kind==='surface'){
+  const age=s.time-(s.search?.protectedTime??0);
+  s.site.depth=Math.min(bottom(s.site.x,s.site.y,s.environment.chartSeed)-5,2+age/500+Math.max(0,age-(860+hash01(s.patrol.seed,820)*220))*.35);
+  if(s.site.depth>15&&o.remaining>0){o.dead+=o.remaining;o.remaining=0;log(s,'The casualty has gone under. No further survivor signals. Recover the rescue team.','damage');}
  }
  return o.completed;
 }
@@ -135,16 +141,16 @@ export function objectiveState(s){
  if(s.mission==='seek-and-destroy')return {label:'SINK THE CONVOY',text:'Find and sink the military transports',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
  if(s.operation){const o=s.operation,c=operationConditions(s);
   if(s.mission==='survey'){
-   const camera=s.difficulty?.drone!==false&&s.drone.mode!=='lost';
-   const tally=Math.floor(o.scan)+'/45',prefix=o.active?'Scanning. ':s.drone.mode==='lost'?'ROV lost. ':'';
-   return {label:'SURVEY THE WRECK',text:tally+' s scan'+(camera?' · '+o.photoAngles.length+'/3 camera angles':''),
-    progress:tally,advice:o.find||prefix+'Your sub scans automatically at 0.5–3 kn, within 100 m horizontally and 32 m vertically. Slow passes add up.'};
+   const camera=s.difficulty?.drone!==false&&s.drone.mode!=='lost',v=surveyCriteria;
+   const tally=Math.floor(o.scan)+'/'+v.scanSeconds,prefix=o.active?'Scanning. ':s.drone.mode==='lost'?'ROV lost. ':'';
+   return {label:'SURVEY THE WRECK',text:tally+' s scan'+(camera?' · '+o.photoAngles.length+'/'+v.photographs+' camera angles':''),
+    progress:tally,advice:o.find||prefix+`Your sub scans automatically at ${v.slowestKnots}–${v.fastestKnots} kn, within ${v.horizontalRange} m horizontally and ${v.verticalRange} m vertically. Slow passes add up.`};
   }
   return {label:s.site.kind==='surface'?'RECOVER SURVIVORS':'DIVER RESCUE',text:`${o.rescued} aboard · ${o.known?o.remaining:'?'} awaiting rescue`,progress:o.rescued+'/'+(o.known?o.rescued+o.remaining:'?'),advice:o.completed?`${o.rescued} survivors and the rescue team aboard. Surface at extraction.`:c.holding?(o.known?'Hold position. Transfers every 9 seconds.':'Hold position. Rescue team assessing the casualty…'):`Hold 30–${s.site.kind==='surface'?85:75} m away · depth ${c.depth.toFixed(0)} m ±${s.site.kind==='surface'?1:5} · ≤0.6 kn`};
  }
  return {label:s.mission==='recon'?'PHOTOGRAPH THE CONVOY':s.mission==='intercept'?'INTERCEPT '+(s.ships.find(v=>v.id==='cobalt')?.name||'MILITARY FREIGHTER').toUpperCase():'LISTEN WITHOUT BEING SEEN',text:s.mission==='recon'?`Photograph ${s.patrol.photoGoal} different merchant ships`:s.mission==='shadow'?`Track quietly for ${s.patrol.trackGoal} seconds`:MISSIONS.find(m=>m.id===s.mission).short,progress:s.mission==='recon'?s.photos.length+'/'+s.patrol.photoGoal:s.mission==='shadow'?Math.min(s.patrol.trackGoal,Math.floor(s.trackTime))+'/'+s.patrol.trackGoal:'0/1',advice:''};
 }
-export const objectiveComplete=(s,dt)=>evaluateObjective(s,dt,updateOperation);
+export const objectiveComplete=(s,dt)=>evaluateObjective(s,dt,{operation:updateOperation,survey:updateSurvey});
 export function randomizePatrol(s,seed){
  const h=n=>hash01(seed,n),heading=220+h(21)*65,start={x:(h(22)-.5)*500,y:(h(23)-.5)*500};
  s.patrol={seed,startingTorpedoes:s.torps,photoGoal:2+Math.floor(h(24)*2),trackGoal:150+30*Math.floor(h(25)*4),variant:1+Math.floor(h(26)*999)};

@@ -1,5 +1,6 @@
 import {missions} from './mission-catalog.ts';
 import {friendlyLead} from './fleet-action.ts';
+import type {SurveyCriteria} from './wreck-survey.ts';
 
 export {missions as MISSIONS};
 type Mission = (typeof missions)[number];
@@ -20,11 +21,13 @@ export function allSunk(ships: Patrol['ships'], targets: readonly string[]): boo
   return targets.every(id => ships.find(ship => ship.id === id)?.hull === 0);
 }
 
-export function evaluateObjective<P extends Patrol>(
-  state: P,
-  dt: number,
-  advanceOperation: (state: P, dt: number) => boolean
-): boolean {
+// Mission work that changes patrol state each tick stays with the simulation.
+export interface ObjectiveWork<P> {
+  operation: (state: P, dt: number) => boolean;
+  survey: (state: P, dt: number, criteria: SurveyCriteria) => boolean;
+}
+
+export function evaluateObjective<P extends Patrol>(state: P, dt: number, work: ObjectiveWork<P>): boolean {
   const goal = objectives.get(state.mission);
   if (!goal) throw new Error('Unknown patrol mission: ' + state.mission);
   switch (goal.kind) {
@@ -43,6 +46,8 @@ export function evaluateObjective<P extends Patrol>(
     case 'track':
       return state.trackTime >= state.patrol.trackGoal;
     case 'operation':
-      return advanceOperation(state, dt);
+      return work.operation(state, dt);
+    case 'survey':
+      return work.survey(state, dt, goal);
   }
 }

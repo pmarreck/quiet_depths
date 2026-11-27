@@ -34,6 +34,17 @@ encodeObjective objective =
         FinishOperation ->
             rule "operation" []
 
+        SurveyWreck c ->
+            rule "survey"
+                [ ( "scanSeconds", E.float c.scanSeconds )
+                , ( "horizontalRange", E.float c.horizontalRange )
+                , ( "verticalRange", E.float c.verticalRange )
+                , ( "slowestKnots", E.float c.slowestKnots )
+                , ( "fastestKnots", E.float c.fastestKnots )
+                , ( "photographs", E.int c.photographs )
+                , ( "photoSeparation", E.float c.photoSeparation )
+                ]
+
         FleetLead margin ->
             rule "fleetLead" [ ( "margin", E.int margin ) ]
 
