@@ -2,7 +2,7 @@ import type * as Three from './vendor/three.module.js';
 import {applyScopePose} from './periscope.ts';
 import {lensFilter} from './instrument-damage.ts';
 import {operatingFraction} from './equipment.ts';
-import {WEATHER,surfaceHeight} from './environment.ts';
+import {WEATHER,isWeather,surfaceHeight} from './environment.ts';
 
 const MAX_SIDE=640,MAX_CHARACTERS=300000;
 const finite=Number.isFinite;
@@ -89,7 +89,7 @@ export function captureOptics(o: OpticsRig | null | undefined, health = 100): st
  return finish(canvas,context,{seed:source.width*31+source.height});
 }
 function photoEnvironment(plan: SatellitePlan){
- const preset=WEATHER[plan.weather.id as keyof typeof WEATHER]||WEATHER.clear,{daylight: given, hour: clock}=plan.weather,daylight=typeof given==='number'&&finite(given)?given:plan.night?0:1,hour=typeof clock==='number'&&finite(clock)?clock:plan.night?22:12,angle=(hour-6)*Math.PI/12;
+ const preset=isWeather(plan.weather.id)?WEATHER[plan.weather.id as keyof typeof WEATHER]:WEATHER.clear,{daylight: given, hour: clock}=plan.weather,daylight=typeof given==='number'&&finite(given)?given:plan.night?0:1,hour=typeof clock==='number'&&finite(clock)?clock:plan.night?22:12,angle=(hour-6)*Math.PI/12;
  return{...preset,...plan.weather,daylight,twilight:1-Math.abs(daylight*2-1),sunDirection:{x:Math.cos(angle),y:Math.sin(angle),z:-.32}};
 }
 function disposeGroup(group: Three.Object3D){

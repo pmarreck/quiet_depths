@@ -70,3 +70,12 @@ test('a satellite exposure isolates sea appearance and releases its temporary ma
  ocean.renderer.render=()=>{assert.notEqual(ocean.water.material,live);ocean.water.material.addEventListener('dispose',()=>disposed=true);throw new Error('isolated sea exposure');};
  assert.throws(()=>captureSatellite(ocean,{},packet()),/isolated sea exposure/);assert.equal(ocean.water.material,live);assert.equal(disposed,true);
 });
+test('a saved photograph naming an unknown or prototype weather is lit as clear weather',async()=>{
+ const {WEATHER}=await import('../src/environment.js');
+ for(const id of ['constructor','toString','__proto__','monsoon']){
+  const ocean=fakeScene();let seen;
+  ocean.renderer.render=()=>{seen=ocean.waterUniforms.waveScale.value;throw new Error('checked capture weather');};
+  assert.throws(()=>captureSatellite(ocean,{},{...packet(),weather:{id,daylight:1,hour:12}}),/checked capture weather/);
+  assert.equal(seen,WEATHER.clear.waveScale,id);
+ }
+});

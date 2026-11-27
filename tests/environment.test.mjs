@@ -157,3 +157,15 @@ test('pre-weather patrols migrate without losing mission progress or helm orders
 test('a damaging pressure front is applied only once, including after save/load',()=>{
  const s=createGame();s.depth=90;emitSound(s,{type:'blast',x:s.x,y:s.y,depth:90});let calls=0;updateAcoustics(s,()=>calls++);updateAcoustics(s,()=>calls++);const r=restore(save(s));updateAcoustics(r,()=>calls++);assert.equal(calls,1);
 });
+
+test('weather and time names are looked up only among the defined ones, never on the object prototype',async()=>{
+ const {makeEnvironment,environmentAt}=await import('../src/environment.js'),{createGame,save,restore}=await import('../src/sim.js');
+ for(const name of ['constructor','toString','__proto__','hasOwnProperty','valueOf']){
+  assert.equal(makeEnvironment(7,{weather:name}).startWeather,'clear',name);
+  assert.equal(makeEnvironment(7,{timeOfDay:name}).startHour,18,name);
+  const s=createGame('recon',3);s.environment.startWeather=name;
+  assert.equal(restore(save(s)),null,'a save naming '+name+' as its weather is rejected');
+ }
+ const e=environmentAt({environment:makeEnvironment(7,{weather:'constructor'}),time:0});
+ assert.ok(Number.isFinite(e.visibility)&&e.weatherId==='clear');
+});

@@ -22,8 +22,11 @@ export const WEATHER = Object.freeze({
 } satisfies Record<string, Weather>);
 export const TIMES = Object.freeze({dawn: {name: 'Dawn', hour: 6}, day: {name: 'Day', hour: 12}, dusk: {name: 'Dusk', hour: 18}, night: {name: 'Night', hour: 22}});
 // Lookups by saved or chosen name, including names this build does not know.
-const weatherNamed = WEATHER as Readonly<Record<string, Weather | undefined>>;
-const timeNamed = TIMES as Readonly<Record<string, {name: string; hour: number} | undefined>>;
+// Only the defined names count: a name such as "constructor" must not reach
+// the object prototype.
+const weatherNamed = (name: string): Weather | undefined => Object.hasOwn(WEATHER, name) ? (WEATHER as Readonly<Record<string, Weather>>)[name] : undefined;
+const timeNamed = (name: string) => Object.hasOwn(TIMES, name) ? (TIMES as Readonly<Record<string, {name: string; hour: number}>>)[name] : undefined;
+export const isWeather = (name: unknown): boolean => typeof name === 'string' && weatherNamed(name) !== undefined;
 
 export interface EnvironmentConfig {startDay?: number; chartSeed: number; startHour: number; startWeather: string; changing: boolean; seed: number}
 type Direction = {x: number; y: number; z: number};
@@ -39,15 +42,15 @@ type Sky = {environment?: EnvironmentConfig; time?: number; wavePhase?: number; 
 
 export function makeEnvironment(seed = 19830604, options: {timeOfDay?: string; weather?: string; changing?: boolean} = {}): EnvironmentConfig {
   return {startDay: sailingDay(seed), chartSeed: seed >>> 0,
-    startHour: options.timeOfDay === 'random' ? Object.values(TIMES)[Math.floor(hash01(seed, 750) * 4)].hour : timeNamed[options.timeOfDay as string]?.hour ?? 18,
-    startWeather: options.weather === 'random' ? Object.keys(WEATHER)[Math.floor(hash01(seed, 751) * 4)] : weatherNamed[options.weather as string] ? options.weather as string : 'clear',
+    startHour: options.timeOfDay === 'random' ? Object.values(TIMES)[Math.floor(hash01(seed, 750) * 4)].hour : timeNamed(options.timeOfDay as string)?.hour ?? 18,
+    startWeather: options.weather === 'random' ? Object.keys(WEATHER)[Math.floor(hash01(seed, 751) * 4)] : weatherNamed(options.weather as string) ? options.weather as string : 'clear',
     changing: options.changing !== false, seed: seed >>> 0};
 }
 
 export function environmentAt(s: Sky): Environment {
   const cfg = s.environment || makeEnvironment(), time = s.time || 0, ids = Object.keys(WEATHER), slot = Math.floor(time / 300);
   const idAt = (n: number) => n <= 0 ? cfg.startWeather : ids[Math.floor(hash01(cfg.seed, n) * ids.length)];
-  const a = weatherNamed[idAt(cfg.changing ? slot - 1 : 0)]!, b = weatherNamed[idAt(cfg.changing ? slot : 0)]!;
+  const a = weatherNamed(idAt(cfg.changing ? slot - 1 : 0))!, b = weatherNamed(idAt(cfg.changing ? slot : 0))!;
   const blend = slot > 0 && cfg.changing ? smooth(0, 75, time % 300) : 0;
   // Fields are assigned in a fixed order, as the original module did.
   const e = {} as Environment;

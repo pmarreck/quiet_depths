@@ -9,7 +9,7 @@ import {validTubeTimes} from './torpedo-tubes.ts';
 import {validAlliedWatch} from './convoy-watch.ts';
 import {validEcho, validTracks} from './torpedo-watch.ts';
 import {BOAT_PARTS, DRONE_PARTS, readLimits} from './equipment.ts';
-import {makeEnvironment, WEATHER} from './environment.ts';
+import {makeEnvironment, isWeather} from './environment.ts';
 import {MISSIONS, validMissionTargets} from './missions.ts';
 import {isDieselMode} from './power-plant.ts';
 import {maxNosePitch} from './rov-flight.ts';
@@ -115,7 +115,7 @@ export function restore(raw: string): World | null {
     s.environment.startDay ??= sailingDay(s.environment.seed);
     if (!Number.isInteger(s.environment.startDay) || s.environment.startDay < 0 || s.environment.startDay > 365) return null;
     if (s.environment?.chartSeed !== undefined && (!Number.isInteger(s.environment.chartSeed) || s.environment.chartSeed < 0 || s.environment.chartSeed > 0xffffffff)) return null;
-    if (!s.environment || !(WEATHER as Readonly<Record<string, unknown>>)[s.environment.startWeather] || !finite(s.environment.startHour) || !finite(s.environment.seed) ||
+    if (!s.environment || !isWeather(s.environment.startWeather) || !finite(s.environment.startHour) || !finite(s.environment.seed) ||
       typeof s.environment.changing !== 'boolean') return null;
     if (!s.systems || Object.keys(freshSystems()).some(k => { const v = (s.systems as Fields)[k]; return !finite(v) || (v as number) < 0 || (v as number) > 100; })) return null;
     s.repairLimits = readLimits(BOAT_PARTS, {...s.systems, hull: s.hull}, s.repairLimits)!;
