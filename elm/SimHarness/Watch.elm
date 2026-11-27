@@ -4,9 +4,11 @@ module SimHarness.Watch exposing (function)
 
 import Json.Decode as D
 import Json.Encode as E
+import Sim.Carrier as Carrier
 import Sim.Foundering as Foundering
 import Sim.TorpedoWatch as TorpedoWatch
-import SimHarness.Codec exposing (andMap, arg, call1, call2, flag, maybe, point, position3, surfaceShip, vesselKind)
+import Sim.Vessel as Vessel
+import SimHarness.Codec exposing (andMap, arg, call1, call2, flag, maybe, point, position3, safeInt, surfaceShip, vesselKind, wholeNumber)
 
 
 vessel : D.Decoder (Foundering.Vessel {})
@@ -19,6 +21,46 @@ vessel =
         |> andMap (flag "settled")
         |> andMap (flag "collapsed")
         |> andMap (D.maybe (D.at [ "wreckMark", "observed" ] D.bool) |> D.map (Maybe.withDefault False))
+
+
+carrier : D.Decoder (Carrier.Carrier {})
+carrier =
+    D.map5 (\hits hull flood disabled speed -> { directHits = hits, hull = hull, flood = flood, disabled = disabled, speed = speed })
+        (D.field "directHits" D.int)
+        (D.field "hull" D.float)
+        (D.field "flood" D.float)
+        (D.field "disabled" D.bool)
+        (D.field "speed" D.float)
+
+
+encodeCarrier : Carrier.Carrier {} -> E.Value
+encodeCarrier c =
+    E.object [ ( "directHits", E.int c.directHits ), ( "hull", E.float c.hull ), ( "flood", E.float c.flood ), ( "disabled", E.bool c.disabled ), ( "speed", E.float c.speed ) ]
+
+
+{-| A ship as incidental damage reads it: hull defaults to 100 and direct
+hits to none, as the TypeScript's `??` does.
+-}
+struck : D.Decoder { kind : Vessel.Kind, hull : Float, directHits : Int }
+struck =
+    D.map3 (\kind hull hits -> { kind = kind, hull = hull, directHits = hits })
+        (D.field "kind" vesselKind)
+        (D.maybe (D.field "hull" D.float) |> D.map (Maybe.withDefault 100))
+        (D.maybe (D.field "directHits" D.int) |> D.map (Maybe.withDefault 0))
+
+
+{-| A saved carrier passes when its counts are whole and the rules hold. -}
+validCarrier : D.Value -> Bool
+validCarrier value =
+    D.decodeValue
+        (D.map4 (\fighters flood hits hull -> Carrier.validCarrier { fighterCount = fighters, flood = flood, directHits = hits, hull = hull })
+            (D.field "fighterCount" wholeNumber)
+            (D.field "flood" D.float)
+            (D.field "directHits" safeInt)
+            (D.field "hull" D.float)
+        )
+        value
+        |> Result.withDefault False
 
 
 encodePose : { roll : Float, pitch : Float, wave : Float } -> E.Value
@@ -98,6 +140,34 @@ function name =
 
         "foundering.wreckVisible" ->
             Just (call2 vessel D.float E.bool Foundering.wreckVisible)
+
+        "carrier.constants" ->
+            Just
+                (D.succeed
+                    (E.object
+                        [ ( "carrierId", E.string Carrier.carrierId )
+                        , ( "carrierSize", E.object [ ( "halfLength", E.float Carrier.carrierSize.halfLength ), ( "halfBeam", E.float Carrier.carrierSize.halfBeam ), ( "deckHeight", E.float Carrier.carrierSize.deckHeight ) ] )
+                        ]
+                    )
+                )
+
+        "carrier.registerCarrierHit" ->
+            Just (call1 carrier encodeCarrier Carrier.registerCarrierHit)
+
+        "carrier.advanceCarrierFlood" ->
+            Just (call2 carrier D.float encodeCarrier (\c dt -> Carrier.advanceCarrierFlood dt c))
+
+        "carrier.incidentalHull" ->
+            Just (call2 struck D.float E.float Carrier.incidentalHull)
+
+        "carrier.carrierDoomed" ->
+            Just (call1 (D.field "directHits" D.int) E.bool (\hits -> Carrier.carrierDoomed { directHits = hits }))
+
+        "carrier.carrierDescentFactor" ->
+            Just (call1 (D.field "directHits" D.int) E.float (\hits -> Carrier.carrierDescentFactor { directHits = hits }))
+
+        "carrier.validCarrier" ->
+            Just (D.map (validCarrier >> E.bool) (arg 0 D.value))
 
         "torpedoWatch.gameEcho" ->
             Just (D.map4 (\b s t v -> encodeEcho (TorpedoWatch.gameEcho b s t v)) (arg 0 position3) (arg 1 shot) (arg 2 D.float) (arg 3 D.float))

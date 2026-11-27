@@ -67,3 +67,26 @@ test('the Elm periscope raises, lowers and reaches the eye height the TypeScript
   const advances = scopes.flatMap(s => [0, .1, .3, 1.5, 2.9999, 3, 4, ...(s.scopeTravel === undefined ? [] : [3 * Math.abs(Number(s.scope) - s.scopeTravel)])].map(t => [s, t]));
   assert.deepEqual(await elm('periscope.advanceScope', advances), advances.map(([s, t]) => {const c = {...s}; periscope.advanceScope(c, t); return c;}));
 });
+
+test('Elm rescue rules match the TypeScript for both rescues', async () => {
+  const rescue = await import('../src/rescue-operation.js'), random = seeded(55);
+  const kinds = ['surface', 'wreck', 'sub', null, 'Surface'].map(k => [k]);
+  // The catalog tags each objective with its kind; the Elm record's constructor carries it instead.
+  const untagged = ({kind, ...criteria}) => (assert.equal(kind, 'rescue'), criteria);
+  assert.deepEqual(await elm('rescueOperation.rescueCriteriaFor', kinds), kinds.map(([k]) => untagged(rescue.rescueCriteriaFor(k ?? undefined))));
+  const sink = rescue.surfaceRescue.sinking, depths = [];
+  for (const age of [0, 500, 859.99, 860, 1080, 1500, 4000]) for (const roll of [0, .5, .999]) for (const resting of [2, 3.5, 20, 400]) depths.push([age, roll, resting]);
+  for (let i = 0; i < 600; i++) depths.push([random() * 3000, random(), 5 + random() * 300]);
+  assert.deepEqual(await elm('rescueOperation.casualtyDepth', depths), depths.map(([age, roll, resting]) => rescue.casualtyDepth(age, roll, sink, resting)));
+  const named = {surface: rescue.surfaceRescue, undersea: rescue.underseaRescue}, survivors = [], losses = [], stations = [];
+  for (const name of Object.keys(named)) {
+    for (const empty of [0, .0799999, .08, .5]) for (const count of [0, .124, .125, .999]) survivors.push([empty, count, name]);
+    for (const dead of [0, 1, 7]) for (const roll of [0, .5, .999]) losses.push([dead, roll, name]);
+    for (const range of [29.999, 30, 75, 75.001, 85, 85.001]) for (const speed of [-0.61, -0.6, 0, 0.6, 0.6001]) for (const error of [-5, -4.999, 0, 0.999, 1, 4.999, 5])
+      stations.push([range, speed, error, name]);
+    for (let i = 0; i < 400; i++) stations.push([random() * 120, (random() - .5) * 2, (random() - .5) * 14, name]);
+  }
+  assert.deepEqual(await elm('rescueOperation.initialSurvivors', survivors), survivors.map(([e, c, n]) => rescue.initialSurvivors(e, c, named[n])));
+  assert.deepEqual(await elm('rescueOperation.nextLossDelay', losses), losses.map(([d, r, n]) => rescue.nextLossDelay(d, r, named[n])));
+  assert.deepEqual(await elm('rescueOperation.stationKeeping', stations), stations.map(([r, s, e, n]) => rescue.stationKeeping(r, s, e, named[n])));
+});

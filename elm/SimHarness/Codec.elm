@@ -1,4 +1,4 @@
-module SimHarness.Codec exposing (andMap, arg, call1, call2, call3, call5, flag, maybe, point, position3, surfaceShip, vesselKind)
+module SimHarness.Codec exposing (andMap, arg, call1, call2, call3, call5, flag, maybe, point, position3, safeInt, surfaceShip, vesselKind, wholeNumber)
 
 {-| Decoding a call's arguments and encoding its result, shared by the harness tables. -}
 
@@ -83,3 +83,31 @@ surfaceShip =
 vesselKind : D.Decoder Vessel.Kind
 vesselKind =
     D.oneOf [ D.string |> D.andThen (\k -> if k == "sub" then D.succeed Vessel.Submarine else D.fail "surface"), D.map Vessel.Surface surfaceShip ]
+
+
+{-| JavaScript's `Number.isInteger`: a finite whole number of any size. -}
+wholeNumber : D.Decoder Int
+wholeNumber =
+    D.float
+        |> D.andThen
+            (\f ->
+                if isNaN f || isInfinite f || toFloat (round f) /= f then
+                    D.fail "not a whole number"
+
+                else
+                    D.succeed (round f)
+            )
+
+
+{-| JavaScript's `Number.isSafeInteger`: a whole number of at most 2^53 - 1. -}
+safeInt : D.Decoder Int
+safeInt =
+    wholeNumber
+        |> D.andThen
+            (\n ->
+                if Basics.abs (toFloat n) <= 9007199254740991 then
+                    D.succeed n
+
+                else
+                    D.fail "not a safe integer"
+            )

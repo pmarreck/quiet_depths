@@ -131,3 +131,11 @@ Level 1 so far: `Sim.ReconPhotos`, `Sim.ConvoyTracking`, `Sim.WreckSurvey` and
 differential tests also confirm the generated catalog matches the Elm
 records. Vessel kinds live in `Sim.Vessel`. `applyScopePose` poses the mast
 model and stays with the renderer.
+
+`Sim.RescueOperation` and `Sim.Carrier` follow. `carrierGroup`, which builds
+whole ship records, waits for the Elm ship type: a ship carries 47 fields in
+the TypeScript (the intersection of every vessel slice), and the vessel
+dynamics modules settle what most of them mean, so `Sim.Ship` will be
+designed with them. Until then the ports take extensible records naming the
+fields they use, as the TypeScript slices do. `carrierDeck` is the
+renderer's. Site kinds live in `Sim.Site`.

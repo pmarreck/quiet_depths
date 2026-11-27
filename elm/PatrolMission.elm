@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EarlyEnd(..), PartialCredit(..), EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), EncounterOdds, PatrolTiming, PhotoCriteria, RescueCriteria, SinkingCasualty, SurveyCriteria, TrackingCriteria, all, briefing, convoyTracking, estimatedMinutes, fromId, encounterOdds, merchantPhotos, patrolTiming, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EarlyEnd(..), PartialCredit(..), EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), EncounterOdds, PatrolTiming, PhotoCriteria, RescueCriteria, SinkingCasualty, SurveyCriteria, TrackingCriteria, all, briefing, carrierFatalHits, convoyTracking, estimatedMinutes, fromId, encounterOdds, merchantPhotos, patrolTiming, startingTorpedoes, surfaceRescue, surveyCriteria, underseaRescue)
 
 startingTorpedoes : Int
 startingTorpedoes =

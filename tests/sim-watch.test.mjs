@@ -75,3 +75,37 @@ test('Elm torpedo echoes and tracks follow the TypeScript fix by fix', async () 
   const threatCases = steps.map(([s]) => [s.time, s.torpedoTracks]);
   assert.deepEqual(await elm('torpedoWatch.threats', threatCases), steps.map(([s]) => watch.threats(s)));
 });
+
+test('Elm carrier hits, flooding, incidental damage and save checks match the TypeScript', async () => {
+  const carrier = await import('../src/carrier.js'), random = seeded(44);
+  const [constants] = await elm('carrier.constants');
+  assert.deepEqual(constants, {carrierId: carrier.carrierId, carrierSize: {...carrier.carrierSize}});
+  // A carrier taking hit after hit, from fresh through doomed and beyond.
+  const hits = [];
+  for (const start of [{directHits: 0, hull: 100, flood: 0, disabled: false, speed: 12}, {directHits: 0, hull: 25, flood: 3, disabled: false, speed: 4}, {directHits: 1, hull: 5, flood: 0, disabled: false, speed: 9}]) {
+    let ship = {...start};
+    for (let i = 0; i < 5; i++) {hits.push([{...ship}]); carrier.registerCarrierHit(ship);}
+  }
+  assert.deepEqual(await elm('carrier.registerCarrierHit', hits), hits.map(([s]) => {const c = {...s}; carrier.registerCarrierHit(c); return c;}));
+  const floods = hits.flatMap(([s]) => [0, .5, 7, 300].map(dt => [s, dt]));
+  assert.deepEqual(await elm('carrier.advanceCarrierFlood', floods), floods.map(([s, dt]) => {const c = {...s}; carrier.advanceCarrierFlood(c, dt); return c;}));
+  const counts = [0, 1, 2, 3, 6].map(n => [{directHits: n}]);
+  assert.deepEqual(await elm('carrier.carrierDoomed', counts), counts.map(([s]) => carrier.carrierDoomed(s)));
+  assert.deepEqual(await elm('carrier.carrierDescentFactor', counts), counts.map(([s]) => carrier.carrierDescentFactor(s)));
+  const struck = [];
+  for (const kind of ['carrier', 'escort', 'merchant', 'fishing', 'sub']) for (const hull of [undefined, 100, 12, 1, 0]) for (const directHits of [undefined, 0, 1, 2])
+    for (const damage of [0, 11, 12, 13, 150]) {
+      const ship = {kind};
+      if (hull !== undefined) ship.hull = hull;
+      if (directHits !== undefined) ship.directHits = directHits;
+      struck.push([ship, damage]);
+    }
+  assert.deepEqual(await elm('carrier.incidentalHull', struck), struck.map(([s, d]) => carrier.incidentalHull(s, d)));
+  const saves = [];
+  for (const fighterCount of [0, 1, 3, 4, 1.5, NaN]) for (const flood of [0, 4, -1, Infinity, NaN]) for (const directHits of [0, 1, 2, 3, -1, 1.5, 2 ** 53])
+    for (const hull of [-1, 0, 0.5, 100, 100.5, NaN]) saves.push([{fighterCount, flood, directHits, hull}]);
+  for (let i = 0; i < 300; i++) saves.push([{fighterCount: 1 + Math.floor(random() * 3), flood: random() * 10, directHits: Math.floor(random() * 4), hull: random() * 100}]);
+  const valid = saves.map(([s]) => carrier.validCarrier(s));
+  assert.ok(valid.filter(Boolean).length > 50, 'the corpus includes valid carriers');
+  assert.deepEqual(await elm('carrier.validCarrier', saves), valid);
+});
