@@ -31,7 +31,7 @@ import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
-import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading} from './panel-readings.js';
+import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading} from './panel-readings.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
@@ -253,6 +253,7 @@ const boatCondition=globalThis.Elm.BoatCondition.init({node:$('boat-condition-ro
 const droneBay=globalThis.Elm.DroneBay.init({node:$('drone-bay-root')});
 const stationStrip=globalThis.Elm.StationStrip.init({node:$('station-strip-root')});
 const helmCaption=globalThis.Elm.HelmCaption.init({node:$('helm-caption-root')});
+const captainsLog=globalThis.Elm.CaptainsLog.init({node:$('captains-log-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
@@ -716,24 +717,17 @@ $('ticker-next').onclick=()=>{
  const items=$('ticker-items');
  items.scrollLeft=items.scrollLeft+items.clientWidth<items.scrollWidth-1?items.scrollLeft+items.clientWidth:0;
 };
-let lastLogHead=null,logSequence=0;
+let lastLogHead=null,lastLogCount=-1,logSequence=0;
 const logKeys=new WeakMap();
+const logKey=event=>{if(!logKeys.has(event))logKeys.set(event,++logSequence);return logKeys.get(event);};
 function updatePatrolLog(events){
- const list=$('log');
- if(events[0]===lastLogHead&&list.childElementCount===events.length)return;
- lastLogHead=events[0];
- const atTop=list.scrollTop===0;
- reconcileKeyedChildren(list,events,event=>{
-  if(!logKeys.has(event))logKeys.set(event,++logSequence);
-  return logKeys.get(event);
- },event=>{
-  const row=document.createElement('div'),time=document.createElement('time'),message=document.createElement('span');
-  row.className='log-entry '+event.kind;
-  time.textContent=String(Math.floor(event.t/60)).padStart(2,'0')+':'+String(Math.floor(event.t%60)).padStart(2,'0');
-  message.textContent=event.text;row.append(time,message);return row;
- },()=>{});
- if(atTop)list.scrollTop=0;
- $('log-count').textContent=String(events.length).padStart(2,'0');
+ if(events[0]===lastLogHead&&events.length===lastLogCount)return;
+ lastLogHead=events[0];lastLogCount=events.length;
+ // A reader at the top stays there as entries arrive. Elm draws on the next
+ // animation frame; this callback is queued after that draw, before paint.
+ const atTop=$('log').scrollTop===0;
+ captainsLog.ports.logReading.send(logReading(events,logKey));
+ if(atTop)requestAnimationFrame(()=>{$('log').scrollTop=0;});
 }
 function updateUI(){
  if(!patrolStarted||replay)return;

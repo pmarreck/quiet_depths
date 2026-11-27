@@ -34,7 +34,14 @@ test('every statically required application control exists in the HTML exactly o
  const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8'),app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);assert.equal(ids.length,new Set(ids).size,'HTML IDs must be unique');
  const required=new Set([...app.matchAll(/(?:\$\(|bindCommand\()'([^']+)'/g)].map(m=>m[1]));
- for(const id of required)assert.ok(ids.includes(id),`missing required UI control: ${id}`);
+ // Elm views the page mounts render some controls. An id comes from the page or
+ // from Elm, never both, and every id the script looks up comes from one of them.
+ const mounted=[...new Set([...app.matchAll(/globalThis\.Elm\.(\w+)\.init/g)].map(m=>m[1]))];
+ const views=await Promise.all(mounted.map(name=>readFile(new URL(`../elm/${name}.elm`,import.meta.url),'utf8')));
+ const rendered=new Set(views.flatMap(source=>[...source.matchAll(/\bid "([^"]+)"/g)].map(m=>m[1])));
+ assert.ok(rendered.has('log'),'the Elm views are scanned');
+ for(const id of rendered)assert.ok(!ids.includes(id),`rendered by Elm and also static in the HTML: ${id}`);
+ for(const id of required)assert.ok(ids.includes(id)||rendered.has(id),`missing required UI control: ${id}`);
 });
 
 test('each modal takes its accessible name from its own heading',async()=>{

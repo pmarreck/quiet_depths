@@ -86,3 +86,18 @@ test('the station reading formats weather and time as the strip showed them',asy
  assert.deepEqual([r.bottomed,r.surfaced,r.silent],[true,true,true]);
  assert.equal(stationReading({depth:NaN},env,'0000').surfaced,false,'an unknown depth is not surfaced');
 });
+
+test('log entries keep their keys and read as the log always showed them',async()=>{
+ const {logReading,logTime}=await import('../src/panel-readings.js');
+ const {log}=await import('../src/sim.js');
+ assert.deepEqual([logTime(0),logTime(59.9),logTime(61.5),logTime(3725)],['00:00','00:59','01:01','62:05']);
+ const keys=new WeakMap();let n=0;const keyOf=e=>{if(!keys.has(e))keys.set(e,++n);return keys.get(e);};
+ const s={events:[],time:5};
+ log(s,'Dived.');s.time=75;log(s,'Contact.','warning');
+ const first=logReading(s.events,keyOf);
+ assert.deepEqual(first,{count:'02',entries:[{key:'1',kind:'warning',time:'01:15',text:'Contact.'},{key:'2',kind:'info',time:'00:05',text:'Dived.'}]});
+ s.time=80;log(s,'Surfaced.','success');
+ const next=logReading(s.events,keyOf);
+ assert.deepEqual(next.entries.map(e=>e.key),['3','1','2'],'existing rows keep their keys when an entry arrives');
+ assert.deepEqual(logReading([{t:0}],keyOf).entries[0],{key:'4',kind:'undefined',time:'00:00',text:''});
+});

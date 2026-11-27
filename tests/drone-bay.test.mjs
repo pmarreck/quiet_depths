@@ -6,7 +6,7 @@ const read=path=>readFile(new URL('../'+path,import.meta.url),'utf8');
 const [page,app,elm]=await Promise.all([read('src/index.html'),read('src/app.js'),read('elm/DroneBay.elm')]);
 
 test('the drone bay panel is drawn only by its Elm view',()=>{
- assert.match(page,/<div id="drone-bay-root"><\/div><\/div><section class="log-panel">/);
+ assert.match(page,/<div id="drone-bay-root"><\/div><\/div><div id="captains-log-root"><\/div>/);
  for(const id of ['drone-bay-mode','drone-bay-metrics','drone-bay-advice']){
   assert.doesNotMatch(page,new RegExp(`id="${id}"`),'index.html must not keep a static #'+id);
   assert.match(elm,new RegExp(`id "${id}"`),'the Elm view renders #'+id);

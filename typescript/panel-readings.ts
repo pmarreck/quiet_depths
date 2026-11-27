@@ -100,3 +100,16 @@ export function stationReading(s: {bottomed?: unknown; depth: number; silent?: u
   return {bottomed: !!s.bottomed, surfaced: isSurfaced(s), depth: Number(s.depth), silent: !!s.silent,
     weather: env.phase + ' · ' + env.weather + ' · SEA ' + env.seaState, time: env.date + ' · ' + clock + 'Z'};
 }
+
+export interface LogEntryReading {key: string; kind: string; time: string; text: string}
+export interface LogReading {count: string; entries: LogEntryReading[]}
+
+/** Patrol time as minutes and seconds, each at least two digits. */
+export const logTime = (t: number) => String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+
+/** `keyOf` gives each event object a lasting key, so its row survives new entries.
+ * A missing kind or text reads as the class and textContent showed it. */
+export function logReading(events: {t: number; kind?: unknown; text?: unknown}[], keyOf: (event: object) => number): LogReading {
+  return {count: String(events.length).padStart(2, '0'),
+    entries: events.map(e => ({key: String(keyOf(e)), kind: String(e.kind), time: logTime(e.t), text: String(e.text ?? '')}))};
+}
