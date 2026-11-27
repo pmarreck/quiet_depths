@@ -248,6 +248,7 @@ $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const telegraph=globalThis.Elm.EngineTelegraph.init({node:$('telegraph-root')});
 const compass=globalThis.Elm.HelmCompass.init({node:$('helm-compass-root')});
+const soundingsStrip=globalThis.Elm.Soundings.init({node:$('soundings-root')});
 const propulsionPanel=globalThis.Elm.HelmPropulsion.init({node:$('propulsion-root')});
 const dieselModeOptions=Object.entries(dieselModes).map(([value,label])=>({value,label}));
 // Elm helm axes. Slider moves and presets arrive as orders checked as clicks
@@ -835,10 +836,9 @@ function updateUI(){
  $('viewport').dataset.lastLightning=s.lightning.at(-1)?.id||'';$('viewport').dataset.heardThunder=s.acoustics.filter(a=>a.type==='thunder'&&a.heard).length;
  $('viewport').dataset.visibleBolt=String(!!scene?.boltVisible);
  const droneSounding=view==='drone'&&['remote','return'].includes(s.drone.mode),seabed=getSoundings(s,droneSounding);
- $('below-label').textContent=droneSounding?'BELOW DRONE':'BELOW KEEL';$('below-keel').textContent=seabed.belowKeel.toFixed(0)+' m';$('water-depth').textContent=seabed.waterDepth>0?seabed.waterDepth.toFixed(0)+' m':'LAND';
- const warning=seabed.belowKeel<0?'BOTTOM CONTACT':seabed.belowKeel<10?'DANGER · RISE':seabed.belowKeel<30?'SHALLOW CLEARANCE':'CLEAR BELOW';if($('seabed-advice').textContent!==warning)$('seabed-advice').textContent=warning;
- $('soundings').classList.toggle('caution',seabed.belowKeel<30);$('soundings').classList.toggle('danger',seabed.belowKeel<10);
- $('wind-value').textContent=Math.round(env.wind)+' km/h WIND';$('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
+ soundingsStrip.ports.soundingsReading.send({drone:droneSounding,belowKeel:seabed.belowKeel,belowKeelText:seabed.belowKeel.toFixed(0)+' m',
+  waterDepthText:seabed.waterDepth>0?seabed.waterDepth.toFixed(0)+' m':'LAND',windText:Math.round(env.wind)+' km/h WIND'});
+ $('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
  const lampContact=matchingBearing(s.convoy?.pin,s,s.time,s.contacts);
  const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.fix?.source==='lamp'?'LAMP FIX · '+Math.round(s.time-c.fix.time)+' s old':c.id===lampContact?'POSSIBLE SUB · LAMP + PASSIVE':affiliation(c)||(c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED'))+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
