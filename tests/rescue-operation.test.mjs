@@ -1,0 +1,86 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createGame,save,restore} from '../src/sim.js';
+import {updateOperation,operationConditions} from '../src/missions.js';
+
+// Reference behavior recorded from r91. Separation limits are inclusive, the
+// speed limit is inclusive, and the depth tolerance is strict.
+const SEEDS=[0,1972,4294967295];
+const RESCUES={'undersea-rescue':{farthest:75,tolerance:5},'surface-rescue':{farthest:85,tolerance:1}};
+const SPEEDS=[[.6,true],[-.6,true],[.61,false]];
+
+// Integer site coordinates keep offsets such as 30 m exact in floating point.
+function rescueAt(mission,seed,range,depthOffset,speed){
+ const s=createGame(mission,seed),site=s.site;
+ Object.assign(site,{x:Math.round(site.x),y:Math.round(site.y),depth:Math.round(site.depth)});
+ const station=operationConditions(s).depth;
+ Object.assign(s,{x:site.x+range,y:site.y,depth:station+depthOffset,targetDepth:station+depthOffset,speed,targetSpeed:speed,ships:[]});
+ return s;
+}
+
+test('rescue station keeping follows the recorded separation, speed and depth boundaries, before and after a restore',()=>{
+ let cases=0;
+ for(const [mission,{farthest,tolerance}] of Object.entries(RESCUES))for(const seed of SEEDS)
+  for(const [range,inRange] of [[29.99,false],[30,true],[farthest,true],[farthest+.01,false]])
+   for(const [speed,slow] of SPEEDS)for(const [depthOffset,atDepth] of [[tolerance-.01,true],[tolerance,false]]){
+    const label=JSON.stringify({mission,seed,range,speed,depthOffset});
+    const s=rescueAt(mission,seed,range,depthOffset,speed),o=s.operation,remaining=o.remaining;
+    const holding=inRange&&slow&&atDepth;
+    assert.equal(operationConditions(s).onStation,inRange&&slow,label);
+    assert.equal(updateOperation(s,1),false,label);
+    assert.equal(o.holding,holding,label);
+    assert.equal(o.active,holding,label);
+    assert.equal(o.assessment,holding?1:0,label);
+    assert.equal(o.boarding,holding&&remaining>0?1:0,label);
+    const resumed=restore(save(s));
+    updateOperation(s,.25);updateOperation(resumed,.25);
+    assert.deepEqual(resumed.operation,s.operation,label);
+    cases++;
+   }
+ assert.equal(cases,144);
+});
+
+test('assessment, transfers and the team’s return take the recorded times',()=>{
+ for(const mission of Object.keys(RESCUES)){
+  const s=rescueAt(mission,1972,50,0,0),o=s.operation;
+  o.remaining=2;o.dead=0;o.lastCasualty=1e9;
+  const at=t=>{while(s.time<t){s.time+=.25;updateOperation(s,.25);}};
+  at(8.75);assert.equal(o.rescued,0,mission);
+  at(9);assert.equal(o.rescued,1,mission+' first transfer at 9 s');
+  at(17.75);assert.equal(o.rescued,1);
+  at(18);assert.equal(o.rescued,2,mission+' second transfer at 18 s');
+  at(21.75);assert.equal(o.known,false,mission);
+  at(22);assert.equal(o.known,true,mission+' assessment at 22 s');
+  // The return clock includes the tick in which the assessment finishes.
+  at(30.5);assert.equal(o.completed,false,mission);
+  at(30.75);assert.equal(o.completed,true,mission+' team returns 9 s after the assessment');
+  assert.equal(o.diverReturn,9);
+ }
+});
+
+test('the Elm mission definitions supply the rescue criteria used by the briefings, rules and progress text',async()=>{
+ const {MISSIONS,objectiveState}=await import('../src/missions.js');
+ const {readFile}=await import('node:fs/promises');
+ const {rescueCriteriaFor,stationKeeping,surfaceRescue,underseaRescue}=await import('../src/rescue-operation.js');
+ const team={assessmentSeconds:22,transferSeconds:9,returnSeconds:9,closestRange:30,fastestKnots:.6};
+ const undersea=MISSIONS.find(m=>m.id==='undersea-rescue'),surface=MISSIONS.find(m=>m.id==='surface-rescue');
+ assert.deepEqual(undersea.objective,{kind:'rescue',...team,farthestRange:75,depthTolerance:5});
+ assert.deepEqual(surface.objective,{kind:'rescue',...team,farthestRange:85,depthTolerance:1});
+ assert.equal(underseaRescue,undersea.objective);assert.equal(surfaceRescue,surface.objective);
+ assert.equal(rescueCriteriaFor('surface'),surfaceRescue);assert.equal(rescueCriteriaFor('sub'),underseaRescue);
+ for(const [mission,c] of [[undersea,underseaRescue],[surface,surfaceRescue]])
+  assert.ok(mission.desc.includes(`old ${c.closestRange}–${c.farthestRange} m`)&&mission.desc.includes(`below ${c.fastestKnots} knots`),mission.id);
+ const s=rescueAt('surface-rescue',1972,120,0,0);
+ assert.equal(objectiveState(s).advice,`Hold ${surfaceRescue.closestRange}–${surfaceRescue.farthestRange} m away · depth 0 m ±${surfaceRescue.depthTolerance} · ≤${surfaceRescue.fastestKnots} kn`);
+ // Static documents cannot import the catalog. Edit them when the Elm values change.
+ const u=underseaRescue,f=surfaceRescue,words={9:'nine'};
+ const page=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
+ assert.ok(page.includes(`Undersea rescue needs ${u.closestRange}–${u.farthestRange} m separation, the stated depth ±${u.depthTolerance} m and ≤${u.fastestKnots} kn. Surface rescue needs ${f.closestRange}–${f.farthestRange} m and depth under ${f.depthTolerance} m.`));
+ const guide=await readFile(new URL('../README.md',import.meta.url),'utf8');
+ assert.ok(guide.includes(`For undersea rescue, hold ${u.closestRange}–${u.farthestRange} m away, within ${u.depthTolerance} m of the assigned depth, at ${u.fastestKnots} kn or less. Surface rescue needs ${f.closestRange}–${f.farthestRange} m of separation at the surface and the same low speed. Allow ${u.assessmentSeconds} patrol seconds for assessment, ${words[u.transferSeconds]} seconds per transfer and ${words[u.returnSeconds]} more for the team to return.`));
+ // The rule follows whatever record it is given.
+ assert.deepEqual(stationKeeping(50,.5,2,u),{onStation:true,holding:true});
+ assert.deepEqual(stationKeeping(50,.5,2,{...u,farthestRange:40}),{onStation:false,holding:false});
+ assert.deepEqual(stationKeeping(50,.5,2,{...u,depthTolerance:2}),{onStation:true,holding:false});
+ assert.deepEqual(stationKeeping(50,.5,2,{...u,fastestKnots:.4}),{onStation:false,holding:false});
+});

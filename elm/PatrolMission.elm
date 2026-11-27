@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), SurveyCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), RescueCriteria, SurveyCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
@@ -26,10 +26,48 @@ type Objective
     | Survive
     | ReachGate Float
     | TrackQuietly
-    | FinishOperation
+    | RecoverSurvivors RescueCriteria
     | SurveyWreck SurveyCriteria
     | FleetLead Int
     | ProtectConvoy String Int
+
+
+{-| The sub holds station while its separation from the casualty is within the
+inclusive range, its speed is at most fastestKnots and its depth is strictly
+within depthTolerance of the rescue depth. The team assesses, transfers each
+survivor and returns over the given number of seconds while the sub holds.
+-}
+type alias RescueCriteria =
+    { closestRange : Float
+    , farthestRange : Float
+    , depthTolerance : Float
+    , fastestKnots : Float
+    , assessmentSeconds : Float
+    , transferSeconds : Float
+    , returnSeconds : Float
+    }
+
+
+underseaRescue : RescueCriteria
+underseaRescue =
+    { closestRange = 30
+    , farthestRange = 75
+    , depthTolerance = 5
+    , fastestKnots = 0.6
+    , assessmentSeconds = 22
+    , transferSeconds = 9
+    , returnSeconds = 9
+    }
+
+
+surfaceRescue : RescueCriteria
+surfaceRescue =
+    { underseaRescue | farthestRange = 85, depthTolerance = 1 }
+
+
+separation : RescueCriteria -> String
+separation c =
+    String.fromFloat c.closestRange ++ "–" ++ String.fromFloat c.farthestRange ++ " m"
 
 
 {-| A scanning pass counts while the sub is closer than both ranges, its speed
@@ -199,16 +237,16 @@ briefing mission =
         UnderseaRescue ->
             Briefing "undersea-rescue" "Someone is still knocking" "UNDERSEA RESCUE" RoutineWatch Observe
                 { standard = ( 8, 14 ), longer = ( 16, 30 ) }
-                "A disabled submarine lies on the reef shelf. Hold 30–75 m from her at rescue depth, below 0.6 knots, while divers assess and recover survivors. Hostile patrols may still be nearby."
+                ("A disabled submarine lies on the reef shelf. Hold " ++ separation underseaRescue ++ " from her at rescue depth, below " ++ String.fromFloat underseaRescue.fastestKnots ++ " knots, while divers assess and recover survivors. Hostile patrols may still be nearby.")
                 "Hold at the wreck; recover survivors"
-                FinishOperation
+                (RecoverSurvivors underseaRescue)
 
         SurfaceRescue ->
             Briefing "surface-rescue" "A light in the swell" "SURFACE RESCUE" RoutineWatch Observe
                 { standard = ( 7, 12 ), longer = ( 14, 25 ) }
-                "A damaged research vessel is sinking. Surface and hold 30–85 m away, below 0.6 knots. Rescue launches bring survivors aboard. Enemy gunfire or ramming may force you to move."
+                ("A damaged research vessel is sinking. Surface and hold " ++ separation surfaceRescue ++ " away, below " ++ String.fromFloat surfaceRescue.fastestKnots ++ " knots. Rescue launches bring survivors aboard. Enemy gunfire or ramming may force you to move.")
                 "Surface beside the casualty; hold position"
-                FinishOperation
+                (RecoverSurvivors surfaceRescue)
 
         Survey ->
             Briefing "survey" "What the sea remembers" "WRECK SURVEY" RoutineWatch Observe

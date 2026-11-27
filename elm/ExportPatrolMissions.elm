@@ -31,8 +31,16 @@ encodeObjective objective =
         TrackQuietly ->
             rule "track" []
 
-        FinishOperation ->
-            rule "operation" []
+        RecoverSurvivors c ->
+            rule "rescue"
+                [ ( "closestRange", E.float c.closestRange )
+                , ( "farthestRange", E.float c.farthestRange )
+                , ( "depthTolerance", E.float c.depthTolerance )
+                , ( "fastestKnots", E.float c.fastestKnots )
+                , ( "assessmentSeconds", E.float c.assessmentSeconds )
+                , ( "transferSeconds", E.float c.transferSeconds )
+                , ( "returnSeconds", E.float c.returnSeconds )
+                ]
 
         SurveyWreck c ->
             rule "survey"

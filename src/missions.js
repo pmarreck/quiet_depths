@@ -9,6 +9,7 @@ import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanic
 import {hash01,TIMES} from './environment.js';
 import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-objective.js';
 import {addScan,scanRate,surveyComplete,surveyCriteria} from './wreck-survey.js';
+import {rescueCriteriaFor,stationKeeping} from './rescue-operation.js';
 export {MISSIONS};
 
 export function updateFleetBattle(s){
@@ -80,8 +81,7 @@ export function operationApproach(s){
 export function operationConditions(s){
  if(!s.site)return null;
  const d=distance(s,s.site),surface=s.site.kind==='surface',depth=surface?0:s.site.depth-11;
- const onStation=d>=30&&d<=(surface?85:75)&&Math.abs(s.speed)<=.6;
- return {range:d,depth,onStation,holding:onStation&&Math.abs(s.depth-depth)<(surface?1:5)};
+ return {range:d,depth,...stationKeeping(d,s.speed,s.depth-depth,rescueCriteriaFor(s.site.kind))};
 }
 export function startRescue(s){
  const c=operationConditions(s);
@@ -116,12 +116,16 @@ export function updateSurvey(s,dt,criteria=surveyCriteria){
 }
 export function updateOperation(s,dt){
  if(s.mission==='survey')return updateSurvey(s,dt);
+ return updateRescue(s,dt,rescueCriteria(s));
+}
+const rescueCriteria=s=>rescueCriteriaFor(s.site?.kind);
+export function updateRescue(s,dt,rules){
  const o=s.operation;if(!o||o.completed)return false;
  const c=operationConditions(s);o.holding=c.holding;
  if(c.holding){o.active=true;o.assessment+=dt;
-  if(o.assessment>=22&&!o.known){o.known=true;log(s,`Rescue team report: ${o.remaining} survivors still awaiting transfer.`,'success');}
-  if(o.remaining>0){o.boarding+=dt;if(o.boarding>=9){o.boarding-=9;o.remaining--;o.rescued++;log(s,`Survivor aboard. ${o.rescued} rescued.`,'success');}}
-  if(o.known&&o.remaining===0){o.diverReturn+=dt;if(o.diverReturn>=9){o.completed=true;o.active=false;log(s,o.rescued?`Rescue team recovered. ${o.rescued} survivors safe aboard.`:'Rescue search complete. No survivors found. Team recovered.',o.rescued?'success':'warning');}}
+  if(o.assessment>=rules.assessmentSeconds&&!o.known){o.known=true;log(s,`Rescue team report: ${o.remaining} survivors still awaiting transfer.`,'success');}
+  if(o.remaining>0){o.boarding+=dt;if(o.boarding>=rules.transferSeconds){o.boarding-=rules.transferSeconds;o.remaining--;o.rescued++;log(s,`Survivor aboard. ${o.rescued} rescued.`,'success');}}
+  if(o.known&&o.remaining===0){o.diverReturn+=dt;if(o.diverReturn>=rules.returnSeconds){o.completed=true;o.active=false;log(s,o.rescued?`Rescue team recovered. ${o.rescued} survivors safe aboard.`:'Rescue search complete. No survivors found. Team recovered.',o.rescued?'success':'warning');}}
  }else{o.active=false;o.boarding=0;o.diverReturn=0;}
  if(s.time>casualtyDeadline(s)&&o.remaining>0){o.lastCasualty=s.time;o.remaining--;o.dead++;if(o.known)log(s,'A survivor’s signal has stopped. Rescue window is narrowing.','warning');}
  if(s.site.kind==='surface'){
@@ -139,18 +143,18 @@ export function objectiveState(s){
  if(s.mission==='sneaky-seamen')return {label:'GATE A → GATE B',text:'Reach Gate B at any depth',progress:(distance(s,s.home)/1000).toFixed(1)+' km',advice:'The convoy is expecting you.'};
  if(s.mission==='seek-and-destroy-sub')return {label:'HUNT OR WITHDRAW',text:'Surface at extraction to survive the patrol',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
  if(s.mission==='seek-and-destroy')return {label:'SINK THE CONVOY',text:'Find and sink the military transports',progress:s.ships.filter(ship=>ship.wreckMark).length+' WRECK SITES',advice:''};
- if(s.operation){const o=s.operation,c=operationConditions(s);
+ if(s.operation){const o=s.operation,c=operationConditions(s),r=rescueCriteria(s);
   if(s.mission==='survey'){
    const camera=s.difficulty?.drone!==false&&s.drone.mode!=='lost',v=surveyCriteria;
    const tally=Math.floor(o.scan)+'/'+v.scanSeconds,prefix=o.active?'Scanning. ':s.drone.mode==='lost'?'ROV lost. ':'';
    return {label:'SURVEY THE WRECK',text:tally+' s scan'+(camera?' · '+o.photoAngles.length+'/'+v.photographs+' camera angles':''),
     progress:tally,advice:o.find||prefix+`Your sub scans automatically at ${v.slowestKnots}–${v.fastestKnots} kn, within ${v.horizontalRange} m horizontally and ${v.verticalRange} m vertically. Slow passes add up.`};
   }
-  return {label:s.site.kind==='surface'?'RECOVER SURVIVORS':'DIVER RESCUE',text:`${o.rescued} aboard · ${o.known?o.remaining:'?'} awaiting rescue`,progress:o.rescued+'/'+(o.known?o.rescued+o.remaining:'?'),advice:o.completed?`${o.rescued} survivors and the rescue team aboard. Surface at extraction.`:c.holding?(o.known?'Hold position. Transfers every 9 seconds.':'Hold position. Rescue team assessing the casualty…'):`Hold 30–${s.site.kind==='surface'?85:75} m away · depth ${c.depth.toFixed(0)} m ±${s.site.kind==='surface'?1:5} · ≤0.6 kn`};
+  return {label:s.site.kind==='surface'?'RECOVER SURVIVORS':'DIVER RESCUE',text:`${o.rescued} aboard · ${o.known?o.remaining:'?'} awaiting rescue`,progress:o.rescued+'/'+(o.known?o.rescued+o.remaining:'?'),advice:o.completed?`${o.rescued} survivors and the rescue team aboard. Surface at extraction.`:c.holding?(o.known?`Hold position. Transfers every ${r.transferSeconds} seconds.`:'Hold position. Rescue team assessing the casualty…'):`Hold ${r.closestRange}–${r.farthestRange} m away · depth ${c.depth.toFixed(0)} m ±${r.depthTolerance} · ≤${r.fastestKnots} kn`};
  }
  return {label:s.mission==='recon'?'PHOTOGRAPH THE CONVOY':s.mission==='intercept'?'INTERCEPT '+(s.ships.find(v=>v.id==='cobalt')?.name||'MILITARY FREIGHTER').toUpperCase():'LISTEN WITHOUT BEING SEEN',text:s.mission==='recon'?`Photograph ${s.patrol.photoGoal} different merchant ships`:s.mission==='shadow'?`Track quietly for ${s.patrol.trackGoal} seconds`:MISSIONS.find(m=>m.id===s.mission).short,progress:s.mission==='recon'?s.photos.length+'/'+s.patrol.photoGoal:s.mission==='shadow'?Math.min(s.patrol.trackGoal,Math.floor(s.trackTime))+'/'+s.patrol.trackGoal:'0/1',advice:''};
 }
-export const objectiveComplete=(s,dt)=>evaluateObjective(s,dt,{operation:updateOperation,survey:updateSurvey});
+export const objectiveComplete=(s,dt)=>evaluateObjective(s,dt,{rescue:updateRescue,survey:updateSurvey});
 export function randomizePatrol(s,seed){
  const h=n=>hash01(seed,n),heading=220+h(21)*65,start={x:(h(22)-.5)*500,y:(h(23)-.5)*500};
  s.patrol={seed,startingTorpedoes:s.torps,photoGoal:2+Math.floor(h(24)*2),trackGoal:150+30*Math.floor(h(25)*4),variant:1+Math.floor(h(26)*999)};

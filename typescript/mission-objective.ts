@@ -1,6 +1,7 @@
 import {missions} from './mission-catalog.ts';
 import {friendlyLead} from './fleet-action.ts';
 import type {SurveyCriteria} from './wreck-survey.ts';
+import type {RescueCriteria} from './rescue-operation.ts';
 
 export {missions as MISSIONS};
 type Mission = (typeof missions)[number];
@@ -23,7 +24,7 @@ export function allSunk(ships: Patrol['ships'], targets: readonly string[]): boo
 
 // Mission work that changes patrol state each tick stays with the simulation.
 export interface ObjectiveWork<P> {
-  operation: (state: P, dt: number) => boolean;
+  rescue: (state: P, dt: number, criteria: RescueCriteria) => boolean;
   survey: (state: P, dt: number, criteria: SurveyCriteria) => boolean;
 }
 
@@ -45,8 +46,8 @@ export function evaluateObjective<P extends Patrol>(state: P, dt: number, work: 
       return Math.hypot(state.x - state.home.x, state.y - state.home.y) <= goal.radius;
     case 'track':
       return state.trackTime >= state.patrol.trackGoal;
-    case 'operation':
-      return work.operation(state, dt);
+    case 'rescue':
+      return work.rescue(state, dt, goal);
     case 'survey':
       return work.survey(state, dt, goal);
   }
