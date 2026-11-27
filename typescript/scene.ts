@@ -10,7 +10,7 @@ import {bottom,rad} from './sim.ts';
 import {feedActive,cameraEuler,droneCameraPitch,orbitVerticalFov} from './controls.ts';
 import {environmentAt,SEA_SAMPLE_GLSL,wavePhaseAt,surfaceHeight,scopePosition,boatSurfacePose,hash01,waterColumnLight} from './environment.ts';
 import {FloodBubbles} from './flood-bubbles.ts';
-import {SternSpray} from './surface-motion.ts';
+import {SternSpray} from './stern-spray.ts';
 import {Atmosphere} from './atmosphere.ts';
 import {UnderseaLife} from './undersea.ts';
 import {FLOOR_WIDTH,FLOOR_SEGMENTS} from './seafloor.ts';

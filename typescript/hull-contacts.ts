@@ -1,5 +1,5 @@
 import {scopeExtension} from './periscope.ts';
-import {replayEvent} from './instant-replay.ts';
+import {replayEvent} from './replay-events.ts';
 import {carrierSize, incidentalHull} from './carrier.ts';
 import {damagePart} from './equipment.ts';
 import {recordCivilianHit} from './patrol-reports.ts';

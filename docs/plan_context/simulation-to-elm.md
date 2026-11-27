@@ -139,3 +139,11 @@ dynamics modules settle what most of them mean, so `Sim.Ship` will be
 designed with them. Until then the ports take extensible records naming the
 fields they use, as the TypeScript slices do. `carrierDeck` is the
 renderer's. Site kinds live in `Sim.Site`.
+
+Three more modules mixed display state into the simulation, and each is now
+split: the stern spray emitter (`stern-spray.ts`) and the wake's foam ribbons
+(`wake-ribbons.ts`) are render buffers, and the instant replay recorder
+listens on `replay-events.ts`, the channel the simulation announces replay
+moments on. In the Elm port those announcements become events the update
+returns, as the acoustics' receipts already are. The boundary test now also
+fails on any class or typed array the simulation reaches.

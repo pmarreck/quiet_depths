@@ -5,7 +5,7 @@ import {operatingFraction} from './equipment.ts';
 import {addDebrief, type DebriefEntry} from './debrief.ts';
 import {emitSound, launchNoise, type Sound} from './acoustics.ts';
 import {report} from './patrol-reports.ts';
-import {replayEvent} from './instant-replay.ts';
+import {replayEvent} from './replay-events.ts';
 import {floorSurface} from './seafloor.ts';
 import {alliedFix, liveTransmission, validLampFix, validCopy, copyLamp, lampRange, makeTransmission, validEstimate, validTransmission,
   type Estimate, type LampFix, type Transmission} from './signal-lamp.ts';

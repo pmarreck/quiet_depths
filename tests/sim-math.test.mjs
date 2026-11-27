@@ -54,11 +54,15 @@ test('the simulation reaches exp, expm1, tanh and cbrt only through the shared m
 
 // Whatever moves to Elm must be pure simulation. Display and browser code
 // stays in the page, so no module the simulation reaches may touch them.
-test('the simulation reaches no Three.js, DOM, canvas or browser storage code', () => {
+// Classes and typed arrays are how this codebase keeps render buffers and
+// recorders, and Elm has neither, so they count as display code too.
+test('the simulation reaches no Three.js, DOM, canvas, browser storage, class or typed array code', () => {
   const modules = simulationModules();
-  assert.ok(modules.has('sonar-transmitters') && !modules.has('sonar-imager'), 'the imager display stays outside the simulation');
+  for (const display of ['sonar-imager', 'stern-spray', 'wake-ribbons', 'instant-replay'])
+    assert.ok(!modules.has(display), display + ' stays outside the simulation');
+  assert.ok(modules.has('sonar-transmitters') && modules.has('replay-events'), 'the simulation halves are reached');
   const display = [...modules].flatMap(([name, code]) =>
-    [...code.matchAll(/vendor\/three|\bdocument\.|\bwindow\.|CanvasRenderingContext2D|getContext\(|requestAnimationFrame|localStorage|\bnavigator\./g)].map(m => name + ': ' + m[0]));
+    [...code.matchAll(/vendor\/three|\bdocument\.|\bwindow\.|CanvasRenderingContext2D|getContext\(|requestAnimationFrame|localStorage|\bnavigator\.|^\s*(?:export\s+)?class\s|\b(?:Float32|Float64|Int8|Uint8|Uint8Clamped|Int16|Uint16|Int32|Uint32)Array\b/gm)].map(m => name + ': ' + m[0].trim()));
   assert.deepEqual(display, []);
 });
 

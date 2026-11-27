@@ -1,6 +1,6 @@
 import {blastCloud,animateCloud,detonationFlash} from './blast-cloud.ts';
 import * as T from './vendor/three.module.js';
-import {WakeRibbons} from './surface-wake.ts';
+import {WakeRibbons} from './wake-ribbons.ts';
 import {hash01,surfaceHeight} from './environment.ts';
 import {chargeAltitude} from './combat.ts';
 import type {Environment} from './environment.ts';

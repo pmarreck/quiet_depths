@@ -2,7 +2,7 @@ import {playerSignal} from './cold-watch.ts';
 import {recordLocalLaunch} from './mess-watch.ts';
 import {isOpponent} from './fleet-action.ts';
 import {freshTubeTimes, RELOAD_SECONDS, torpedoTubes} from './torpedo-tubes.ts';
-import {replayEvent} from './instant-replay.ts';
+import {replayEvent} from './replay-events.ts';
 import {descentSpeed, submergedDepth, surfaceCollapseAge} from './foundering.ts';
 import {advanceCarrierFlood, carrierDescentFactor, carrierDoomed, incidentalHull} from './carrier.ts';
 import {operatingFraction} from './equipment.ts';

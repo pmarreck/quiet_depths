@@ -3,7 +3,7 @@ import {carrierId, carrierGroup, validCarrier} from './carrier.ts';
 import {setupHenhouse, validConvoy, convoyLosses} from './convoy-watch.ts';
 import {advanceFleetAction, fleetTheater, validTheater} from './fleet-action.ts';
 import {emitSound, launchNoise, type Sound} from './acoustics.ts';
-import {replayEvent} from './instant-replay.ts';
+import {replayEvent} from './replay-events.ts';
 import {operatingFraction} from './equipment.ts';
 import {rad, bearing, delta, distance, separation, bottom, log, type LogEntry} from './mechanics.ts';
 import {hash01, TIMES, type EnvironmentConfig} from './environment.ts';

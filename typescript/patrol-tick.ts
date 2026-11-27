@@ -4,7 +4,7 @@ import {recordWake} from './surface-wake.ts';
 import {advanceTraffic, canAttackPlayer, playerSignal} from './cold-watch.ts';
 import {recordLocalLaunch} from './mess-watch.ts';
 import {updateAlliedWatch, convoyLosses, updateLamp, updateConvoyRaid, resolveConvoyCharge} from './convoy-watch.ts';
-import {replayEvent} from './instant-replay.ts';
+import {replayEvent} from './replay-events.ts';
 import {observeTorpedo} from './torpedo-watch.ts';
 import {operatingFraction} from './equipment.ts';
 import {report, hearWreck} from './patrol-reports.ts';

@@ -3,6 +3,8 @@ import {boatLocal} from './surface-motion.ts';
 // The recorder owns only pictures of the renderable world. Neither playback
 // nor its camera can advance a patrol, expend ammunition or write a game save.
 import {activeVolleys,fleetShotPose,type Volley} from './fleet-action.ts';
+import {listenForReplayEvents,type ReplayEvent} from './replay-events.ts';
+export type {ReplayEvent};
 type Point={x:number;y:number;depth:number};
 type Pose=Point & {heading:number;pitch?:number;speed?:number};
 type Ship=Pose & {id:string;kind:string;sinkDepth:number;hull:number};
@@ -19,8 +21,6 @@ type World=Pose & {
   planes:number;rudder:number;cavitation:number;propRpm:number;propAngle:number;scopeAngle:number;
   towerAngle:number;towerPitch:number;verticalSpeed:number;scope:boolean;scopeTravel?:number;
 };
-export type ReplayEvent={kind:'ground'|'collision'|'blast'|'torpedo'|'near-miss'|'collapse'|'sinking';
-  point:Point; heading?:number; target?:string; shot?:number; enemy?:boolean};
 type TimedEvent=ReplayEvent & {time:number};
 type Frame=ReturnType<typeof picture>;
 export type Clip={event:TimedEvent;frames:Frame[];wall:number};
@@ -35,9 +35,6 @@ function picture(s:World){
     battle:{volleys:copies(activeVolleys(s))},
     impacts:copies(s.impacts),lightning:copies(s.lightning),blasts:copies(s.blasts),shells:copies(s.shells),gunRounds:copies(s.gunRounds)};
 }
-const observers=new WeakMap<object,ReplayRecorder>();
-// Any patrol object can mark an event; recorders are found by identity.
-export function replayEvent(s:{time:number},event:ReplayEvent){observers.get(s)?.mark(s.time,event);}
 const waitTime={ground:1.2,collision:1.2,blast:5,torpedo:3,'near-miss':.15,collapse:2,sinking:1};
 const lead=5, aftermath=1.2;
 export class ReplayRecorder {
@@ -46,7 +43,7 @@ export class ReplayRecorder {
   private readonly clock:()=>number;
   constructor(world:World,clock=()=>performance.now()/1000){
     this.clock=clock;
-    if(world.difficulty.instantReplay){observers.set(world,this);this.capture(world);}
+    if(world.difficulty.instantReplay){listenForReplayEvents(world,this);this.capture(world);}
   }
   mark(time:number,event:ReplayEvent){
     const latest=this.history.at(-1);

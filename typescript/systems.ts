@@ -2,7 +2,7 @@ import {exp, expm1, tanh} from './sim-math.ts';
 import {orderScope, advanceScope} from './periscope.ts';
 import {energyDraw, propulsion, throttlePercent, batteryOutput} from './power-plant.ts';
 import {addDebrief, type DebriefEntry} from './debrief.ts';
-import {replayEvent} from './instant-replay.ts';
+import {replayEvent} from './replay-events.ts';
 import {carrierSize} from './carrier.ts';
 import {SYSTEM_NAMES, SYSTEM_KEYS, hitSystem, hitSection, DRONE_PARTS, DRONE_HIT_FACTORS, fullCondition, damagePart, repairPart, operatingFraction} from './equipment.ts';
 import {updatePressure} from './pressure.ts';

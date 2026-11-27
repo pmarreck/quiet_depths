@@ -5,7 +5,7 @@ import {environmentAt,DAY_SECONDS,WEATHER,TIMES,surfaceHeight,scopeWashed,soundi
 import {AIR_SOUND_SPEED,WATER_SOUND_SPEED,airWaterPath,propagationTime,perceivedSound,engineSound,emitSound,updateAcoustics} from '../src/acoustics.js';
 import * as sea from '../src/environment.js';
 import {SUB_DESIGN as design} from '../src/hull-design.js';
-import {SternSpray} from '../src/surface-motion.js';
+import {SternSpray} from '../src/stern-spray.js';
 
 test('surface trim exposes one quarter of the hull diameter and wave pitch fades by periscope depth',()=>{
  const s=createGame('recon',121,{weather:'storm',changing:false});s.depth=0;s.pitch=0;

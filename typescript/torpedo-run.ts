@@ -1,6 +1,6 @@
 import {playerSignal} from './cold-watch.ts';
 import {exitPitch} from './torpedo-tubes.ts';
-import {replayEvent} from './instant-replay.ts';
+import {replayEvent} from './replay-events.ts';
 import {gameEcho} from './torpedo-watch.ts';
 import {registerCarrierHit} from './carrier.ts';
 import {recordCivilianHit, report} from './patrol-reports.ts';
