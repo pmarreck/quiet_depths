@@ -11,6 +11,7 @@ import {torpedoTubes} from './torpedo-tubes.js';
 import {bindBriefingNavigation} from './briefing-navigation.js';
 import {ReplayRecorder,ReplayPlayback,replayLabels} from './instant-replay.js';
 import {helmStatusText} from './helm-status.js';
+import {attachCompassSteering} from './compass-steering.js';
 import {seriousRepairs} from './red-alert.js';
 import {threats} from './torpedo-watch.js';
 import {conditionLabel,DRONE_PARTS,operatingFraction} from './equipment.js';
@@ -225,6 +226,8 @@ $('patrol-seed').onclick=event=>{event.target.select();copySeed(parsePatrolSeed(
 $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity('');$('seed-status').textContent='';});
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const telegraph=globalThis.Elm.EngineTelegraph.init({node:$('telegraph-root')});
+const compass=globalThis.Elm.HelmCompass.init({node:$('helm-compass-root')});
+attachCompassSteering($('helm-compass'),()=>helmFor(state,view).heading,heading=>{if(view==='orbit'||!canIssue(state,context())||!pilotEnabled())return;order('heading',heading);updateUI();});
 telegraph.ports.ringTelegraph.subscribe(({lever,quiet})=>{
  if(!pilotEnabled()||!canIssue(state,context()))return;
  if(view==='drone'&&lever===0)applyHelmKeys(state,context(),new Set(['rovStop']),0);
@@ -717,6 +720,7 @@ function updateUI(){
 
  const drone=view==='drone',v=helmFor(s,view),actual={heading:v.heading,depth:v.depth,speed:v.speed},requested={heading:v.targetHeading,depth:v.targetDepth,speed:v.targetSpeed};
  $('helm-status').textContent=helmStatusText(s,throttlePercent(s.targetSpeed));
+ compass.ports.compassReading.send({heading:v.heading,requested:v.targetHeading});
  $('helm-mode').textContent=drone?(v.mode==='remote'?'DRONE HELM':v.mode==='return'?'DRONE · AUTO RETURN':'DRONE · OFFLINE'):'SUBMARINE HELM';
  $('heading-value').textContent=deg(v.heading);$('depth-value').textContent=Math.round(v.depth);$('speed-value').textContent=v.speed.toFixed(1);
  $('heading-order').innerHTML=`<span>ACT ${deg(v.heading)}°</span><span>REQ ${deg(v.targetHeading)}°</span>`;

@@ -43,6 +43,8 @@ Heading, depth and speed are orders to a helmsman. A new compass heading needs w
 
 **Ahead Full**, **Ahead Silent**, **All Stop** and **Astern Full** sit beside the desktop throttle. On a compact screen, tap **Speed ▾**. Ahead Silent selects electric power, engages silent running and requests up to three knots. The full orders release silent running on the selected engine. All Stop lets the hull coast down. The slider supports intermediate settings and snaps near zero. The actual speed depends on the power plant, depth and damage.
 
+On a wide screen, the helm sits in a band beneath the view on **Periscope & Controls** and steers the ROV on its own station. The compass card turns so your actual heading is always at the top, with a red-and-black needle marking north. Drag the gold circle around the rim to order a new heading. Depth and speed use vertical sliders on either side, with the surface and ahead at the top. Other stations give the view the full height and show a one-line helm status.
+
 | Healthy power setting | Surface | Snorkeling | Battery behavior |
 | --- | ---: | ---: | --- |
 | Electric | 16 kn | 16 kn | Draws from the battery and also works below snorkel depth. |

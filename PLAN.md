@@ -13,7 +13,8 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 - [x] Move wreck-survey completion criteria into the Elm mission definition, shared by the briefing, rules, progress text and ROV photos (done 2026-11-27 01:24 EST; commit 2a6d92b).
 - [ ] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks.
-- [ ] Rebuild the desktop helm in Elm: controls only on Periscope & Controls and ROV, vertical speed and depth, heading-up compass with drag-to-steer rim (context: docs/plan_context/owner-feedback-2026-11-27.md).
+- [x] Rebuild the desktop helm: controls only on Periscope & Controls and ROV, vertical speed and depth, heading-up Elm compass with drag-to-steer rim (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 02:47 EST).
+- [ ] Move the remaining helm controls (depth and speed sliders, turn buttons, propulsion) from JavaScript-wired markup into the Elm helm.
 - [ ] Move simulation and the remaining game UI to Elm in stages, preserving existing patrol saves.
 - [ ] Migrate remaining first-party browser code to strict TypeScript, including the Three.js, Web Audio and persistence adapters.
 

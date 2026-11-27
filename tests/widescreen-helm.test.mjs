@@ -23,12 +23,12 @@ test('widescreen keeps the helm on Periscope & Controls and the ROV, with a stat
  const hidden='body:not(.orbiting):is([data-station=sonar],[data-station=chart],[data-station=tower],[data-station=gun],[data-station=photos])';
  assert.ok(wide.includes(hidden+' :is(.soundings-strip,.helm-caption,.helm){display:none}'));
  assert.ok(wide.includes(hidden+' .helm-status{display:flex}'));
- assert.ok(helmCss.startsWith('.wide-label,.helm-status{display:none}'),'compact layouts keep the short tab label and the full helm');
+ assert.ok(helmCss.startsWith('.wide-label,.helm-status,.helm-compass-frame{display:none}'),'compact layouts keep the short tab label and the full helm');
 });
 
 test('the widescreen band centers heading between depth and speed sliders',()=>{
  assert.match(page,/<div class="helm-group depth-helm"><div class="control-label">DEPTH /);
- const band=helmCss.slice(helmCss.lastIndexOf('@media (min-width:1101px)'));
+ const band=helmCss.slice(helmCss.indexOf('@media (min-width:1101px)'));
  // Propulsion, depth, heading, then speed with its orders.
  const order=Object.fromEntries([...band.matchAll(/\.helm>\.(propulsion|depth-helm|course-control|speed-helm)\{order:(\d)\}/g)].map(m=>[m[1],+m[2]]));
  assert.deepEqual(order,{propulsion:1,'depth-helm':2,'course-control':3,'speed-helm':4});
