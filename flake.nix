@@ -32,6 +32,20 @@
         elmVersion = elmConfig.elm-version;
         registryDat = nixpkgs.outPath + "/pkgs/development/compilers/elm/registry.dat";
       };
+      # Type declarations for the vendored Three r170 and the WebXR types they
+      # reference, pinned to releases from November 2024. Only the type check
+      # reads them; nothing from them reaches the site.
+      threeTypes = pkgs.runCommand "quiet-depths-three-types-0.170.0" { } ''
+        mkdir -p "$out/node_modules/@types/three" "$out/node_modules/@types/webxr"
+        tar -xzf ${pkgs.fetchurl {
+          url = "https://registry.npmjs.org/@types/three/-/three-0.170.0.tgz";
+          hash = "sha512-CUm2uckq+zkCY7ZbFpviRttY+6f9fvwm6YqSqPfA5K22s9w7R4VnA3rzJse8kHVvuzLcTx+CjNCs2NYe0QFAyg==";
+        }} -C "$out/node_modules/@types/three" --strip-components=1
+        tar -xzf ${pkgs.fetchurl {
+          url = "https://registry.npmjs.org/@types/webxr/-/webxr-0.5.20.tgz";
+          hash = "sha512-JGpU6qiIJQKUuVSKx1GtQnHJGxRjtfGIhzO2ilq43VZZS//f1h1Sgexbdk+Lq+7569a6EYhOWrUpIruR/1Enmg==";
+        }} -C "$out/node_modules/@types/webxr" --strip-components=1
+      '';
       patrolCatalog = pkgs.runCommand "quiet-depths-patrol-catalog.ts" {
         nativeBuildInputs = [ pkgs.elmPackages.elm pkgs.nodejs ];
       } ''
@@ -64,6 +78,7 @@
             echo "Refresh typescript/mission-catalog.ts from nix build .#patrol-catalog" >&2
             exit 1
           }
+          ln -s ${threeTypes}/node_modules node_modules
           tsc --project tsconfig.json --noEmit false --outDir "$TMPDIR/typed-game"
           tsc --project tsconfig.worker.json --noEmit false --outDir "$TMPDIR/typed-worker"
           cp "$TMPDIR/typed-game/"*.js src/
@@ -103,6 +118,7 @@
     in {
       default = pkgs.lib.makeOverridable build { };
       patrol-catalog = patrolCatalog;
+      three-types = threeTypes;
     });
     checks = each (system: { site = self.packages.${system}.default; });
     devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
