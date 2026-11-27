@@ -1,5 +1,6 @@
 // Immutable particle paths sampled by event age. Replay can seek without
 // advancing an emitter or consuming the patrol's random stream.
+import type * as Three from './vendor/three.module.js';
 const vertex = `
  uniform float age, extent, spray, seed;
  attribute float grain;
@@ -46,19 +47,9 @@ const fragment = `
    #include <colorspace_fragment>
  }`;
 
-interface Geometry {setAttribute(name:string, attr:object):unknown}
-interface Cloud {
-  visible:boolean;frustumCulled:boolean;
-  material:{uniforms:Record<string,{value:number}>};
-}
-interface Kit {
-  BufferGeometry:new()=>Geometry;
-  Float32BufferAttribute:new(values:number[], size:number)=>object;
-  ShaderMaterial:new(settings:object)=>object;
-  Points:new(geo:Geometry,material:object)=>Cloud;
-}
+export type Cloud = Three.Points<Three.BufferGeometry, Three.ShaderMaterial>;
 
-export function blastCloud(T: Kit){
+export function blastCloud(T: typeof Three): Cloud {
   const count=240,positions:number[]=[],grain:number[]=[];
   let rng=2791;
   const next=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967296);
