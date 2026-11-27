@@ -188,11 +188,12 @@ request a gameplay feature or fix. For any such change:
 A change to a module not yet ported needs only the TypeScript; the port
 then carries it over.
 
-## Checkpoint at one third (owner decision, 2026-11-27)
+## Checkpoint at one third (decided with the owner, 2026-11-27)
 
 Once a third of the simulation's code lines are mirrored in Elm
-(`node scripts/elm-port-progress.mjs`), porting stops and the owner decides,
-on evidence, whether to complete the port or abandon it. On 2026-11-27 the
+(`node scripts/elm-port-progress.mjs`), porting stops, and we decide together,
+on evidence, whether to complete the port or abandon it. The agent brings
+the evidence below and its own recommendation. On 2026-11-27 the
 figure was 20.4% (913 of 4,465 lines, 25 of 59 modules). The remaining
 modules are the larger, stateful ones (systems, missions, the patrol tick,
 restore, combat), so the evidence should say how far the leaf experience
@@ -217,3 +218,24 @@ predicts them. Bring:
    strict TypeScript, which the splits and boundary tests already improved);
    or anything in between, with the cost of keeping two simulations.
 
+
+**Early speed reading (2026-11-27, Node 24, optimized Elm, best of five
+after warm-up; nanoseconds per call, identical results in both):**
+
+| Function | Elm | TypeScript | Ratio |
+|---|---|---|---|
+| `chartDepth` | 371 | 190 | 1.95 |
+| `surfaceMotion` | 615 | 411 | 1.50 |
+| `propulsion` | 498 | 157 | 3.17 |
+| acoustics update, 96 heard sounds | 5,024 | 594 | 8.45 |
+| `hash01` | 41 | 14 | 2.85 |
+
+Arithmetic runs 1.5 to 3 times slower in Elm, from curried calls, record
+copies and the exact-arithmetic wrappers. List-heavy code is worse: the
+acoustics update makes five passes over its list where the TypeScript makes
+two, and could skip them when nothing is due. A whole TypeScript tick takes
+0.03 to 0.06 ms early in a patrol, and substeps are capped at 0.25 s, so
+even 20x compression runs about two ticks per 60 Hz frame. At the worst
+ratio measured, a tick would still fit the 2 ms budget several times over.
+The checkpoint should repeat this with busy battle ticks and a committed
+benchmark.
