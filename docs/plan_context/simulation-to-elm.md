@@ -330,3 +330,26 @@ trusted only with the right type, as the TypeScript's `typeof` checks do;
 one difference remains: a track naming a kind the game does not have leaves
 the contact's kind as it was, where the TypeScript would copy the string.
 Recon builds tracks from real ships, so no patrol can produce one.
+
+## Cutover spike, part one: the boundary (2026-11-27)
+
+`scripts/elm-boundary-bench.mjs` sends busy patrols' ships and contacts
+(saved ten minutes in) through an Elm worker's ports, decoding them with the
+shared records' decoders and encoding them back, 200 to a batch so the
+figure is the work, not the port's scheduling. Node 24, optimized Elm:
+
+| Patrol | Ships | Contacts | Save | Ships and contacts | `JSON.stringify` of the save | Elm round trip | Share of a 60 Hz frame |
+|---|---|---|---|---|---|---|---|
+| Fleet action | 9 | 2 | 19.7 KB | 4.9 KB | 0.083 ms | 0.256 ms | 1.5% |
+| Carrier hunt | 4 | 4 | 18.7 KB | 3.3 KB | 0.085 ms | 0.156 ms | 0.9% |
+| Convoy defense | 7 | 6 | 30.9 KB | 5.3 KB | 0.142 ms | 0.265 ms | 1.6% |
+| Convoy attack | 6 | 6 | 17.7 KB | 4.4 KB | 0.080 ms | 0.205 ms | 1.2% |
+| Reconnaissance | 7 | 7 | 17.3 KB | 4.6 KB | 0.081 ms | 0.206 ms | 1.2% |
+
+Reading: the Elm round trip runs about 2.5 times JavaScript's own
+serialization. Scaled to the whole save, sending all of it across every
+frame would cost roughly 1 to 1.5 ms, affordable but not free. If Elm owns
+the state, only the outbound half crosses each frame, and a snapshot of what
+the renderer draws would be far smaller still. Part two, the same in a
+browser with real ticks, needs headless Chromium, which the session's
+low-memory guard stopped; restarting it waits for the owner.
