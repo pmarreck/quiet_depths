@@ -5,6 +5,7 @@ import {appleTouchDevice,isHardwareShortcut,offersInstall,showsKeyboardHints,TOU
 
 const page=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
 const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
+const picker=await readFile(new URL('../elm/MissionPicker.elm',import.meta.url),'utf8');
 const css=(await Promise.all(['style.css','controls.css','interface.css','mobile.css','operations.css','warfare.css','atmosphere.css']
  .map(name=>readFile(new URL('../src/'+name,import.meta.url),'utf8')))).join('\n');
 const element=(html,open,close)=>{const start=html.indexOf(open);assert.ok(start>=0,'missing '+open);const end=html.indexOf(close,start);assert.ok(end>start,'unclosed '+open);return html.slice(start,end+close.length);};
@@ -64,4 +65,6 @@ test('keyboard-only markup is marked so touch-only devices hide it',()=>{
  for(const phrase of [/\bEsc\b/,/\bSpace\b/,/\bW\/S\b/,/\bA\/D\b/,/arrows/,/\bor J\b/,/\bwith F\b/,/\bR limits\b/,/\bBy default W\b/])
   assert.doesNotMatch(guide,phrase);
  assert.ok(app.includes('<span class="key-only">Press P to raise it.</span><span class="touch-hint">Choose Raise Scope to raise it.</span>'));
+ // The briefing's first orders name the pause key from the current bindings.
+ assert.match(picker,/Html\.strong \[ class "key-only" \] \[ text \(model\.pauseKey \+\+ " pauses the patrol\."\) \]/);
 });

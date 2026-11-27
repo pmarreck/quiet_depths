@@ -175,7 +175,7 @@ view model =
             , p []
                 [ text (selectedMission.description ++ " ")
                 , text ("You carry " ++ String.fromInt PatrolMission.startingTorpedoes ++ " torpedoes in total, with two bow tubes ready. ")
-                , Html.strong [] [ text (model.pauseKey ++ " pauses the patrol.") ]
+                , Html.strong [ class "key-only" ] [ text (model.pauseKey ++ " pauses the patrol.") ]
                 ]
             ]
         , fieldset [ class "patrol-conditions" ]
