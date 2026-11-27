@@ -188,3 +188,32 @@ request a gameplay feature or fix. For any such change:
 A change to a module not yet ported needs only the TypeScript; the port
 then carries it over.
 
+## Checkpoint at one third (owner decision, 2026-11-27)
+
+Once a third of the simulation's code lines are mirrored in Elm
+(`node scripts/elm-port-progress.mjs`), porting stops and the owner decides,
+on evidence, whether to complete the port or abandon it. On 2026-11-27 the
+figure was 20.4% (913 of 4,465 lines, 25 of 59 modules). The remaining
+modules are the larger, stateful ones (systems, missions, the patrol tick,
+restore, combat), so the evidence should say how far the leaf experience
+predicts them. Bring:
+
+1. **Pace.** Lines mirrored per working hour from the port commits, and how
+   it changed as modules grew.
+2. **Correctness cost.** The traps found (JavaScript arithmetic Elm lacks,
+   the optimizer's `== 0`, unpaired surrogates, compound assignment,
+   simulation modules carrying display state) and whether new ones still
+   turn up; mutation survivors and what they revealed.
+3. **Speed.** Elm against TypeScript per call for the hot paths already
+   ported (acoustics, chart depth, surface motion, propulsion), and an
+   estimate of a whole tick against the 2 ms frame budget.
+4. **Size.** The optimized, minified Elm simulation against the TypeScript.
+5. **Dual-change burden.** How many owner requests touched mirrored modules
+   while both existed, and what each cost.
+6. **The switch.** What remains beyond porting: saves, the frame loop through
+   ports, replay events and sounds as update results, the renderer reading
+   Elm state.
+7. **Options.** Complete; abandon (delete the Elm simulation and keep the
+   strict TypeScript, which the splits and boundary tests already improved);
+   or anything in between, with the cost of keeping two simulations.
+
