@@ -8,6 +8,9 @@ import {isSurfaced} from './vehicle-status.ts';
 import {conditionLabel, SYSTEM_NAMES, DRONE_PARTS} from './equipment.ts';
 import {droneDeployReason} from './systems.ts';
 import {suspicionLabel} from './suspicion.ts';
+import {torpedoTubes} from './torpedo-tubes.ts';
+import {firingBearing} from './combat.ts';
+import {operatingFraction} from './equipment.ts';
 import {throttlePercent, SURFACE_KNOTS} from './power-plant.ts';
 import type {World} from './sim.ts';
 
@@ -158,4 +161,19 @@ export function resourceReading(s: {battery: number; oxygen: number; fuel: numbe
     {key: 'oxygen', level: Number(s.oxygen), text: Math.round(s.oxygen) + '%'},
     {key: 'fuel', level: Number(s.fuel), text: Math.round(s.fuel) + capacity(s.systems.fuelTank) + '%'},
   ]};
+}
+
+type TorpedoTarget = Parameters<typeof firingBearing>[1] & {side?: unknown; probableSide?: unknown; identified?: unknown; military?: unknown};
+export interface TorpedoReading {
+  torps: string; tubes: {key: 'port' | 'starboard'; name: string; offline: boolean; remaining: number | null}[]; runSetting: number; runText: string;
+  target: {side: string; probableSide: string; identified: boolean; military: boolean; bearing: string} | null; running: string;
+}
+
+export function torpedoReading(s: Parameters<typeof torpedoTubes>[0] & {systems: {tubes: number}; runSetting: number; time: number; x: number; y: number;
+  projectiles: {owner?: string; age: number; lock?: unknown; heading: number}[]}, target: TorpedoTarget | undefined): TorpedoReading {
+  const tubes = torpedoTubes(s), offline = !operatingFraction(s.systems.tubes);
+  return {torps: s.torps + ' ABOARD', tubes: (['port', 'starboard'] as const).map(key => ({key, name: key === 'port' ? 'Port' : 'Starboard', offline, remaining: tubes[key]})),
+    runSetting: Number(s.runSetting), runText: (s.runSetting / 1000).toFixed(2) + ' km',
+    target: target ? {side: String(target.side ?? ''), probableSide: String(target.probableSide ?? ''), identified: !!target.identified, military: !!target.military, bearing: deg(firingBearing(s, target))} : null,
+    running: s.projectiles.filter(p => p.owner === 'player').map((p, i) => `TORP ${i + 1} · ${p.age < 4 ? 'ARMING' : p.lock ? 'SONAR TRACK' : 'SEARCHING'} · ${deg(p.heading)}°`).join(' / ')};
 }

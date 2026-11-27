@@ -24,14 +24,14 @@ import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
 import {objectiveState,operationApproach,operationConditions,startRescue,dronePhotograph,parsePatrolSeed,patrolSetup} from './missions.js';
 import {OceanScene} from './scene.js';
-import {MAX_RUN,fireDeckGun,aimGunAt,firingBearing} from './combat.js';
+import {MAX_RUN,fireDeckGun,aimGunAt} from './combat.js';
 import {HeldInput} from './input.js';
 import {SoundSystem} from './audio.js';
 import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
-import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading,missionReading,operationReading,footerReading,resourceReading} from './panel-readings.js';
+import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading,missionReading,operationReading,footerReading,resourceReading,torpedoReading} from './panel-readings.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
@@ -47,7 +47,6 @@ import {difficultyPanel,patrolDifficulty} from './difficulty.js';
 import {actionForKey,shortcutConflict,allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
-const tubeLabels={port:$('tube-port'),starboard:$('tube-starboard')};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
@@ -258,6 +257,7 @@ const missionBlock=globalThis.Elm.MissionBlock.init({node:$('mission-block-root'
 const operationCard=globalThis.Elm.OperationCard.init({node:$('operation-card-root')});
 const footerStatus=globalThis.Elm.FooterStatus.init({node:$('footer-status-root')});
 const resourcePanel=globalThis.Elm.ResourcePanel.init({node:$('resources-root')});
+const torpedoControl=globalThis.Elm.TorpedoControl.init({node:$('torpedo-control-root'),flags:{maxRun:MAX_RUN}});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
@@ -516,9 +516,19 @@ function assignDamageControl(){
  toast('Damage control working for 2 minutes. Uses battery.');
 }
 bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}},()=>state.decoys>0);
-$('run-limit').max=MAX_RUN;
-bindCommand('run-limit','input',e=>{state.runSetting=clamp(e.target.valueAsNumber,100,MAX_RUN);});
-bindCommand('fire','click',launchSelected,()=>!!state.contacts.find(c=>c.id===selected)&&operatingFraction(state.systems.tubes)>0&&torpedoTubes(state).next!==null&&state.depth<=100);
+// Torpedo orders from the Elm panel, checked as the button and slider were. Every
+// order counts as handled, refused or not, so the panel stops holding the run.
+const torpedoOrders={
+ fire:{enabled:()=>!!state.contacts.find(c=>c.id===selected)&&operatingFraction(state.systems.tubes)>0&&torpedoTubes(state).next!==null&&state.depth<=100,run:()=>launchSelected()},
+ run:{enabled:()=>true,run:value=>{state.runSetting=clamp(value,100,MAX_RUN);}},
+};
+let torpedoHandled=0;
+torpedoControl.ports.torpedoOrder.subscribe(({kind,value,seq})=>{
+ torpedoHandled=Math.max(torpedoHandled,seq);
+ const command=torpedoOrders[kind];
+ if(command&&view!=='orbit'&&canIssue(state,context())&&command.enabled())command.run(value);
+ updateUI();
+});
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
 bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');if(!compactLayout.matches)toast(rovKeyHint());}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
@@ -836,15 +846,9 @@ function updateUI(){
  const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.fix?.source==='lamp'?'LAMP FIX · '+Math.round(s.time-c.fix.time)+' s old':c.id===lampContact?'POSSIBLE SUB · LAMP + PASSIVE':affiliation(c)||(c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED'))+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
  reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
 
- $('torp-count').textContent=s.torps+' ABOARD';
- const tubes=torpedoTubes(s);
- for(const [tube,status] of Object.entries(tubeLabels)){
-  const remaining=tubes[tube];
-  status.textContent=!operatingFraction(s.systems.tubes)?'Offline':remaining===null?'Empty':remaining===0?'Ready':'Reload '+Math.ceil(remaining)+' s';
-  status.classList.toggle('ready',remaining===0&&operatingFraction(s.systems.tubes)>0);
- }
- $('run-limit').value=s.runSetting;$('run-readout').textContent=(s.runSetting/1000).toFixed(2)+' km';
- const target=s.contacts.find(c=>c.id===selected);$('weapon-hint').textContent=target?(target.side==='friendly'?'Confirmed friendly. Hold fire.':target.probableSide==='friendly'&&!target.identified?'Probable friendly. Check identification.':target.identified&&!target.military?'Identified neutral. Hold fire.':`Firing bearing ${deg(firingBearing(s,target))}° true. Seeker may choose another target.`):'Select a contact to set firing bearing.';$('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.side!=='friendly'&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('torpedo-status').textContent=s.projectiles.filter(p=>p.owner==='player').map((p,i)=>`TORP ${i+1} · ${p.age<4?'ARMING':p.lock?'SONAR TRACK':'SEARCHING'} · ${deg(p.heading)}°`).join(' / ');$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='SUB STOP';
+ {const able=enabled=>canIssue(s,context())&&enabled();
+  torpedoControl.ports.torpedoReading.send({...torpedoReading(s,s.contacts.find(c=>c.id===selected)),fireEnabled:able(torpedoOrders.fire.enabled),runEnabled:able(torpedoOrders.run.enabled),handled:torpedoHandled});}
+ $('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.side!=='friendly'&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='SUB STOP';
  resourcePanel.ports.resourceReading.send(resourceReading(s));
  footerStatus.ports.footerReading.send(footerReading(s,getSoundings(s).belowKeel));
  $('damage-flash').style.opacity=s.shock?String(s.shock*.2):'0';$('cracks').classList.toggle('hidden',!(drone?active&&s.drone.camera<65:view==='scope'&&active&&s.systems.periscope<=45));

@@ -142,3 +142,19 @@ test('resource gauges show a damaged store’s remaining capacity',async()=>{
  s.systems={batteryBank:79.8,fuelTank:99.99};
  assert.deepEqual(resourceReading(s).gauges.map(g=>g.text),['92 / 79%','20%','0 / 99%']);
 });
+
+test('the torpedo reading describes tubes, run, target and running torpedoes',async()=>{
+ const {torpedoReading}=await import('../src/panel-readings.js');
+ const {torpedoTubes}=await import('../src/torpedo-tubes.js');
+ const s=createGame('recon',7);
+ let r=torpedoReading(s,undefined);
+ const tubes=torpedoTubes(s);
+ assert.deepEqual(r.tubes,[{key:'port',name:'Port',offline:false,remaining:tubes.port},{key:'starboard',name:'Starboard',offline:false,remaining:tubes.starboard}]);
+ assert.deepEqual([r.torps,r.runText,r.target,r.running],[s.torps+' ABOARD',(s.runSetting/1000).toFixed(2)+' km',null,'']);
+ s.systems.tubes=0;assert.equal(torpedoReading(s,undefined).tubes[0].offline,true);
+ const target={id:'A1',bearing:47.6,side:'hostile',identified:1,military:0};
+ r=torpedoReading(s,target);
+ assert.deepEqual(r.target,{side:'hostile',probableSide:'',identified:true,military:false,bearing:'048'});
+ s.projectiles=[{owner:'player',age:2,heading:10},{owner:'enemy',age:9,heading:0},{owner:'player',age:6,lock:'A1',heading:359.6},{owner:'player',age:6,heading:90},{owner:'player',age:4,heading:180}];
+ assert.equal(torpedoReading(s,undefined).running,'TORP 1 · ARMING · 010° / TORP 2 · SONAR TRACK · 000° / TORP 3 · SEARCHING · 090° / TORP 4 · SEARCHING · 180°','a torpedo is armed from four seconds');
+});
