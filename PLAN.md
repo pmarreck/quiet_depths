@@ -20,8 +20,8 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## New gameplay
 
-- [x] Let the sub rest on the seafloor to reduce detection, with touchdown damage by descent rate and hull wear when moving while bottomed (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 03:05 EST).
-- [ ] Add TorpedoCam, an Orbit-dependent option to follow the player’s torpedoes in the water (context: docs/plan_context/owner-feedback-2026-11-27.md).
+- [x] Let the sub rest on the seafloor to reduce detection, with touchdown damage by descent rate and hull wear when moving while bottomed (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 03:05 EST; commit 52cc880).
+- [x] Add TorpedoCam, an Orbit-dependent option to follow the player’s torpedoes in the water (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 03:12 EST).
 
 ## Future features
 

@@ -12,7 +12,8 @@ export const difficultyControls = [
   {id:'omniscientChart', label:'Exact enemy positions on chart', initial:false},
   {id:'orbitCamera', label:'External orbit camera (Turn off for more realism)', initial:true},
   {id:'instantReplay', label:'Instant replay', initial:true},
-  {id:'enemyReplay', label:'Also instant-replay enemy events (even less realism)', initial:false, requires:'instantReplay'}
+  {id:'enemyReplay', label:'Also instant-replay enemy events (even less realism)', initial:false, requires:'instantReplay'},
+  {id:'torpedoCam', label:'TorpedoCam: follow your torpedoes in Orbit (even less realism)', initial:true, requires:'orbitCamera'}
 ] as const;
 
 

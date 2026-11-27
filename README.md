@@ -81,7 +81,7 @@ Once per twelve hours of ship time there are independent chances of a friendly s
 
 Tiebreaker’s two NPC fleets can fight and sink one another while you watch. Friendly briefing areas are prior information and remain on the chart. Observations can refine affiliation. Friendly surface ships carry forked blue pennants and hostile ones orange pennants in that scenario. Passing friendly vessels elsewhere can aid a threatened ally.
 
-Mission setup also lets you adjust the damage advantage, your detectability, ping detection chance and the effect of depth. Enemy aircraft, the satellite, the ROV, chart omniscience, Orbit, instant replay and replays of enemy events have separate controls.
+Mission setup also lets you adjust the damage advantage, your detectability, ping detection chance and the effect of depth. Enemy aircraft, the satellite, the ROV, chart omniscience, Orbit, TorpedoCam, instant replay and replays of enemy events have separate controls.
 
 ## Weapons and air support
 
@@ -110,6 +110,8 @@ Open **Sub** to see each system’s current condition and repair ceiling. Engine
 ## Orbit, replay and the ROV
 
 **Orbit** is the deliberately impossible camera. Press **V** or choose **Orbit** and swing around your own sub. You can watch the rudder answer the helm, the hull pitch in a swell, bubbles thin behind the propeller, the yellow ROV at the end of its cable, or a torpedo slip past. Drag to orbit and zoom with the wheel, touch gestures or +/−. The patrol and its sonar keep running. **Pause** holds time for a closer look. **Exit view** or **Esc** takes you back. Orbit defaults on and can be disabled in the briefing for a more restricted view.
+
+**TorpedoCam** rides along with your torpedoes in Orbit. Press **1–9** or choose **T1**, **T2** and so on to follow your torpedoes in the water in launch order. Press **0** or choose **SUB** to return to the boat. The camera starts close and can zoom in further on a torpedo. When a followed shot detonates or runs out, the view holds on that spot for a few seconds before returning to the sub. It is on by default whenever Orbit is enabled, and has its own switch in the briefing.
 
 **Instant replay** pauses the live patrol and plays the preceding five patrol seconds from an external camera. The framing follows the objects involved in an impact, grounding or qualifying torpedo near miss. You can rotate, zoom and exit early. Replays work independently of Orbit. A second checkbox includes enemy events such as hits, implosions and the final moments of a sinking ship.
 

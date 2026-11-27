@@ -117,3 +117,4 @@ body:is([data-station=scope],[data-station=tower],[data-station=gun],[data-stati
  #speed-sheet-presets .telegraph-buttons{grid-template-columns:repeat(4,minmax(0,1fr))}
  .order-sheet{max-height:100%;overflow-y:auto;box-sizing:border-box}
 }
+.torpedo-cam{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.torpedo-cam[hidden]{display:none}#orbit-tools .torpedo-cam button[aria-pressed=true]{color:var(--gold);border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}

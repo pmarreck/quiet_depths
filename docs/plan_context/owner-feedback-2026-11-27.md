@@ -150,3 +150,9 @@ sub again.
 player’s torpedoes in launch order and 0 returns to the sub. Station hotkeys
 work again after leaving Orbit with Esc or V. Touch layouts get on-screen
 buttons.
+
+**As built (2026-11-27).** TorpedoCam is a briefing option that requires Orbit
+and defaults on, an easily reversed assumption. Following a torpedo starts the
+camera at 18 m and allows zooming to 8 m; the sub keeps its 37 m minimum. A
+finished shot holds the view on its last position for 4 patrol seconds. Only
+the player's torpedoes are offered.

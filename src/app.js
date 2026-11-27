@@ -12,6 +12,7 @@ import {bindBriefingNavigation} from './briefing-navigation.js';
 import {ReplayRecorder,ReplayPlayback,replayLabels} from './instant-replay.js';
 import {helmStatusText} from './helm-status.js';
 import {attachCompassSteering} from './compass-steering.js';
+import {followFocus,followForDigit,playerTorpedoes,torpedoCamActive} from './torpedo-cam.js';
 import {seriousRepairs} from './red-alert.js';
 import {threats} from './torpedo-watch.js';
 import {conditionLabel,DRONE_PARTS,operatingFraction} from './equipment.js';
@@ -67,6 +68,8 @@ function currentPaper(mode=instrument,profile=selectedProfiles[mode]){
 }
 let sonarRange=SONAR_RANGES.at(-1);
 let orbit=null,recorder=null,replay=null,returnFocus=null,lossSoundPlayed=false;
+const NO_FOLLOW={follow:null,last:null,lostAt:null};
+let follow=NO_FOLLOW,followButtons='';
 let bindings=shortcutBindings(),remapping=null,invertRovPitch=false;
 try{invertRovPitch=localStorage.getItem('quiet-depths-invert-rov-pitch')==='true';}catch{}
 try{bindings=shortcutBindings(JSON.parse(localStorage.getItem('quiet-depths-shortcuts-v1')));}catch{}
@@ -125,12 +128,30 @@ function setRate(r){rate=r;all('[data-time]').forEach(b=>b.classList.toggle('act
 function setPaused(p){paused=p;held.clear();drag=null;document.body.classList.toggle('paused',p);$('pause').setAttribute('aria-label',p?'Resume patrol':'Pause patrol');updateUI();sound.update();persist();}
 function setView(v){if(v==='drone'&&!state.difficulty.drone)return;zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;document.body.classList.toggle('orbiting',v==='orbit');held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();sound.update();}
 function changeOrbit(){
- if(view==='orbit'){setView(previousView);$('open-orbit').focus();return;}
+ if(view==='orbit'){follow=NO_FOLLOW;if(orbit)delete orbit.focus;setView(previousView);$('open-orbit').focus();return;}
  if(!scene||!state.difficulty.orbitCamera||context().modal||!patrolStarted)return;
  orbit??=initialOrbit(state);
  previousView=view;setView('orbit');$('orbit-pause').focus({preventScroll:true});
 }
-function zoomOrbit(factor){orbit.distance=clamp(orbit.distance*factor,37,120);}
+function followDigit(digit){
+ const target=followForDigit(digit,state.projectiles);
+ if(target===undefined)return;
+ if(target!==null&&follow.follow===null&&orbit)orbit.distance=Math.min(orbit.distance,18);
+ follow={follow:target,last:null,lostAt:null};updateUI();
+}
+// Rebuild the follow buttons only when the torpedoes in the water change, so a press is never lost.
+function updateFollowButtons(s){
+ const group=$('torpedo-cam'),shots=view==='orbit'&&torpedoCamActive(s.difficulty)?playerTorpedoes(s.projectiles):[];
+ group.hidden=!shots.length&&follow.follow===null;
+ const key=shots.map(p=>p.id).join(',')+'|'+follow.follow;
+ if(key===followButtons)return;
+ followButtons=key;
+ const button=(digit,label,id)=>{const b=document.createElement('button');b.type='button';b.dataset.follow=String(digit);b.setAttribute('aria-pressed',String(follow.follow===id));b.append(label+' ');const k=document.createElement('kbd');k.textContent=String(digit);b.append(k);return b;};
+ group.replaceChildren(button(0,'SUB',null),...shots.slice(0,9).map((p,i)=>button(i+1,'T'+(i+1),p.id)));
+}
+// A torpedo is small, so following one allows a much closer camera than the sub.
+const orbitMinimum=()=>follow.follow===null?37:8;
+function zoomOrbit(factor){orbit.distance=clamp(orbit.distance*factor,orbitMinimum(),120);}
 function renderServiceRecord(){
  try{const record=serviceRecord(localStorage);$('service-record').textContent=`${record.ships} ships sunk · ${record.submarines} submarines sunk · ${record.doubleHunts} two-submarine patrols`;}catch{}
  renderCaptainRecords();
@@ -406,6 +427,7 @@ $('sound').onclick=()=>{sound.toggle();renderSound();};$('pause').onclick=()=>se
 all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI();}));
 all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
 $('open-orbit').onclick=changeOrbit;$('orbit-exit').onclick=changeOrbit;$('orbit-pause').onclick=()=>setPaused(!paused);
+$('torpedo-cam').onclick=e=>{const b=e.target.closest('[data-follow]');if(b)followDigit(Number(b.dataset.follow));};
 $('orbit-in').onclick=()=>zoomOrbit(1/1.2);$('orbit-out').onclick=()=>zoomOrbit(1.2);
 function scopeToggle(){if(!canIssue(state,context())||!operatingFraction(state.systems.periscope))return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}orderScope(state,!state.scope);if(!state.scope)scene?.clear();updateUI();}
 function takePhoto(){
@@ -627,6 +649,7 @@ window.addEventListener('keydown',e=>{
  if(view==='orbit'){
   if(e.code==='Escape'||action==='KeyV'){e.preventDefault();if(!e.repeat)changeOrbit();}
   else if(action==='Escape'){e.preventDefault();if(!e.repeat)setPaused(!paused);}
+  else if(/^Digit[0-9]$/.test(e.code)&&torpedoCamActive(state.difficulty)){e.preventDefault();followDigit(Number(e.code.slice(5)));}
   return;
  }
  if(action==='KeyV'){e.preventDefault();if(!e.repeat)changeOrbit();return;}
@@ -720,6 +743,7 @@ function updateUI(){
 
  const drone=view==='drone',v=helmFor(s,view),actual={heading:v.heading,depth:v.depth,speed:v.speed},requested={heading:v.targetHeading,depth:v.targetDepth,speed:v.targetSpeed};
  $('helm-status').textContent=helmStatusText(s,throttlePercent(s.targetSpeed));
+ updateFollowButtons(s);
  compass.ports.compassReading.send({heading:v.heading,requested:v.targetHeading});
  $('helm-mode').textContent=drone?(v.mode==='remote'?'DRONE HELM':v.mode==='return'?'DRONE · AUTO RETURN':'DRONE · OFFLINE'):'SUBMARINE HELM';
  $('heading-value').textContent=deg(v.heading);$('depth-value').textContent=Math.round(v.depth);$('speed-value').textContent=v.speed.toFixed(1);
@@ -1072,6 +1096,7 @@ function frame(now){
   vp.style.setProperty('--shock-y',Math.cos(renderClock*19)*state.shock*1.7+'px');
  }
  const r=vp.getBoundingClientRect();
+ if(view==='orbit'&&orbit){const next=followFocus(follow,state.projectiles,state.time);follow=next.state;if(next.focus)orbit.focus=next.focus;else delete orbit.focus;orbit.distance=Math.max(orbitMinimum(),orbit.distance);}
  if(scene&&feedActive(state,view)){scene.resize(r.width,r.height);scene.render(state,view,zoom,renderClock,orbit,presentationSeconds);}
  if(view==='scope'&&feedActive(state,'scope'))drawScope();if(view==='gun'&&feedActive(state,'gun'))drawGun();if(view==='sonar'){drawSonar('tactical',false,renderClock);if(instrument==='bearings')drawHydrophones(renderClock);}if(view==='chart')drawChart();drawSonar('mini-sonar',true,renderClock);captureEvidence();
  if(now-lastUI>100){updateUI();sound.update();lastUI=now;}if(now-lastSave>8000&&!ctx.modal&&!paused){persist();lastSave=now;}scheduleFrame();
