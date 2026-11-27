@@ -1,6 +1,7 @@
 module SimHarness.World exposing (function)
 
-{-| Harness entries for the calendar, the chart and the weather. -}
+{-| Harness entries for the calendar, the chart and the weather.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -34,7 +35,8 @@ encodeDay d =
         ]
 
 
-{-| A missing number reads as NaN, as `undefined` does in arithmetic. -}
+{-| A missing number reads as NaN, as `undefined` does in arithmetic.
+-}
 lenient : String -> D.Decoder Float
 lenient key =
     D.oneOf [ D.field key D.float, D.succeed (0 / 0) ]
@@ -59,7 +61,8 @@ weatherId =
             )
 
 
-{-| Saved conditions; a missing or null start day is an older save's. -}
+{-| Saved conditions; a missing or null start day is an older save's.
+-}
 config : D.Decoder Env.Config
 config =
     D.map6 Env.Config
@@ -86,7 +89,8 @@ type alias Boat =
     }
 
 
-{-| The sky's inputs, with the hull and periscope when they are given. -}
+{-| The sky's inputs, with the hull and periscope when they are given.
+-}
 boat : D.Decoder Boat
 boat =
     D.succeed Boat
@@ -111,15 +115,36 @@ direction d =
 encodeEnvironment : Env.Environment -> E.Value
 encodeEnvironment e =
     E.object
-        ([ ( "cloud", E.float e.cloud ), ( "rain", E.float e.rain ), ( "storm", E.float e.storm ), ( "waveScale", E.float e.waveScale )
-         , ( "waveSpeed", E.float e.waveSpeed ), ( "wind", E.float e.wind ), ( "visibility", E.float e.visibility )
-         , ( "weather", E.string e.weather ), ( "weatherId", E.string (Env.weatherIdName e.weatherId) ), ( "hour", E.float e.hour )
-         , ( "sunAltitude", E.float e.sunAltitude ), ( "daylight", E.float e.daylight ), ( "twilight", E.float e.twilight )
-         , ( "phase", E.string (Env.phaseName e.phase) ), ( "fog", E.float e.fog ), ( "date", E.string e.date ), ( "holiday", encodeHoliday e.holiday )
-         , ( "day", E.int e.day ), ( "cycle", E.float e.cycle ), ( "illumination", E.float e.illumination ), ( "moonDirection", direction e.moonDirection )
-         , ( "clearLight", E.float e.clearLight ), ( "moonLight", E.float e.moonLight ), ( "sunDirection", direction e.sunDirection )
-         , ( "opticalRange", E.float e.opticalRange ), ( "subVisualRange", E.float e.subVisualRange ), ( "lightRange", E.float e.lightRange )
-         , ( "navigationLights", E.bool e.navigationLights ), ( "seaState", E.int e.seaState ), ( "flash", E.float e.flash )
+        ([ ( "cloud", E.float e.cloud )
+         , ( "rain", E.float e.rain )
+         , ( "storm", E.float e.storm )
+         , ( "waveScale", E.float e.waveScale )
+         , ( "waveSpeed", E.float e.waveSpeed )
+         , ( "wind", E.float e.wind )
+         , ( "visibility", E.float e.visibility )
+         , ( "weather", E.string e.weather )
+         , ( "weatherId", E.string (Env.weatherIdName e.weatherId) )
+         , ( "hour", E.float e.hour )
+         , ( "sunAltitude", E.float e.sunAltitude )
+         , ( "daylight", E.float e.daylight )
+         , ( "twilight", E.float e.twilight )
+         , ( "phase", E.string (Env.phaseName e.phase) )
+         , ( "fog", E.float e.fog )
+         , ( "date", E.string e.date )
+         , ( "holiday", encodeHoliday e.holiday )
+         , ( "day", E.int e.day )
+         , ( "cycle", E.float e.cycle )
+         , ( "illumination", E.float e.illumination )
+         , ( "moonDirection", direction e.moonDirection )
+         , ( "clearLight", E.float e.clearLight )
+         , ( "moonLight", E.float e.moonLight )
+         , ( "sunDirection", direction e.sunDirection )
+         , ( "opticalRange", E.float e.opticalRange )
+         , ( "subVisualRange", E.float e.subVisualRange )
+         , ( "lightRange", E.float e.lightRange )
+         , ( "navigationLights", E.bool e.navigationLights )
+         , ( "seaState", E.int e.seaState )
+         , ( "flash", E.float e.flash )
          ]
             ++ List.filterMap identity [ Maybe.map (\t -> ( "sampledAt", E.float t )) e.sampledAt, Maybe.map (\w -> ( "wavePhase", E.float w )) e.wavePhase ]
         )
@@ -128,8 +153,12 @@ encodeEnvironment e =
 encodeConfig : Env.Config -> E.Value
 encodeConfig c =
     E.object
-        [ ( "startDay", Maybe.map E.float c.startDay |> Maybe.withDefault E.null ), ( "chartSeed", E.float c.chartSeed ), ( "startHour", E.float c.startHour )
-        , ( "startWeather", E.string (Env.weatherIdName c.startWeather) ), ( "changing", E.bool c.changing ), ( "seed", E.float c.seed )
+        [ ( "startDay", Maybe.map E.float c.startDay |> Maybe.withDefault E.null )
+        , ( "chartSeed", E.float c.chartSeed )
+        , ( "startHour", E.float c.startHour )
+        , ( "startWeather", E.string (Env.weatherIdName c.startWeather) )
+        , ( "changing", E.bool c.changing )
+        , ( "seed", E.float c.seed )
         ]
 
 
@@ -157,13 +186,21 @@ options =
     D.map3 (\time sky changing -> { timeOfDay = time, weather = sky, changing = changing })
         (optional "timeOfDay" D.string)
         (optional "weather" D.string)
-        (optional "changing" D.value |> D.map (\v -> case Maybe.map (D.decodeValue D.bool) v of
-            Just (Ok False) -> False
+        (optional "changing" D.value
+            |> D.map
+                (\v ->
+                    case Maybe.map (D.decodeValue D.bool) v of
+                        Just (Ok False) ->
+                            False
 
-            _ -> True))
+                        _ ->
+                            True
+                )
+        )
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of
@@ -204,8 +241,14 @@ function name =
                                         in
                                         ( Env.weatherIdName id
                                         , E.object
-                                            [ ( "name", E.string w.name ), ( "cloud", E.float w.cloud ), ( "rain", E.float w.rain ), ( "storm", E.float w.storm )
-                                            , ( "waveScale", E.float w.waveScale ), ( "waveSpeed", E.float w.waveSpeed ), ( "wind", E.float w.wind ), ( "visibility", E.float w.visibility )
+                                            [ ( "name", E.string w.name )
+                                            , ( "cloud", E.float w.cloud )
+                                            , ( "rain", E.float w.rain )
+                                            , ( "storm", E.float w.storm )
+                                            , ( "waveScale", E.float w.waveScale )
+                                            , ( "waveSpeed", E.float w.waveSpeed )
+                                            , ( "wind", E.float w.wind )
+                                            , ( "visibility", E.float w.visibility )
                                             ]
                                         )
                                     )

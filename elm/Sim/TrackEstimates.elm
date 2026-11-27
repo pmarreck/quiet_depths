@@ -201,7 +201,17 @@ applyReconPacket packet s =
 
     else
         Just
-            (List.foldl (apply s) { s | nextId = if safeInteger s.nextId && s.nextId >= 1 then s.nextId else 1 } observations)
+            (List.foldl (apply s)
+                { s
+                    | nextId =
+                        if safeInteger s.nextId && s.nextId >= 1 then
+                            s.nextId
+
+                        else
+                            1
+                }
+                observations
+            )
 
 
 apply : { a | time : Float, x : Float, y : Float } -> ( Track, Observation ) -> { s | contacts : List Contact, nextId : Float } -> { s | contacts : List Contact, nextId : Float }
@@ -215,10 +225,30 @@ apply at ( track, o ) s =
                 [] ->
                     let
                         fresh =
-                            { id = track.id, label = designation s.nextId, x = track.x, y = track.y, range = 0, bearing = 0, confidence = 0, age = 0
-                            , identified = Just False, name = Nothing, side = Nothing, probableSide = Nothing, kind = Nothing, military = Nothing, method = Just Satellite
-                            , fix = Nothing, lastSweep = Nothing, sweepArea = Nothing, passiveAt = Nothing, passiveBearing = Nothing, passiveX = Nothing, passiveY = Nothing
-                            , depthEstimate = Nothing, courseEstimated = Nothing
+                            { id = track.id
+                            , label = designation s.nextId
+                            , x = track.x
+                            , y = track.y
+                            , range = 0
+                            , bearing = 0
+                            , confidence = 0
+                            , age = 0
+                            , identified = Just False
+                            , name = Nothing
+                            , side = Nothing
+                            , probableSide = Nothing
+                            , kind = Nothing
+                            , military = Nothing
+                            , method = Just Satellite
+                            , fix = Nothing
+                            , lastSweep = Nothing
+                            , sweepArea = Nothing
+                            , passiveAt = Nothing
+                            , passiveBearing = Nothing
+                            , passiveX = Nothing
+                            , passiveY = Nothing
+                            , depthEstimate = Nothing
+                            , courseEstimated = Nothing
                             }
                     in
                     ( fresh, s.contacts ++ [ fresh ], s.nextId + 1 )
@@ -271,7 +301,8 @@ apply at ( track, o ) s =
     { s | contacts = replaceFirst track.id named withContact, nextId = nextId }
 
 
-{-| Only the first contact with the id, as `find` returns it. -}
+{-| Only the first contact with the id, as `find` returns it.
+-}
 replaceFirst : String -> Contact -> List Contact -> List Contact
 replaceFirst id replacement contacts =
     case contacts of

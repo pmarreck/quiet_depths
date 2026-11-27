@@ -16,13 +16,15 @@ rad d =
     d * pi / 180
 
 
-{-| Compass bearing from one point to another, 0 to 360. -}
+{-| Compass bearing from one point to another, 0 to 360.
+-}
 bearing : { a | x : Float, y : Float } -> { b | x : Float, y : Float } -> Float
 bearing a b =
     M.remainder (atan2 (b.x - a.x) (b.y - a.y) * 180 / pi + 360) 360
 
 
-{-| The signed turn from bearing b to bearing a, -180 to 180. -}
+{-| The signed turn from bearing b to bearing a, -180 to 180.
+-}
 delta : Float -> Float -> Float
 delta a b =
     M.remainder (a - b + 540) 360 - 180
@@ -104,7 +106,8 @@ log text kind s =
             { s | events = [ { t = s.time, text = text, kind = kind } ] }
 
 
-{-| JavaScript's `value || 0`. -}
+{-| JavaScript's `value || 0`.
+-}
 orZero : Float -> Float
 orZero value =
     if M.truthy value then

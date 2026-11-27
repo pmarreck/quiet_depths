@@ -1,4 +1,4 @@
-module Sim.HullTraffic exposing (Collision, Hurt, Role(..), Traffic, Work, bodyOf, boatBody, roleKey, shipBody, store)
+module Sim.HullTraffic exposing (Collision, Hurt, Role(..), Traffic, Work, boatBody, bodyOf, roleKey, shipBody, store)
 
 {-| The patrol as hull contacts sees it, and the roles that stand in for the
 TypeScript's object identity: the boat, the site, a ship afloat (by its place
@@ -17,12 +17,14 @@ import Sim.SurfaceMotion exposing (Point)
 import Sim.Vessel as Vessel
 
 
-{-| `hurt severity text part` applies damage to the boat, as `systems` does. -}
+{-| `hurt severity text part` applies damage to the boat, as `systems` does.
+-}
 type alias Hurt t c r =
     Float -> String -> String -> Traffic t c r -> Traffic t c r
 
 
-{-| A collision the replay should show. -}
+{-| A collision the replay should show.
+-}
 type alias Collision =
     { target : Maybe String, point : Point }
 
@@ -61,15 +63,41 @@ type Role
 
 shipBody : Ship -> Body
 shipBody v =
-    { x = v.x, y = v.y, depth = v.depth, heading = v.heading, pitch = v.pitch, roll = v.roll, speed = v.speed, verticalSpeed = v.verticalSpeed
-    , kind = Just (Vessel.kindName v.kind), id = Just v.id, name = Just v.name, hull = Just v.hull, military = v.military, fixedWreck = v.fixedWreck == Just True, directHits = v.directHits
+    { x = v.x
+    , y = v.y
+    , depth = v.depth
+    , heading = v.heading
+    , pitch = v.pitch
+    , roll = v.roll
+    , speed = v.speed
+    , verticalSpeed = v.verticalSpeed
+    , kind = Just (Vessel.kindName v.kind)
+    , id = Just v.id
+    , name = Just v.name
+    , hull = Just v.hull
+    , military = v.military
+    , fixedWreck = v.fixedWreck == Just True
+    , directHits = v.directHits
     }
 
 
 boatBody : Traffic t c r -> Body
 boatBody s =
-    { x = s.x, y = s.y, depth = Just s.depth, heading = s.heading, pitch = Just s.pitch, roll = s.roll, speed = s.speed, verticalSpeed = Just s.verticalSpeed
-    , kind = Nothing, id = Nothing, name = Nothing, hull = Nothing, military = Nothing, fixedWreck = False, directHits = Nothing
+    { x = s.x
+    , y = s.y
+    , depth = Just s.depth
+    , heading = s.heading
+    , pitch = Just s.pitch
+    , roll = s.roll
+    , speed = s.speed
+    , verticalSpeed = Just s.verticalSpeed
+    , kind = Nothing
+    , id = Nothing
+    , name = Nothing
+    , hull = Nothing
+    , military = Nothing
+    , fixedWreck = False
+    , directHits = Nothing
     }
 
 

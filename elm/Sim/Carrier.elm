@@ -22,7 +22,8 @@ carrierSize =
     { halfLength = 108, halfBeam = 16, deckHeight = 17 }
 
 
-{-| How many direct hits doom the carrier; the mission definition owns it. -}
+{-| How many direct hits doom the carrier; the mission definition owns it.
+-}
 fatalHits : Int
 fatalHits =
     PatrolMission.carrierFatalHits
@@ -85,13 +86,15 @@ carrierDoomed ship =
     fatalHits <= ship.directHits
 
 
-{-| Each hit past the fatal one speeds her descent after she slips under. -}
+{-| Each hit past the fatal one speeds her descent after she slips under.
+-}
 carrierDescentFactor : { a | directHits : Int } -> Float
 carrierDescentFactor ship =
     M.max 1 (toFloat (ship.directHits - fatalHits + 1))
 
 
-{-| Once doomed she settles as buoyancy goes. -}
+{-| Once doomed she settles as buoyancy goes.
+-}
 advanceCarrierFlood : Float -> Carrier a -> Carrier a
 advanceCarrierFlood dt ship =
     if fatalHits <= ship.directHits then
@@ -107,12 +110,18 @@ Whole-number counts are the decoder's to check.
 -}
 validCarrier : { a | fighterCount : Int, flood : Float, directHits : Int, hull : Float } -> Bool
 validCarrier ship =
-    ship.fighterCount >= 1
-        && ship.fighterCount <= 3
+    ship.fighterCount
+        >= 1
+        && ship.fighterCount
+        <= 3
         && not (isNaN ship.flood || isInfinite ship.flood)
-        && ship.flood >= 0
+        && ship.flood
+        >= 0
         && (ship.directHits < fatalHits || ship.flood > 0)
-        && ship.directHits >= 0
-        && ship.hull >= 0
-        && ship.hull <= 100
+        && ship.directHits
+        >= 0
+        && ship.hull
+        >= 0
+        && ship.hull
+        <= 100
         && (ship.hull > 0 || fatalHits <= ship.directHits)

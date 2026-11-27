@@ -34,7 +34,8 @@ type Msg
     = Call { id : Int, fn : String, batch : List D.Value }
 
 
-{-| Each function the tests may call, by the TypeScript name it replaces. -}
+{-| Each function the tests may call, by the TypeScript name it replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     List.foldl

@@ -18,7 +18,8 @@ depthHoldPitch verticalSpeed =
     -18 * M.max -1 (M.min 1 verticalSpeed)
 
 
-{-| The camera's pitch in radians. -}
+{-| The camera's pitch in radians.
+-}
 droneCameraPitch : Float -> Maybe Float -> Float
 droneCameraPitch verticalSpeed nosePitch =
     Maybe.withDefault (depthHoldPitch verticalSpeed) nosePitch * pi / 180

@@ -1,6 +1,7 @@
 module SimHarness.Hulls exposing (function)
 
-{-| Harness entries for hull contacts. -}
+{-| Harness entries for hull contacts.
+-}
 
 import Dict
 import Json.Decode as D
@@ -176,7 +177,8 @@ encodeTraffic s =
         ]
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

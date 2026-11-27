@@ -3,7 +3,7 @@ module Sim.Ship exposing (Order(..), Parley, Pursuit(..), Report, Ship, decoder,
 {-| One vessel at sea, as saves hold it. The record mirrors the TypeScript
 field for field while both implementations change together: the fields a
 save must have are plain and every other is a `Maybe`, so a save
-round-trips exactly. See docs/plan_context/ship-and-contact-records.md.
+round-trips exactly. See docs/plan\_context/ship-and-contact-records.md.
 -}
 
 import Json.Decode as D
@@ -14,7 +14,8 @@ import Sim.Suspicion exposing (Clue)
 import Sim.Vessel as Vessel exposing (Kind, Side)
 
 
-{-| Whether a hunter holds the player: absent and `null` both mean not. -}
+{-| Whether a hunter holds the player: absent and `null` both mean not.
+-}
 type Pursuit
     = Tracking
     | Searching
@@ -30,12 +31,14 @@ type Order
     | Retreat
 
 
-{-| A cold-watch ship's stand toward another. -}
+{-| A cold-watch ship's stand toward another.
+-}
 type alias Parley =
     { against : String, level : Float, order : Order, range : Float, next : Float, cruise : Float, origin : Maybe { x : Float, y : Float, time : Float } }
 
 
-{-| Where a hunter last placed the player, and why. -}
+{-| Where a hunter last placed the player, and why.
+-}
 type alias Report =
     { x : Float, y : Float, depth : Float, heading : Float, speed : Float, time : Float, reason : Maybe String }
 
@@ -100,7 +103,8 @@ andMap =
     D.map2 (|>)
 
 
-{-| An absent field is `Nothing`; a present one must decode. -}
+{-| An absent field is `Nothing`; a present one must decode.
+-}
 optional : String -> D.Decoder a -> D.Decoder (Maybe a)
 optional key valueDecoder =
     D.oneOf [ D.field key D.value |> D.map (\_ -> True), D.succeed False ]
@@ -131,13 +135,15 @@ finite =
     check "a finite number" (\n -> not (isNaN n || isInfinite n)) D.float
 
 
-{-| A time or timer: finite and not negative. -}
+{-| A time or timer: finite and not negative.
+-}
 timer : D.Decoder Float
 timer =
     check "a time at or after zero" (\n -> n >= 0) finite
 
 
-{-| A moment between the patrol's start and now. -}
+{-| A moment between the patrol's start and now.
+-}
 moment : Float -> D.Decoder Float
 moment now =
     check "a time no later than now" (\t -> t <= now) timer
@@ -311,7 +317,8 @@ point3 p =
     E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ), ( "time", E.float p.time ) ]
 
 
-{-| The ship as a save holds it; absent fields stay absent. -}
+{-| The ship as a save holds it; absent fields stay absent.
+-}
 encode : Ship -> E.Value
 encode s =
     let
@@ -319,8 +326,16 @@ encode s =
             Maybe.map (\v -> ( key, enc v ))
     in
     E.object
-        ([ ( "id", E.string s.id ), ( "name", E.string s.name ), ( "kind", E.string (Vessel.kindName s.kind) ), ( "x", E.float s.x ), ( "y", E.float s.y )
-         , ( "heading", E.float s.heading ), ( "speed", E.float s.speed ), ( "hull", E.float s.hull ), ( "alert", E.float s.alert ), ( "attack", E.float s.attack )
+        ([ ( "id", E.string s.id )
+         , ( "name", E.string s.name )
+         , ( "kind", E.string (Vessel.kindName s.kind) )
+         , ( "x", E.float s.x )
+         , ( "y", E.float s.y )
+         , ( "heading", E.float s.heading )
+         , ( "speed", E.float s.speed )
+         , ( "hull", E.float s.hull )
+         , ( "alert", E.float s.alert )
+         , ( "attack", E.float s.attack )
          ]
             ++ List.filterMap identity
                 [ field "military" E.bool s.military
@@ -335,8 +350,17 @@ encode s =
                 , field "lampFix"
                     (\f ->
                         E.object
-                            [ ( "text", E.string f.text ), ( "x", E.float f.x ), ( "y", E.float f.y ), ( "time", E.float f.time ), ( "radius", E.float f.radius ), ( "sender", E.string f.sender )
-                            , ( "number", E.float f.number ), ( "target", E.string f.target ), ( "depth", E.float f.depth ), ( "course", E.float f.course ), ( "speed", E.float f.speed )
+                            [ ( "text", E.string f.text )
+                            , ( "x", E.float f.x )
+                            , ( "y", E.float f.y )
+                            , ( "time", E.float f.time )
+                            , ( "radius", E.float f.radius )
+                            , ( "sender", E.string f.sender )
+                            , ( "number", E.float f.number )
+                            , ( "target", E.string f.target )
+                            , ( "depth", E.float f.depth )
+                            , ( "course", E.float f.course )
+                            , ( "speed", E.float f.speed )
                             ]
                     )
                     s.lampFix
@@ -362,8 +386,12 @@ encode s =
                 , field "parley"
                     (\p ->
                         E.object
-                            ([ ( "against", E.string p.against ), ( "level", E.float p.level ), ( "order", E.string (orderName p.order) ), ( "range", E.float p.range )
-                             , ( "next", E.float p.next ), ( "cruise", E.float p.cruise )
+                            ([ ( "against", E.string p.against )
+                             , ( "level", E.float p.level )
+                             , ( "order", E.string (orderName p.order) )
+                             , ( "range", E.float p.range )
+                             , ( "next", E.float p.next )
+                             , ( "cruise", E.float p.cruise )
                              ]
                                 ++ List.filterMap identity [ field "origin" point3 p.origin ]
                             )

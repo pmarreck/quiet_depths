@@ -21,7 +21,8 @@ isSurfaced s =
     not (isNaN s.depth || isInfinite s.depth) && s.depth <= surfaceDepth
 
 
-{-| A missing mobility reading counts as fully working. -}
+{-| A missing mobility reading counts as fully working.
+-}
 droneReturnSpeed : Maybe Float -> Float
 droneReturnSpeed mobility =
     10 * operatingFraction (Maybe.withDefault 100 mobility)

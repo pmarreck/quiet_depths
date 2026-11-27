@@ -29,7 +29,8 @@ type alias Difficulty =
     }
 
 
-{-| A finite number from the settings, held within the control's range. -}
+{-| A finite number from the settings, held within the control's range.
+-}
 slider : String -> Float -> Float -> Float -> D.Value -> Float
 slider key low high initial stored =
     case D.decodeValue (D.field key D.float) stored of
@@ -49,7 +50,8 @@ switch key initial stored =
     D.decodeValue (D.field key D.bool) stored |> Result.withDefault initial
 
 
-{-| Reads any value; anything but an object reads as all defaults. -}
+{-| Reads any value; anything but an object reads as all defaults.
+-}
 decode : D.Value -> Difficulty
 decode stored =
     { damage = slider "damage" -1 1 0 stored

@@ -1,6 +1,7 @@
 module SimHarness.Lamp exposing (function)
 
-{-| Harness entries for signal lamps. -}
+{-| Harness entries for signal lamps.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -24,8 +25,13 @@ estimate =
 encodeEstimate : Lamp.Estimate -> E.Value
 encodeEstimate p =
     E.object
-        [ ( "text", E.string p.text ), ( "x", E.float p.x ), ( "y", E.float p.y ), ( "radius", E.float p.radius )
-        , ( "time", E.float p.time ), ( "sender", E.string p.sender ), ( "number", E.float p.number )
+        [ ( "text", E.string p.text )
+        , ( "x", E.float p.x )
+        , ( "y", E.float p.y )
+        , ( "radius", E.float p.radius )
+        , ( "time", E.float p.time )
+        , ( "sender", E.string p.sender )
+        , ( "number", E.float p.number )
         ]
 
 
@@ -48,9 +54,17 @@ lampFix =
 encodeLampFix : Lamp.LampFix -> E.Value
 encodeLampFix p =
     E.object
-        [ ( "sender", E.string p.sender ), ( "target", E.string p.target ), ( "x", E.float p.x ), ( "y", E.float p.y ), ( "radius", E.float p.radius )
-        , ( "time", E.float p.time ), ( "number", E.float p.number ), ( "text", E.string p.text ), ( "depth", E.float p.depth )
-        , ( "course", E.float p.course ), ( "speed", E.float p.speed )
+        [ ( "sender", E.string p.sender )
+        , ( "target", E.string p.target )
+        , ( "x", E.float p.x )
+        , ( "y", E.float p.y )
+        , ( "radius", E.float p.radius )
+        , ( "time", E.float p.time )
+        , ( "number", E.float p.number )
+        , ( "text", E.string p.text )
+        , ( "depth", E.float p.depth )
+        , ( "course", E.float p.course )
+        , ( "speed", E.float p.speed )
         ]
 
 
@@ -73,17 +87,25 @@ nullable encode =
 encodeTransmission : (e -> E.Value) -> Lamp.Transmission e -> E.Value
 encodeTransmission encode m =
     E.object
-        [ ( "estimate", encode m.estimate ), ( "elapsed", E.float m.elapsed ), ( "since", nullable E.float m.since ), ( "copied", E.int m.copied )
-        , ( "delivered", E.bool m.delivered ), ( "completedAt", nullable E.float m.completedAt )
+        [ ( "estimate", encode m.estimate )
+        , ( "elapsed", E.float m.elapsed )
+        , ( "since", nullable E.float m.since )
+        , ( "copied", E.int m.copied )
+        , ( "delivered", E.bool m.delivered )
+        , ( "completedAt", nullable E.float m.completedAt )
         ]
 
 
-{-| The copying state only; the estimate rides along unchanged. -}
+{-| The copying state only; the estimate rides along unchanged.
+-}
 encodeProgress : Lamp.Transmission e -> E.Value
 encodeProgress m =
     E.object
-        [ ( "elapsed", E.float m.elapsed ), ( "since", nullable E.float m.since ), ( "copied", E.int m.copied )
-        , ( "delivered", E.bool m.delivered ), ( "completedAt", nullable E.float m.completedAt )
+        [ ( "elapsed", E.float m.elapsed )
+        , ( "since", nullable E.float m.since )
+        , ( "copied", E.int m.copied )
+        , ( "delivered", E.bool m.delivered )
+        , ( "completedAt", nullable E.float m.completedAt )
         ]
 
 
@@ -110,7 +132,8 @@ bearing =
         |> andMap (optional "side" D.string)
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

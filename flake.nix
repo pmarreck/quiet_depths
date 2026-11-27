@@ -53,6 +53,7 @@
         mkdir elm
         cp ${./elm.json} elm.json
         cp ${./elm/PatrolMission.elm} elm/PatrolMission.elm
+        cp ${./elm/PatrolCriteria.elm} elm/PatrolCriteria.elm
         cp ${./elm/ExportPatrolMissions.elm} elm/ExportPatrolMissions.elm
         elm make elm/ExportPatrolMissions.elm --optimize --output=export-missions.js
         node ${./scripts/export-patrol-missions.mjs} export-missions.js > "$out"
@@ -122,7 +123,7 @@
     });
     checks = each (system: { site = self.packages.${system}.default; });
     devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
-      default = pkgs.mkShell { packages = [ pkgs.nodejs pkgs.elmPackages.elm pkgs.typescript ]; };
+      default = pkgs.mkShell { packages = [ pkgs.nodejs pkgs.elmPackages.elm pkgs.elmPackages.elm-format pkgs.elmPackages.elm-review pkgs.elm2nix pkgs.typescript ]; };
       profiling = pkgs.mkShell { packages = [ pkgs.nodejs performance-profile.packages.${system}.default ]; };
     });
   };

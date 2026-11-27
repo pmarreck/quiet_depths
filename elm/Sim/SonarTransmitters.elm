@@ -53,7 +53,8 @@ decoder =
     D.map2 Transmitters (D.field "scribbler" (D.nullable profile)) (D.field "painter" (D.nullable profile))
 
 
-{-| Listening range in meters. -}
+{-| Listening range in meters.
+-}
 range : Profile -> Float
 range profile =
     case profile of
@@ -64,7 +65,8 @@ range profile =
             650
 
 
-{-| How readily a transmission on this profile gives the boat away. -}
+{-| How readily a transmission on this profile gives the boat away.
+-}
 exposure : Profile -> Float
 exposure profile =
     case profile of

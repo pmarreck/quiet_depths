@@ -145,7 +145,8 @@ top =
     67108864
 
 
-{-| 2 ^ k for 0 <= k <= 30, exactly. -}
+{-| 2 ^ k for 0 <= k <= 30, exactly.
+-}
 pow2 : Int -> Float
 pow2 k =
     toFloat (Bitwise.shiftLeftBy k 1)
@@ -181,7 +182,8 @@ withSign like magnitude =
         magnitude
 
 
-{-| Rounds a whole number below 2^53 to a 26-bit mantissa, half to even. -}
+{-| Rounds a whole number below 2^53 to a 26-bit mantissa, half to even.
+-}
 normalize : Float -> Float -> Num
 normalize v e =
     if isNaN v || v == 0 then

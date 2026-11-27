@@ -5,12 +5,13 @@ the next one is lost, and how a sinking casualty goes down. The mission
 definitions own the criteria.
 -}
 
-import PatrolMission exposing (RescueCriteria, SinkingCasualty)
+import PatrolCriteria exposing (RescueCriteria, SinkingCasualty)
 import Sim.Math as M
 import Sim.Site as Site
 
 
-{-| Depth of a sinking casualty, never below its resting place on the seabed. -}
+{-| Depth of a sinking casualty, never below its resting place on the seabed.
+-}
 casualtyDepth : Float -> Float -> SinkingCasualty -> Float -> Float
 casualtyDepth age roll sink restingDepth =
     M.min restingDepth (sink.startDepth + age / sink.settleSeconds + M.max 0 (age - (sink.foundersAfter + roll * sink.foundersSpread)) * sink.sinkRate)
@@ -22,10 +23,10 @@ undersea rules.
 criteriaFor : Maybe Site.Kind -> RescueCriteria
 criteriaFor site =
     if site == Just Site.SurfaceCasualty then
-        PatrolMission.surfaceRescue
+        PatrolCriteria.surfaceRescue
 
     else
-        PatrolMission.underseaRescue
+        PatrolCriteria.underseaRescue
 
 
 initialSurvivors : Float -> Float -> RescueCriteria -> Int

@@ -28,7 +28,8 @@ wearPerKnotSecond =
     0.06
 
 
-{-| Driving into a bank counts as an impact as well as sinking onto it. -}
+{-| Driving into a bank counts as an impact as well as sinking onto it.
+-}
 touchdownImpact : Float -> Float -> Float
 touchdownImpact descent speedKnots =
     M.max descent (0.2 * M.abs speedKnots)
@@ -48,7 +49,8 @@ touchdownDamage impact =
         4 + 12 * M.min 1.5 ((impact - safeImpact) / (heavyImpact - safeImpact))
 
 
-{-| Outer hull points lost while the sub works against the seabed. -}
+{-| Outer hull points lost while the sub works against the seabed.
+-}
 seabedWear : Float -> Float -> Float
 seabedWear effortKnots dt =
     let

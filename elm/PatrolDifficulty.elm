@@ -48,9 +48,21 @@ update msg model =
     case msg of
         Toggle switch on ->
             if enabled model switch then
-                ( { model | switches = List.map (\s -> if s.id == switch.id then { s | value = on } else s) model.switches }
+                ( { model
+                    | switches =
+                        List.map
+                            (\s ->
+                                if s.id == switch.id then
+                                    { s | value = on }
+
+                                else
+                                    s
+                            )
+                            model.switches
+                  }
                 , Just { id = switch.id, value = Encode.bool on }
                 )
+
             else
                 ( model, Nothing )
 
@@ -58,9 +70,21 @@ update msg model =
             case String.toFloat raw of
                 Just parsed ->
                     let
-                        level = clamp slider.min slider.max parsed
+                        level =
+                            clamp slider.min slider.max parsed
                     in
-                    ( { model | sliders = List.map (\s -> if s.id == slider.id then { s | value = level } else s) model.sliders }
+                    ( { model
+                        | sliders =
+                            List.map
+                                (\s ->
+                                    if s.id == slider.id then
+                                        { s | value = level }
+
+                                    else
+                                        s
+                                )
+                                model.sliders
+                      }
                     , Just { id = slider.id, value = Encode.float level }
                     )
 
@@ -76,11 +100,15 @@ view playtime model =
                 [ text slider.label
                 , output [] [ text (String.fromFloat slider.value) ]
                 , input
-                    [ type_ "range", attribute "data-difficulty" slider.id
-                    , Html.Attributes.min (String.fromFloat slider.min), Html.Attributes.max (String.fromFloat slider.max)
-                    , Html.Attributes.step (String.fromFloat slider.step), value (String.fromFloat slider.value)
+                    [ type_ "range"
+                    , attribute "data-difficulty" slider.id
+                    , Html.Attributes.min (String.fromFloat slider.min)
+                    , Html.Attributes.max (String.fromFloat slider.max)
+                    , Html.Attributes.step (String.fromFloat slider.step)
+                    , value (String.fromFloat slider.value)
                     , onInput (Slide slider)
-                    ] []
+                    ]
+                    []
                 , small [] [ text (slider.low ++ " ↔ " ++ slider.high) ]
                 ]
 
@@ -88,12 +116,17 @@ view playtime model =
             label [] <|
                 [ text switch.label
                 , input
-                    [ type_ "checkbox", attribute "data-difficulty" switch.id, checked switch.value
-                    , disabled (not (enabled model switch)), onCheck (Toggle switch)
-                    ] []
+                    [ type_ "checkbox"
+                    , attribute "data-difficulty" switch.id
+                    , checked switch.value
+                    , disabled (not (enabled model switch))
+                    , onCheck (Toggle switch)
+                    ]
+                    []
                 ]
                     ++ (if switch.id == longPatrolId then
                             [ small [ attribute "role" "status" ] [ text ("Estimated play time · " ++ String.toLower playtime) ] ]
+
                         else
                             []
                        )

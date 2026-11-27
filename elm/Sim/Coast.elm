@@ -16,7 +16,8 @@ type alias Coastline =
     { phase : Float, second : Float, islands : List Island, mainland : Float }
 
 
-{-| Draws from the seed in sequence, as the TypeScript's `roll()` does. -}
+{-| Draws from the seed in sequence, as the TypeScript's `roll()` does.
+-}
 type alias Rolls =
     { seed : Float, next : Float }
 
@@ -103,7 +104,7 @@ coastline seed =
                                 in
                                 place (i - 1)
                                     ( x + side * (800 + stepX * 2100)
-                                    -- y += a + b adds the whole step at once.
+                                      -- y += a + b adds the whole step at once.
                                     , y + ((1000 + stepAlong * 2300) * sin bearing + (stepAcross - 0.5) * 1500)
                                     , ( placed ++ [ island ], s8 )
                                     )

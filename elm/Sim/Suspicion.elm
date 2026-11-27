@@ -42,7 +42,8 @@ type alias Patrol a p d =
     }
 
 
-{-| How long a clue stays worth searching. -}
+{-| How long a clue stays worth searching.
+-}
 searchSeconds : Float -> Float
 searchSeconds pursuit =
     100 * pursuit
@@ -63,7 +64,8 @@ suspicionLabel level ships =
         "No suspicion"
 
 
-{-| A clue names the 600 m chart square the observation fell in. -}
+{-| A clue names the 600 m chart square the observation fell in.
+-}
 leaveClue : Float -> Clue -> Watcher a -> Watcher a
 leaveClue amount observed v =
     let

@@ -1,4 +1,4 @@
-module Sim.Periscope exposing (Scope, advanceScope, orderScope, scopeEyeHeight, scopeExtension)
+module Sim.Periscope exposing (Scope, advanceScope, orderScope, scopeExtension, scopeEyeHeight)
 
 {-| The periscope takes three seconds to travel between stowed and raised.
 `travel` is its extension while moving; at rest the order says where it is.

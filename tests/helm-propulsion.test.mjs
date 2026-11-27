@@ -30,10 +30,10 @@ test('a helm axis holds the player’s slider value until the app reports that o
  // Readings that predate an order must not snap the slider back a step: the
  // view keeps its value until a reading has handled >= the order's sequence.
  assert.match(elm,/if reading\.handled >= model\.seq then/);
- assert.match(elm,/axisOrder \{axis = model\.flags\.axis, kind = "set", value = amount, detent = detent, seq = seq\}/);
+ assert.match(elm,/axisOrder \{ axis = model\.flags\.axis, kind = "set", value = amount, detent = detent, seq = seq \}/);
  // A turn is relative to the app's requested value, so it holds nothing and
  // reuses the latest sequence number rather than claiming a new one.
- assert.match(elm,/axisOrder \{axis = model\.flags\.axis, kind = "nudge", value = by, detent = False, seq = model\.seq\}/);
+ assert.match(elm,/axisOrder \{ axis = model\.flags\.axis, kind = "nudge", value = by, detent = False, seq = model\.seq \}/);
  // The app counts every order as handled, including one it refuses, before the
  // guard, and every reading the axis receives carries that count.
  const handler=app.match(/app\.ports\.axisOrder\.subscribe\(\(\{kind,value,detent,seq\}\)=>\{\n([^\n]*)\n([^\n]*)\n([^\n]*)\n \}\);/);

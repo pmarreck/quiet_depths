@@ -1,6 +1,7 @@
 module SimHarness.Watch exposing (function)
 
-{-| Harness entries for sinking ships and the torpedo watch. -}
+{-| Harness entries for sinking ships and the torpedo watch.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -50,7 +51,8 @@ struck =
         (D.maybe (D.field "directHits" D.int) |> D.map (Maybe.withDefault 0))
 
 
-{-| A saved carrier passes when its counts are whole and the rules hold. -}
+{-| A saved carrier passes when its counts are whole and the rules hold.
+-}
 validCarrier : D.Value -> Bool
 validCarrier value =
     D.decodeValue
@@ -170,13 +172,24 @@ track =
 encodeTrack : TorpedoWatch.Track -> E.Value
 encodeTrack t =
     E.object
-        [ ( "id", E.int t.id ), ( "time", E.float t.time ), ( "x", E.float t.x ), ( "y", E.float t.y ), ( "depth", E.float t.depth ), ( "speed", E.float t.speed )
-        , ( "inboundRun", E.bool t.inboundRun ), ( "fixes", E.int t.fixes ), ( "activeAt", E.float t.activeAt ), ( "activeX", E.float t.activeX ), ( "activeY", E.float t.activeY )
-        , ( "course", maybe E.int t.course ), ( "arrival", maybe E.float t.arrival )
+        [ ( "id", E.int t.id )
+        , ( "time", E.float t.time )
+        , ( "x", E.float t.x )
+        , ( "y", E.float t.y )
+        , ( "depth", E.float t.depth )
+        , ( "speed", E.float t.speed )
+        , ( "inboundRun", E.bool t.inboundRun )
+        , ( "fixes", E.int t.fixes )
+        , ( "activeAt", E.float t.activeAt )
+        , ( "activeX", E.float t.activeX )
+        , ( "activeY", E.float t.activeY )
+        , ( "course", maybe E.int t.course )
+        , ( "arrival", maybe E.float t.arrival )
         ]
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

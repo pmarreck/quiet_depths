@@ -42,12 +42,13 @@ main =
         { init = \_ -> ( (), Cmd.none )
         , subscriptions = \_ -> Sub.none
         , update = \order _ -> ( (), ringTelegraph (Tuple.second (settings order)) )
-        , view = \_ ->
-            div [ class "telegraph-buttons" ]
-                (List.map
-                    (\order ->
-                        button [ type_ "button", onClick order ] [ text (Tuple.first (settings order)) ]
+        , view =
+            \_ ->
+                div [ class "telegraph-buttons" ]
+                    (List.map
+                        (\order ->
+                            button [ type_ "button", onClick order ] [ text (Tuple.first (settings order)) ]
+                        )
+                        [ AheadFull, AheadSilent, AllStop, AsternFull ]
                     )
-                    [ AheadFull, AheadSilent, AllStop, AsternFull ]
-                )
         }

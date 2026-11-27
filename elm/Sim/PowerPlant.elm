@@ -47,7 +47,8 @@ type DieselMode
     | Assist
 
 
-{-| Only the system conditions the plant reads. -}
+{-| Only the system conditions the plant reads.
+-}
 type alias Plant a c =
     { a
         | engine : EngineMode
@@ -58,7 +59,8 @@ type alias Plant a c =
     }
 
 
-{-| The diesel needs air, so it runs at snorkel depth or shallower. -}
+{-| The diesel needs air, so it runs at snorkel depth or shallower.
+-}
 generatorOutput : Plant a c -> Float
 generatorOutput s =
     if s.engine == Diesel && s.depth <= 14 && s.fuel > 0 then
@@ -77,7 +79,8 @@ batteryOutput s =
         0
 
 
-{-| The saved lever runs from -4 to 17; both directions reach full throttle. -}
+{-| The saved lever runs from -4 to 17; both directions reach full throttle.
+-}
 throttlePercent : Float -> Float
 throttlePercent order =
     M.min 100

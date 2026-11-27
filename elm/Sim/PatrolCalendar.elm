@@ -9,7 +9,8 @@ import Bitwise
 import Sim.SurfaceMotion exposing (hash01)
 
 
-{-| Seconds in a patrol day. -}
+{-| Seconds in a patrol day.
+-}
 daySeconds : Float
 daySeconds =
     2880
@@ -22,10 +23,62 @@ in minutes from 1972-01-01 0000 UTC. NASA, Phases of the Moon 1901–2000:
 phases : Array Float
 phases =
     Array.fromList
-        [ -20457, -9985, -220, 10891, 22252, 32249, 42418, 53951, 64829, 74480, 85152, 96905, 107255, 116772, 127925, 139664
-        , 149551, 159165, 170684, 182186, 191768, 201676, 213387, 224482, 233970, 244301, 256006, 266605, 276219, 287026, 298523, 308642
-        , 318566, 329829, 340942, 350688, 361048, 372673, 383287, 392836, 403688, 415495, 425605, 435161, 446481, 458221, 467947, 477705
-        , 489384, 500796, 510345, 520467, 532302, 543207, 552808, 563405
+        [ -20457
+        , -9985
+        , -220
+        , 10891
+        , 22252
+        , 32249
+        , 42418
+        , 53951
+        , 64829
+        , 74480
+        , 85152
+        , 96905
+        , 107255
+        , 116772
+        , 127925
+        , 139664
+        , 149551
+        , 159165
+        , 170684
+        , 182186
+        , 191768
+        , 201676
+        , 213387
+        , 224482
+        , 233970
+        , 244301
+        , 256006
+        , 266605
+        , 276219
+        , 287026
+        , 298523
+        , 308642
+        , 318566
+        , 329829
+        , 340942
+        , 350688
+        , 361048
+        , 372673
+        , 383287
+        , 392836
+        , 403688
+        , 415495
+        , 425605
+        , 435161
+        , 446481
+        , 458221
+        , 467947
+        , 477705
+        , 489384
+        , 500796
+        , 510345
+        , 520467
+        , 532302
+        , 543207
+        , 552808
+        , 563405
         ]
 
 
@@ -34,13 +87,15 @@ phaseAt i =
     Array.get i phases |> Maybe.withDefault (0 / 0)
 
 
-{-| The day of 1972 a patrol sails, from its seed. -}
+{-| The day of 1972 a patrol sails, from its seed.
+-}
 sailingDay : Float -> Int
 sailingDay seed =
     floor (hash01 seed 1972366 * 366)
 
 
-{-| The moon's age as a fraction of its cycle, 0 at new moon. -}
+{-| The moon's age as a fraction of its cycle, 0 at new moon.
+-}
 moonCycle : Float -> Float
 moonCycle day =
     let
@@ -141,7 +196,8 @@ civilFromDays days =
     ( year, month, dayOfMonth )
 
 
-{-| 1972-01-01 is day 730 after 1970-01-01. -}
+{-| 1972-01-01 is day 730 after 1970-01-01.
+-}
 patrolCalendar : Float -> Float -> Float -> Day
 patrolCalendar startDay startHour time =
     let

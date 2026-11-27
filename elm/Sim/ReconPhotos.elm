@@ -4,7 +4,7 @@ module Sim.ReconPhotos exposing (framed, photoGoal)
 definition owns the criteria.
 -}
 
-import PatrolMission exposing (PhotoCriteria)
+import PatrolCriteria exposing (PhotoCriteria)
 import Sim.Math as M
 
 
@@ -16,7 +16,8 @@ photoGoal roll c =
     c.fewestPhotos + floor (roll * toFloat c.goalSpread)
 
 
-{-| Whether a ship this many degrees off the scope's line of sight is in frame. -}
+{-| Whether a ship this many degrees off the scope's line of sight is in frame.
+-}
 framed : Float -> PhotoCriteria -> Bool
 framed offsetDegrees c =
     M.abs offsetDegrees < c.framingDegrees

@@ -1,6 +1,7 @@
 module Sim.Drone exposing (Drone, Mode(..), decoder, encode)
 
-{-| The inspection drone as current saves hold it. -}
+{-| The inspection drone as current saves hold it.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -154,12 +155,29 @@ decoder =
 encode : Drone -> E.Value
 encode d =
     E.object
-        [ ( "mode", E.string (modeName d.mode) ), ( "x", E.float d.x ), ( "y", E.float d.y ), ( "depth", E.float d.depth ), ( "heading", E.float d.heading )
-        , ( "battery", E.float d.battery ), ( "nosePitch", Maybe.map E.float d.nosePitch |> Maybe.withDefault E.null ), ( "verticalSpeed", E.float d.verticalSpeed )
-        , ( "speed", E.float d.speed ), ( "targetSpeed", E.float d.targetSpeed ), ( "targetDepth", E.float d.targetDepth ), ( "targetHeading", E.float d.targetHeading )
-        , ( "collisionCooldown", E.float d.collisionCooldown ), ( "lowAlarm", E.bool d.lowAlarm ), ( "rangeAlarm", E.bool d.rangeAlarm ), ( "lostReason", E.string d.lostReason )
-        , ( "returnStage", E.int d.returnStage ), ( "returnClearance", E.float d.returnClearance ), ( "returnHoldSide", E.float d.returnHoldSide )
+        [ ( "mode", E.string (modeName d.mode) )
+        , ( "x", E.float d.x )
+        , ( "y", E.float d.y )
+        , ( "depth", E.float d.depth )
+        , ( "heading", E.float d.heading )
+        , ( "battery", E.float d.battery )
+        , ( "nosePitch", Maybe.map E.float d.nosePitch |> Maybe.withDefault E.null )
+        , ( "verticalSpeed", E.float d.verticalSpeed )
+        , ( "speed", E.float d.speed )
+        , ( "targetSpeed", E.float d.targetSpeed )
+        , ( "targetDepth", E.float d.targetDepth )
+        , ( "targetHeading", E.float d.targetHeading )
+        , ( "collisionCooldown", E.float d.collisionCooldown )
+        , ( "lowAlarm", E.bool d.lowAlarm )
+        , ( "rangeAlarm", E.bool d.rangeAlarm )
+        , ( "lostReason", E.string d.lostReason )
+        , ( "returnStage", E.int d.returnStage )
+        , ( "returnClearance", E.float d.returnClearance )
+        , ( "returnHoldSide", E.float d.returnHoldSide )
         , ( "returnHoldForward", E.float d.returnHoldForward )
         , ( "repairLimits", E.object [ ( "hull", E.float d.repairLimits.hull ), ( "mobility", E.float d.repairLimits.mobility ), ( "buoyancy", E.float d.repairLimits.buoyancy ), ( "camera", E.float d.repairLimits.camera ) ] )
-        , ( "buoyancy", E.float d.buoyancy ), ( "camera", E.float d.camera ), ( "hull", E.float d.hull ), ( "mobility", E.float d.mobility )
+        , ( "buoyancy", E.float d.buoyancy )
+        , ( "camera", E.float d.camera )
+        , ( "hull", E.float d.hull )
+        , ( "mobility", E.float d.mobility )
         ]

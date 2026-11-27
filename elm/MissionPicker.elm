@@ -17,20 +17,26 @@ type alias Flags =
     , weather : List Choice
     }
 
+
 type alias Choice =
     { id : String, name : String }
+
 
 type alias Conditions =
     { timeOfDay : String, weather : String, changing : Bool }
 
+
 type alias Setup =
     { mission : String, conditions : Conditions }
+
 
 type alias Slot =
     { id : Int, revision : String, image : String, label : String }
 
+
 type alias Slots =
     { entries : List Slot, canSave : Bool, message : String }
+
 
 type alias Model =
     { selected : Mission, pauseKey : String, difficulty : Difficulty.Model, slots : Slots, confirm : Maybe Slot, busy : Bool, times : List Choice, weather : List Choice, conditions : Conditions }
@@ -56,7 +62,9 @@ type Msg
 
 port difficultyChanged : { id : String, value : Encode.Value } -> Cmd msg
 
+
 port showDifficulty : (Difficulty.Model -> msg) -> Sub msg
+
 
 port showPauseKey : (String -> msg) -> Sub msg
 
@@ -66,15 +74,21 @@ port beginPatrol : (() -> msg) -> Sub msg
 
 port patrolRequested : Setup -> Cmd msg
 
+
 port selectSetup : (Setup -> msg) -> Sub msg
+
 
 port showSlots : (Slots -> msg) -> Sub msg
 
+
 port saveSlot : { id : Int, revision : String } -> Cmd msg
+
 
 port readSlot : { id : Int, revision : String } -> Cmd msg
 
+
 port transferFile : { action : String, id : Int, revision : String, setup : Setup } -> Cmd msg
+
 
 main : Program Flags Model Msg
 main =
@@ -89,7 +103,8 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        conditions = model.conditions
+        conditions =
+            model.conditions
     in
     case msg of
         Choose mission ->
@@ -117,7 +132,8 @@ update msg model =
 
         ChangeDifficulty change ->
             let
-                ( settings, changed ) = Difficulty.update change model.difficulty
+                ( settings, changed ) =
+                    Difficulty.update change model.difficulty
             in
             ( { model | difficulty = settings }, Maybe.withDefault Cmd.none (Maybe.map difficultyChanged changed) )
 
@@ -133,6 +149,7 @@ update msg model =
         Save slot ->
             if slot.revision == "" then
                 update (Confirm slot) model
+
             else
                 ( { model | confirm = Just slot }, Cmd.none )
 
@@ -191,6 +208,7 @@ view model =
         , Html.map ChangeDifficulty (Difficulty.view (PatrolMission.estimatedMinutes longer selectedMission) model.difficulty)
         ]
 
+
 conditionMenu : String -> String -> String -> List Choice -> String -> (String -> Msg) -> Html Msg
 conditionMenu title elementId accessible choices current change =
     let
@@ -205,17 +223,23 @@ conditionMenu title elementId accessible choices current change =
             ]
         ]
 
+
 slotView : Model -> Slot -> Html Msg
 slotView model slot =
     let
-        number = String.fromInt slot.id
+        number =
+            String.fromInt slot.id
+
         action label msg unavailable =
             button [ type_ "button", attribute "aria-label" (label ++ " slot " ++ number), disabled (model.busy || unavailable), onClick msg ] [ text label ]
+
         buttons =
             if model.confirm == Just slot then
                 [ span [] [ text ("Replace slot " ++ number ++ "?") ], action "Overwrite" (Confirm slot) False, action "Cancel" Cancel False ]
+
             else
-                [ action "Save" (Save slot) (not model.slots.canSave), action "Load" (Load slot) (slot.revision == "")
+                [ action "Save" (Save slot) (not model.slots.canSave)
+                , action "Load" (Load slot) (slot.revision == "")
                 , action "Export" (Transfer "export-slot" slot.id slot.revision) (slot.revision == "")
                 , action "Import" (Transfer "import-slot" slot.id slot.revision) False
                 ]
@@ -223,6 +247,7 @@ slotView model slot =
     div [ class "patrol-slot" ]
         [ if slot.image == "" then
             span [ class "slot-number" ] [ text number ]
+
           else
             img [ src slot.image, alt "", class "slot-image" ] []
         , div [ class "slot-caption" ]
@@ -244,7 +269,13 @@ missionButton longer selected choice =
         [ type_ "button"
         , classList [ ( "mission-option", True ), ( "active", active ) ]
         , attribute "data-mission" mission.id
-        , attribute "aria-pressed" (if active then "true" else "false")
+        , attribute "aria-pressed"
+            (if active then
+                "true"
+
+             else
+                "false"
+            )
         , onClick (Choose choice)
         ]
         [ span [ attribute "aria-hidden" "true" ] []

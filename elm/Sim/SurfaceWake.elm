@@ -6,7 +6,7 @@ moves, recorded once a second as a trail the renderer draws foam along.
 
 import Sim.HullDesign exposing (design)
 import Sim.Math as M
-import Sim.Periscope exposing (scopeEyeHeight, scopeExtension)
+import Sim.Periscope exposing (scopeExtension, scopeEyeHeight)
 import Sim.SurfaceMotion as Motion exposing (Point, Sea, boatPoint, surfaceHeight)
 
 
@@ -14,7 +14,8 @@ type alias WakeSample =
     { x : Float, y : Float, heading : Float, time : Float, width : Float, strength : Float }
 
 
-{-| Seconds a crossing stays in the trail. -}
+{-| Seconds a crossing stays in the trail.
+-}
 wakeLifetime : Float
 wakeLifetime =
     26
@@ -29,7 +30,8 @@ hullProfile =
     List.map (\st -> { forward = negate st.z, top = st.radius, base = negate st.radius, beam = st.radius }) design.stations
 
 
-{-| Cross sections of the capsule the exterior model uses for the sail. -}
+{-| Cross sections of the capsule the exterior model uses for the sail.
+-}
 sailProfile : List Column
 sailProfile =
     List.map
@@ -68,7 +70,8 @@ type alias Boat a c =
     }
 
 
-{-| The leading crossing found so far, and how much of the boat is out. -}
+{-| The leading crossing found so far, and how much of the boat is out.
+-}
 type alias Crossing =
     { leading : Float, x : Float, y : Float, exposure : Float }
 

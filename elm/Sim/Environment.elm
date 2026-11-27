@@ -104,7 +104,8 @@ weather id =
             { name = "Storm", cloud = 1, rain = 1, storm = 1, waveScale = 2.6, waveSpeed = 1.55, wind = 65, visibility = 0.46 }
 
 
-{-| The times a patrol can sail at, by their setup names, in draw order. -}
+{-| The times a patrol can sail at, by their setup names, in draw order.
+-}
 timeIds : List String
 timeIds =
     [ "dawn", "day", "dusk", "night" ]
@@ -138,7 +139,8 @@ defaultSeed =
     19830604
 
 
-{-| JavaScript's `seed >>> 0`. -}
+{-| JavaScript's `seed >>> 0`.
+-}
 unsigned : Float -> Float
 unsigned seed =
     toFloat (Bitwise.shiftRightZfBy 0 (M.toInt32 seed))
@@ -245,7 +247,8 @@ type alias Strike =
     { time : Float, x : Float, y : Float }
 
 
-{-| What the sky depends on. No conditions means a default patrol's. -}
+{-| What the sky depends on. No conditions means a default patrol's.
+-}
 type alias Sky a =
     { a | environment : Maybe Config, time : Float, wavePhase : Maybe Float, lightning : List Strike, x : Float, y : Float }
 
@@ -327,7 +330,7 @@ environmentAt s =
             sin angle
 
         daylight =
-            smooth (-0.14) 0.18 sunAltitude
+            smooth -0.14 0.18 sunAltitude
 
         rain =
             mixed .rain
@@ -431,7 +434,7 @@ environmentAt s =
     , illumination = calendar.illumination
     , moonDirection = moonDirection
     , clearLight = clearLight
-    , moonLight = calendar.illumination * smooth (-0.01) 0.12 moonDirection.y * clearLight
+    , moonLight = calendar.illumination * smooth -0.01 0.12 moonDirection.y * clearLight
     , sunDirection = { x = cos angle, y = sin angle, z = -0.32 }
     , opticalRange = (3900 + 2600 * daylight) * visibility
     , subVisualRange = (1800 + 3700 * daylight) * visibility
@@ -454,19 +457,22 @@ environmentAt s =
     }
 
 
-{-| How the boat rides the sea in these conditions. -}
+{-| How the boat rides the sea in these conditions.
+-}
 boatSurfacePose : { a | x : Float, y : Float, heading : Float, depth : Float, pitch : Float } -> Sea b -> Float -> Pose
 boatSurfacePose =
     surfaceMotion
 
 
-{-| Where the periscope's eye is, raised as far as it has traveled. -}
+{-| Where the periscope's eye is, raised as far as it has traveled.
+-}
 scopePosition : Pose -> Scope a -> Point
 scopePosition pose s =
     boatPoint pose { side = 0, forward = negate design.scopeZ, down = negate (scopeEyeHeight s) }
 
 
-{-| Whether the lens is under the passing wave, with a hand's breadth of spray. -}
+{-| Whether the lens is under the passing wave, with a hand's breadth of spray.
+-}
 scopeWashed : { a | scope : Bool, scopeTravel : Maybe Float, x : Float, y : Float, heading : Float, depth : Float, pitch : Float, time : Float } -> Environment -> Bool
 scopeWashed s e =
     let

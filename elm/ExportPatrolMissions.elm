@@ -1,11 +1,15 @@
 port module ExportPatrolMissions exposing (main)
 
 import Json.Encode as E
+import PatrolCriteria
 import PatrolMission exposing (EarlyEnd(..), Objective(..), PartialCredit(..))
 import Platform
 
 
+
 -- The synchronous simulation reads this table before its first tick.
+
+
 port catalog : E.Value -> Cmd msg
 
 
@@ -83,7 +87,8 @@ encodeObjective objective =
             rule "protectConvoy" [ ( "hunter", E.string hunter ), ( "lossLimit", E.int limit ) ]
 
 
-{-| Missions that never offer an early end encode null. -}
+{-| Missions that never offer an early end encode null.
+-}
 encodeEarlyEnd : EarlyEnd -> E.Value
 encodeEarlyEnd earlyEnd =
     let
@@ -116,7 +121,7 @@ encodeEarlyEnd earlyEnd =
             rule "tracking" [ ( "share", E.float share ) ]
 
 
-encodeSinking : PatrolMission.SinkingCasualty -> E.Value
+encodeSinking : PatrolCriteria.SinkingCasualty -> E.Value
 encodeSinking c =
     E.object
         [ ( "startDepth", E.float c.startDepth )
@@ -131,7 +136,8 @@ encodeSinking c =
 encodeMission : PatrolMission.Mission -> E.Value
 encodeMission mission =
     let
-        b = PatrolMission.briefing mission
+        b =
+            PatrolMission.briefing mission
     in
     E.object
         [ ( "id", E.string b.id )

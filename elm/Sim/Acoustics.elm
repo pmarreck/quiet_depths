@@ -22,6 +22,7 @@ full ocean acoustic model. Typical speeds: NOAA,
 
 Optional numbers follow the TypeScript's `value || default`, so a missing,
 zero or NaN power counts as 1 and a missing, zero or NaN depth as 0.
+
 -}
 
 import Sim.Math as M exposing (exp, hypot2)
@@ -93,7 +94,8 @@ kindName kind =
             "blast"
 
 
-{-| Thunder and gunfire start in the air; everything else starts underwater. -}
+{-| Thunder and gunfire start in the air; everything else starts underwater.
+-}
 airborne : Kind -> Bool
 airborne kind =
     case kind of
@@ -119,7 +121,8 @@ type alias Perceived =
     { distance : Float, delay : Float, pan : Float, gain : Float, cutoff : Float }
 
 
-{-| JavaScript's `value || fallback` for an optional number. -}
+{-| JavaScript's `value || fallback` for an optional number.
+-}
 or : Float -> Maybe Float -> Float
 or fallback value =
     case value of
@@ -332,4 +335,3 @@ update now listener sounds =
                 List.foldr listen ( [], 0, [] ) sounds
         in
         ( recent, happened )
-

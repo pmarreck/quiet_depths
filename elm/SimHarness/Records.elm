@@ -1,6 +1,7 @@
 module SimHarness.Records exposing (function)
 
-{-| Harness entries for the shared records saves hold. -}
+{-| Harness entries for the shared records saves hold.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -21,7 +22,8 @@ loose key =
     D.oneOf [ D.field key D.float, D.succeed (0 / 0) ]
 
 
-{-| `value ?? default`: missing or null is unsaid; another type is not a number. -}
+{-| `value ?? default`: missing or null is unsaid; another type is not a number.
+-}
 unsaid : String -> D.Decoder (Maybe Float)
 unsaid key =
     D.oneOf [ D.field key (D.nullable D.float), D.field key D.value |> D.map (\_ -> Just (0 / 0)), D.succeed Nothing ]
@@ -41,7 +43,8 @@ observation =
         |> andMap (D.maybe (D.field "source" D.string))
 
 
-{-| A satellite track; fields of the wrong type are untrusted, as `typeof` guards them. -}
+{-| A satellite track; fields of the wrong type are untrusted, as `typeof` guards them.
+-}
 track : D.Decoder Tracks.Track
 track =
     let
@@ -73,8 +76,16 @@ encodeChart entry =
 
         Tracks.Exact p ->
             E.object
-                ([ ( "id", E.string p.id ), ( "label", E.string "LIVE" ), ( "name", E.string p.name ), ( "identified", E.bool True ), ( "kind", E.string (Vessel.kindName p.kind) )
-                 , ( "age", E.float 0 ), ( "range", E.float 1 ), ( "exact", E.bool True ), ( "x", E.float p.x ), ( "y", E.float p.y )
+                ([ ( "id", E.string p.id )
+                 , ( "label", E.string "LIVE" )
+                 , ( "name", E.string p.name )
+                 , ( "identified", E.bool True )
+                 , ( "kind", E.string (Vessel.kindName p.kind) )
+                 , ( "age", E.float 0 )
+                 , ( "range", E.float 1 )
+                 , ( "exact", E.bool True )
+                 , ( "x", E.float p.x )
+                 , ( "y", E.float p.y )
                  , ( "fix", E.object [ ( "time", E.float p.time ), ( "x", E.float p.x ), ( "y", E.float p.y ), ( "vx", E.float p.vx ), ( "vy", E.float p.vy ), ( "positionSigma", E.float 0 ), ( "velocitySigma", E.float 0 ), ( "maneuverSigma", E.float 0 ) ] )
                  ]
                     ++ List.filterMap identity

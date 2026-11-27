@@ -1,6 +1,7 @@
 module SimHarness.Acoustics exposing (function)
 
-{-| Harness entries for the acoustics. -}
+{-| Harness entries for the acoustics.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -31,8 +32,18 @@ listener =
 extras each kind carries come back unchanged.
 -}
 type alias TestSound =
-    { kind : Acoustics.Kind, x : Float, y : Float, depth : Maybe Float, altitude : Maybe Float, power : Maybe Float
-    , id : Int, time : Float, heard : Bool, heardAt : Maybe Float, perceived : Maybe Acoustics.Perceived, raw : D.Value
+    { kind : Acoustics.Kind
+    , x : Float
+    , y : Float
+    , depth : Maybe Float
+    , altitude : Maybe Float
+    , power : Maybe Float
+    , id : Int
+    , time : Float
+    , heard : Bool
+    , heardAt : Maybe Float
+    , perceived : Maybe Acoustics.Perceived
+    , raw : D.Value
     }
 
 
@@ -91,7 +102,8 @@ encodeEvent event =
             E.list identity [ E.string "blast", E.int s.id, E.float distance ]
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

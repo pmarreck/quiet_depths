@@ -20,12 +20,14 @@ which means `x === 0`.
 Elm has no `exp`, `expm1`, `tanh` or `cbrt` either, and `e ^ x` differs from
 `Math.exp` in the last bits for most inputs. The TypeScript simulation computes
 these through `typescript/sim-math.ts` with the same formulas, so both agree.
+
 -}
 
 import Bitwise
 
 
-{-| JavaScript's `x === 0`: true for 0 and -0, false for NaN. -}
+{-| JavaScript's `x === 0`: true for 0 and -0, false for NaN.
+-}
 isZero : Float -> Bool
 isZero x =
     not (isNaN x) && x == 0
@@ -57,7 +59,8 @@ imul a b =
     Bitwise.or 0 (aLow * bLow + Bitwise.shiftLeftBy 16 (Bitwise.shiftRightZfBy 16 a * bLow + aLow * Bitwise.shiftRightZfBy 16 b))
 
 
-{-| JavaScript's truthiness of a number: false for 0, -0 and NaN. -}
+{-| JavaScript's truthiness of a number: false for 0, -0 and NaN.
+-}
 truthy : Float -> Bool
 truthy x =
     not (isZero x || isNaN x)
@@ -68,7 +71,8 @@ isNegativeZero x =
     isZero x && 1 / x < 0
 
 
-{-| Math.max of two values: NaN if either is, and 0 above -0. -}
+{-| Math.max of two values: NaN if either is, and 0 above -0.
+-}
 max : Float -> Float -> Float
 max a b =
     if isNaN a || isNaN b then
@@ -87,7 +91,8 @@ max a b =
         a
 
 
-{-| Math.min of two values: NaN if either is, and -0 below 0. -}
+{-| Math.min of two values: NaN if either is, and -0 below 0.
+-}
 min : Float -> Float -> Float
 min a b =
     if isNaN a || isNaN b then
@@ -106,7 +111,8 @@ min a b =
         b
 
 
-{-| Math.abs: the magnitude, with -0 becoming 0. -}
+{-| Math.abs: the magnitude, with -0 becoming 0.
+-}
 abs : Float -> Float
 abs x =
     if x < 0 then
@@ -119,7 +125,8 @@ abs x =
         x
 
 
-{-| Math.sign: -1, 1, or the zero or NaN it was given. -}
+{-| Math.sign: -1, 1, or the zero or NaN it was given.
+-}
 sign : Float -> Float
 sign x =
     if x > 0 then
@@ -132,13 +139,15 @@ sign x =
         x
 
 
-{-| `Math.max(low, Math.min(high, value))`, as the TypeScript writes it. -}
+{-| `Math.max(low, Math.min(high, value))`, as the TypeScript writes it.
+-}
 clamp : Float -> Float -> Float -> Float
 clamp low high value =
     max low (min high value)
 
 
-{-| Math.hypot of two values. -}
+{-| Math.hypot of two values.
+-}
 hypot2 : Float -> Float -> Float
 hypot2 x y =
     let
@@ -173,7 +182,8 @@ hypot2 x y =
             sqrt s2 * largest
 
 
-{-| Math.hypot of three values. -}
+{-| Math.hypot of three values.
+-}
 hypot3 : Float -> Float -> Float -> Float
 hypot3 x y z =
     let
@@ -239,7 +249,8 @@ expm1 x =
     e ^ x - 1
 
 
-{-| Beyond ±20 the result is ±1 to double precision; the cutoff keeps e ^ (2x) finite. -}
+{-| Beyond ±20 the result is ±1 to double precision; the cutoff keeps e ^ (2x) finite.
+-}
 tanh : Float -> Float
 tanh x =
     if x > 20 then
@@ -299,7 +310,8 @@ remainder x y =
             magnitude
 
 
-{-| The largest `y * 2^k` that does not exceed `r`, given `y <= r`. -}
+{-| The largest `y * 2^k` that does not exceed `r`, given `y <= r`.
+-}
 largestMultiple : Float -> Float -> Float
 largestMultiple y r =
     let

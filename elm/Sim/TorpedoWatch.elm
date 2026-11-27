@@ -29,7 +29,8 @@ type alias Track =
     }
 
 
-{-| JavaScript's `value || 0`. -}
+{-| JavaScript's `value || 0`.
+-}
 orZero : Float -> Float
 orZero value =
     if M.isZero value || isNaN value then
@@ -82,8 +83,19 @@ observe boat echo active tracks =
         Nothing ->
             if active then
                 tracks
-                    ++ [ { id = echo.id, time = echo.time, x = echo.x, y = echo.y, depth = echo.depth, speed = echo.speed, inboundRun = echo.inboundRun
-                         , arrival = Nothing, fixes = 1, activeAt = echo.time, activeX = echo.x, activeY = echo.y, course = Nothing
+                    ++ [ { id = echo.id
+                         , time = echo.time
+                         , x = echo.x
+                         , y = echo.y
+                         , depth = echo.depth
+                         , speed = echo.speed
+                         , inboundRun = echo.inboundRun
+                         , arrival = Nothing
+                         , fixes = 1
+                         , activeAt = echo.time
+                         , activeX = echo.x
+                         , activeY = echo.y
+                         , course = Nothing
                          }
                        ]
 

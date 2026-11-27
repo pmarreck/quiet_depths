@@ -62,7 +62,8 @@ is kind body =
     body.kind == Just kind
 
 
-{-| Rounded hulls and a separate sail, in the visible boat's coordinates. -}
+{-| Rounded hulls and a separate sail, in the visible boat's coordinates.
+-}
 hullParts : Body -> List Part
 hullParts body =
     let
@@ -93,7 +94,7 @@ hullParts body =
         [ part (along (negate end)) (along end) carrierSize.halfBeam ]
 
     else if sub then
-        [ part (along (-27.5)) (along 27.5) 5, part { side = 0, forward = 5, down = -4 } { side = 0, forward = 5, down = -11 } 2.1 ]
+        [ part (along -27.5) (along 27.5) 5, part { side = 0, forward = 5, down = -4 } { side = 0, forward = 5, down = -11 } 2.1 ]
 
     else
         [ part (along (-52 * size)) (along (52 * size)) (12 * size) ]
@@ -196,7 +197,8 @@ closestContact a b heading =
             Just { point = point, nx = cos (Mechanics.rad heading), ny = negate (sin (Mechanics.rad heading)), nd = 0, overlap = overlap, lateralGap = lateralGap }
 
 
-{-| The deepest meeting of two hulls, if they touch. -}
+{-| The deepest meeting of two hulls, if they touch.
+-}
 hullContact : Body -> Body -> Maybe Contact
 hullContact a b =
     let
@@ -229,7 +231,8 @@ hullContact a b =
         List.foldl (\part found -> List.foldl (\second f -> deepest (closestContact part second a.heading) f) found (hullParts b)) Nothing (hullParts a)
 
 
-{-| How readily a hull gives way; a fixed wreck or a submerged site does not. -}
+{-| How readily a hull gives way; a fixed wreck or a submerged site does not.
+-}
 weight : Body -> Bool -> Float
 weight body isSite =
     if body.fixedWreck || isSite && not (is "surface" body) then
@@ -251,7 +254,8 @@ weight body isSite =
         1
 
 
-{-| The seabed under a hull's bow, middle and stern, less its draft. -}
+{-| The seabed under a hull's bow, middle and stern, less its draft.
+-}
 keelLimit : Body -> Maybe Coastline -> Float
 keelLimit body chart =
     let
@@ -309,7 +313,8 @@ orZero n =
             0
 
 
-{-| Nudges a grounded hull down the seabed's slope, at most 30 m. -}
+{-| Nudges a grounded hull down the seabed's slope, at most 30 m.
+-}
 pushOffShoal : { b | x : Float, y : Float } -> Float -> Maybe Coastline -> { b | x : Float, y : Float }
 pushOffShoal body overlap chart =
     let

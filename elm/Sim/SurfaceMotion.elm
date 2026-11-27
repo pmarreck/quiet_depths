@@ -29,7 +29,8 @@ waveComponents =
     ]
 
 
-{-| `wavePhase` accumulates during play; `sampledAt` is when it was taken. -}
+{-| `wavePhase` accumulates during play; `sampledAt` is when it was taken.
+-}
 type alias Sea a =
     { a | waveScale : Float, waveSpeed : Float, wavePhase : Maybe Float, sampledAt : Maybe Float }
 
@@ -42,7 +43,8 @@ type alias Pose =
     { x : Float, y : Float, heading : Float, depth : Float, pitch : Float, roll : Float }
 
 
-{-| Offsets along the boat's own axes: starboard, forward and down. -}
+{-| Offsets along the boat's own axes: starboard, forward and down.
+-}
 type alias Offset =
     { side : Float, forward : Float, down : Float }
 
@@ -69,7 +71,8 @@ surfaceHeight x y time sea =
     sea.waveScale * List.foldl (\w sum -> sum + w.amplitude * sin (x * w.kx + y * w.ky + phase * w.omega)) 0 waveComponents
 
 
-{-| JavaScript's `value || 0`. -}
+{-| JavaScript's `value || 0`.
+-}
 orZero : Float -> Float
 orZero value =
     if M.truthy value then
@@ -203,7 +206,8 @@ boatPoint boat offset =
     }
 
 
-{-| A world point along the boat's own axes; the inverse of `boatPoint`. -}
+{-| A world point along the boat's own axes; the inverse of `boatPoint`.
+-}
 boatLocal : { a | x : Float, y : Float, heading : Float, depth : Float, pitch : Float, roll : Float } -> Point -> Offset
 boatLocal boat at =
     let

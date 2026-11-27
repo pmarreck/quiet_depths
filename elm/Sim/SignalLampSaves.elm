@@ -25,7 +25,8 @@ digits fewest most text =
     fewest <= String.length text && String.length text <= most && String.all Char.isDigit text
 
 
-{-| `SUB <compass point> <1 to 99999> KM`. -}
+{-| `SUB <compass point> <1 to 99999> KM`.
+-}
 telegramText : String -> Bool
 telegramText text =
     case String.split " " text of
@@ -87,7 +88,8 @@ validTransmission m time =
     validEstimate m.estimate time && validCopy m time
 
 
-{-| `E|W<1-5 digits> N|S<1-5 digits> D<1-3> C<1-3> K<1-2>`. -}
+{-| `E|W<1-5 digits> N|S<1-5 digits> D<1-3> C<1-3> K<1-2>`.
+-}
 fixText : String -> Bool
 fixText text =
     let

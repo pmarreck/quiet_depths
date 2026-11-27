@@ -12,7 +12,8 @@ type alias Profile =
     { scale : Float, list : Float, trim : Float, lastVisible : Float }
 
 
-{-| Final list and trim while passing beneath the surface. -}
+{-| Final list and trim while passing beneath the surface.
+-}
 profile : SurfaceShip -> Profile
 profile kind =
     case kind of
@@ -108,5 +109,8 @@ wreckVisible v now =
 
             Surface ship ->
                 (v.collapsed || v.settled)
-                    && surfaceCollapseAge <= now - Maybe.withDefault now v.sunkAt
-                    && submergedDepth ship < Maybe.withDefault 0 v.sinkDepth
+                    && surfaceCollapseAge
+                    <= now
+                    - Maybe.withDefault now v.sunkAt
+                    && submergedDepth ship
+                    < Maybe.withDefault 0 v.sinkDepth

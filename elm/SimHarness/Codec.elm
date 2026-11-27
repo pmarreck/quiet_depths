@@ -1,6 +1,7 @@
 module SimHarness.Codec exposing (andMap, arg, call1, call2, call3, call5, flag, maybe, point, position3, safeInt, surfaceShip, vesselKind, wholeNumber)
 
-{-| Decoding a call's arguments and encoding its result, shared by the harness tables. -}
+{-| Decoding a call's arguments and encoding its result, shared by the harness tables.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -82,10 +83,22 @@ surfaceShip =
 
 vesselKind : D.Decoder Vessel.Kind
 vesselKind =
-    D.oneOf [ D.string |> D.andThen (\k -> if k == "sub" then D.succeed Vessel.Submarine else D.fail "surface"), D.map Vessel.Surface surfaceShip ]
+    D.oneOf
+        [ D.string
+            |> D.andThen
+                (\k ->
+                    if k == "sub" then
+                        D.succeed Vessel.Submarine
+
+                    else
+                        D.fail "surface"
+                )
+        , D.map Vessel.Surface surfaceShip
+        ]
 
 
-{-| JavaScript's `Number.isInteger`: a finite whole number of any size. -}
+{-| JavaScript's `Number.isInteger`: a finite whole number of any size.
+-}
 wholeNumber : D.Decoder Int
 wholeNumber =
     D.float
@@ -99,7 +112,8 @@ wholeNumber =
             )
 
 
-{-| JavaScript's `Number.isSafeInteger`: a whole number of at most 2^53 - 1. -}
+{-| JavaScript's `Number.isSafeInteger`: a whole number of at most 2^53 - 1.
+-}
 safeInt : D.Decoder Int
 safeInt =
     wholeNumber

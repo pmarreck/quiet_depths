@@ -18,7 +18,8 @@ depthLimit s =
     toFloat (round (220 * (0.15 + 0.35 * s.outerHull / 100 + 0.5 * s.hull / 100)))
 
 
-{-| 0 within tolerance, 1 beyond it, 2 beyond 112% of it. -}
+{-| 0 within tolerance, 1 beyond it, 2 beyond 112% of it.
+-}
 pressureLevel : { a | depth : Float, outerHull : Float, hull : Float } -> Int
 pressureLevel s =
     if depthLimit s * 1.12 < s.depth then

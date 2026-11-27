@@ -5,7 +5,7 @@ deep with a convoy merchant inside its listening range. The mission
 definition owns the criteria.
 -}
 
-import PatrolMission exposing (TrackingCriteria)
+import PatrolCriteria exposing (TrackingCriteria)
 import Sim.Equipment as Equipment
 import Sim.Math as M
 import Sim.Vessel exposing (Kind(..), SurfaceShip(..))
@@ -20,7 +20,8 @@ type alias Tracked b =
     { b | x : Float, y : Float, kind : Kind, hull : Float, incidental : Bool }
 
 
-{-| `sonar` is the sonar's condition. -}
+{-| `sonar` is the sonar's condition.
+-}
 type alias Listener a b =
     { a | x : Float, y : Float, noise : Float, depth : Float, sonar : Float, ships : List (Tracked b) }
 

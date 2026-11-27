@@ -1,6 +1,7 @@
 module SimHarness.Enemy exposing (function)
 
-{-| Harness entries for what the enemy suspects. -}
+{-| Harness entries for what the enemy suspects.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -38,7 +39,8 @@ encodeClue c =
     E.object [ ( "x", E.float c.x ), ( "y", E.float c.y ), ( "time", E.float c.time ) ]
 
 
-{-| The watcher's fields the suspicion rules touch; absent ones stay absent. -}
+{-| The watcher's fields the suspicion rules touch; absent ones stay absent.
+-}
 encodeWatcher : TestWatcher -> E.Value
 encodeWatcher v =
     E.object
@@ -75,15 +77,38 @@ patrol =
 
 instrument : D.Decoder Sonar.Instrument
 instrument =
-    D.string |> D.andThen (\m -> if m == "painter" then D.succeed Sonar.Painter else if m == "scribbler" then D.succeed Sonar.Scribbler else D.fail m)
+    D.string
+        |> D.andThen
+            (\m ->
+                if m == "painter" then
+                    D.succeed Sonar.Painter
+
+                else if m == "scribbler" then
+                    D.succeed Sonar.Scribbler
+
+                else
+                    D.fail m
+            )
 
 
 profile : D.Decoder Sonar.Profile
 profile =
-    D.string |> D.andThen (\p -> if p == "survey" then D.succeed Sonar.Survey else if p == "detail" then D.succeed Sonar.Detail else D.fail p)
+    D.string
+        |> D.andThen
+            (\p ->
+                if p == "survey" then
+                    D.succeed Sonar.Survey
+
+                else if p == "detail" then
+                    D.succeed Sonar.Detail
+
+                else
+                    D.fail p
+            )
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

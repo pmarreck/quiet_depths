@@ -4,7 +4,7 @@ module Sim.Boat exposing (Boat, Limits, Parts, Systems, condition, decoder, enco
 alarms, the periscope, the fourteen systems and fifteen repair limits as
 records (a missing system fails to compile), and the drone (`Sim.Drone`).
 Restore also migrates older saves in eight ways before checking them; those
-are counted as remaining work (docs/plan_context/ship-and-contact-records.md).
+are counted as remaining work (docs/plan\_context/ship-and-contact-records.md).
 -}
 
 import Dict exposing (Dict)
@@ -23,7 +23,8 @@ type alias Limits =
     { hull : Float, diesel : Float, fuelTank : Float, batteryBank : Float, tubes : Float, engine : Float, propeller : Float, oxygen : Float, ballast : Float, planes : Float, rudder : Float, sonar : Float, periscope : Float, deckgun : Float, crew : Float }
 
 
-{-| Anything holding a value per system: the conditions, or the limits. -}
+{-| Anything holding a value per system: the conditions, or the limits.
+-}
 type alias Parts a =
     { a | diesel : Float, fuelTank : Float, batteryBank : Float, tubes : Float, engine : Float, propeller : Float, oxygen : Float, ballast : Float, planes : Float, rudder : Float, sonar : Float, periscope : Float, deckgun : Float, crew : Float }
 
@@ -387,12 +388,25 @@ encodeParts =
 
 systemFields : Parts a -> List ( String, Float )
 systemFields p =
-    [ ( "diesel", p.diesel ), ( "fuelTank", p.fuelTank ), ( "batteryBank", p.batteryBank ), ( "tubes", p.tubes ), ( "engine", p.engine ), ( "propeller", p.propeller ), ( "oxygen", p.oxygen )
-    , ( "ballast", p.ballast ), ( "planes", p.planes ), ( "rudder", p.rudder ), ( "sonar", p.sonar ), ( "periscope", p.periscope ), ( "deckgun", p.deckgun ), ( "crew", p.crew )
+    [ ( "diesel", p.diesel )
+    , ( "fuelTank", p.fuelTank )
+    , ( "batteryBank", p.batteryBank )
+    , ( "tubes", p.tubes )
+    , ( "engine", p.engine )
+    , ( "propeller", p.propeller )
+    , ( "oxygen", p.oxygen )
+    , ( "ballast", p.ballast )
+    , ( "planes", p.planes )
+    , ( "rudder", p.rudder )
+    , ( "sonar", p.sonar )
+    , ( "periscope", p.periscope )
+    , ( "deckgun", p.deckgun )
+    , ( "crew", p.crew )
     ]
 
 
-{-| The boat's fields as a current save holds them, with the plant version. -}
+{-| The boat's fields as a current save holds them, with the plant version.
+-}
 encode : Boat -> List ( String, E.Value )
 encode b =
     let
@@ -403,17 +417,51 @@ encode b =
             ( key, E.float v )
     in
     List.map number
-        [ ( "x", b.x ), ( "y", b.y ), ( "depth", b.depth ), ( "heading", b.heading ), ( "pitch", b.pitch ), ( "speed", b.speed ), ( "targetSpeed", b.targetSpeed )
-        , ( "targetHeading", b.targetHeading ), ( "targetDepth", b.targetDepth ), ( "verticalSpeed", b.verticalSpeed ), ( "hull", b.hull ), ( "outerHull", b.outerHull )
-        , ( "flood", b.flood ), ( "shock", b.shock ), ( "fuel", b.fuel ), ( "fuelLeak", b.fuelLeak ), ( "fuelFire", b.fuelFire ), ( "battery", b.battery ), ( "oxygen", b.oxygen )
-        , ( "water", b.water ), ( "ballast", b.ballast ), ( "planes", b.planes ), ( "rudder", b.rudder ), ( "propAngle", b.propAngle ), ( "cavitation", b.cavitation )
-        , ( "propRpm", b.propRpm ), ( "noise", b.noise ), ( "repair", b.repair ), ( "collisionCooldown", b.collisionCooldown ), ( "criticalExposure", b.criticalExposure )
+        [ ( "x", b.x )
+        , ( "y", b.y )
+        , ( "depth", b.depth )
+        , ( "heading", b.heading )
+        , ( "pitch", b.pitch )
+        , ( "speed", b.speed )
+        , ( "targetSpeed", b.targetSpeed )
+        , ( "targetHeading", b.targetHeading )
+        , ( "targetDepth", b.targetDepth )
+        , ( "verticalSpeed", b.verticalSpeed )
+        , ( "hull", b.hull )
+        , ( "outerHull", b.outerHull )
+        , ( "flood", b.flood )
+        , ( "shock", b.shock )
+        , ( "fuel", b.fuel )
+        , ( "fuelLeak", b.fuelLeak )
+        , ( "fuelFire", b.fuelFire )
+        , ( "battery", b.battery )
+        , ( "oxygen", b.oxygen )
+        , ( "water", b.water )
+        , ( "ballast", b.ballast )
+        , ( "planes", b.planes )
+        , ( "rudder", b.rudder )
+        , ( "propAngle", b.propAngle )
+        , ( "cavitation", b.cavitation )
+        , ( "propRpm", b.propRpm )
+        , ( "noise", b.noise )
+        , ( "repair", b.repair )
+        , ( "collisionCooldown", b.collisionCooldown )
+        , ( "criticalExposure", b.criticalExposure )
         , ( "plantVersion", 1 )
         ]
-        ++ [ ( "silent", E.bool b.silent ), ( "floodAlarm", E.bool b.floodAlarm ), ( "bottomed", E.bool b.bottomed ), ( "cookoff", E.bool b.cookoff ), ( "imploded", E.bool b.imploded )
-           , ( "scope", E.bool b.scope ), ( "torps", E.int b.torps ), ( "pressureAlarm", E.int b.pressureAlarm ), ( "engine", E.string (engineName b.engine) )
-           , ( "dieselMode", E.string (dieselModeName b.dieselMode) ), ( "collisionHits", E.dict identity E.float b.collisionHits )
-           , ( "systems", encodeParts (systemFields b.systems) ), ( "repairLimits", encodeParts (( "hull", b.repairLimits.hull ) :: systemFields b.repairLimits) )
+        ++ [ ( "silent", E.bool b.silent )
+           , ( "floodAlarm", E.bool b.floodAlarm )
+           , ( "bottomed", E.bool b.bottomed )
+           , ( "cookoff", E.bool b.cookoff )
+           , ( "imploded", E.bool b.imploded )
+           , ( "scope", E.bool b.scope )
+           , ( "torps", E.int b.torps )
+           , ( "pressureAlarm", E.int b.pressureAlarm )
+           , ( "engine", E.string (engineName b.engine) )
+           , ( "dieselMode", E.string (dieselModeName b.dieselMode) )
+           , ( "collisionHits", E.dict identity E.float b.collisionHits )
+           , ( "systems", encodeParts (systemFields b.systems) )
+           , ( "repairLimits", encodeParts (( "hull", b.repairLimits.hull ) :: systemFields b.repairLimits) )
            , ( "drone", Drone.encode b.drone )
            ]
         ++ List.filterMap identity [ field "roll" E.float b.roll, field "gunLoudUntil" E.float b.gunLoudUntil, field "unpoweredSince" E.float b.unpoweredSince, field "scopeTravel" E.float b.scopeTravel ]

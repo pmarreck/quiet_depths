@@ -2,7 +2,7 @@ module Sim.Contact exposing (Contact, SavedFix, Sighting(..), SweepArea, decoder
 
 {-| A sonar or visual contact, as saves hold it. Like `Sim.Ship` it mirrors
 the TypeScript field for field while both implementations change together;
-see docs/plan_context/ship-and-contact-records.md.
+see docs/plan\_context/ship-and-contact-records.md.
 -}
 
 import Json.Decode as D
@@ -11,7 +11,8 @@ import Sim.Math as M
 import Sim.Vessel as Vessel exposing (Kind, Side)
 
 
-{-| How the contact was gained. -}
+{-| How the contact was gained.
+-}
 type Sighting
     = Visual
     | Passive
@@ -88,7 +89,8 @@ type alias SavedFix =
     }
 
 
-{-| The area a hunter swept for this contact. -}
+{-| The area a hunter swept for this contact.
+-}
 type alias SweepArea =
     { x : Float, y : Float, size : Float, time : Float }
 
@@ -177,7 +179,8 @@ finite =
     check "a finite number" (\n -> not (isNaN n || isInfinite n)) D.float
 
 
-{-| A moment between the patrol's start and now. -}
+{-| A moment between the patrol's start and now.
+-}
 moment : Float -> D.Decoder Float
 moment now =
     check "a time between the start and now" (\t -> t >= 0 && t <= now) finite
@@ -304,7 +307,8 @@ passiveComplete c =
 -- ENCODING
 
 
-{-| The contact as a save holds it; absent fields stay absent. -}
+{-| The contact as a save holds it; absent fields stay absent.
+-}
 encode : Contact -> E.Value
 encode c =
     let
@@ -312,8 +316,14 @@ encode c =
             Maybe.map (\v -> ( key, enc v ))
     in
     E.object
-        ([ ( "id", E.string c.id ), ( "label", E.string c.label ), ( "x", E.float c.x ), ( "y", E.float c.y ), ( "range", E.float c.range )
-         , ( "bearing", E.float c.bearing ), ( "confidence", E.float c.confidence ), ( "age", E.float c.age )
+        ([ ( "id", E.string c.id )
+         , ( "label", E.string c.label )
+         , ( "x", E.float c.x )
+         , ( "y", E.float c.y )
+         , ( "range", E.float c.range )
+         , ( "bearing", E.float c.bearing )
+         , ( "confidence", E.float c.confidence )
+         , ( "age", E.float c.age )
          ]
             ++ List.filterMap identity
                 [ field "identified" E.bool c.identified

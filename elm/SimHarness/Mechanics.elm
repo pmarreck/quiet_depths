@@ -1,6 +1,7 @@
 module SimHarness.Mechanics exposing (function)
 
-{-| Harness entries for mechanics and the small modules built on it. -}
+{-| Harness entries for mechanics and the small modules built on it.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -44,7 +45,8 @@ encodeLog e =
     E.object [ ( "t", E.float e.t ), ( "text", E.string e.text ), ( "kind", E.string (Mechanics.logKindName e.kind) ) ]
 
 
-{-| A saved random state wraps to 32 bits, as every draw's first step does. -}
+{-| A saved random state wraps to 32 bits, as every draw's first step does.
+-}
 rng : D.Decoder Int
 rng =
     D.map M.toInt32 D.float
@@ -125,15 +127,25 @@ pressureBoat =
 encodePressureBoat : PressureBoat -> E.Value
 encodePressureBoat s =
     E.object
-        [ ( "outerHull", E.float s.outerHull ), ( "hull", E.float s.hull ), ( "depth", E.float s.depth ), ( "pressureAlarm", E.int s.pressureAlarm )
-        , ( "criticalExposure", E.float s.criticalExposure ), ( "flood", E.float s.flood ), ( "repairLimits", E.object [ ( "hull", E.float s.repairLimits.hull ) ] )
-        , ( "status", E.string (Status.statusName s.status) ), ( "imploded", E.bool s.imploded ), ( "shock", E.float s.shock ), ( "rng", E.int s.rng )
-        , ( "events", E.list encodeLog s.events ), ( "time", E.float s.time )
+        [ ( "outerHull", E.float s.outerHull )
+        , ( "hull", E.float s.hull )
+        , ( "depth", E.float s.depth )
+        , ( "pressureAlarm", E.int s.pressureAlarm )
+        , ( "criticalExposure", E.float s.criticalExposure )
+        , ( "flood", E.float s.flood )
+        , ( "repairLimits", E.object [ ( "hull", E.float s.repairLimits.hull ) ] )
+        , ( "status", E.string (Status.statusName s.status) )
+        , ( "imploded", E.bool s.imploded )
+        , ( "shock", E.float s.shock )
+        , ( "rng", E.int s.rng )
+        , ( "events", E.list encodeLog s.events )
+        , ( "time", E.float s.time )
         , ( "debrief", E.list (\d -> E.object [ ( "time", E.float d.time ), ( "text", E.string d.text ) ]) s.debrief )
         ]
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

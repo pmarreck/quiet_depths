@@ -14,13 +14,15 @@ type alias Aloft =
     { x : Float, y : Float, altitude : Float }
 
 
-{-| An angle wrapped into 0 to 360. -}
+{-| An angle wrapped into 0 to 360.
+-}
 wrap : Float -> Float
 wrap n =
     M.remainder (M.remainder n 360 + 360) 360
 
 
-{-| JavaScript's `value || 0`. -}
+{-| JavaScript's `value || 0`.
+-}
 orZero : Float -> Float
 orZero value =
     if M.truthy value then

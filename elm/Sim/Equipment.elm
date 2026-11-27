@@ -40,7 +40,8 @@ type System
     | Crew
 
 
-{-| Every system, in the order saves list them and hits draw from them. -}
+{-| Every system, in the order saves list them and hits draw from them.
+-}
 systems : List System
 systems =
     [ Diesel, FuelTank, BatteryBank, Tubes, Engine, Propeller, Oxygen, Ballast, Planes, Rudder, Sonar, Periscope, Deckgun, Crew ]
@@ -193,7 +194,8 @@ compartment system =
             Stern
 
 
-{-| A part's condition and the most a repair can restore, both in percent. -}
+{-| A part's condition and the most a repair can restore, both in percent.
+-}
 type alias Part =
     { condition : Float, limit : Float }
 

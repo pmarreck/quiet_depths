@@ -6,6 +6,7 @@ mission definition's own criteria, as the TypeScript does.
 
 import Json.Decode as D
 import Json.Encode as E
+import PatrolCriteria
 import PatrolMission
 import Sim.ConvoyTracking as ConvoyTracking
 import Sim.PatrolSearch as Search
@@ -75,38 +76,52 @@ siteKind =
             )
 
 
-rescue : D.Decoder PatrolMission.RescueCriteria
+rescue : D.Decoder PatrolCriteria.RescueCriteria
 rescue =
     D.string
         |> D.andThen
             (\name ->
                 case name of
                     "surface" ->
-                        D.succeed PatrolMission.surfaceRescue
+                        D.succeed PatrolCriteria.surfaceRescue
 
                     "undersea" ->
-                        D.succeed PatrolMission.underseaRescue
+                        D.succeed PatrolCriteria.underseaRescue
 
                     _ ->
                         D.fail ("unknown rescue " ++ name)
             )
 
 
-encodeRescue : PatrolMission.RescueCriteria -> E.Value
+encodeRescue : PatrolCriteria.RescueCriteria -> E.Value
 encodeRescue c =
     E.object
-        [ ( "closestRange", E.float c.closestRange ), ( "farthestRange", E.float c.farthestRange ), ( "depthTolerance", E.float c.depthTolerance )
-        , ( "fastestKnots", E.float c.fastestKnots ), ( "assessmentSeconds", E.float c.assessmentSeconds ), ( "transferSeconds", E.float c.transferSeconds )
-        , ( "returnSeconds", E.float c.returnSeconds ), ( "emptySiteChance", E.float c.emptySiteChance ), ( "fewestSurvivors", E.int c.fewestSurvivors )
-        , ( "survivorSpread", E.int c.survivorSpread ), ( "casualtyClockStart", E.float c.casualtyClockStart ), ( "firstLossDelay", E.float c.firstLossDelay )
-        , ( "firstLossSpread", E.float c.firstLossSpread ), ( "laterLossDelay", E.float c.laterLossDelay ), ( "laterLossSpread", E.float c.laterLossSpread )
+        [ ( "closestRange", E.float c.closestRange )
+        , ( "farthestRange", E.float c.farthestRange )
+        , ( "depthTolerance", E.float c.depthTolerance )
+        , ( "fastestKnots", E.float c.fastestKnots )
+        , ( "assessmentSeconds", E.float c.assessmentSeconds )
+        , ( "transferSeconds", E.float c.transferSeconds )
+        , ( "returnSeconds", E.float c.returnSeconds )
+        , ( "emptySiteChance", E.float c.emptySiteChance )
+        , ( "fewestSurvivors", E.int c.fewestSurvivors )
+        , ( "survivorSpread", E.int c.survivorSpread )
+        , ( "casualtyClockStart", E.float c.casualtyClockStart )
+        , ( "firstLossDelay", E.float c.firstLossDelay )
+        , ( "firstLossSpread", E.float c.firstLossSpread )
+        , ( "laterLossDelay", E.float c.laterLossDelay )
+        , ( "laterLossSpread", E.float c.laterLossSpread )
         , ( "sinking"
           , c.sinking
                 |> Maybe.map
                     (\s ->
                         E.object
-                            [ ( "startDepth", E.float s.startDepth ), ( "settleSeconds", E.float s.settleSeconds ), ( "foundersAfter", E.float s.foundersAfter )
-                            , ( "foundersSpread", E.float s.foundersSpread ), ( "sinkRate", E.float s.sinkRate ), ( "lostBelow", E.float s.lostBelow )
+                            [ ( "startDepth", E.float s.startDepth )
+                            , ( "settleSeconds", E.float s.settleSeconds )
+                            , ( "foundersAfter", E.float s.foundersAfter )
+                            , ( "foundersSpread", E.float s.foundersSpread )
+                            , ( "sinkRate", E.float s.sinkRate )
+                            , ( "lostBelow", E.float s.lostBelow )
                             ]
                     )
                 |> Maybe.withDefault E.null
@@ -150,7 +165,8 @@ traffic =
             )
 
 
-{-| The patrol setup: mission, seed, ships and an optional site. -}
+{-| The patrol setup: mission, seed, ships and an optional site.
+-}
 setup : D.Decoder { mission : PatrolMission.Mission, seed : Float, ships : List (Search.Traffic {}), site : Maybe Search.Point }
 setup =
     D.map4 (\m seed ships site -> { mission = m, seed = seed, ships = ships, site = site })
@@ -176,8 +192,14 @@ searchArea =
 encodeSearch : Search.SearchArea -> E.Value
 encodeSearch a =
     E.object
-        [ ( "x", E.float a.x ), ( "y", E.float a.y ), ( "radius", E.float a.radius ), ( "targets", E.list E.string a.targets ), ( "recognized", E.list E.string a.recognized )
-        , ( "located", E.bool a.located ), ( "activeSeconds", E.float a.activeSeconds ), ( "protectedTime", E.float a.protectedTime )
+        [ ( "x", E.float a.x )
+        , ( "y", E.float a.y )
+        , ( "radius", E.float a.radius )
+        , ( "targets", E.list E.string a.targets )
+        , ( "recognized", E.list E.string a.recognized )
+        , ( "located", E.bool a.located )
+        , ( "activeSeconds", E.float a.activeSeconds )
+        , ( "protectedTime", E.float a.protectedTime )
         ]
 
 
@@ -194,40 +216,42 @@ encodeScope s =
     E.object (( "scope", E.bool s.scope ) :: (s.scopeTravel |> Maybe.map (\t -> [ ( "scopeTravel", E.float t ) ]) |> Maybe.withDefault []))
 
 
-{-| The surface rescue's sinking casualty, the only one the missions define. -}
-sinking : PatrolMission.SinkingCasualty
+{-| The surface rescue's sinking casualty, the only one the missions define.
+-}
+sinking : PatrolCriteria.SinkingCasualty
 sinking =
-    PatrolMission.surfaceRescue.sinking
+    PatrolCriteria.surfaceRescue.sinking
         |> Maybe.withDefault { startDepth = 0 / 0, settleSeconds = 0 / 0, foundersAfter = 0 / 0, foundersSpread = 0 / 0, sinkRate = 0 / 0, lostBelow = 0 / 0 }
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of
         "reconPhotos.photoGoal" ->
-            Just (call1 D.float E.int (\roll -> ReconPhotos.photoGoal roll PatrolMission.merchantPhotos))
+            Just (call1 D.float E.int (\roll -> ReconPhotos.photoGoal roll PatrolCriteria.merchantPhotos))
 
         "reconPhotos.framed" ->
-            Just (call1 D.float E.bool (\offset -> ReconPhotos.framed offset PatrolMission.merchantPhotos))
+            Just (call1 D.float E.bool (\offset -> ReconPhotos.framed offset PatrolCriteria.merchantPhotos))
 
         "convoyTracking.trackingGoal" ->
-            Just (call1 D.float E.int (\roll -> ConvoyTracking.trackingGoal roll PatrolMission.convoyTracking))
+            Just (call1 D.float E.int (\roll -> ConvoyTracking.trackingGoal roll PatrolCriteria.convoyTracking))
 
         "convoyTracking.trackingConvoy" ->
-            Just (call1 listener E.bool (\s -> ConvoyTracking.trackingConvoy s PatrolMission.convoyTracking))
+            Just (call1 listener E.bool (\s -> ConvoyTracking.trackingConvoy s PatrolCriteria.convoyTracking))
 
         "wreckSurvey.scanRate" ->
-            Just (call1 surveyPass E.float (\pass -> WreckSurvey.scanRate pass PatrolMission.surveyCriteria))
+            Just (call1 surveyPass E.float (\pass -> WreckSurvey.scanRate pass PatrolCriteria.surveyCriteria))
 
         "wreckSurvey.addScan" ->
-            Just (call3 D.float D.float D.float E.float (\scan rate dt -> WreckSurvey.addScan scan rate dt PatrolMission.surveyCriteria))
+            Just (call3 D.float D.float D.float E.float (\scan rate dt -> WreckSurvey.addScan scan rate dt PatrolCriteria.surveyCriteria))
 
         "wreckSurvey.surveyComplete" ->
             Just
                 (call1 (D.map2 (\scan angles -> { scan = scan, photoAngles = angles }) (D.field "scan" D.float) (D.field "photoAngles" (D.list D.float)))
                     E.bool
-                    (\op -> WreckSurvey.surveyComplete op PatrolMission.surveyCriteria)
+                    (\op -> WreckSurvey.surveyComplete op PatrolCriteria.surveyCriteria)
                 )
 
         "rescueOperation.rescueCriteriaFor" ->

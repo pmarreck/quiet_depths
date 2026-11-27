@@ -83,17 +83,17 @@ update msg model =
             case model.pending of
                 Just amount ->
                     if reading.handled >= model.seq then
-                        ( {model | reading = Just reading, pending = Nothing}, Cmd.none )
+                        ( { model | reading = Just reading, pending = Nothing }, Cmd.none )
 
                     else
-                        ( {model | reading = Just {reading | requested = amount}}, Cmd.none )
+                        ( { model | reading = Just { reading | requested = amount } }, Cmd.none )
 
                 Nothing ->
-                    ( {model | reading = Just reading}, Cmd.none )
+                    ( { model | reading = Just reading }, Cmd.none )
 
         Dragging pointer ->
             -- A pointer drag may snap to a detent; arrow keys step exactly.
-            ( {model | detent = pointer}, Cmd.none )
+            ( { model | detent = pointer }, Cmd.none )
 
         Slide amount ->
             give amount model.detent model
@@ -103,7 +103,7 @@ update msg model =
 
         Turn by ->
             -- Relative to whatever the app holds as requested, so nothing to hold here.
-            ( model, axisOrder {axis = model.flags.axis, kind = "nudge", value = by, detent = False, seq = model.seq} )
+            ( model, axisOrder { axis = model.flags.axis, kind = "nudge", value = by, detent = False, seq = model.seq } )
 
 
 give : Float -> Bool -> Model -> ( Model, Cmd Msg )
@@ -114,8 +114,8 @@ give amount detent model =
     in
     -- Elm reapplies an input's value on every render; hold the player's value
     -- so a render before the app answers cannot snap the slider back a step.
-    ( {model | seq = seq, pending = Just amount, reading = Maybe.map (\r -> {r | requested = amount}) model.reading}
-    , axisOrder {axis = model.flags.axis, kind = "set", value = amount, detent = detent, seq = seq}
+    ( { model | seq = seq, pending = Just amount, reading = Maybe.map (\r -> { r | requested = amount }) model.reading }
+    , axisOrder { axis = model.flags.axis, kind = "set", value = amount, detent = detent, seq = seq }
     )
 
 
@@ -194,7 +194,7 @@ view model =
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init = \flags -> ( {flags = flags, reading = Nothing, detent = True, seq = 0, pending = Nothing}, Cmd.none )
+        { init = \flags -> ( { flags = flags, reading = Nothing, detent = True, seq = 0, pending = Nothing }, Cmd.none )
         , update = update
         , view = view
         , subscriptions = \_ -> axisReading Read

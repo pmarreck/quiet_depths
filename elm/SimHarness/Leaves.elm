@@ -1,6 +1,7 @@
 module SimHarness.Leaves exposing (function)
 
-{-| Harness entries for the arithmetic and the small leaf modules. -}
+{-| Harness entries for the arithmetic and the small leaf modules.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -11,8 +12,8 @@ import Sim.HullDesign as HullDesign
 import Sim.Math as SimMath
 import Sim.SeabedRest as SeabedRest
 import Sim.SonarTransmitters as Sonar
-import Sim.TorpedoTubes as TorpedoTubes
 import Sim.Text as Text
+import Sim.TorpedoTubes as TorpedoTubes
 import Sim.WatchWarnings as WatchWarnings
 import SimHarness.Codec exposing (arg, call1, call2, call3, call5, maybe, point)
 
@@ -101,12 +102,24 @@ encodeDesign =
             HullDesign.design
     in
     E.object
-        [ ( "year", E.int d.year ), ( "hullRadius", E.float d.hullRadius ), ( "propellerRadius", E.float d.propellerRadius )
-        , ( "propellerPitch", E.float d.propellerPitch ), ( "propellerZ", E.float d.propellerZ ), ( "propellerBlades", E.int d.propellerBlades )
-        , ( "shaftRadius", E.float d.shaftRadius ), ( "sailRadius", E.float d.sailRadius ), ( "sailBarrel", E.float d.sailBarrel )
-        , ( "sailStretch", E.float d.sailStretch ), ( "bridgeZ", E.float d.bridgeZ ), ( "bridgeRoof", E.float d.bridgeRoof )
-        , ( "bridgeEye", E.float d.bridgeEye ), ( "bridgeRailRadius", E.float d.bridgeRailRadius ), ( "scopeZ", E.float d.scopeZ )
-        , ( "scopeEye", E.float d.scopeEye ), ( "tubeSide", E.float d.tubeSide ), ( "tubeDown", E.float d.tubeDown )
+        [ ( "year", E.int d.year )
+        , ( "hullRadius", E.float d.hullRadius )
+        , ( "propellerRadius", E.float d.propellerRadius )
+        , ( "propellerPitch", E.float d.propellerPitch )
+        , ( "propellerZ", E.float d.propellerZ )
+        , ( "propellerBlades", E.int d.propellerBlades )
+        , ( "shaftRadius", E.float d.shaftRadius )
+        , ( "sailRadius", E.float d.sailRadius )
+        , ( "sailBarrel", E.float d.sailBarrel )
+        , ( "sailStretch", E.float d.sailStretch )
+        , ( "bridgeZ", E.float d.bridgeZ )
+        , ( "bridgeRoof", E.float d.bridgeRoof )
+        , ( "bridgeEye", E.float d.bridgeEye )
+        , ( "bridgeRailRadius", E.float d.bridgeRailRadius )
+        , ( "scopeZ", E.float d.scopeZ )
+        , ( "scopeEye", E.float d.scopeEye )
+        , ( "tubeSide", E.float d.tubeSide )
+        , ( "tubeDown", E.float d.tubeDown )
         , ( "tubeForward", E.float d.tubeForward )
         , ( "stations", E.list (\s -> E.object [ ( "z", E.float s.z ), ( "radius", E.float s.radius ) ]) d.stations )
         ]
@@ -160,7 +173,8 @@ sectionName s =
             "stern"
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of
@@ -178,7 +192,21 @@ function name =
                 (D.map4 (\eye object mode reach -> E.bool (Sonar.scanSector eye object mode reach))
                     (arg 0 (D.map4 (\x y depth heading -> { x = x, y = y, depth = depth, heading = heading }) (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float) (D.field "heading" D.float)))
                     (arg 1 (D.map3 (\x y depth -> { x = x, y = y, depth = depth }) (D.field "x" D.float) (D.field "y" D.float) (D.maybe (D.field "depth" D.float))))
-                    (arg 2 (D.string |> D.andThen (\m -> if m == "painter" then D.succeed Sonar.Painter else if m == "scribbler" then D.succeed Sonar.Scribbler else D.fail m)))
+                    (arg 2
+                        (D.string
+                            |> D.andThen
+                                (\m ->
+                                    if m == "painter" then
+                                        D.succeed Sonar.Painter
+
+                                    else if m == "scribbler" then
+                                        D.succeed Sonar.Scribbler
+
+                                    else
+                                        D.fail m
+                                )
+                        )
+                    )
                     (arg 3 D.float)
                 )
 

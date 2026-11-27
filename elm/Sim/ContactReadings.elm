@@ -68,7 +68,8 @@ projectedPosition fix age =
     { x = fix.x + fix.vx * age, y = fix.y + fix.vy * age }
 
 
-{-| JavaScript's `value || 0`. -}
+{-| JavaScript's `value || 0`.
+-}
 orZero : Float -> Float
 orZero value =
     if M.truthy value then
@@ -78,7 +79,8 @@ orZero value =
         0
 
 
-{-| A bearing in degrees, 0 to 360, toward a displacement east and north. -}
+{-| A bearing in degrees, 0 to 360, toward a displacement east and north.
+-}
 bearingTo : Float -> Float -> Float
 bearingTo east north =
     M.remainder (atan2 east north * 180 / pi + 360) 360

@@ -50,8 +50,42 @@ patterns =
     Dict.fromList
         (List.map2 Tuple.pair
             (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-            [ ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..", ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.", "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--.."
-            , "-----", ".----", "..---", "...--", "....-", ".....", "-....", "--...", "---..", "----."
+            [ ".-"
+            , "-..."
+            , "-.-."
+            , "-.."
+            , "."
+            , "..-."
+            , "--."
+            , "...."
+            , ".."
+            , ".---"
+            , "-.-"
+            , ".-.."
+            , "--"
+            , "-."
+            , "---"
+            , ".--."
+            , "--.-"
+            , ".-."
+            , "..."
+            , "-"
+            , "..-"
+            , "...-"
+            , ".--"
+            , "-..-"
+            , "-.--"
+            , "--.."
+            , "-----"
+            , ".----"
+            , "..---"
+            , "...--"
+            , "....-"
+            , "....."
+            , "-...."
+            , "--..."
+            , "---.."
+            , "----."
             ]
         )
 
@@ -177,7 +211,8 @@ lampLit m =
             False
 
 
-{-| One letter's place in a copy mask. -}
+{-| One letter's place in a copy mask.
+-}
 bit : Int -> Int
 bit i =
     Bitwise.shiftLeftBy i 1
@@ -278,7 +313,8 @@ lampRange e =
     (2300 + e.twilight * 1400 + (1 - e.daylight) * 3700) * (1 - 0.36 * e.storm) * (1 - 0.16 * e.rain) * (1 - 0.81 * e.fog)
 
 
-{-| A telegram's region grows as its sighting ages. -}
+{-| A telegram's region grows as its sighting ages.
+-}
 reportRadius : { p | radius : Float, time : Float } -> Float -> Float
 reportRadius p time =
     p.radius + M.min 1500 (M.max 0 (time - p.time) * 1.5)
@@ -347,7 +383,8 @@ type alias LampFix =
     { text : String, x : Float, y : Float, time : Float, radius : Float, sender : String, number : Float, target : String, depth : Float, course : Float, speed : Float }
 
 
-{-| The chart coordinates the lamp actually spells out. -}
+{-| The chart coordinates the lamp actually spells out.
+-}
 alliedFix : { a | id : String } -> { b | id : String, x : Float, y : Float, depth : Float, heading : Float, speed : Float } -> Float -> Float -> LampFix
 alliedFix sender target time number =
     let

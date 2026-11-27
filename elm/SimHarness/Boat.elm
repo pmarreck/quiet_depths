@@ -1,6 +1,7 @@
 module SimHarness.Boat exposing (function)
 
-{-| Harness entries for the boat's own machinery. -}
+{-| Harness entries for the boat's own machinery.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -96,8 +97,12 @@ propulsion =
 encodePropulsion : Plant.Propulsion -> E.Value
 encodePropulsion p =
     E.object
-        [ ( "generator", E.float p.generator ), ( "drive", E.float p.drive ), ( "ahead", E.float p.ahead ), ( "astern", E.float p.astern )
-        , ( "chargeRate", E.float p.chargeRate ), ( "assistDrain", E.float p.assistDrain )
+        [ ( "generator", E.float p.generator )
+        , ( "drive", E.float p.drive )
+        , ( "ahead", E.float p.ahead )
+        , ( "astern", E.float p.astern )
+        , ( "chargeRate", E.float p.chargeRate )
+        , ( "assistDrain", E.float p.assistDrain )
         ]
 
 
@@ -110,7 +115,8 @@ sea =
         (D.maybe (D.field "sampledAt" D.float))
 
 
-{-| A hull; a missing roll reads as level, as `undefined || 0` does. -}
+{-| A hull; a missing roll reads as level, as `undefined || 0` does.
+-}
 hull : D.Decoder Motion.Pose
 hull =
     D.map6 Motion.Pose
@@ -127,7 +133,8 @@ encodePose p =
     E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ), ( "heading", E.float p.heading ), ( "depth", E.float p.depth ), ( "pitch", E.float p.pitch ), ( "roll", E.float p.roll ) ]
 
 
-{-| Missing offsets are zero, as the TypeScript's destructuring defaults are. -}
+{-| Missing offsets are zero, as the TypeScript's destructuring defaults are.
+-}
 offset : D.Decoder Motion.Offset
 offset =
     let
@@ -171,7 +178,8 @@ encodeWakeSample w =
     E.object [ ( "x", E.float w.x ), ( "y", E.float w.y ), ( "time", E.float w.time ), ( "heading", E.float w.heading ), ( "width", E.float w.width ), ( "strength", E.float w.strength ) ]
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

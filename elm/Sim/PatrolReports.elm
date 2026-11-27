@@ -22,7 +22,8 @@ report id text s =
     Mechanics.log text Info { s | reports = List.filter (\r -> r.id /= id && s.time - r.time < 18) s.reports ++ [ { id = id, text = text, time = s.time } ] }
 
 
-{-| Only a vessel's first civilian hit is recorded. -}
+{-| Only a vessel's first civilian hit is recorded.
+-}
 recordCivilianHit : String -> { s | time : Float, debrief : List Debrief.Entry } -> { v | neutralHitAt : Maybe Float } -> ( { s | time : Float, debrief : List Debrief.Entry }, { v | neutralHitAt : Maybe Float } )
 recordCivilianHit cause s ship =
     case ship.neutralHitAt of

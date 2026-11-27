@@ -8,10 +8,12 @@ through these.
 
 Numbers are written as JavaScript's `toFixed` writes them, which rounds the
 exact binary value half up: 0.15 is stored as 0.1499... and gives "0.1".
+
 -}
 
 
-{-| The UTF-16 code units JavaScript's `charCodeAt` reads, index by index. -}
+{-| The UTF-16 code units JavaScript's `charCodeAt` reads, index by index.
+-}
 codeUnits : String -> List Int
 codeUnits text =
     List.map (\i -> unitOf (String.slice i (i + 1) text)) (List.range 0 (String.length text - 1))
@@ -76,7 +78,8 @@ unitOf unit =
                 0
 
 
-{-| Dekker's split of a double into high and low halves of 26 bits. -}
+{-| Dekker's split of a double into high and low halves of 26 bits.
+-}
 split : Float -> ( Float, Float )
 split a =
     let
@@ -106,7 +109,7 @@ twoProduct a scale =
 
 
 {-| JavaScript's `x.toFixed(digits)` for 0 to 3 digits, exact for magnitudes
-below 2^53 / 10^digits (about 9 * 10^12 at three digits), far beyond any
+below 2^53 / 10^digits (about 9 \* 10^12 at three digits), far beyond any
 patrol value.
 -}
 toFixed : Int -> Float -> String
@@ -159,4 +162,3 @@ toFixed digits x =
 
         else
             String.dropRight digits text ++ "." ++ String.right digits text
-

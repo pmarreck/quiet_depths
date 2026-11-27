@@ -1,6 +1,7 @@
 module SimHarness.Crew exposing (function)
 
-{-| Harness entries for the crew's reports and the record of who was struck. -}
+{-| Harness entries for the crew's reports and the record of who was struck.
+-}
 
 import Json.Decode as D
 import Json.Encode as E
@@ -53,7 +54,8 @@ type alias Vessel =
     { id : String, name : String, military : Bool, side : Maybe String, playerDamaged : Bool, neutralHitAt : Maybe Float, wreckMark : Maybe Reports.WreckMark }
 
 
-{-| A vessel's record; a missing flag reads as false, as `undefined` does. -}
+{-| A vessel's record; a missing flag reads as false, as `undefined` does.
+-}
 vessel : D.Decoder Vessel
 vessel =
     D.succeed Vessel
@@ -66,7 +68,8 @@ vessel =
         |> andMap (optional "wreckMark" (D.map3 Reports.WreckMark (D.field "x" D.float) (D.field "y" D.float) (D.field "observed" D.bool)))
 
 
-{-| The functions this module answers for, by the TypeScript name each replaces. -}
+{-| The functions this module answers for, by the TypeScript name each replaces.
+-}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of

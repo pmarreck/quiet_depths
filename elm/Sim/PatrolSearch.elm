@@ -35,7 +35,8 @@ type alias Approach =
     { x : Float, y : Float, heading : Float, targetHeading : Float, search : SearchArea, home : Maybe Point }
 
 
-{-| The ships a mission sends the boat to find. -}
+{-| The ships a mission sends the boat to find.
+-}
 objectives : Mission -> List (Traffic a) -> List (Traffic a)
 objectives mission ships =
     let

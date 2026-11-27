@@ -235,7 +235,8 @@ strike hurt roleA roleB a b hit severity role work =
             damaged
 
 
-{-| Carrier rules apply only to the carrier; any other hull sinks at zero. -}
+{-| Carrier rules apply only to the carrier; any other hull sinks at zero.
+-}
 carrierKind : Body -> Kind
 carrierKind x =
     if is "carrier" x then

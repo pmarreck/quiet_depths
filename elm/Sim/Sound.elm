@@ -3,7 +3,7 @@ module Sim.Sound exposing (Echo, Sound, decoder, encode)
 {-| A sound in the patrol's acoustic history, as saves hold it. It fits the
 acoustics' `Heard` record, so `Sim.Acoustics.update` runs on saved sounds
 as they are. Like the ship and contact records it mirrors the TypeScript
-field for field; see docs/plan_context/ship-and-contact-records.md.
+field for field; see docs/plan\_context/ship-and-contact-records.md.
 -}
 
 import Json.Decode as D
@@ -11,7 +11,8 @@ import Json.Encode as E
 import Sim.Acoustics as Acoustics exposing (Kind, Perceived)
 
 
-{-| What a torpedo seeker's ping returned. -}
+{-| What a torpedo seeker's ping returned.
+-}
 type alias Echo =
     { id : Float, x : Float, y : Float, depth : Float, speed : Float, time : Float, inboundRun : Bool }
 
@@ -89,7 +90,8 @@ kind =
             )
 
 
-{-| A seeker's echo, valid at its sound's time. -}
+{-| A seeker's echo, valid at its sound's time.
+-}
 echo : Float -> D.Decoder Echo
 echo time =
     D.map7 Echo
@@ -153,7 +155,8 @@ decoder shipIds =
             )
 
 
-{-| The sound as a save holds it; absent fields stay absent. -}
+{-| The sound as a save holds it; absent fields stay absent.
+-}
 encode : Sound -> E.Value
 encode s =
     let

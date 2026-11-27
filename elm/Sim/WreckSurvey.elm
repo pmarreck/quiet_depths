@@ -4,7 +4,7 @@ module Sim.WreckSurvey exposing (SurveyPass, addScan, scanRate, surveyComplete)
 definition owns the criteria.
 -}
 
-import PatrolMission exposing (SurveyCriteria)
+import PatrolCriteria exposing (SurveyCriteria)
 import Sim.Equipment as Equipment
 import Sim.Math as M
 
