@@ -8,7 +8,6 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## Elm migration
 
-- [x] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks. Answer: every objective's criteria, briefing numbers, patrol windows, transit timing and encounter odds now come from Elm, with characterization, mutation and document-drift tests; combat and AI tuning remains under the simulation item (done 2026-11-27 03:21 EST).
 - [ ] Move the remaining helm controls (depth and speed sliders, turn buttons, propulsion) from JavaScript-wired markup into the Elm helm.
 - [ ] Move simulation and the remaining game UI to Elm in stages, preserving existing patrol saves.
 - [x] Convert the shared mechanics, debrief and loss-screen modules to strict TypeScript (done 2026-11-27 03:24 EST; commit 1a7ef42).
@@ -19,7 +18,8 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [x] Convert held-input tracking and hostile pursuit to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:35 EST; commit 20cd0af).
 - [x] Convert satellite reconnaissance and its save validation to strict TypeScript, checked identical to the original across every relay phase and 341,557 mutated saves (done 2026-11-27 03:38 EST; commit d27c5ba).
 - [x] Convert hull collisions, grounding and shoal push-off to strict TypeScript, checked identical to the original across collisions, groundings and sheared periscopes (done 2026-11-27 03:41 EST; commit dcd153d).
-- [x] Convert convoy lamp signals, the hunter's raids and allied telegrams to strict TypeScript, checked identical to the original through 40 full convoy patrols (done 2026-11-27 03:44 EST).
+- [x] Convert convoy lamp signals, the hunter's raids and allied telegrams to strict TypeScript, checked identical to the original through 40 full convoy patrols (done 2026-11-27 03:44 EST; commit 821bf6a).
+- [x] Convert boat and drone systems (propulsion, depth control, damage, fuel fires, flooding, drone flight and recovery) to strict TypeScript, checked identical to the original through scripted patrols covering every logged branch (done 2026-11-27 03:48 EST).
 - [ ] Migrate remaining first-party browser code to strict TypeScript, including the Three.js, Web Audio and persistence adapters.
 
 ## New gameplay

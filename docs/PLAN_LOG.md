@@ -147,3 +147,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Move rescue survivor counts and casualty pacing into the Elm rescue criteria (done 2026-11-27 03:16 EST; commit 5e48486).
 - [x] [Elm migration] Move the surface casualty’s settling, foundering and loss depth into the Elm rescue criteria (done 2026-11-27 03:18 EST; commit 3b5f2d9).
 - [x] [Elm migration] Move passing-traffic odds and the holiday restraint on hostile initiative into the Elm patrol definition (done 2026-11-27 03:20 EST; commit 418b4d6).
+- [x] [Elm migration] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks. Answer: every objective's criteria, briefing numbers, patrol windows, transit timing and encounter odds now come from Elm, with characterization, mutation and document-drift tests; combat and AI tuning remains under the simulation item (done 2026-11-27 03:21 EST).
