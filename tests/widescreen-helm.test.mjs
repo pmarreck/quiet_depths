@@ -25,3 +25,20 @@ test('widescreen keeps the helm on Periscope & Controls and the ROV, with a stat
  assert.ok(wide.includes(hidden+' .helm-status{display:flex}'));
  assert.ok(helmCss.startsWith('.wide-label,.helm-status{display:none}'),'compact layouts keep the short tab label and the full helm');
 });
+
+test('the widescreen band centers heading between depth and speed sliders',()=>{
+ assert.match(page,/<div class="helm-group depth-helm"><div class="control-label">DEPTH /);
+ const band=helmCss.slice(helmCss.lastIndexOf('@media (min-width:1101px)'));
+ // Propulsion, depth, heading, then speed with its orders.
+ const order=Object.fromEntries([...band.matchAll(/\.helm>\.(propulsion|depth-helm|course-control|speed-helm)\{order:(\d)\}/g)].map(m=>[m[1],+m[2]]));
+ assert.deepEqual(order,{propulsion:1,'depth-helm':2,'course-control':3,'speed-helm':4});
+ const columns=band.match(/\.helm\{height:\d+px;grid-template-columns:([^}]+)\}/)[1];
+ const widths=[...columns.matchAll(/minmax\(0,([\d.]+)fr\)/g)].map(m=>+m[1]);
+ assert.equal(widths.length,4);
+ assert.equal(widths[0]+widths[1],widths[3],'the heading column sits at the center of the band');
+ // Depth runs down from the surface; speed runs up toward ahead.
+ assert.ok(band.includes('input[type=range]{inset:0 auto 0 50%;width:3px;height:100%;transform:translateX(-50%);writing-mode:vertical-lr}'));
+ assert.ok(band.includes('#depth{direction:ltr}')&&band.includes('#speed{direction:rtl}'));
+ assert.ok(band.includes('.helm>.depth-helm .actual-tick{top:var(--actual)}'));
+ assert.ok(band.includes('.helm>.speed-helm .actual-tick{top:auto;bottom:var(--actual)'));
+});
