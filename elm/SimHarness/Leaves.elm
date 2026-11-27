@@ -244,6 +244,12 @@ function name =
         "math.clamp" ->
             Just (call3 D.float D.float D.float E.float SimMath.clamp)
 
+        "math.imul" ->
+            Just (call2 D.int D.int E.int SimMath.imul)
+
+        "math.toInt32" ->
+            Just (call1 D.float E.int SimMath.toInt32)
+
         "math.remainder" ->
             Just (call2 D.float D.float E.float SimMath.remainder)
 

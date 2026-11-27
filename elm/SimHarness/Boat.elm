@@ -5,6 +5,7 @@ module SimHarness.Boat exposing (function)
 import Json.Decode as D
 import Json.Encode as E
 import Sim.PowerPlant as Plant
+import Sim.SurfaceMotion as Motion
 import SimHarness.Codec exposing (andMap, arg, call1, call2, call3)
 
 
@@ -98,10 +99,79 @@ encodePropulsion p =
         ]
 
 
+sea : D.Decoder (Motion.Sea {})
+sea =
+    D.map4 (\scale speed phase at -> { waveScale = scale, waveSpeed = speed, wavePhase = phase, sampledAt = at })
+        (D.field "waveScale" D.float)
+        (D.field "waveSpeed" D.float)
+        (D.maybe (D.field "wavePhase" D.float))
+        (D.maybe (D.field "sampledAt" D.float))
+
+
+{-| A hull; a missing roll reads as level, as `undefined || 0` does. -}
+hull : D.Decoder Motion.Pose
+hull =
+    D.map6 Motion.Pose
+        (D.field "x" D.float)
+        (D.field "y" D.float)
+        (D.field "heading" D.float)
+        (D.field "depth" D.float)
+        (D.field "pitch" D.float)
+        (D.maybe (D.field "roll" D.float) |> D.map (Maybe.withDefault 0))
+
+
+encodePose : Motion.Pose -> E.Value
+encodePose p =
+    E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ), ( "heading", E.float p.heading ), ( "depth", E.float p.depth ), ( "pitch", E.float p.pitch ), ( "roll", E.float p.roll ) ]
+
+
+{-| Missing offsets are zero, as the TypeScript's destructuring defaults are. -}
+offset : D.Decoder Motion.Offset
+offset =
+    let
+        along key =
+            D.maybe (D.field key D.float) |> D.map (Maybe.withDefault 0)
+    in
+    D.map3 Motion.Offset (along "side") (along "forward") (along "down")
+
+
+point : D.Decoder Motion.Point
+point =
+    D.map3 Motion.Point (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float)
+
+
 {-| The functions this module answers for, by the TypeScript name each replaces. -}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of
+        "surfaceMotion.wavePhaseAt" ->
+            Just (call2 D.float sea E.float Motion.wavePhaseAt)
+
+        "surfaceMotion.surfaceHeight" ->
+            Just (D.map4 (\x y time s -> E.float (Motion.surfaceHeight x y time s)) (arg 0 D.float) (arg 1 D.float) (arg 2 D.float) (arg 3 sea))
+
+        "surfaceMotion.surfaceMotion" ->
+            Just (call3 hull sea D.float encodePose Motion.surfaceMotion)
+
+        "surfaceMotion.boatPoint" ->
+            Just (call2 hull offset (\p -> E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ), ( "depth", E.float p.depth ) ]) Motion.boatPoint)
+
+        "surfaceMotion.boatLocal" ->
+            Just (call2 hull point (\o -> E.object [ ( "side", E.float o.side ), ( "forward", E.float o.forward ), ( "down", E.float o.down ) ]) Motion.boatLocal)
+
+        "surfaceMotion.hash01" ->
+            Just (call2 D.float D.float E.float Motion.hash01)
+
+        "surfaceMotion.constants" ->
+            Just
+                (D.succeed
+                    (E.object
+                        [ ( "periscopeDepth", E.float Motion.periscopeDepth )
+                        , ( "WAVE_COMPONENTS", E.list (\w -> E.object [ ( "kx", E.float w.kx ), ( "ky", E.float w.ky ), ( "omega", E.float w.omega ), ( "amplitude", E.float w.amplitude ) ]) Motion.waveComponents )
+                        ]
+                    )
+                )
+
         "powerPlant.constants" ->
             Just (D.succeed (E.object [ ( "SURFACE_KNOTS", E.float Plant.surfaceKnots ), ( "ELECTRIC_KNOTS", E.float Plant.electricKnots ) ]))
 

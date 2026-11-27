@@ -1,4 +1,4 @@
-module Sim.Math exposing (abs, cbrt, clamp, exp, expm1, hypot2, hypot3, isZero, max, min, remainder, sign, tanh, truthy)
+module Sim.Math exposing (abs, cbrt, clamp, exp, expm1, hypot2, hypot3, imul, isZero, max, min, remainder, sign, tanh, toInt32, truthy)
 
 {-| Arithmetic the simulation needs exactly as JavaScript computes it, so the
 Elm simulation reproduces the TypeScript one bit for bit in V8.
@@ -22,11 +22,39 @@ Elm has no `exp`, `expm1`, `tanh` or `cbrt` either, and `e ^ x` differs from
 these through `typescript/sim-math.ts` with the same formulas, so both agree.
 -}
 
+import Bitwise
+
 
 {-| JavaScript's `x === 0`: true for 0 and -0, false for NaN. -}
 isZero : Float -> Bool
 isZero x =
     not (isNaN x) && x == 0
+
+
+{-| JavaScript's `x | 0`: the number wrapped to a signed 32-bit integer, with
+NaN and the infinities becoming 0. Elm's `truncate` compiles to exactly this,
+which is why the simulation never calls it under its own name.
+-}
+toInt32 : Float -> Int
+toInt32 =
+    Basics.truncate
+
+
+{-| JavaScript's `Math.imul`: the low 32 bits of the product, signed. Elm's
+`*` multiplies as doubles, so the 16-bit halves are multiplied separately.
+Every partial product and the final sum stay below 2^53, so each is exact,
+and the closing `| 0` keeps the low 32 bits.
+-}
+imul : Int -> Int -> Int
+imul a b =
+    let
+        aLow =
+            Bitwise.and a 0xFFFF
+
+        bLow =
+            Bitwise.and b 0xFFFF
+    in
+    Bitwise.or 0 (aLow * bLow + Bitwise.shiftLeftBy 16 (Bitwise.shiftRightZfBy 16 a * bLow + aLow * Bitwise.shiftRightZfBy 16 b))
 
 
 {-| JavaScript's truthiness of a number: false for 0, -0 and NaN. -}

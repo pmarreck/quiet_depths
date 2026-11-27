@@ -88,3 +88,12 @@ test('Elm simulation modules never use the Basics arithmetic that differs from J
   }
   assert.deepEqual(offenders, []);
 });
+
+test('Elm imul and toInt32 equal Math.imul and x | 0 bit for bit', async () => {
+  const random = seeded(28), edges = [0, 1, -1, 2, 0x7fffffff, -0x80000000, 0x80000000, 0xffffffff, 0x9e3779b9, 0x21f0aaad, 0x735a2d97, 65535, 65536, -65536];
+  const pairs = edges.flatMap(a => edges.map(b => [a, b]));
+  for (let i = 0; i < 20000; i++) pairs.push([Math.floor((random() - .5) * 2 ** 33), Math.floor((random() - .5) * 2 ** 33)]);
+  same(await elm('math.imul', pairs), pairs.map(([a, b]) => Math.imul(a, b)), 'imul');
+  const values = [...specials, 2 ** 31, 2 ** 31 - 1, -(2 ** 31), -(2 ** 31) - 1, 2 ** 32, 2 ** 32 + 5, -1.5, 1.5, 1e20, -1e20, 2 ** 53 + 2, ...Array.from({length: 20000}, () => (random() - .5) * 2 ** (random() * 70))];
+  same(await elm('math.toInt32', values.map(v => [v])), values.map(v => v | 0), 'toInt32');
+});

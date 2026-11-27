@@ -147,3 +147,8 @@ listens on `replay-events.ts`, the channel the simulation announces replay
 moments on. In the Elm port those announcements become events the update
 returns, as the acoustics' receipts already are. The boundary test now also
 fails on any class or typed array the simulation reaches.
+
+`Sim.SurfaceMotion` brings the seeded hash the whole patrol draws from.
+`Sim.Math` gained `imul` (Elm's `*` multiplies as doubles) and `toInt32`
+(JavaScript's `| 0`, which is what Elm's `truncate` compiles to), each checked
+against JavaScript on 20,000 inputs and every 32-bit edge.
