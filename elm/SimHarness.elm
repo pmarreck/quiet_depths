@@ -244,6 +244,18 @@ function name =
         "math.hypot3" ->
             Just (call3 D.float D.float D.float E.float SimMath.hypot3)
 
+        "math.exp" ->
+            Just (call1 D.float E.float SimMath.exp)
+
+        "math.expm1" ->
+            Just (call1 D.float E.float SimMath.expm1)
+
+        "math.tanh" ->
+            Just (call1 D.float E.float SimMath.tanh)
+
+        "math.cbrt" ->
+            Just (call1 D.float E.float SimMath.cbrt)
+
         "math.remainder" ->
             Just (call2 D.float D.float E.float SimMath.remainder)
 

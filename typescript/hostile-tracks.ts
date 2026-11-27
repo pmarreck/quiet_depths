@@ -1,3 +1,4 @@
+import {exp} from './sim-math.ts';
 import {scopeExtension} from './periscope.ts';
 import {searchSeconds} from './suspicion.ts';
 import {bearing, clamp, delta, distance, log, rad, rand, type LogEntry} from './mechanics.ts';
@@ -51,7 +52,7 @@ export function updateHostileTrack(s: Patrol, ship: Hunter, env: {subVisualRange
   const visual = ship.kind === 'sub' && ship.depth > 15 ? 0 : clamp(1 - range / env.subVisualRange, 0, 1) * exposure;
   const depthStealth = s.difficulty?.depthStealth ?? 1;
   const noise = s.noise * (1 - .45 * depthStealth * clamp(s.depth / 120, 0, 1));
-  const acoustic = clamp(1 - range / 5500, 0, 1) * noise * .7 * (1 - env.storm * .38 * Math.exp(-s.depth / 70)) *
+  const acoustic = clamp(1 - range / 5500, 0, 1) * noise * .7 * (1 - env.storm * .38 * exp(-s.depth / 70)) *
     restingStealth(s.bottomed, Math.max(Math.abs(s.speed), Math.abs(s.targetSpeed ?? s.speed)));
   const pursuit = s.difficulty?.pursuit ?? 1, sensitivity = s.difficulty?.detection ?? 1;
   const canSee = visual * sensitivity >= 9;

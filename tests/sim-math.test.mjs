@@ -1,5 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import * as shared from '../src/sim-math.js';
 import {elm, seeded} from './sim-harness.mjs';
 
 // The Elm simulation's arithmetic must equal JavaScript's to the last bit,
@@ -31,4 +33,27 @@ test('Elm remainder equals the JavaScript % operator bit for bit', async () => {
   const random = seeded(23), cases = corpus(24, 2, 60000);
   for (let i = 0; i < 20000; i++) cases.push([(random() - .5) * 1e5, 360], [(random() - .5) * 720, 360], [random() * 1e6, random() * 10 + 1e-9]);
   same(await elm('math.remainder', cases), cases.map(([x, y]) => x % y), 'remainder');
+});
+
+test('Elm exp, expm1, tanh and cbrt equal the TypeScript simulation’s shared versions bit for bit', async () => {
+  const random = seeded(25), inputs = [...specials, -746, -745, -40, -20.000001, -20, -19.99, -1e-12, 1e-12, 19.99, 20, 20.000001, 709, 710, 27, -27, 8, 1 / 3];
+  for (let i = 0; i < 40000; i++) inputs.push((random() - .5) * [1e-6, 1, 10, 60, 800][i % 5]);
+  for (const name of ['exp', 'expm1', 'tanh', 'cbrt'])
+    same(await elm('math.' + name, inputs.map(x => [x])), inputs.map(shared[name]), name);
+});
+
+// A simulation module that called the built-ins directly would drift from the
+// Elm port, so every module the simulation reaches must use the shared ones.
+test('the simulation reaches exp, expm1, tanh and cbrt only through the shared module', () => {
+  const source = name => readFileSync(new URL(`../typescript/${name}.ts`, import.meta.url), 'utf8');
+  const seen = new Set(), pending = ['sim'];
+  while (pending.length) {
+    const name = pending.pop();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    for (const [, next] of source(name).matchAll(/^(?:import|export) (?!type)[^;]*from '\.\/([a-z0-9-]+)\.ts'/gm)) pending.push(next);
+  }
+  assert.ok(seen.has('coast') && seen.has('systems') && seen.size > 50, 'the walk reaches the whole simulation');
+  const direct = [...seen].filter(name => name !== 'sim-math' && /Math\.(exp|expm1|tanh|cbrt)\(/.test(source(name)));
+  assert.deepEqual(direct, []);
 });

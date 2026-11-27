@@ -1,3 +1,4 @@
+import {exp} from './sim-math.ts';
 import {scopeEyeHeight} from './periscope.ts';
 import {surfaceMotion, wavePhaseAt, surfaceHeight, WAVE_COMPONENTS, hash01, boatPoint} from './surface-motion.ts';
 import {SUB_DESIGN as D} from './hull-design.ts';
@@ -78,7 +79,7 @@ export function environmentAt(s: Sky): Environment {
   for (const strike of s.lightning || []) {
     const age = time - strike.time;
     if (age >= 0 && age < .75) {
-      const pulse = Math.exp(-age * 13) + .75 * Math.exp(-(((age - .22) / .05) ** 2));
+      const pulse = exp(-age * 13) + .75 * exp(-(((age - .22) / .05) ** 2));
       const d = Math.hypot(strike.x - (s.x as number), strike.y - (s.y as number));
       e.flash = Math.max(e.flash, pulse / (1 + d / 14000));
     }
@@ -91,9 +92,9 @@ export function environmentAt(s: Sky): Environment {
 export function waterColumnLight(depth: number, e: {daylight: number; cloud: number; sunAltitude: number}) {
   const meters = Math.max(0, depth), diffuse = e.daylight * (1 - .52 * e.cloud);
   return {
-    red: diffuse * Math.exp(-.12 * meters),
-    green: diffuse * Math.exp(-.045 * meters),
-    blue: diffuse * Math.exp(-.023 * meters),
+    red: diffuse * exp(-.12 * meters),
+    green: diffuse * exp(-.045 * meters),
+    blue: diffuse * exp(-.023 * meters),
     direct: e.daylight * Math.sqrt(Math.max(0, e.sunAltitude)) * (1 - e.cloud) ** 2,
   };
 }

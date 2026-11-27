@@ -1,4 +1,4 @@
-module Sim.Math exposing (clamp, hypot2, hypot3, remainder)
+module Sim.Math exposing (cbrt, clamp, exp, expm1, hypot2, hypot3, remainder, tanh)
 
 {-| Arithmetic the simulation needs exactly as JavaScript computes it, so the
 Elm simulation reproduces the TypeScript one bit for bit in V8.
@@ -7,6 +7,10 @@ Elm has no `Math.hypot`, and `sqrt (x*x + y*y)` differs from it in the last
 bit for many inputs. These follow V8's algorithm: scale by the largest
 magnitude, then sum the squares with Kahan compensation. Elm also has no
 floating-point remainder; `remainder` matches JavaScript's `%` exactly.
+
+Elm has no `exp`, `expm1`, `tanh` or `cbrt` either, and `e ^ x` differs from
+`Math.exp` in the last bits for most inputs. The TypeScript simulation computes
+these through `typescript/sim-math.ts` with the same formulas, so both agree.
 -}
 
 
@@ -104,6 +108,42 @@ kahan magnitude largest ( sum, compensation ) =
             sum + summand
     in
     ( preliminary, (preliminary - sum) - summand )
+
+
+exp : Float -> Float
+exp x =
+    e ^ x
+
+
+expm1 : Float -> Float
+expm1 x =
+    e ^ x - 1
+
+
+{-| Beyond ±20 the result is ±1 to double precision; the cutoff keeps e ^ (2x) finite. -}
+tanh : Float -> Float
+tanh x =
+    if x > 20 then
+        1
+
+    else if x < -20 then
+        -1
+
+    else
+        let
+            e2 =
+                e ^ (2 * x)
+        in
+        (e2 - 1) / (e2 + 1)
+
+
+cbrt : Float -> Float
+cbrt x =
+    if x < 0 then
+        negate (negate x ^ (1 / 3))
+
+    else
+        x ^ (1 / 3)
 
 
 {-| JavaScript's `x % y`: the remainder with the sign of `x`, computed exactly.

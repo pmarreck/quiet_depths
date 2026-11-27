@@ -1,3 +1,4 @@
+import {exp} from './sim-math.ts';
 import {hash01} from './surface-motion.ts';
 
 interface Island {x:number;y:number;length:number;width:number;cos:number;sin:number;height:number;phase:number}
@@ -19,8 +20,8 @@ function coastline(seed:number){
 }
 const charts=new Map<number,ReturnType<typeof coastline>>();
 export function chartDepth(x:number,y:number,seed?:number){
-  const reef=155*Math.exp(-((x-1900)**2+(y-700)**2)/470000);
-  const greybank=460*Math.exp(-((x+3800)**2+(y-4000)**2)/1900000);
+  const reef=155*exp(-((x-1900)**2+(y-700)**2)/470000);
+  const greybank=460*exp(-((x+3800)**2+(y-4000)**2)/1900000);
   const old=230+30*Math.sin(x/1100)*Math.cos(y/900)-reef-greybank;
   // Retain the surveyed inner shelf and the island airstrip. Older saves use their original chart everywhere.
   if(seed===undefined||Math.abs(x)<4500&&y<5600&&y>-4500)return old;
@@ -43,7 +44,7 @@ export function chartDepth(x:number,y:number,seed?:number){
     if(Math.abs(dx)>i.length*2.5+i.width||Math.abs(dy)>i.length*2.5+i.width)continue;
     const u=(dx*i.cos+dy*i.sin)/i.length,v=(dy*i.cos-dx*i.sin)/i.width;
     const bend=v+.24*Math.sin(2.9*u+i.phase)+.08*Math.sin(5*u+i.phase);
-    depth-=blend*i.height*Math.exp(-1.3*(u*u+bend*bend));
+    depth-=blend*i.height*exp(-1.3*(u*u+bend*bend));
   }
   return Math.max(-360,depth);
 }

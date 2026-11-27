@@ -77,3 +77,16 @@ harness, as the GLSL sea already is.
 A large rewrite; frame time across the port; save compatibility; and seeds
 that replay the same patrol within each implementation but may drift slightly
 between the TypeScript and Elm versions over a long patrol.
+
+## Exact arithmetic (2026-11-27)
+
+Floating point now matches to the bit after all, so differential tests compare
+with exact equality, signed zeros and NaN included. `Sim.Math` reproduces
+V8's `Math.hypot` and JavaScript's `%`, each checked on about 240,000 inputs.
+Elm has no `exp`, `expm1`, `tanh` or `cbrt`, and its `e ^ x` differs from
+`Math.exp` on 92% of inputs, so the TypeScript simulation now computes those
+four through `typescript/sim-math.ts` with the same `Math.pow` formulas as
+Elm. That moved its results by a few units in the last place at most, and
+every existing test still passes. A test fails the build if any module the
+simulation reaches calls the four built-ins directly. The audio and renderer
+keep the built-ins.

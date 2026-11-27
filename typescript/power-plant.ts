@@ -1,3 +1,4 @@
+import {cbrt} from './sim-math.ts';
 import {operatingFraction} from './equipment.ts';
 
 export const SURFACE_KNOTS = 20.5;
@@ -40,7 +41,7 @@ export function propulsion(s: Plant & {dieselMode: DieselMode; targetSpeed: numb
   if (s.dieselMode === 'assist' && generator > 0 && battery > 0) {
     // Approximate shaft power as proportional to speed cubed. Only the demand
     // above generator capacity draws on the battery. Both sources share a motor.
-    const combined = Math.cbrt(genKnots**3+(Math.min(battery,shaft)*ELECTRIC_KNOTS)**3);
+    const combined = cbrt(genKnots**3+(Math.min(battery,shaft)*ELECTRIC_KNOTS)**3);
     ahead = Math.min(shaft*rating(22,17),combined);
     const demand = Math.min(s.silent?3:ahead,Math.max(0,throttlePercent(s.targetSpeed))/100*ahead);
     assistDrain = .20*Math.max(0,demand**3-genKnots**3)/ELECTRIC_KNOTS**3;

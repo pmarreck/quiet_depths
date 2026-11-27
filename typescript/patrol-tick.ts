@@ -1,3 +1,4 @@
+import {exp} from './sim-math.ts';
 import {activeClue, imagerClue, leaveClue, searchClue} from './suspicion.ts';
 import {recordWake} from './surface-wake.ts';
 import {advanceTraffic, canAttackPlayer, playerSignal} from './cold-watch.ts';
@@ -166,7 +167,7 @@ function tick(s: World, dt: number, input: StepInput) {
   for (const ship of s.ships) {
     if (ship.hull <= 0) continue;
     const d = distance(s, ship);
-    if (operatingFraction(s.systems.sonar) > 0 && (s.silent || s.speed < 9) && d < (ship.kind === 'fishing' ? 2300 : 5600) * (1 - env.storm * .25 * Math.exp(-s.depth / 80)) * operatingFraction(s.systems.sonar) &&
+    if (operatingFraction(s.systems.sonar) > 0 && (s.silent || s.speed < 9) && d < (ship.kind === 'fishing' ? 2300 : 5600) * (1 - env.storm * .25 * exp(-s.depth / 80)) * operatingFraction(s.systems.sonar) &&
       newTriad) contact(s, ship, 'passive');
     const topside = ['tower', 'gun'].includes(input.observation as string) && s.depth <= 1;
     const look = input.look ?? ((s.heading + s.scopeAngle) % 360);

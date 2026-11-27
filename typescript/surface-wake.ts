@@ -1,3 +1,4 @@
+import {expm1} from './sim-math.ts';
 import {scopeEyeHeight,scopeExtension} from './periscope.ts';
 import {boatPoint,surfaceHeight,surfaceMotion} from './surface-motion.ts';
 import {SUB_DESIGN as D} from './hull-design.ts';
@@ -87,7 +88,7 @@ export class WakeRibbons {
   let vertices=0,count=0;
   const row=(x:number,y:number,heading:number,time:number,width:number,strength:number,connect:boolean)=>{
    const age=Math.max(0,s.time-time),distance=width*age;
-   const spread=distance+3.8*strength*Math.sqrt(-Math.expm1(-distance));
+   const spread=distance+3.8*strength*Math.sqrt(-expm1(-distance));
    const thickness=Math.min(spread,(.23+1.4*strength)*(1+.075*age));
    const angle=heading*Math.PI/180,east=Math.cos(angle),north=-Math.sin(angle);
    const alpha=Math.sqrt(strength)*Math.max(0,1-age/lifetime)*.94;

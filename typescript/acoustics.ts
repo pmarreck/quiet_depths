@@ -1,3 +1,4 @@
+import {exp} from './sim-math.ts';
 // Constant-speed, flat-interface approximation. Typical speeds: NOAA,
 // https://oceanservice.noaa.gov/facts/sound.html . Not a full ocean acoustic model.
 export const AIR_SOUND_SPEED = 340;
@@ -43,7 +44,7 @@ export function perceivedSound(source: Source, listener: Listener): Perceived {
   const depth = Math.max(0, listener.depth || 0), horizontal = Math.hypot(source.x - listener.x, source.y - listener.y);
   const distance = Math.hypot(horizontal, (source.depth || 0) - depth), under = depth > 1;
   if (source.type === 'thunder' || source.type === 'gunfire') return {distance, delay: propagationTime(source, listener), pan: spatialPan(source, listener),
-    gain: (source.power || 1) / (1 + (Math.hypot(horizontal, source.altitude || 0) / 3400) ** 1.2) * (under ? .55 * Math.exp(-depth / 170) : 1),
+    gain: (source.power || 1) / (1 + (Math.hypot(horizontal, source.altitude || 0) / 3400) ** 1.2) * (under ? .55 * exp(-depth / 170) : 1),
     cutoff: under ? Math.max(85, 950 / (1 + depth / 28)) : 3200};
   return {distance, delay: propagationTime(source, listener), pan: spatialPan(source, listener),
     gain: clamp((source.power || 1) / (1 + (distance / 220) ** 1.25), 0, 1), cutoff: Math.max(130, 4200 / (1 + distance / 1200))};
@@ -60,7 +61,7 @@ export function engineSound(ship: {x: number; y: number; depth?: number; speed?:
 
 export function aircraftSound(plane: {x: number; y: number; altitude?: number; speed?: number; hull: number}, listener: Listener) {
   const depth = Math.max(0, listener.depth || 0), under = depth > 1, distance = Math.hypot(plane.x - listener.x, plane.y - listener.y, (plane.altitude || 0) + depth);
-  return {distance, gain: plane.hull <= 0 || distance > 6000 ? 0 : .28 / (1 + (distance / 500) ** 1.5) * (under ? .35 * Math.exp(-depth / 90) : 1),
+  return {distance, gain: plane.hull <= 0 || distance > 6000 ? 0 : .28 / (1 + (distance / 500) ** 1.5) * (under ? .35 * exp(-depth / 90) : 1),
     pan: spatialPan(plane, listener), cutoff: under ? Math.max(90, 700 / (1 + depth / 25)) : 2200, frequency: 68 + (plane.speed || 0) * .35, bladeRate: 12};
 }
 

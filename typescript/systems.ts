@@ -1,3 +1,4 @@
+import {exp, expm1, tanh} from './sim-math.ts';
 import {orderScope, advanceScope} from './periscope.ts';
 import {energyDraw, propulsion, throttlePercent, batteryOutput} from './power-plant.ts';
 import {addDebrief, type DebriefEntry} from './debrief.ts';
@@ -162,13 +163,13 @@ function fuelEmergency(s: Boat, dt: number, crew: number) {
     s.fuel = Math.max(0, s.fuel - s.fuelLeak * .12 * dt);
     s.fuelLeak = Math.max(0, s.fuelLeak - working * .018 * dt);
     if (s.fuelLeak === 0) log(s, 'Crew sealed the fuel leak.', 'success');
-    if (s.fuel > 0 && !s.fuelFire && s.fuelLeak && rand(s) < -Math.expm1(-dt * s.fuelLeak * .012)) {
+    if (s.fuel > 0 && !s.fuelFire && s.fuelLeak && rand(s) < -expm1(-dt * s.fuelLeak * .012)) {
       s.fuelFire = 24; log(s, 'Fuel fire! Damage control requested.', 'damage'); addDebrief(s, 'Leaking fuel caught fire.');
     }
   }
   if (s.fuelFire > 0) {
     s.fuel = Math.max(0, s.fuel - dt * .07); s.hull = Math.max(0, s.hull - dt * .09);
-    if (s.fuel > 0 && rand(s) < -Math.expm1(-dt * .0015)) {
+    if (s.fuel > 0 && rand(s) < -expm1(-dt * .0015)) {
       const message = 'Fuel vapor explosion in the machinery space.';
       onboardExplosion(s, 'vapor', s); replayEvent(s, {kind: 'blast', point: {x: s.x, y: s.y, depth: s.depth}});
       hurt(s, 9, message, 'diesel'); addDebrief(s, message); s.fuelFire = 0;
@@ -196,7 +197,7 @@ export function updateBoat(s: Boat, dt: number): boolean {
   const accelerating = Math.sign(order) === Math.sign(order - s.speed);
   const change = dt * .35 * (accelerating && order !== 0 ? drive : 1);
   s.speed += clamp(order - s.speed, -change, change);
-  const turn = delta(s.targetHeading, s.heading), flow = Math.tanh(s.speed / 5);
+  const turn = delta(s.targetHeading, s.heading), flow = tanh(s.speed / 5);
   // An ordered course is absolute. The helmsman reverses the blade angle astern.
   // At rest the steering gear can still swing the rudder for the next movement.
   const steering = operatingFraction(s.systems.rudder);
@@ -248,7 +249,7 @@ export function updateBoat(s: Boat, dt: number): boolean {
     if (floor < 0) pushOffShoal(s, -floor, s.environment.chartSeed);
     if (!s.bottomed) touchdown(s, impact);
     scrapeSeabed(s, dt);
-    s.verticalSpeed = Math.min(0, s.verticalSpeed); s.speed *= Math.exp(-dt * 1.5);
+    s.verticalSpeed = Math.min(0, s.verticalSpeed); s.speed *= exp(-dt * 1.5);
   } else if (s.bottomed && s.depth < floor - 1) { s.bottomed = false; log(s, 'Off the bottom.'); }
   updatePressure(s, dt);
   if (s.status === 'lost') return diesel;

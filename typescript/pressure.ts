@@ -1,3 +1,4 @@
+import {expm1} from './sim-math.ts';
 import {damagePart} from './equipment.ts';
 import {clamp, log, rand, type LogEntry} from './mechanics.ts';
 import {addDebrief, type DebriefEntry} from './debrief.ts';
@@ -24,12 +25,12 @@ export function updatePressure(s: Boat, dt: number): void {
   s.criticalExposure = level === 2 ? s.criticalExposure + dt : 0;
   if (!level) return;
   const excess = s.depth / depthLimit(s) - 1;
-  if (rand(s) < -Math.expm1(-dt * (.012 + .075 * excess))) {
+  if (rand(s) < -expm1(-dt * (.012 + .075 * excess))) {
     s.flood = clamp(s.flood + .8 + rand(s) * 1.8, 0, 25);
     damagePart(s, s.repairLimits, 'hull', .4);
     log(s, 'Pressure seam leaking. Assign damage control to seal it and pump the bilge.', 'damage');
   }
-  if (level === 2 && s.criticalExposure > 20 && rand(s) < -Math.expm1(-dt * (excess - .12) * .035)) {
+  if (level === 2 && s.criticalExposure > 20 && rand(s) < -expm1(-dt * (excess - .12) * .035)) {
     damagePart(s, s.repairLimits, 'hull', 100);
     s.status = 'lost'; s.imploded = true; s.shock = 2;
     const text = 'Pressure hull imploded beyond the damaged sub’s depth tolerance.';
