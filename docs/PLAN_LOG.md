@@ -155,3 +155,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Convert the ROV tether and patrol report modules to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:33 EST; commit 7f1b1a3).
 - [x] [Elm migration] Convert held-input tracking and hostile pursuit to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:35 EST; commit 20cd0af).
 - [x] [Elm migration] Convert satellite reconnaissance and its save validation to strict TypeScript, checked identical to the original across every relay phase and 341,557 mutated saves (done 2026-11-27 03:38 EST; commit d27c5ba).
+- [x] [Elm migration] Convert hull collisions, grounding and shoal push-off to strict TypeScript, checked identical to the original across collisions, groundings and sheared periscopes (done 2026-11-27 03:41 EST; commit dcd153d).
