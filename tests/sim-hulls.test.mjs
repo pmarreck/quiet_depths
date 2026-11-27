@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import {resolveTraffic, hullContact, keelLimit, pushOffShoal} from '../src/hull-contacts.js';
 import {listenForReplayEvents} from '../src/replay-events.js';
 import {bottom} from '../src/mechanics.js';
-import {elm, sameResults, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 
-const plain = v => JSON.parse(JSON.stringify(v));
 const kinds = ['merchant', 'escort', 'fishing', 'carrier', 'sub'];
 // A point over water between `low` and `high` meters deep on this chart.
 function shoal(random, seed, low, high) {
@@ -83,7 +82,7 @@ test('Elm resolves traffic, pair by pair, as the TypeScript does', async () => {
     listenForReplayEvents(c, {mark: (time, e) => collisions.push(e)});
     c.hurts = [];
     resolveTraffic(c, (st, severity, text, part) => { st.hurts.push({severity, text, part}); st.hull -= severity * .1; });
-    return plain({x: c.x, y: c.y, depth: c.depth, speed: c.speed, verticalSpeed: c.verticalSpeed, site: c.site, ships: c.ships, collisionHits: c.collisionHits, systems: c.systems,
+    return exact({x: c.x, y: c.y, depth: c.depth, speed: c.speed, verticalSpeed: c.verticalSpeed, site: c.site, ships: c.ships, collisionHits: c.collisionHits, systems: c.systems,
       repairLimits: c.repairLimits, scope: c.scope, scopeTravel: c.scopeTravel ?? null, events: c.events, debrief: c.debrief ?? [], collisions, hurts: c.hurts, hull: c.hull});
   });
   const count = f => expected.filter(f).length;

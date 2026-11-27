@@ -455,3 +455,18 @@ collision cases that never reached the collision code, because those hulls
 lay beyond the drone's 100 m link and the drone was lost first. Each gap got
 a case placed on its threshold, the boat now sits 40 m from every collision
 test point, and a guard asserts a drone does strike a ship.
+
+## Compare numbers exactly, never through JSON (2026-11-27)
+
+The systems tests passed both sides through JSON before comparing, which
+turns NaN and both infinities into null and -0 into 0. A port that produced
+Infinity, -Infinity or -0 where the TypeScript produced NaN or 0 would have
+passed: three planted mutants of exactly that kind survived. The tests now
+copy results with `exact` (tests/sim-harness.mjs), which keeps every number
+and drops only undefined keys, and `sameResults` compares with
+`isDeepStrictEqual`, whose `Object.is` semantics keep NaN, Infinity,
+-Infinity, 0, -0 and null apart. A self-test in sim-math holds the comparison
+to that, the hurt test asserts that NaN results reach it as NaN, and hits of
+infinite size joined the cases. All three mutants now fail the tests. JSON
+stays only where the thing under test is itself a save (record codecs, save
+validation).

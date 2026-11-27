@@ -8,7 +8,7 @@ import {updateBoat, updateDrone} from '../src/systems.js';
 import {rand, bottom} from '../src/mechanics.js';
 import {recoveryDock} from '../src/vehicle-status.js';
 import {keelLimit} from '../src/hull-contacts.js';
-import {elm, sameResults} from './sim-harness.mjs';
+import {elm, sameResults, exact} from './sim-harness.mjs';
 
 const SYSTEMS = ['diesel', 'fuelTank', 'batteryBank', 'tubes', 'engine', 'propeller', 'oxygen', 'ballast', 'planes', 'rudder', 'sonar', 'periscope', 'deckgun', 'crew'];
 const FIELDS = ['time', 'x', 'y', 'depth', 'heading', 'pitch', 'speed', 'targetSpeed', 'targetHeading', 'targetDepth', 'verticalSpeed', 'hull', 'outerHull', 'flood', 'shock', 'fuel',
@@ -37,20 +37,18 @@ function systemPatrols() {
 }
 
 // The fields systems can change after a call, and the replay events the
-// TypeScript announced to its listener, as JSON carries them.
+// TypeScript announced to its listener, with every number kept exactly.
 function runTypeScript(state, call) {
   const w = restore(JSON.stringify(state)), replay = [];
   assert.ok(w, 'the patrol restores');
-  const input = JSON.parse(JSON.stringify(w));
+  const input = exact(w);
   listenForReplayEvents(w, {mark: (time, event) => replay.push({time, event})});
   const result = call(w);
   const picked = Object.fromEntries(FIELDS.filter(k => w[k] !== undefined).map(k => [k, w[k]]));
   if (picked.debrief === undefined) picked.debrief = [];
-  return {input, output: JSON.parse(JSON.stringify({...picked, replay})), result};
+  return {input, output: exact({...picked, replay}), result};
 }
 
-// Both sides go through JSON, as saves do: NaN becomes null on each.
-const viaJson = v => JSON.parse(JSON.stringify(v));
 const restorable = () => systemPatrols().filter(s => restore(JSON.stringify(s)) !== null);
 const withDrone = (s, drone) => ({...s, drone: {...s.drone, ...drone}});
 
@@ -64,7 +62,7 @@ test('the drone deploy reasons match, for every reason the TypeScript gives', as
   }
   const runs = cases.map(c => runTypeScript(c, w => droneDeployReason(w)));
   assert.ok(new Set(runs.map(r => r.result)).size >= 8, 'every reason occurs');
-  sameResults(viaJson(await elm('systems.droneDeployReason', runs.map(r => [r.input]))), runs.map(r => r.result));
+  sameResults(await elm('systems.droneDeployReason', runs.map(r => [r.input])), runs.map(r => r.result));
 });
 
 test('deploying, recalling and losing the drone match', async () => {
@@ -85,28 +83,28 @@ test('deploying, recalling and losing the drone match', async () => {
   }
   assert.ok(deploys.some(r => r.result) && deploys.some(r => !r.result), 'deploys succeed and fail');
   assert.ok(new Set(recalls.map(r => r.output.drone.returnStage + '/' + r.output.drone.returnClearance)).size >= 3, 'stages and clearances vary');
-  sameResults(viaJson(await elm('systems.deployDrone', deploys.map(r => [r.input]))), deploys.map(r => [r.output, r.result]));
-  sameResults(viaJson(await elm('systems.recallDrone', recalls.map(r => [r.input]))), recalls.map(r => r.output));
-  sameResults(viaJson(await elm('systems.loseDrone', losses.map(r => [r.input, 'Link severed.']))), losses.map(r => r.output));
+  sameResults(await elm('systems.deployDrone', deploys.map(r => [r.input])), deploys.map(r => [r.output, r.result]));
+  sameResults(await elm('systems.recallDrone', recalls.map(r => [r.input])), recalls.map(r => r.output));
+  sameResults(await elm('systems.loseDrone', losses.map(r => [r.input, 'Link severed.'])), losses.map(r => r.output));
 });
 
 test('damage to each system matches, with its side effects and log lines', async () => {
   const runs = [];
   const bases = restorable().filter((_, i) => i % 5 === 0);
-  for (const [i, s] of bases.entries()) for (const key of SYSTEMS) for (const amount of [0, -1, NaN, 5, 30, 55, 150]) {
+  for (const [i, s] of bases.entries()) for (const key of SYSTEMS) for (const amount of [0, -1, NaN, Infinity, 5, 30, 55, 150]) {
     const state = i % 3 === 0 ? {...s, systems: {...s.systems, [key]: 62}, scope: true, scopeTravel: .5} : i % 3 === 1 ? {...s, systems: {...s.systems, [key]: 21}, fuel: 0} : s;
     runs.push({args: [key, amount], ...runTypeScript(state, w => damageSystem(w, key, amount))});
   }
   const texts = runs.flatMap(r => r.output.events.map(e => e.text));
   for (const phrase of ['destroyed. Beyond onboard repair.', ' offline.', 'damaged. Performance reduced.', 'Fuel tank leaking.']) assert.ok(texts.some(t => t.includes(phrase)), phrase);
-  sameResults(viaJson(await elm('systems.damageSystem', runs.map(r => [r.input, ...r.args]))), runs.map(r => r.output));
+  sameResults(await elm('systems.damageSystem', runs.map(r => [r.input, ...r.args])), runs.map(r => r.output));
 });
 
 test('hurting the boat matches: hull, flooding, section hits, cook-offs and losses', async () => {
   const runs = [];
   const bases = restorable().filter((_, i) => i % 4 === 1);
   let n = 0;
-  for (const s of bases) for (const amount of [0, -3, NaN, 1, 1.9, 2, 10, 30, 60]) for (const subsystem of [null, 'sonar']) for (const at of [null, 20, 0, -20]) {
+  for (const s of bases) for (const amount of [0, -3, NaN, Infinity, -Infinity, 1, 1.9, 2, 10, 30, 60]) for (const subsystem of [null, 'sonar']) for (const at of [null, 20, 0, -20]) {
     n++;
     const a = s.heading * Math.PI / 180, point = at === null ? null : {x: s.x + Math.sin(a) * at, y: s.y + Math.cos(a) * at, depth: s.depth};
     const state = {...s, rng: (n * 2654435761) | 0, difficulty: {...s.difficulty, damage: [undefined, 1, -1][n % 3]}, status: n % 17 === 0 ? 'won' : s.status, hull: n % 11 === 0 ? 4 : s.hull, flood: n % 5 === 0 ? 24.5 : s.flood};
@@ -120,7 +118,10 @@ test('hurting the boat matches: hull, flooding, section hits, cook-offs and loss
   assert.ok(runs.some(r => r.output.cookoff && !r.input.cookoff), 'a cook-off happens');
   assert.ok(runs.some(r => r.output.status === 'lost' && !r.output.cookoff), 'a breach loses the boat');
   assert.ok(runs.some(r => r.output.events.some(e => /^(BOW|MIDSHIPS|STERN) hit/.test(e.text))), 'section hits are logged');
-  sameResults(viaJson(await elm('systems.hurt', runs.map(r => [r.input, ...r.args]))), runs.map(r => r.output));
+  // NaN must reach the comparison as NaN, not as JSON's null, or a port that
+  // produced an infinity instead would pass.
+  assert.ok(runs.filter(r => Number.isNaN(r.output.outerHull) && Number.isNaN(r.output.flood)).length > 100, 'NaN hits leave NaN hulls');
+  sameResults(await elm('systems.hurt', runs.map(r => [r.input, ...r.args])), runs.map(r => r.output));
 });
 
 test('damage to the drone matches, through to its loss', async () => {
@@ -129,7 +130,7 @@ test('damage to the drone matches, through to its loss', async () => {
     runs.push({args: [amount, 'seabed'], ...runTypeScript(withDrone({...s, difficulty: {...s.difficulty, damage: [undefined, -1, 1][k % 3]}}, {mode}), w => damageDrone(w, amount, 'seabed'))});
   }
   assert.ok(runs.some(r => r.output.drone.mode === 'lost' && r.input.drone.mode !== 'lost'), 'a drone is destroyed');
-  sameResults(viaJson(await elm('systems.damageDrone', runs.map(r => [r.input, ...r.args]))), runs.map(r => r.output));
+  sameResults(await elm('systems.damageDrone', runs.map(r => [r.input, ...r.args])), runs.map(r => r.output));
 });
 
 // Seeds whose first draw falls below a threshold, for rare random events.
@@ -178,7 +179,7 @@ test("the boat's tick matches: motion, plant, seabed, pressure, emergencies, flo
     ['a hard landing', (b, a) => a.replay.some(e => e.event.kind === 'ground')], ['power runs out', (b, a) => a.status === 'expired'],
     ['flooding sinks the boat', (b, a) => a.status === 'lost'], ['the flooding alarm sounds', (b, a) => !b.floodAlarm && a.floodAlarm]])
     assert.ok(before.some((b, i) => ok(b, after[i])), what);
-  sameResults(viaJson(await elm('systems.updateBoat', runs.map(r => [r.input, r.dt]))), runs.map(r => [r.output, r.result]));
+  sameResults(await elm('systems.updateBoat', runs.map(r => [r.input, r.dt])), runs.map(r => [r.output, r.result]));
 });
 
 test("the drone's tick matches: link, battery, the return lane, collisions, the seabed, pressure waves and recovery", async () => {
@@ -224,5 +225,5 @@ test("the drone's tick matches: link, battery, the return lane, collisions, the 
     ['the drone hits the seabed', (b, a) => a.events.some(e => e.text.includes('Drone impact: seabed'))], ['the range alarm sounds', (b, a) => !b.drone.rangeAlarm && a.drone.rangeAlarm],
     ['the low battery alarm sounds', (b, a) => !b.drone.lowAlarm && a.drone.lowAlarm], ['the return lane advances', (b, a) => a.drone.returnStage > b.drone.returnStage]])
     assert.ok(pairs.some(([b, a]) => ok(b, a)), what);
-  sameResults(viaJson(await elm('systems.updateDrone', runs.map(r => [r.input, ...r.args]))), runs.map(r => r.output));
+  sameResults(await elm('systems.updateDrone', runs.map(r => [r.input, ...r.args])), runs.map(r => r.output));
 });

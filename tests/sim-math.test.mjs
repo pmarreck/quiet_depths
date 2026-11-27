@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, readdirSync} from 'node:fs';
 import * as shared from '../src/sim-math.js';
-import {elm, sameResults, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 import {simulationModules} from './sim-modules.mjs';
 
 // The Elm simulation's arithmetic must equal JavaScript's to the last bit,
@@ -102,6 +102,20 @@ test('Elm reads every string as the UTF-16 code units JavaScript does, unpaired 
   const random = seeded(29), texts = ['', 'kestrel', 'Ünïcode', 'ship 🚢', '🚢', '\ud800', '\udc00', '\ud800lone', 'lone\udfff', 'a\udc00b', '􏿿', '\ud800𐀀', '￿퟿'];
   for (let i = 0; i < 2000; i++) texts.push(String.fromCharCode(...Array.from({length: Math.floor(random() * 12)}, () => random() < .3 ? 0xd800 + Math.floor(random() * 0x800) : Math.floor(random() * 0x10000))));
   sameResults(await elm('text.codeUnits', texts.map(t => [t])), texts.map(t => Array.from({length: t.length}, (_, i) => t.charCodeAt(i))));
+});
+
+// The differential tests' comparison must keep apart every value a numeric
+// slip can produce, and exact must hand those values through unchanged.
+test('the comparison tells NaN, both infinities, both zeros and null apart, and exact keeps them', () => {
+  const values = [NaN, Infinity, -Infinity, 0, -0, null];
+  for (const [i, a] of values.entries()) for (const [j, b] of values.entries()) {
+    const compare = () => sameResults([{v: a}], [{v: b}]);
+    if (i === j) compare(); else assert.throws(compare, undefined, `${Object.is(a, -0) ? '-0' : a} against ${Object.is(b, -0) ? '-0' : b}`);
+  }
+  const copied = exact({values, nested: [{x: NaN, gone: undefined}], gone: undefined});
+  assert.ok(Object.is(copied.values[0], NaN) && copied.values[1] === Infinity && copied.values[2] === -Infinity && Object.is(copied.values[4], -0) && copied.values[5] === null);
+  assert.deepStrictEqual(Object.keys(copied), ['values', 'nested']);
+  assert.deepStrictEqual(Object.keys(copied.nested[0]), ['x']);
 });
 
 // Until the game loop switches to Elm, a gameplay change to a ported module

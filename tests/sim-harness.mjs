@@ -76,6 +76,17 @@ export function sameResults(actual, expected) {
   assert.equal(actual.length, expected.length);
 }
 
+// A copy of a result that keeps every number exactly, for sameResults to
+// compare. JSON would turn NaN and both infinities into null and -0 into 0,
+// hiding a port that produced one where the TypeScript produced another.
+// Only object keys whose value is undefined are dropped, since Elm leaves an
+// absent Maybe out of what it encodes.
+export function exact(value) {
+  if (Array.isArray(value)) return value.map(exact);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => [k, exact(v)]));
+  return value;
+}
+
 export function seeded(seed) {
   let state = seed >>> 0;
   return () => {
