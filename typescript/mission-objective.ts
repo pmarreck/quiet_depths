@@ -1,9 +1,11 @@
-import {missions} from './mission-catalog.ts';
+import {missions, patrol} from './mission-catalog.ts';
 import {friendlyLead} from './fleet-action.ts';
 import type {SurveyCriteria} from './wreck-survey.ts';
 import type {RescueCriteria} from './rescue-operation.ts';
 
 export {missions as MISSIONS};
+// Patrol-wide timing from the Elm patrol definition.
+export const patrolTiming = patrol;
 type Mission = (typeof missions)[number];
 type Point = {x: number; y: number};
 interface Patrol extends Point {

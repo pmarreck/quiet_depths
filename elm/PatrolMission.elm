@@ -1,8 +1,29 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), PhotoCriteria, RescueCriteria, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), PatrolTiming, PhotoCriteria, RescueCriteria, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, patrolTiming, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
     6
+
+
+{-| Patrol seconds before command recalls the sub. A longer mission's window
+starts after its protected transit, which ends once the sub has spent
+searchSeconds of unpaused play and protectedTransit seconds of patrol time.
+-}
+type alias PatrolTiming =
+    { standardWindow : Int
+    , longerWindow : Int
+    , protectedTransit : Int
+    , searchSeconds : Int
+    }
+
+
+patrolTiming : PatrolTiming
+patrolTiming =
+    { standardWindow = 30 * 60
+    , longerWindow = 90 * 60
+    , protectedTransit = 20 * 60
+    , searchSeconds = 3 * 60
+    }
 
 
 type Mission

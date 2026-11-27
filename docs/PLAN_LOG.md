@@ -133,3 +133,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 ## Retired 2026-11-27
 
 - [x] [Playtest fixes (owner feedback 2026-11-27)] Fix torpedoes that veer off and search instead of running to a selected target; debug from the exported convoy save with a regression that fails on r83 (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:01 EST; commit ba09d65).
+- [x] [Playtest fixes (owner feedback 2026-11-27)] Show Install Game only on installable touch devices and never on desktop (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:09 EST; commit 59c7970).

@@ -1,3 +1,4 @@
+import {patrol} from './mission-catalog.ts';
 import {hash01} from './surface-motion.ts';
 
 type Point={x:number;y:number};
@@ -35,19 +36,20 @@ export function longPatrol(s:Setup){
   return {...start,heading,targetHeading:heading,search,...(s.mission==='sneaky-seamen'?{}:{home:pickup})};
 }
 export function advanceApproach(search:SearchArea,dt:number,timeRate:number){
-  // At least three minutes of unpaused play, plus transit allowance for a cruising sub at 1x.
-  if(search.activeSeconds>=180&&search.protectedTime>=1200)return false;
+  // Minutes of unpaused play, plus transit allowance for a cruising sub at 1x.
+  const {searchSeconds,protectedTransit}=patrol;
+  if(search.activeSeconds>=searchSeconds&&search.protectedTime>=protectedTransit)return false;
   const active=search.activeSeconds+dt/Math.max(1,timeRate);
-  search.activeSeconds=active>180-1e-8?180:active;
+  search.activeSeconds=active>searchSeconds-1e-8?searchSeconds:active;
   search.protectedTime+=dt;
   return true;
 }
-export const approachProgress=(a:SearchArea)=>Math.min(1,a.activeSeconds/180,a.protectedTime/1200);
+export const approachProgress=(a:SearchArea)=>Math.min(1,a.activeSeconds/patrol.searchSeconds,a.protectedTime/patrol.protectedTransit);
 export function validSearch(s:Setup & {search?:SearchArea;time:number}){
   const a=s.search;if(!a)return false;
   const expected=s.site?[]:objectives({...s,ships:s.ships.filter(v=>!v.incidental)}).map(v=>v.id);
   return [a.x,a.y,a.radius,a.activeSeconds,a.protectedTime].every(Number.isFinite)&&a.radius>0&&
-    a.activeSeconds>=0&&a.activeSeconds<=180&&a.protectedTime>=0&&a.protectedTime<=s.time+.001&&
+    a.activeSeconds>=0&&a.activeSeconds<=patrol.searchSeconds&&a.protectedTime>=0&&a.protectedTime<=s.time+.001&&
     typeof a.located==='boolean'&&Array.isArray(a.targets)&&a.targets.length===expected.length&&expected.every(id=>a.targets.includes(id))&&
     Array.isArray(a.recognized)&&a.recognized.length===new Set(a.recognized).size&&a.recognized.every(id=>expected.includes(id));
 }

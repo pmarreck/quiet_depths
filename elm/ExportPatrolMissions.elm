@@ -94,10 +94,20 @@ encodeMission mission =
         ]
 
 
+encodeTiming : PatrolMission.PatrolTiming -> E.Value
+encodeTiming t =
+    E.object
+        [ ( "standardWindow", E.int t.standardWindow )
+        , ( "longerWindow", E.int t.longerWindow )
+        , ( "protectedTransit", E.int t.protectedTransit )
+        , ( "searchSeconds", E.int t.searchSeconds )
+        ]
+
+
 main : Program () () Never
 main =
     Platform.worker
-        { init = \() -> ( (), catalog (E.list encodeMission PatrolMission.all) )
+        { init = \() -> ( (), catalog (E.object [ ( "missions", E.list encodeMission PatrolMission.all ), ( "patrol", encodeTiming PatrolMission.patrolTiming ) ]) )
         , update = \msg _ -> never msg
         , subscriptions = \_ -> Sub.none
         }

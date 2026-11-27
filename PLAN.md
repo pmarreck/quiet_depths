@@ -4,7 +4,6 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## Playtest fixes (owner feedback 2026-11-27)
 
-- [x] Show Install Game only on installable touch devices and never on desktop (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:09 EST; commit 59c7970).
 - [x] Hide keyboard hints and shortcut remapping on touch-only devices, keeping the touch ROV inversion setting (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:09 EST; commit 59c7970).
 - [ ] Ask “End mission?” on entering extraction surfaced before the objective is complete, scoring per-mission partial credit after owner review of the draft rules (context: docs/plan_context/owner-feedback-2026-11-27.md).
 
@@ -15,6 +14,7 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [x] Move convoy tracking range, noise and depth limits and the seeded tracking goal into the Elm mission definition (done 2026-11-27 03:06 EST; commit 5e65857).
 - [x] Move reconnaissance photo framing and the seeded photograph goal into the Elm mission definition (done 2026-11-27 03:08 EST; commit 34c206b).
 - [x] Move the carrier’s fatal direct-hit count into the Elm mission definition, shared by the briefing and carrier rules (done 2026-11-27 03:10 EST; commit 5a3fb49).
+- [x] Move the standard and longer patrol windows and the protected-transit search timing into the Elm patrol definition (done 2026-11-27 03:13 EST).
 - [ ] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks.
 - [x] Rebuild the desktop helm: controls only on Periscope & Controls and ROV, vertical speed and depth, heading-up Elm compass with drag-to-steer rim (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 02:46 EST; commit 1a885be).
 - [ ] Move the remaining helm controls (depth and speed sliders, turn buttons, propulsion) from JavaScript-wired markup into the Elm helm.

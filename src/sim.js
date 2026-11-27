@@ -20,6 +20,7 @@ import {emitSound,launchNoise,updateAcoustics} from './acoustics.js';
 import {sweepClutter} from './seabed-rest.js';
 import {trackingConvoy,trackingCriteria} from './convoy-tracking.js';
 import {framed,photoCriteria} from './recon-photos.js';
+import {patrolTiming} from './mission-objective.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets,updateFleetBattle} from './missions.js';
 import {isDieselMode} from './power-plant.js';
@@ -367,7 +368,7 @@ function tick(s,dt,input){
  }
  if(s.status==='patrol'&&s.phase==='extract'&&distance(s,s.home)<400&&s.depth<=1){s.status='won';log(s,'Patrol complete. Surfaced at pickup. Sub and crew home safely.','success');}
  if(s.mission==='tiebreaker'&&s.phase==='objective'&&s.status==='patrol'&&sidesAfloat(s.ships).friendly<2){s.status='expired';addDebrief(s,'Too few friendly vessels remained to establish the lead. Command recalled the patrol.');}
- const patrolWindow=s.search?5400+s.search.protectedTime:1800;
+ const patrolWindow=s.search?patrolTiming.longerWindow+s.search.protectedTime:patrolTiming.standardWindow;
  if(s.time>patrolWindow&&s.status==='patrol'&&!(s.mission==='tiebreaker'&&s.phase==='extract')){s.status='expired';log(s,'Patrol window closed. Command orders withdrawal.','warning');}
 }
 export function save(s){return JSON.stringify(s);}
