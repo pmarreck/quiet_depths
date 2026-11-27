@@ -169,7 +169,7 @@ Both formats are versioned, cleartext JSON. A live snapshot includes the patrol 
 
 ## Building and verifying the game
 
-Quiet Depths is a static site. Elm owns the mission definitions, briefing controls, engine telegraph and sonar tab UI. Strict TypeScript handles parts of the simulation and browser adapters, alongside the remaining JavaScript. Elm and TypeScript compile to JavaScript. The shipped game uses WebGL through vendored Three.js and Web Audio. It has no WebAssembly runtime or server-side game process. It runs without an account or tracking.
+Quiet Depths is a static site. Elm owns the mission definitions and their objective criteria, the patrol windows and encounter odds, the briefing controls, engine telegraph, helm compass and sonar tab UI. Strict TypeScript handles parts of the simulation and browser adapters, alongside the remaining JavaScript. Elm and TypeScript compile to JavaScript. The shipped game uses WebGL through vendored Three.js and Web Audio. It has no WebAssembly runtime or server-side game process. It runs without an account or tracking.
 
 Nix with flakes is required. The pinned toolchain builds on x86-64 and ARM64 Linux, including Linux under WSL, and Apple silicon macOS. Each target produces the browser game.
 
@@ -182,7 +182,7 @@ Nix with flakes is required. The pinned toolchain builds on x86-64 and ARM64 Lin
 
 The build compiles optimized Elm, checks strict TypeScript, checks JavaScript syntax and runs the Node simulation and interface tests. The install check verifies offline asset coverage and build identity. The preview serves the Nix output directly. Any static web server can serve that directory. The tracked `dist/` directory is a staging snapshot. [Build definition](flake.nix) · [Verification entry point](test)
 
-To change a mission, edit the Elm catalog. Run `nix build .#patrol-catalog --print-out-paths --no-link` and copy the printed store file to `typescript/mission-catalog.ts`. The simulation and Node tests read that generated table. The build verifies it against the optimized Elm exporter. [Elm mission catalog](elm/PatrolMission.elm) · [Generated table](typescript/mission-catalog.ts) · [Migration plan](PLAN.md)
+To change a mission or patrol rule, edit the Elm catalog. Tests also compare the briefing, field guide and this guide against the catalog values, so update the wording when a number changes. Run `nix build .#patrol-catalog --print-out-paths --no-link` and copy the printed store file to `typescript/mission-catalog.ts`. The simulation and Node tests read that generated table. The build verifies it against the optimized Elm exporter. [Elm mission catalog](elm/PatrolMission.elm) · [Generated table](typescript/mission-catalog.ts) · [Migration plan](PLAN.md)
 
 A build from clean, complete Git history records its version, full commit and `rN-abcdef` revision in `build-provenance.json` when built via the project scripts. The briefing shows `rN` and exposes the full identifier in its tooltip. GitHub Actions checks that the tested artifact matches the exact push to `yolo` before publishing it to Pages. Pull requests run the same build. [Pages workflow](.github/workflows/pages.yml)
 
