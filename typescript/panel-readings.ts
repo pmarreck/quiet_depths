@@ -147,3 +147,15 @@ export function footerReading(s: {difficulty: {showSuspicion?: unknown}; alert: 
   return {show: !!s.difficulty.showSuspicion, alert: Number(s.alert), alertText: suspicionLabel(s.alert, s.ships).toUpperCase() + ' ' + Math.round(s.alert) + '%',
     noiseText: 'SELF NOISE ' + Math.round(s.noise) + ' dB', clearanceText: 'KEEL CLEARANCE ' + Math.round(belowKeel) + ' m'};
 }
+
+export interface ResourceReading {gauges: {key: 'battery' | 'oxygen' | 'fuel'; level: number; text: string}[]}
+
+/** A damaged battery bank or fuel tank shows its remaining capacity after the level. */
+export function resourceReading(s: {battery: number; oxygen: number; fuel: number; systems: {batteryBank: number; fuelTank: number}}): ResourceReading {
+  const capacity = (condition: number) => condition < 100 ? ' / ' + Math.floor(condition) : '';
+  return {gauges: [
+    {key: 'battery', level: Number(s.battery), text: Math.round(s.battery) + capacity(s.systems.batteryBank) + '%'},
+    {key: 'oxygen', level: Number(s.oxygen), text: Math.round(s.oxygen) + '%'},
+    {key: 'fuel', level: Number(s.fuel), text: Math.round(s.fuel) + capacity(s.systems.fuelTank) + '%'},
+  ]};
+}

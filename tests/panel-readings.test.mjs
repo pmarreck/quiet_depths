@@ -134,3 +134,11 @@ test('the footer reading words suspicion, noise and clearance as the bar showed 
  assert.deepEqual(footerReading(s,213.6),{show:true,alert:30.4,alertText:suspicionLabel(30.4,[]).toUpperCase()+' 30%',noiseText:'SELF NOISE 69 dB',clearanceText:'KEEL CLEARANCE 214 m'});
  assert.equal(footerReading({...s,difficulty:{}},0).show,false);
 });
+
+test('resource gauges show a damaged store’s remaining capacity',async()=>{
+ const {resourceReading}=await import('../src/panel-readings.js');
+ const s={battery:91.6,oxygen:19.5,fuel:0,systems:{batteryBank:100,fuelTank:100}};
+ assert.deepEqual(resourceReading(s).gauges,[{key:'battery',level:91.6,text:'92%'},{key:'oxygen',level:19.5,text:'20%'},{key:'fuel',level:0,text:'0%'}]);
+ s.systems={batteryBank:79.8,fuelTank:99.99};
+ assert.deepEqual(resourceReading(s).gauges.map(g=>g.text),['92 / 79%','20%','0 / 99%']);
+});
