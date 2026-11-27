@@ -4,6 +4,7 @@ module SimHarness.Records exposing (function)
 
 import Json.Decode as D
 import Json.Encode as E
+import Sim.Contact as Contact
 import Sim.Ship as Ship
 import SimHarness.Codec exposing (arg)
 
@@ -20,6 +21,16 @@ function name =
                     (arg 0 D.value)
                     (arg 1 D.float)
                 )
+
+        "contact.roundTrip" ->
+            Just
+                (D.map2 (\raw now -> D.decodeValue (Contact.decoder now) raw |> Result.map Contact.encode |> Result.withDefault E.null)
+                    (arg 0 D.value)
+                    (arg 1 D.float)
+                )
+
+        "contact.designation" ->
+            Just (D.map (Contact.designation >> E.string) (arg 0 D.float))
 
         _ ->
             Nothing
