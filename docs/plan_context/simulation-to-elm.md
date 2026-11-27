@@ -246,3 +246,9 @@ the update from 5.0 to 2.6 µs, and returning the list untouched when nothing
 is due or stale took it to 1.6 µs, 2.3 times the TypeScript (and that figure
 includes the benchmark's own list-length passes). Ported code should be
 written for Elm's data structures, not transliterated.
+
+**Porting trap: number formatting.** JavaScript's `toFixed` rounds the exact
+binary value half up, so `(0.15).toFixed(1)` is "0.1"; rounding `x * 10` gets
+such cases wrong. Five simulation modules format numbers with it, so
+`Sim.Text.toFixed` reproduces it exactly with Dekker's error-free product,
+checked on 80,000 values and 42,000 near-ties.

@@ -124,3 +124,20 @@ test('every TypeScript module mirrored in Elm says so and names its twin', () =>
   assert.ok(prefixes.size > 20, 'the harness mirrors the ported modules');
   assert.deepEqual(missing, []);
 });
+
+test('Elm writes numbers exactly as JavaScript toFixed does, rounding the binary value half up', async () => {
+  const random = seeded(30), values = [0, -0, .5, 1.5, 2.5, -2.5, .15, .25, 1.005, 1.45, -.04, -.05, .0005, .0015, 1e-7, -1e-7, 99.95, 999.9995, 123456.789,
+    9e12, -9e12, 1e21, 2e21, -1e21, NaN, Infinity, -Infinity, 1 / 3, 2 / 3, 0.1 + 0.2, 4.35, 8.675, 1.0049999999999999];
+  for (let i = 0; i < 20000; i++) {
+    const r = random();
+    values.push(r < .3 ? Math.round((random() - .5) * 2e6) / [1, 10, 100, 1000, 2000, 8][i % 6] : r < .6 ? (random() - .5) * 10 ** Math.floor(random() * 10) : (Math.floor(random() * 2e5) + .5) / 10 ** (i % 4));
+  }
+  const cases = values.flatMap(v => [0, 1, 2, 3].map(d => [d, v]));
+  // The hardest inputs: within three units in the last place of a half-way point.
+  const step = (x, ulps) => {const b = new Float64Array([x]), u = new BigInt64Array(b.buffer); u[0] += BigInt(ulps); return b[0];};
+  for (const d of [1, 2, 3]) for (let i = 0; i < 2000; i++) {
+    const mid = (Math.floor(random() * 2e5) + .5) / 10 ** d;
+    for (let s = -3; s <= 3; s++) cases.push([d, step(mid, s)]);
+  }
+  assert.deepEqual(await elm('text.toFixed', cases), cases.map(([d, v]) => v.toFixed(d)));
+});
