@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Sound record | about 13 min | fits the acoustics' `Heard` record as it is (`id : Int`, `power : Maybe Float`), so the ported update runs on saved sounds |
 | Hull contacts | about 20 min | identity became roles, mutation a threaded fold, `hurt` a parameter; three modules to stay under 500 lines; the Carrier port's `Int` hits met the ship record's `Maybe Float` |
 | Track estimates | about 15 min | first port on the shared records; the omniscient chart's exact marks became their own type, since they are not contacts |
 

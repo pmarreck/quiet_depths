@@ -89,4 +89,7 @@ fields: always id, time, type, x, y, power, heard; nearly always depth,
 heardAt and a nested `perceived`; sometimes altitude, vessel, friendly, own,
 touched, missed, warning, ownHit and a nested `echo`. `systems` also writes
 `droneHit`, never seen in these patrols. Restore checks sounds separately.
-Not yet designed.
+`Sim.Sound` (2026-11-27) holds all 20 and fits the acoustics' `Heard`
+record, so the ported update runs on saved sounds unchanged. Its decoder
+takes the patrol's ship ids, since a sweep, collapse or settling must name a
+ship, and matches restore on each rule; an echo belongs only to a seeker.

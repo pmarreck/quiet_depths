@@ -122,3 +122,40 @@ test('the Elm contact decoder rejects what restore rejects, and is stricter only
   assert.ok(cases.every(c => c.verdict !== 'rejected' || !c.restores) && cases.every(c => c.verdict !== 'accepted' || c.restores), 'each mutation does what it claims');
   assert.ok(cases.every((c, i) => c.verdict !== 'stricter' || (c.restores && !decoded[i])), 'restore accepts the wrong types and the Elm rejects them');
 });
+
+// A sound carrying every field saves hold, an echoing seeker's.
+const everySoundField = (base, now) => ({...base, type: 'seeker', time: now, depth: 40, altitude: 0, heardAt: now, perceived: {distance: 900, delay: .6, pan: -.2, gain: .4, cutoff: 1800},
+  vessel: 'v0', friendly: false, own: true, touched: true, missed: false, warning: true, ownHit: false, droneHit: true,
+  echo: {id: 3, x: 1, y: 2, depth: 40, speed: 30, time: now, inboundRun: true}});
+
+test('saved sounds round-trip through the Elm sound record', async () => {
+  const calls = [];
+  for (const state of savedPatrols()) for (const a of state.acoustics ?? []) calls.push([a, state.ships.map(v => v.id)]);
+  assert.ok(calls.length > 300 && new Set(calls.map(([a]) => a.type)).size >= 5, 'sounds of several types');
+  const full = everySoundField(calls[0][0], 50);
+  assert.equal(Object.keys(full).length, 20, 'the fixture carries every field');
+  calls.push([full, ['v0']]);
+  sameResults(await elm('sound.roundTrip', calls), calls.map(([a]) => a));
+});
+
+test('the Elm sound decoder rejects what restore rejects', async () => {
+  const bases = savedPatrols().filter(s => (s.acoustics ?? []).length && s.ships.length && restore(JSON.stringify(s)) !== null).filter((s, i) => i % 5 === 1).slice(0, 10);
+  assert.ok(bases.length >= 8, 'restorable patrols with sounds');
+  const echo = (time, extra = {}) => ({id: 3, x: 1, y: 2, depth: 40, speed: 30, time, inboundRun: true, ...extra});
+  const rejected = [a => { a.id = 'one'; }, a => { delete a.time; }, a => { a.x = null; }, a => { a.x = NaN; }, a => { a.power = 'loud'; }, a => { delete a.power; }, a => { a.type = 'whale'; },
+    a => { a.heard = 'yes'; }, a => { delete a.heard; }, a => { a.type = 'sweep'; delete a.vessel; }, a => { a.type = 'collapse'; a.vessel = 'nobody'; },
+    a => { a.type = 'blast'; a.echo = echo(a.time); }, a => { a.type = 'seeker'; a.echo = echo(a.time + 1); }, a => { a.type = 'seeker'; a.echo = echo(a.time, {id: 0}); },
+    a => { a.type = 'seeker'; a.echo = echo(a.time, {depth: -1}); }, a => { a.type = 'seeker'; a.echo = echo(a.time, {speed: -1}); }, a => { a.type = 'seeker'; a.echo = echo(a.time, {inboundRun: 1}); },
+    a => { a.type = 'seeker'; a.echo = echo(a.time, {id: 1.5}); }, a => { a.ownHit = 'no'; }];
+  const accepted = [(a, ships) => { a.type = 'sweep'; a.vessel = ships[0]; delete a.echo; }, a => { a.type = 'seeker'; a.echo = echo(a.time); }, a => { a.ownHit = true; }, a => { a.type = 'thunder'; delete a.echo; },
+    a => { delete a.depth; }, a => { a.heard = !a.heard; }];
+  const cases = [];
+  for (const [verdict, mutations] of [['rejected', rejected], ['accepted', accepted]])
+    for (const base of bases) for (const index of [0, base.acoustics.length - 1]) for (const mutate of mutations) {
+      const state = structuredClone(base); mutate(state.acoustics[index], state.ships.map(v => v.id));
+      cases.push({verdict, sound: state.acoustics[index], ships: state.ships.map(v => v.id), restores: restore(JSON.stringify(state)) !== null});
+    }
+  const decoded = (await elm('sound.roundTrip', cases.map(c => [c.sound, c.ships]))).map(r => r !== null);
+  assert.deepEqual(cases.filter((c, i) => decoded[i] !== c.restores).map(c => ({verdict: c.verdict, type: c.sound.type})), []);
+  assert.ok(cases.every(c => (c.verdict === 'rejected') !== c.restores), 'each mutation does what it claims');
+});
