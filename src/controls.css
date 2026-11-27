@@ -32,6 +32,8 @@ h1{font-size:40px;line-height:1.02;margin:16px 0}
 .hull-title b{font-size:1.25rem}
 .hull-title b span{font-size:.875rem}
 .systems{font-size:.75rem;line-height:1.6;letter-spacing:0}
+/* The Elm boat condition view lays out as if its children sat directly in the panel. */
+.boat-condition{display:contents}
 .systems button{font-size:.875rem;padding-top:10px}
 .log-panel{padding:18px 20px;min-height:100px}
 .log-entry{font-size:.875rem;line-height:1.5;grid-template-columns:40px 1fr;gap:8px;margin-bottom:14px}

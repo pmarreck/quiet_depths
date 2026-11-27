@@ -249,6 +249,12 @@ const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,
 const telegraph=globalThis.Elm.EngineTelegraph.init({node:$('telegraph-root')});
 const compass=globalThis.Elm.HelmCompass.init({node:$('helm-compass-root')});
 const soundingsStrip=globalThis.Elm.Soundings.init({node:$('soundings-root')});
+const boatCondition=globalThis.Elm.BoatCondition.init({node:$('boat-condition-root')});
+// Damage control from the Elm boat panel, checked as the button's clicks were.
+boatCondition.ports.boatOrder.subscribe(kind=>{
+ if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
+ assignDamageControl();updateUI();
+});
 const propulsionPanel=globalThis.Elm.HelmPropulsion.init({node:$('propulsion-root')});
 const dieselModeOptions=Object.entries(dieselModes).map(([value,label])=>({value,label}));
 // Elm helm axes. Slider moves and presets arrive as orders checked as clicks
@@ -502,7 +508,6 @@ function assignDamageControl(){
  state.repair=120;log(state,'Damage control assigned. Sealing leaks, restoring equipment and pumping the bilge.');
  toast('Damage control working for 2 minutes. Uses battery.');
 }
-bindCommand('repair','click',assignDamageControl);
 bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}},()=>state.decoys>0);
 $('run-limit').max=MAX_RUN;
 bindCommand('run-limit','input',e=>{state.runSetting=clamp(e.target.valueAsNumber,100,MAX_RUN);});
@@ -754,16 +759,19 @@ function updateUI(){
  $('start-rescue').textContent=s.operation?.active?'RESCUE UNDERWAY':'START RESCUE HERE';
  if(s.site&&(!s.search||s.search.located))$('operation-range').textContent+=' · Hull '+Math.ceil(s.site.hull)+'%';
  const limit=depthLimit(s),pressure=pressureLevel(s);
- $('hull-limits').textContent='Outer hull '+Math.floor(s.outerHull)+'% · Pressure hull '+conditionLabel(s.hull,s.repairLimits.hull,false)+' · Depth limit '+limit+' m';
+ const hullLimits='Outer hull '+Math.floor(s.outerHull)+'% · Pressure hull '+conditionLabel(s.hull,s.repairLimits.hull,false)+' · Depth limit '+limit+' m';
  $('pressure-warning').hidden=view!=='orbit'||!pressure||s.status!=='patrol';
  $('pressure-warning').classList.toggle('critical',pressure===2);
  $('pressure-warning').textContent=(pressure===2?'CRITICAL · IMPLOSION RISK':'PRESSURE ALARM')+' · Rise above '+limit+' m';
  document.querySelector('.top-coords b').textContent=String(s.patrol.seed);$('home-distance').textContent=s.mission==='tiebreaker'&&!extract?'Awaiting fleet clearance':(distance(s,s.home)/1000).toFixed(1)+' km · '+deg(bearing(s,s.home))+'°';
- $('hull-value').innerHTML=Math.round(s.hull)+'<span>%</span>';$('hull-bar').style.width=s.hull+'%';$('hull-bar').style.background=s.hull<45?'var(--red)':'var(--green)';
- const boatStatus=s.fuelFire?'FUEL FIRE':s.fuelLeak?'FUEL TANK LEAK':s.repair>0?'DAMAGE CONTROL WORKING':s.flood>0?'FLOODING · '+s.flood.toFixed(1)+' T/MIN · '+s.water.toFixed(1)+' T ABOARD':s.hull<99.9?'PRESSURE HULL DAMAGED':s.outerHull<99.9?'OUTER HULL DAMAGED':Object.values(s.systems).some(v=>v<100)?'SUBSYSTEM DAMAGE':'ALL SYSTEMS NOMINAL';
- $('system-status').textContent=boatStatus;$('system-status').style.color=s.flood>0?'var(--red)':s.outerHull<99.9?'var(--gold)':'var(--green)';
+ // Number() keeps each comparison exactly as JavaScript made it; the flooding
+ // figures are formatted only while flooding, as before.
+ boatCondition.ports.boatReading.send({hull:Number(s.hull),hullText:String(Math.round(s.hull)),hullLimits,outerHull:Number(s.outerHull),flood:Number(s.flood),
+  floodText:s.flood>0?s.flood.toFixed(1):'',waterText:s.flood>0?s.water.toFixed(1):'',fuelFire:!!s.fuelFire,fuelLeak:!!s.fuelLeak,repair:Number(s.repair),
+  systemConditions:Object.values(s.systems).map(Number),
+  subsystems:Object.entries(SYSTEM_NAMES).map(([key,name])=>({name,condition:Number(s.systems[key]),label:String(conditionLabel(s.systems[key],s.repairLimits[key],key!=='crew'))})),
+  ballast:Number(s.ballast),ballastText:Math.abs(s.ballast*100).toFixed(0),verticalText:s.verticalSpeed.toFixed(2),rpmText:s.propRpm.toFixed(0),cavitation:Number(s.cavitation),repairEnabled:canIssue(s,context())});
  updatePatrolLog(s.events);
- $('subsystems').innerHTML=Object.entries(SYSTEM_NAMES).map(([key,name])=>`<div><span>${name}</span><b class="${s.systems[key]<60?'damaged':''}">${conditionLabel(s.systems[key],s.repairLimits[key],key!=='crew')}</b></div>`).join('');$('buoyancy-readout').textContent=`BALLAST ${s.ballast>0?'FLOODING':'BLOWING'} ${Math.abs(s.ballast*100).toFixed(0)}% · VERTICAL ${s.verticalSpeed.toFixed(2)} M/S · ${s.propRpm.toFixed(0)} RPM${s.cavitation>.05?' · CAVITATING':''}`;
  $('drone-bay-mode').textContent=s.drone.mode.toUpperCase();$('drone-bay-mode').classList.toggle('damaged',s.drone.mode==='lost');$('drone-bay-metrics').innerHTML=`<span>CHARGE <b>${Math.round(s.drone.battery)}%</b></span>${DRONE_PARTS.map(key=>`<span>${key.toUpperCase()} <b>${conditionLabel(s.drone[key],s.drone.repairLimits[key],key!=='hull')}</b></span>`).join('')}`;$('drone-bay-advice').textContent=s.drone.mode==='lost'?s.drone.lostReason:s.drone.mode==='stowed'?(droneDeployReason(s)||'READY · 280 M MAX · DEPLOY ≤3 KN'):Math.round(separation(s,s.drone))+' / 100 M LINK · BUOYANCY '+Math.round(s.drone.buoyancy)+'%';
  const plant=propulsion(s);
  const sourceStatus=s.engine==='diesel'?(s.depth>14?'INTAKE SUBMERGED':!s.fuel?'NO FUEL':!plant.generator?'GENERATOR / FUEL OFFLINE':s.depth<=1?'SURFACE DIESEL':'SNORKEL DIESEL'):batteryOutput(s)?'BATTERY POWER':'BATTERY UNAVAILABLE';
