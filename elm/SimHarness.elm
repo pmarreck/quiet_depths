@@ -13,6 +13,8 @@ import Platform
 import Sim.Acoustics as Acoustics
 import Sim.Debrief as Debrief
 import Sim.Equipment as Equipment
+import Sim.Foundering as Foundering
+import Sim.TorpedoWatch as TorpedoWatch
 import Sim.HullDesign as HullDesign
 import Sim.Math as SimMath
 import Sim.SeabedRest as SeabedRest
@@ -243,6 +245,118 @@ encodeEvent event =
             E.list identity [ E.string "blast", E.int s.id, E.float distance ]
 
 
+surfaceShip : D.Decoder Foundering.SurfaceShip
+surfaceShip =
+    D.string
+        |> D.andThen
+            (\name ->
+                case name of
+                    "merchant" ->
+                        D.succeed Foundering.Merchant
+
+                    "escort" ->
+                        D.succeed Foundering.Escort
+
+                    "fishing" ->
+                        D.succeed Foundering.Fishing
+
+                    "carrier" ->
+                        D.succeed Foundering.Carrier
+
+                    _ ->
+                        D.fail ("not a surface ship: " ++ name)
+            )
+
+
+vesselKind : D.Decoder Foundering.VesselKind
+vesselKind =
+    D.oneOf [ D.string |> D.andThen (\k -> if k == "sub" then D.succeed Foundering.Submarine else D.fail "surface"), D.map Foundering.Surface surfaceShip ]
+
+
+flag : String -> D.Decoder Bool
+flag name =
+    D.maybe (D.field name D.bool) |> D.map (Maybe.withDefault False)
+
+
+vessel : D.Decoder (Foundering.Vessel {})
+vessel =
+    D.succeed (\vesselType hull sinkDepth sunkAt settled collapsed observed -> { kind = vesselType, hull = hull, sinkDepth = sinkDepth, sunkAt = sunkAt, settled = settled, collapsed = collapsed, wreckObserved = observed })
+        |> andMap (D.field "kind" vesselKind)
+        |> andMap (D.field "hull" D.float)
+        |> andMap (D.maybe (D.field "sinkDepth" D.float))
+        |> andMap (D.maybe (D.field "sunkAt" D.float))
+        |> andMap (flag "settled")
+        |> andMap (flag "collapsed")
+        |> andMap (D.maybe (D.at [ "wreckMark", "observed" ] D.bool) |> D.map (Maybe.withDefault False))
+
+
+encodePose : { roll : Float, pitch : Float, wave : Float } -> E.Value
+encodePose p =
+    E.object [ ( "roll", E.float p.roll ), ( "pitch", E.float p.pitch ), ( "wave", E.float p.wave ) ]
+
+
+position3 : D.Decoder { x : Float, y : Float, depth : Float }
+position3 =
+    D.map3 (\x y depth -> { x = x, y = y, depth = depth }) (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float)
+
+
+shot : D.Decoder { id : Int, x : Float, y : Float, depth : Float, enemy : Bool, aim : Maybe { x : Float, y : Float }, orderedDepth : Float, diverted : Bool }
+shot =
+    D.succeed (\id x y depth owner aim ordered diverted -> { id = id, x = x, y = y, depth = depth, enemy = owner == "enemy", aim = aim, orderedDepth = ordered, diverted = diverted })
+        |> andMap (D.field "id" D.int)
+        |> andMap (D.field "x" D.float)
+        |> andMap (D.field "y" D.float)
+        |> andMap (D.field "depth" D.float)
+        |> andMap (D.field "owner" D.string)
+        |> andMap (D.maybe (D.field "aim" (D.nullable point)) |> D.map (Maybe.andThen identity))
+        |> andMap (D.field "orderedDepth" D.float)
+        |> andMap (D.field "diverted" D.bool)
+
+
+echo : D.Decoder TorpedoWatch.Echo
+echo =
+    D.succeed TorpedoWatch.Echo
+        |> andMap (D.field "id" D.int)
+        |> andMap (D.field "time" D.float)
+        |> andMap (D.field "x" D.float)
+        |> andMap (D.field "y" D.float)
+        |> andMap (D.field "depth" D.float)
+        |> andMap (D.field "speed" D.float)
+        |> andMap (D.field "inboundRun" D.bool)
+
+
+encodeEcho : TorpedoWatch.Echo -> E.Value
+encodeEcho e =
+    E.object [ ( "id", E.int e.id ), ( "time", E.float e.time ), ( "x", E.float e.x ), ( "y", E.float e.y ), ( "depth", E.float e.depth ), ( "speed", E.float e.speed ), ( "inboundRun", E.bool e.inboundRun ) ]
+
+
+track : D.Decoder TorpedoWatch.Track
+track =
+    D.succeed TorpedoWatch.Track
+        |> andMap (D.field "id" D.int)
+        |> andMap (D.field "time" D.float)
+        |> andMap (D.field "x" D.float)
+        |> andMap (D.field "y" D.float)
+        |> andMap (D.field "depth" D.float)
+        |> andMap (D.field "speed" D.float)
+        |> andMap (D.field "inboundRun" D.bool)
+        |> andMap (D.field "arrival" (D.nullable D.float))
+        |> andMap (D.field "fixes" D.int)
+        |> andMap (D.field "activeAt" D.float)
+        |> andMap (D.field "activeX" D.float)
+        |> andMap (D.field "activeY" D.float)
+        |> andMap (D.field "course" (D.nullable D.int))
+
+
+encodeTrack : TorpedoWatch.Track -> E.Value
+encodeTrack t =
+    E.object
+        [ ( "id", E.int t.id ), ( "time", E.float t.time ), ( "x", E.float t.x ), ( "y", E.float t.y ), ( "depth", E.float t.depth ), ( "speed", E.float t.speed )
+        , ( "inboundRun", E.bool t.inboundRun ), ( "fixes", E.int t.fixes ), ( "activeAt", E.float t.activeAt ), ( "activeX", E.float t.activeX ), ( "activeY", E.float t.activeY )
+        , ( "course", maybe E.int t.course ), ( "arrival", maybe E.float t.arrival )
+        ]
+
+
 part : D.Decoder Equipment.Part
 part =
     D.map2 Equipment.Part (D.field "condition" D.float) (D.field "limit" D.float)
@@ -383,6 +497,27 @@ function name =
                     (\( sounds, events ) -> E.object [ ( "sounds", E.list encodeSound sounds ), ( "events", E.list encodeEvent events ) ])
                     Acoustics.update
                 )
+
+        "foundering.founderingPose" ->
+            Just (call2 surfaceShip D.float encodePose Foundering.founderingPose)
+
+        "foundering.submergedDepth" ->
+            Just (call1 surfaceShip E.float Foundering.submergedDepth)
+
+        "foundering.descentSpeed" ->
+            Just (call1 D.float E.float Foundering.descentSpeed)
+
+        "foundering.wreckVisible" ->
+            Just (call2 vessel D.float E.bool Foundering.wreckVisible)
+
+        "torpedoWatch.gameEcho" ->
+            Just (D.map4 (\b s t v -> encodeEcho (TorpedoWatch.gameEcho b s t v)) (arg 0 position3) (arg 1 shot) (arg 2 D.float) (arg 3 D.float))
+
+        "torpedoWatch.observe" ->
+            Just (D.map4 (\watch tracks e active -> E.list encodeTrack (TorpedoWatch.observe watch e active tracks)) (arg 0 point) (arg 0 (D.field "torpedoTracks" (D.list track))) (arg 1 echo) (arg 2 D.bool))
+
+        "torpedoWatch.threats" ->
+            Just (call2 D.float (D.list track) (E.list encodeTrack) TorpedoWatch.threats)
 
         "watchWarnings.warnings" ->
             Just (call3 D.float D.float (D.nullable warnings) encodeWarnings WatchWarnings.warnings)

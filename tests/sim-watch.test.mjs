@@ -1,0 +1,77 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import * as foundering from '../src/foundering.js';
+import * as watch from '../src/torpedo-watch.js';
+import {elm, seeded} from './sim-harness.mjs';
+
+const surface = ['merchant', 'escort', 'fishing', 'carrier'];
+
+test('Elm sinking poses, depths and descent match the TypeScript for every surface ship', async () => {
+  const random = seeded(41), poses = [];
+  for (const kind of surface) {
+    for (const drop of [-1, 0, 0.76, 2, 5, 16, 30, 39.86, 42.86, 60, 120, 400]) poses.push([kind, drop]);
+    for (let i = 0; i < 300; i++) poses.push([kind, random() * 140]);
+  }
+  assert.deepEqual(await elm('foundering.founderingPose', poses), poses.map(([k, d]) => foundering.founderingPose(k, d)));
+  assert.deepEqual(await elm('foundering.submergedDepth', surface.map(k => [k])), surface.map(foundering.submergedDepth));
+  const ages = [-1, 0, 13, 26, 40, ...Array.from({length: 200}, () => random() * 40)].map(a => [a]);
+  assert.deepEqual(await elm('foundering.descentSpeed', ages), ages.map(([a]) => foundering.descentSpeed(a)));
+});
+
+test('Elm wreck visibility matches the TypeScript for charted, settled, collapsed and sinking vessels', async () => {
+  const random = seeded(42), cases = [];
+  for (const kind of [...surface, 'sub']) for (const hull of [0, 10]) for (const settled of [undefined, false, true]) for (const collapsed of [undefined, true])
+    for (const sunkAt of [undefined, 0, 30]) for (const observed of [undefined, true]) for (const sinkDepth of [undefined, 10, 60]) for (const now of [40, 110, 200]) {
+      const v = {kind, hull};
+      if (settled !== undefined) v.settled = settled;
+      if (collapsed !== undefined) v.collapsed = collapsed;
+      if (sunkAt !== undefined) v.sunkAt = sunkAt;
+      if (observed !== undefined) v.wreckMark = {observed};
+      if (sinkDepth !== undefined) v.sinkDepth = sinkDepth;
+      cases.push([v, now]);
+    }
+  for (let i = 0; i < 300; i++) cases.push([{kind: [...surface, 'sub'][i % 5], hull: 0, settled: random() < .5, sunkAt: random() * 100, sinkDepth: random() * 80}, random() * 300]);
+  assert.deepEqual(await elm('foundering.wreckVisible', cases), cases.map(([v, now]) => foundering.wreckVisible(v, now)));
+});
+
+test('Elm torpedo echoes and tracks follow the TypeScript fix by fix', async () => {
+  const random = seeded(43), echoes = [], steps = [];
+  for (let run = 0; run < 160; run++) {
+    const boat = {x: (random() - .5) * 400, y: (random() - .5) * 400, depth: 20 + random() * 200};
+    const heading = random() * Math.PI * 2, inbound = random() < .6, start = {x: boat.x + Math.sin(heading) * 3000, y: boat.y + Math.cos(heading) * 3000};
+    const aim = inbound ? {x: boat.x + (random() - .5) * 150, y: boat.y + (random() - .5) * 150} : {x: start.x + 400, y: start.y - 900};
+    const shot = {id: 1 + (run % 7), owner: random() < .8 ? 'enemy' : 'player', aim: random() < .1 ? null : aim, orderedDepth: boat.depth + (random() - .5) * 100,
+      diverted: random() < .1, x: start.x, y: start.y, depth: boat.depth + (random() - .5) * 40};
+    const s = {...boat, time: 0, torpedoTracks: []};
+    for (let tick = 0; tick < 24; tick++) {
+      s.time += random() < .1 ? 0 : 0.5 + random() * 3;
+      const toward = Math.atan2(aim.x - shot.x, aim.y - shot.y);
+      shot.x += Math.sin(toward) * 25 * random(); shot.y += Math.cos(toward) * 25 * random();
+      const speed = 18 + random() * 30, echo = watch.gameEcho(s, shot, s.time - (random() < .1 ? 5 : 0), speed);
+      echoes.push([{x: s.x, y: s.y, depth: s.depth}, {...shot}, echo.time, speed]);
+      const active = random() < .45;
+      steps.push([structuredClone(s), echo, active]);
+      watch.observeTorpedo(s, echo, active);
+    }
+  }
+  // Boundaries the runs above never land on exactly.
+  const still = {x: 0, y: 0, depth: 50};
+  for (const [ax, ordered] of [[105, 50], [109.999, 50], [110, 50], [110.001, 50], [0, 94.99], [0, 95], [0, 5.01], [0, 5]])
+    echoes.push([still, {id: 9, owner: 'enemy', aim: {x: ax, y: 0}, orderedDepth: ordered, diverted: false, x: -0.3, y: -0.4, depth: -0.2}, 3, 20]);
+  echoes.push([still, {id: 9, owner: 'enemy', aim: null, orderedDepth: 50, diverted: false, x: NaN, y: 2.5, depth: 7.5}, 3, 20]);
+  const closing = {...still, time: 0, torpedoTracks: []}, step = (time, x, y, active) => {
+    const echo = {id: 99, time, x, y, depth: 50, speed: 40, inboundRun: true};
+    steps.push([structuredClone({...closing, time}), echo, active]);
+    watch.observeTorpedo(closing, echo, active);
+  };
+  step(0, 0, 100, true); step(1, 0, 99, true); step(2, 0, 97, false); step(3, 0, 96, true);
+  steps.push([{...still, time: 10, torpedoTracks: [{id: 5, time: 2, x: 0, y: 30, depth: 50, speed: 30, inboundRun: true, fixes: 2, activeAt: 2, activeX: 0, activeY: 30, course: 180, arrival: 10}]},
+    {id: 6, time: 10, x: 1, y: 1, depth: 1, speed: 1, inboundRun: false}, false]);
+  assert.deepEqual(await elm('torpedoWatch.gameEcho', echoes), echoes.map(([boat, shot, time, speed]) => watch.gameEcho(boat, shot, time, speed)));
+  const expected = steps.map(([s, echo, active]) => {const copy = structuredClone(s); watch.observeTorpedo(copy, echo, active); return copy.torpedoTracks;});
+  assert.ok(expected.some(t => t.some(track => track.arrival !== null)), 'some runs earn an arrival estimate');
+  assert.ok(expected.some(t => t.some(track => track.fixes === 2 && track.course !== null)), 'some runs earn a course');
+  assert.deepEqual(await elm('torpedoWatch.observe', steps), expected);
+  const threatCases = steps.map(([s]) => [s.time, s.torpedoTracks]);
+  assert.deepEqual(await elm('torpedoWatch.threats', threatCases), steps.map(([s]) => watch.threats(s)));
+});

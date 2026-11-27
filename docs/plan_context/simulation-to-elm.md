@@ -96,3 +96,9 @@ both:
 Simulation modules use `M.max`, `M.min`, `M.abs`, `M.sign`, `M.clamp` and
 `M.isZero`, and a test fails the build on a bare Basics version or a bare
 comparison with 0 in `elm/Sim/` (outside `Sim.Math`).
+
+**Captain names stay in TypeScript.** `captainName` normalizes to Unicode
+NFC, which Elm's String cannot do. The page normalizes a captain's name before
+the patrol sees it, and the Elm save decoder will accept the stored name as
+already normalized, which the TypeScript validation guarantees for every save
+written so far.
