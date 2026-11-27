@@ -143,3 +143,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Move convoy tracking range, noise and depth limits and the seeded tracking goal into the Elm mission definition (done 2026-11-27 03:06 EST; commit 5e65857).
 - [x] [Elm migration] Move reconnaissance photo framing and the seeded photograph goal into the Elm mission definition (done 2026-11-27 03:08 EST; commit 34c206b).
 - [x] [Elm migration] Move the carrier’s fatal direct-hit count into the Elm mission definition, shared by the briefing and carrier rules (done 2026-11-27 03:10 EST; commit 5a3fb49).
+- [x] [Elm migration] Move the standard and longer patrol windows and the protected-transit search timing into the Elm patrol definition (done 2026-11-27 03:13 EST; commit 381d117).
