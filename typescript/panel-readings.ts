@@ -2,10 +2,11 @@
 // the Reading record that its Elm view decodes. The figures are formatted here,
 // exactly as the page wrote them before those panels moved to Elm; the views
 // decide what the measurements mean.
-import {clamp} from './mechanics.ts';
+import {clamp, separation} from './mechanics.ts';
 import {wrapHeading} from './controls.ts';
 import {isSurfaced} from './vehicle-status.ts';
-import {conditionLabel, SYSTEM_NAMES} from './equipment.ts';
+import {conditionLabel, SYSTEM_NAMES, DRONE_PARTS} from './equipment.ts';
+import {droneDeployReason} from './systems.ts';
 import {throttlePercent, SURFACE_KNOTS} from './power-plant.ts';
 import type {World} from './sim.ts';
 
@@ -77,4 +78,17 @@ export function boatReading(s: Boat, limit: number, repairEnabled: boolean): Boa
     subsystems: Object.entries(SYSTEM_NAMES).map(([key, name]) => ({name, condition: Number(systems[key]), label: String(conditionLabel(systems[key], limits[key], key !== 'crew'))})),
     ballast: Number(s.ballast), ballastText: Math.abs(s.ballast * 100).toFixed(0), verticalText: s.verticalSpeed.toFixed(2), rpmText: Number(s.propRpm).toFixed(0),
     cavitation: Number(s.cavitation), repairEnabled};
+}
+
+export interface DroneBayReading {mode: string; charge: string; parts: {name: string; label: string}[]; lostReason: string; deployReason: string; link: string; buoyancy: string}
+
+/** The deploy reason is worked out only for a stowed drone and the link only for
+ * one outside, as before. A missing lost reason reads as blank, as textContent did. */
+export function droneBayReading(s: World): DroneBayReading {
+  const d = s.drone, outside = d.mode !== 'lost' && d.mode !== 'stowed';
+  const limits = d.repairLimits as Record<string, number>;
+  return {mode: String(d.mode), charge: String(Math.round(d.battery)),
+    parts: DRONE_PARTS.map(key => ({name: key.toUpperCase(), label: String(conditionLabel(d[key], limits[key], key !== 'hull'))})),
+    lostReason: d.mode === 'lost' ? String(d.lostReason ?? '') : '', deployReason: d.mode === 'stowed' ? droneDeployReason(s) : '',
+    link: outside ? String(Math.round(separation(s, d))) : '', buoyancy: outside ? String(Math.round(d.buoyancy)) : ''};
 }

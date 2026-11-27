@@ -58,3 +58,21 @@ test('the boat reading covers every subsystem and formats flooding only while fl
  const odd=boatReading(s,100,true);
  assert.ok(Number.isNaN(odd.subsystems.find(x=>x.name===SYSTEM_NAMES.sonar).condition));assert.equal(odd.fuelLeak,false);
 });
+
+test('the drone bay reading works out only the advice its mode needs',async()=>{
+ const {droneBayReading}=await import('../src/panel-readings.js');
+ const {deployDrone}=await import('../src/sim.js');
+ const {DRONE_PARTS}=await import('../src/equipment.js');
+ const s=createGame('recon',7);
+ let r=droneBayReading(s);
+ assert.deepEqual([r.mode,r.charge,r.link,r.buoyancy,r.lostReason],['stowed','100','','','']);
+ assert.deepEqual(r.parts.map(p=>p.name),DRONE_PARTS.map(k=>k.toUpperCase()));
+ assert.equal(r.deployReason,'Slow to 3 knots or less before launching.');
+ s.speed=0;assert.equal(droneBayReading(s).deployReason,'','a ready drone has no reason to wait');
+ assert.ok(deployDrone(s));s.drone.buoyancy=87.6;
+ r=droneBayReading(s);
+ assert.deepEqual([r.mode,r.deployReason,r.link,r.buoyancy],['remote','','18','88']);
+ Object.assign(s.drone,{mode:'lost',lostReason:'Tether cut.'});
+ assert.deepEqual([droneBayReading(s).lostReason,droneBayReading(s).link],['Tether cut.','']);
+ delete s.drone.lostReason;assert.equal(droneBayReading(s).lostReason,'','a missing reason reads blank, as textContent showed it');
+});

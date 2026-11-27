@@ -15,7 +15,7 @@ import {attachCompassSteering} from './compass-steering.js';
 import {followFocus,followForDigit,playerTorpedoes,torpedoCamActive} from './torpedo-cam.js';
 import {seriousRepairs} from './red-alert.js';
 import {threats} from './torpedo-watch.js';
-import {conditionLabel,DRONE_PARTS,operatingFraction} from './equipment.js';
+import {operatingFraction} from './equipment.js';
 import {drawSonarGlass,lensFilter,signalOpacity} from './instrument-damage.js';
 import {disciplinaryFinding} from './patrol-reports.js';
 import {depthLimit,pressureLevel} from './pressure.js';
@@ -31,7 +31,7 @@ import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
-import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading} from './panel-readings.js';
+import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading} from './panel-readings.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
@@ -250,6 +250,7 @@ const telegraph=globalThis.Elm.EngineTelegraph.init({node:$('telegraph-root')});
 const compass=globalThis.Elm.HelmCompass.init({node:$('helm-compass-root')});
 const soundingsStrip=globalThis.Elm.Soundings.init({node:$('soundings-root')});
 const boatCondition=globalThis.Elm.BoatCondition.init({node:$('boat-condition-root')});
+const droneBay=globalThis.Elm.DroneBay.init({node:$('drone-bay-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
@@ -764,7 +765,7 @@ function updateUI(){
  document.querySelector('.top-coords b').textContent=String(s.patrol.seed);$('home-distance').textContent=s.mission==='tiebreaker'&&!extract?'Awaiting fleet clearance':(distance(s,s.home)/1000).toFixed(1)+' km · '+deg(bearing(s,s.home))+'°';
  boatCondition.ports.boatReading.send(boatReading(s,limit,canIssue(s,context())));
  updatePatrolLog(s.events);
- $('drone-bay-mode').textContent=s.drone.mode.toUpperCase();$('drone-bay-mode').classList.toggle('damaged',s.drone.mode==='lost');$('drone-bay-metrics').innerHTML=`<span>CHARGE <b>${Math.round(s.drone.battery)}%</b></span>${DRONE_PARTS.map(key=>`<span>${key.toUpperCase()} <b>${conditionLabel(s.drone[key],s.drone.repairLimits[key],key!=='hull')}</b></span>`).join('')}`;$('drone-bay-advice').textContent=s.drone.mode==='lost'?s.drone.lostReason:s.drone.mode==='stowed'?(droneDeployReason(s)||'READY · 280 M MAX · DEPLOY ≤3 KN'):Math.round(separation(s,s.drone))+' / 100 M LINK · BUOYANCY '+Math.round(s.drone.buoyancy)+'%';
+ droneBay.ports.droneBayReading.send(droneBayReading(s));
  const plant=propulsion(s);
  const sourceStatus=s.engine==='diesel'?(s.depth>14?'INTAKE SUBMERGED':!s.fuel?'NO FUEL':!plant.generator?'GENERATOR / FUEL OFFLINE':s.depth<=1?'SURFACE DIESEL':'SNORKEL DIESEL'):batteryOutput(s)?'BATTERY POWER':'BATTERY UNAVAILABLE';
  const powerStatus=[sourceStatus,dieselRoutingStatus(s,plant)].filter(Boolean).join(' · ');
