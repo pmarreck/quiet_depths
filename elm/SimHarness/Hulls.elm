@@ -43,6 +43,7 @@ body =
 encodeBody : Body -> E.Value
 encodeBody b =
     let
+        field : String -> (a -> E.Value) -> Maybe a -> Maybe ( String, E.Value )
         field key enc =
             Maybe.map (\v -> ( key, enc v ))
     in

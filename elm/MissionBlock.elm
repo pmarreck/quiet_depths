@@ -140,6 +140,7 @@ original =
 view : Maybe Reading -> Html msg
 view reading =
     let
+        r : Reading
         r =
             Maybe.withDefault original reading
     in

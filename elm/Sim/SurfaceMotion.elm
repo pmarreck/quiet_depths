@@ -65,6 +65,7 @@ wavePhaseAt time sea =
 surfaceHeight : Float -> Float -> Float -> Sea a -> Float
 surfaceHeight x y time sea =
     let
+        phase : Float
         phase =
             wavePhaseAt time sea
     in
@@ -90,6 +91,7 @@ effect.
 surfaceMotion : { a | x : Float, y : Float, heading : Float, depth : Float, pitch : Float } -> Sea b -> Float -> Pose
 surfaceMotion boat sea time =
     let
+        response : Float
         response =
             M.max 0 (1 - M.max 0 boat.depth / periscopeDepth) ^ 2
     in
@@ -98,21 +100,27 @@ surfaceMotion boat sea time =
 
     else
         let
+            hullRadius : Float
             hullRadius =
                 design.hullRadius
 
+            angle : Float
             angle =
                 boat.heading * pi / 180
 
+            east : Float
             east =
                 sin angle
 
+            north : Float
             north =
                 cos angle
 
+            arm : Float
             arm =
                 23
 
+            phase : Float
             phase =
                 wavePhaseAt time sea
 
@@ -120,30 +128,39 @@ surfaceMotion boat sea time =
                 List.foldl
                     (\w ( h, p, r ) ->
                         let
+                            at : Float
                             at =
                                 boat.x * w.kx + boat.y * w.ky + phase * w.omega
 
+                            forward : Float
                             forward =
                                 w.kx * east + w.ky * north
 
+                            starboard : Float
                             starboard =
                                 w.kx * north - w.ky * east
 
+                            lag : Float
                             lag =
                                 1.25 * w.omega * sea.waveSpeed
 
+                            scale : Float
                             scale =
                                 w.amplitude * sea.waveScale / (1 + lag * lag)
 
+                            s : Float
                             s =
                                 sin at
 
+                            c : Float
                             c =
                                 cos at
 
+                            height : Float
                             height =
                                 scale * (s - lag * c)
 
+                            slope : Float
                             slope =
                                 scale * (c + lag * s)
                         in
@@ -170,33 +187,43 @@ in the same order as the renderer's YXZ hull transform.
 boatPoint : { a | x : Float, y : Float, heading : Float, depth : Float, pitch : Float, roll : Float } -> Offset -> Point
 boatPoint boat offset =
     let
+        angle : Float
         angle =
             boat.heading * pi / 180
 
+        sn : Float
         sn =
             sin angle
 
+        cs : Float
         cs =
             cos angle
 
+        cp : Float
         cp =
             cos (orZero boat.pitch)
 
+        sp : Float
         sp =
             sin (orZero boat.pitch)
 
+        cr : Float
         cr =
             cos (orZero boat.roll)
 
+        sr : Float
         sr =
             sin (orZero boat.roll)
 
+        right : Float
         right =
             offset.side * cr + offset.down * sr
 
+        below : Float
         below =
             offset.down * cr - offset.side * sr
 
+        ahead : Float
         ahead =
             offset.forward * cp + below * sp
     in
@@ -211,42 +238,55 @@ boatPoint boat offset =
 boatLocal : { a | x : Float, y : Float, heading : Float, depth : Float, pitch : Float, roll : Float } -> Point -> Offset
 boatLocal boat at =
     let
+        angle : Float
         angle =
             boat.heading * pi / 180
 
+        sn : Float
         sn =
             sin angle
 
+        cs : Float
         cs =
             cos angle
 
+        cp : Float
         cp =
             cos (orZero boat.pitch)
 
+        sp : Float
         sp =
             sin (orZero boat.pitch)
 
+        cr : Float
         cr =
             cos (orZero boat.roll)
 
+        sr : Float
         sr =
             sin (orZero boat.roll)
 
+        dx : Float
         dx =
             at.x - boat.x
 
+        dy : Float
         dy =
             at.y - boat.y
 
+        dz : Float
         dz =
             at.depth - boat.depth
 
+        ahead : Float
         ahead =
             dx * sn + dy * cs
 
+        right : Float
         right =
             dx * cs - dy * sn
 
+        below : Float
         below =
             ahead * sp + dz * cp
     in
@@ -259,12 +299,15 @@ and draws are wrapped to 32 bits as JavaScript's `| 0` and `Math.imul` do.
 hash01 : Float -> Float -> Float
 hash01 seed n =
     let
+        mix : Int -> Int -> Int -> Int
         mix x multiplier shift =
             M.imul (Bitwise.xor x (Bitwise.shiftRightZfBy shift x)) multiplier
 
+        start : Int
         start =
             M.toInt32 (seed + toFloat (M.imul (M.toInt32 (n + 1)) 0x9E3779B9))
 
+        mixed : Int
         mixed =
             mix (mix start 0x21F0AAAD 16) 0x735A2D97 15
     in

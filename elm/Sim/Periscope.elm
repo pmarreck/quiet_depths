@@ -54,6 +54,7 @@ advanceScope seconds s =
 
         Just travel ->
             let
+                step : Float
                 step =
                     seconds / fullTravelSeconds
             in

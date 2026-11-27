@@ -99,12 +99,15 @@ sailingDay seed =
 moonCycle : Float -> Float
 moonCycle day =
     let
+        minute : Float
         minute =
             day * 1440
 
+        search : Int -> Int -> Int
         search lo hi =
             if hi - lo > 1 then
                 let
+                    mid : Int
                     mid =
                         Bitwise.shiftRightBy 1 (lo + hi)
                 in
@@ -117,9 +120,11 @@ moonCycle day =
             else
                 lo
 
+        lo0 : Int
         lo0 =
             search 0 (Array.length phases - 1)
 
+        phase : Float
         phase =
             (toFloat lo0 + (minute - phaseAt lo0) / (phaseAt (lo0 + 1) - phaseAt lo0)) / 4
     in
@@ -148,9 +153,11 @@ Howard Hinnant, chrono-compatible low-level date algorithms:
 civilFromDays : Int -> ( Int, Int, Int )
 civilFromDays days =
     let
+        z : Int
         z =
             days + 719468
 
+        era : Int
         era =
             (if z >= 0 then
                 z
@@ -160,21 +167,27 @@ civilFromDays days =
             )
                 // 146097
 
+        dayOfEra : Int
         dayOfEra =
             z - era * 146097
 
+        yearOfEra : Int
         yearOfEra =
             (dayOfEra - dayOfEra // 1460 + dayOfEra // 36524 - dayOfEra // 146096) // 365
 
+        dayOfYear : Int
         dayOfYear =
             dayOfEra - (365 * yearOfEra + yearOfEra // 4 - yearOfEra // 100)
 
+        shifted : Int
         shifted =
             (5 * dayOfYear + 2) // 153
 
+        dayOfMonth : Int
         dayOfMonth =
             dayOfYear - (153 * shifted + 2) // 5 + 1
 
+        month : Int
         month =
             if shifted < 10 then
                 shifted + 3
@@ -182,6 +195,7 @@ civilFromDays days =
             else
                 shifted - 9
 
+        year : Int
         year =
             yearOfEra
                 + era
@@ -201,15 +215,18 @@ civilFromDays days =
 patrolCalendar : Float -> Float -> Float -> Day
 patrolCalendar startDay startHour time =
     let
+        day : Float
         day =
             startDay + startHour / 24 + time / daySeconds
 
+        index : Int
         index =
             floor day
 
         ( year, month, date ) =
             civilFromDays (index + 730)
 
+        cycle : Float
         cycle =
             moonCycle day
     in

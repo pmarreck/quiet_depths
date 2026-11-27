@@ -101,11 +101,14 @@ sent; anything else has no script.
 morseScript : String -> Maybe Script
 morseScript text =
     let
+        sendable : Bool
         sendable =
             String.split " " text |> List.all (\word -> not (String.isEmpty word) && String.all (\c -> Dict.member c patterns) word)
 
+        element : Char -> ( Float, List Span ) -> ( Float, List Span )
         element symbol ( at, marks ) =
             let
+                end : Float
                 end =
                     at
                         + (if symbol == '.' then
@@ -117,6 +120,7 @@ morseScript text =
             in
             ( end + 1, { start = at, end = end } :: marks )
 
+        letter : Char -> Cursor -> Cursor
         letter c acc =
             case Dict.get c patterns of
                 Just pattern ->
@@ -131,6 +135,7 @@ morseScript text =
     in
     if sendable then
         let
+            done : Cursor
             done =
                 String.foldl letter (Cursor 0 [] []) text
         in
@@ -162,21 +167,27 @@ telegram, anchored to its sender at issue.
 makeTransmission : { a | x : Float, y : Float, id : String } -> { b | x : Float, y : Float } -> Float -> Float -> Float -> Transmission Estimate
 makeTransmission sender hunter seed number time =
     let
+        h : Float -> Float
         h n =
             hash01 seed (12000 + number * 6 + n)
 
+        dx : Float
         dx =
             hunter.x - sender.x + (h 1 - 0.5) * 1200
 
+        dy : Float
         dy =
             hunter.y - sender.y + (h 2 - 0.5) * 1200
 
+        sector : Int
         sector =
             modBy 8 (round (atan2 dx dy * 4 / pi) + 8)
 
+        km : Float
         km =
             M.max 1 (toFloat (round (M.hypot2 dx dy / 1000)))
 
+        angle : Float
         angle =
             toFloat sector * pi / 4
     in
@@ -202,6 +213,7 @@ lampLit m =
     case morseScript m.estimate.text of
         Just script ->
             let
+                phase : Float
                 phase =
                     M.remainder (m.elapsed / dotSeconds) script.period
             in
@@ -222,9 +234,11 @@ copyRepeats : Script -> Float -> Float -> Float -> Int -> Int -> Int -> Int
 copyRepeats script from to since repeat last copied =
     if repeat <= last then
         let
+            base : Float
             base =
                 toFloat repeat * script.period
 
+            copy : Int -> Span -> Int -> Int
             copy i letter bits =
                 if from < base + letter.end && base + letter.end <= to + 1.0e-9 && since - 1.0e-9 <= (base + letter.start) * dotSeconds then
                     Bitwise.or bits (bit i)
@@ -245,6 +259,7 @@ Says whether the message was delivered by this step.
 copyLamp : Float -> Bool -> Transmission { e | text : String } -> ( Bool, Transmission { e | text : String } )
 copyLamp seconds inView m =
     let
+        moved : { completedAt : Maybe Float, copied : Int, delivered : Bool, elapsed : Float, estimate : { e | text : String }, since : Maybe Float }
         moved =
             { m | elapsed = m.elapsed + seconds }
     in
@@ -253,24 +268,30 @@ copyLamp seconds inView m =
 
     else
         let
+            since : Float
             since =
                 Maybe.withDefault m.elapsed m.since
 
+            watched : { completedAt : Maybe Float, copied : Int, delivered : Bool, elapsed : Float, estimate : { e | text : String }, since : Maybe Float }
             watched =
                 { moved | since = Just since }
         in
         case ( m.delivered, morseScript m.estimate.text ) of
             ( False, Just script ) ->
                 let
+                    from : Float
                     from =
                         m.elapsed / dotSeconds
 
+                    to : Float
                     to =
                         watched.elapsed / dotSeconds
 
+                    copied : Int
                     copied =
                         copyRepeats script from to since (floor (from / script.period)) (floor (to / script.period)) m.copied
 
+                    delivered : Bool
                     delivered =
                         copied == bit (List.length script.letters) - 1
                 in
@@ -296,9 +317,11 @@ copyPercent m =
     case morseScript m.estimate.text of
         Just script ->
             let
+                letters : Int
                 letters =
                     List.length script.letters
 
+                copied : Int
                 copied =
                     List.range 0 (letters - 1) |> List.filter (\i -> M.truthy (toFloat (Bitwise.and m.copied (bit i)))) |> List.length
             in
@@ -343,19 +366,24 @@ matchingBearing pin observer time contacts =
 
         Just p ->
             let
+                radius : Float
                 radius =
                     reportRadius p time
 
+                matches : Bearing -> Bool
                 matches c =
                     case ( c.passiveAt, c.passiveBearing ) of
                         ( Just at, Just passiveBearing ) ->
                             let
+                                dx : Float
                                 dx =
                                     p.x - Maybe.withDefault observer.x c.passiveX
 
+                                dy : Float
                                 dy =
                                     p.y - Maybe.withDefault observer.y c.passiveY
 
+                                range : Float
                                 range =
                                     M.hypot2 dx dy
                             in
@@ -364,6 +392,7 @@ matchingBearing pin observer time contacts =
 
                             else
                                 let
+                                    halfWidth : Float
                                     halfWidth =
                                         asin (radius / range) * 180 / pi + 4
                                 in
@@ -389,21 +418,27 @@ type alias LampFix =
 alliedFix : { a | id : String } -> { b | id : String, x : Float, y : Float, depth : Float, heading : Float, speed : Float } -> Float -> Float -> LampFix
 alliedFix sender target time number =
     let
+        x : Float
         x =
             10 * toFloat (round (target.x / 10))
 
+        y : Float
         y =
             10 * toFloat (round (target.y / 10))
 
+        depth : Float
         depth =
             toFloat (round target.depth)
 
+        course : Float
         course =
             M.remainder (toFloat (round target.heading) + 360) 360
 
+        speed : Float
         speed =
             toFloat (round target.speed)
 
+        hemisphere : String -> String -> Float -> String
         hemisphere negative positive v =
             (if v < 0 then
                 negative

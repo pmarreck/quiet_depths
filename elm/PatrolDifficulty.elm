@@ -70,6 +70,7 @@ update msg model =
             case String.toFloat raw of
                 Just parsed ->
                     let
+                        level : Float
                         level =
                             clamp slider.min slider.max parsed
                     in
@@ -95,6 +96,7 @@ update msg model =
 view : String -> Model -> Html Msg
 view playtime model =
     let
+        range : Slider -> Html Msg
         range slider =
             label []
                 [ text slider.label
@@ -112,6 +114,7 @@ view playtime model =
                 , small [] [ text (slider.low ++ " ↔ " ++ slider.high) ]
                 ]
 
+        checkbox : Switch -> Html Msg
         checkbox switch =
             label [] <|
                 [ text switch.label

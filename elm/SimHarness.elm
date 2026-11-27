@@ -58,6 +58,7 @@ run request =
 
         Just decoder ->
             let
+                step : D.Value -> ( List E.Value, Maybe String ) -> ( List E.Value, Maybe String )
                 step value ( done, failure ) =
                     case failure of
                         Just _ ->

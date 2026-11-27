@@ -69,9 +69,11 @@ suspicionLabel level ships =
 leaveClue : Float -> Clue -> Watcher a -> Watcher a
 leaveClue amount observed v =
     let
+        square : Float
         square =
             600
 
+        center : Float -> Float
         center c =
             (toFloat (floor (c / square)) + 0.5) * square
     in
@@ -88,9 +90,11 @@ imagerClue s mode profile beat v =
 
     else
         let
+            direct : Bool
             direct =
                 Sonar.scanSector s v mode (Sonar.range profile)
 
+            risk : Float
             risk =
                 Sonar.exposure profile
                     * (if direct then
@@ -102,6 +106,7 @@ imagerClue s mode profile beat v =
                     * s.difficulty.pingDetection
                     * s.difficulty.detection
 
+            key : Float
             key =
                 List.foldl (\unit k -> toFloat (M.imul (M.toInt32 k) 31) + toFloat unit) (beat * 157) (codePointUnits v.id)
         in
@@ -148,18 +153,23 @@ searchClue s dt maybeClue v =
 
         Just clue ->
             let
+                dx : Float
                 dx =
                     clue.x - v.x
 
+                dy : Float
                 dy =
                     clue.y - v.y
 
+                turned : Watcher w
                 turned =
                     if M.hypot2 dx dy > 140 then
                         let
+                            course : Float
                             course =
                                 atan2 dx dy * 180 / pi
 
+                            turn : Float
                             turn =
                                 M.remainder (course - v.heading + 540) 360 - 180
                         in
@@ -168,9 +178,11 @@ searchClue s dt maybeClue v =
                     else
                         v
 
+                sub : Bool
                 sub =
                     v.kind == Submarine
 
+                next : Float
                 next =
                     case turned.nextInquiry of
                         Just n ->
@@ -185,6 +197,7 @@ searchClue s dt maybeClue v =
                                     9
                                   )
 
+                waiting : Watcher w
                 waiting =
                     { turned | nextInquiry = Just next }
             in

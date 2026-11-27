@@ -19,9 +19,11 @@ the knot band is inclusive. Sonar below its working threshold earns nothing.
 scanRate : SurveyPass -> SurveyCriteria -> Float
 scanRate pass c =
     let
+        speed : Float
         speed =
             M.abs pass.speed
 
+        inside : Bool
         inside =
             pass.range < c.horizontalRange && pass.vertical < c.verticalRange && c.slowestKnots <= speed && speed <= c.fastestKnots
     in

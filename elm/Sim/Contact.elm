@@ -25,6 +25,7 @@ type Sighting
 sightings : List Sighting
 sightings =
     let
+        from : Sighting -> List Sighting
         from s =
             s
                 :: (case s of
@@ -130,6 +131,7 @@ safe integer. The arithmetic stays in floats: Elm's `//` truncates through
 designation : Float -> String
 designation index =
     let
+        letters : Float -> String -> String
         letters column acc =
             if column <= 0 then
                 acc
@@ -211,6 +213,7 @@ defaulted key =
 savedFix : D.Decoder SavedFix
 savedFix =
     let
+        sigma : String -> D.Decoder (Maybe Float)
         sigma key =
             defaulted key |> check "an uncertainty at or above zero" (Maybe.withDefault 0 >> (\n -> n >= 0))
     in
@@ -292,6 +295,7 @@ decoder now =
 passiveComplete : Contact -> Bool
 passiveComplete c =
     let
+        isFinite : Float -> Bool
         isFinite n =
             not (isNaN n || isInfinite n)
     in
@@ -312,6 +316,7 @@ passiveComplete c =
 encode : Contact -> E.Value
 encode c =
     let
+        field : String -> (a -> E.Value) -> Maybe a -> Maybe ( String, E.Value )
         field key enc =
             Maybe.map (\v -> ( key, enc v ))
     in
@@ -349,6 +354,7 @@ encode c =
 encodeFix : SavedFix -> E.Value
 encodeFix f =
     let
+        field : String -> (a -> E.Value) -> Maybe a -> Maybe ( String, E.Value )
         field key enc =
             Maybe.map (\v -> ( key, enc v ))
     in

@@ -155,6 +155,7 @@ severity r s =
 
         Repairing ->
             let
+                underlying : Reading
                 underlying =
                     { r | repair = 0 }
             in

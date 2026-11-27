@@ -109,6 +109,7 @@ update msg model =
 give : Float -> Bool -> Model -> ( Model, Cmd Msg )
 give amount detent model =
     let
+        seq : Int
         seq =
             model.seq + 1
     in
@@ -133,9 +134,11 @@ view model =
 
         Just r ->
             let
+                axis : String
                 axis =
                     model.flags.axis
 
+                nudgeButtons : Reading -> Bool -> List (Html Msg)
                 nudgeButtons reading before =
                     model.flags.nudges
                         |> List.filter (\n -> n.before == before)

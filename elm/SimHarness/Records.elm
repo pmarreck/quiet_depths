@@ -48,6 +48,7 @@ observation =
 track : D.Decoder Tracks.Track
 track =
     let
+        known : List a -> (a -> String) -> D.Decoder a
         known values name =
             D.string |> D.andThen (\given -> List.filter (\v -> name v == given) values |> List.head |> Maybe.map D.succeed |> Maybe.withDefault (D.fail given))
     in

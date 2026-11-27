@@ -129,6 +129,7 @@ store role b w =
     case role of
         Boat ->
             let
+                s : Traffic t c r
                 s =
                     w.s
             in
@@ -136,6 +137,7 @@ store role b w =
 
         Site ->
             let
+                s : Traffic t c r
                 s =
                     w.s
             in

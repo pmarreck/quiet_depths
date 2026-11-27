@@ -26,6 +26,7 @@ single remaining round belongs to the tube that finishes reloading first.
 tubes : { a | time : Float, torps : Int, portReadyAt : Float, starboardReadyAt : Float } -> Tubes
 tubes s =
     let
+        first : Tube
         first =
             if s.portReadyAt == s.starboardReadyAt then
                 if modBy 2 s.torps == 1 then
@@ -40,6 +41,7 @@ tubes s =
             else
                 Starboard
 
+        readyAt : Tube -> Float
         readyAt tube =
             case tube of
                 Port ->
@@ -48,6 +50,7 @@ tubes s =
                 Starboard ->
                     s.starboardReadyAt
 
+        remaining : Tube -> Maybe Float
         remaining tube =
             if s.torps > 1 || (s.torps == 1 && tube == first) then
                 Just (M.max 0 (readyAt tube - s.time))
@@ -80,8 +83,10 @@ exitPitch current requested age elapsed duration =
 
     else
         let
+            remaining : Float -> Float
             remaining time =
                 let
+                    t : Float
                     t =
                         M.min 1 (2 * (duration - time) / duration)
                 in

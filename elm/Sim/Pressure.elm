@@ -54,9 +54,11 @@ type alias Boat a r =
 damageHull : Float -> Boat a r -> Boat a r
 damageHull amount s =
     let
+        limits : { r | hull : Float }
         limits =
             s.repairLimits
 
+        part : Equipment.Part
         part =
             Equipment.damage amount { condition = s.hull, limit = limits.hull }
     in
@@ -66,12 +68,15 @@ damageHull amount s =
 updatePressure : Float -> Boat a r -> Boat a r
 updatePressure dt s0 =
     let
+        level : Int
         level =
             pressureLevel s0
 
+        announced : Boat a r
         announced =
             if level /= s0.pressureAlarm then
                 let
+                    logged : Boat a r
                     logged =
                         if level == 2 then
                             Mechanics.log "CRITICAL DEPTH. Pressure bulkheads at risk. Rise now!" Damage s0
@@ -87,6 +92,7 @@ updatePressure dt s0 =
             else
                 s0
 
+        s1 : Boat a r
         s1 =
             { announced
                 | criticalExposure =
@@ -102,12 +108,14 @@ updatePressure dt s0 =
 
     else
         let
+            excess : Float
             excess =
                 s1.depth / depthLimit s1 - 1
 
             ( leakRoll, rng1 ) =
                 rand s1.rng
 
+            s2 : Boat a r
             s2 =
                 if leakRoll < negate (expm1 (negate dt * (0.012 + 0.075 * excess))) then
                     let
@@ -126,14 +134,17 @@ updatePressure dt s0 =
                 ( implodeRoll, rng3 ) =
                     rand s2.rng
 
+                s3 : Boat a r
                 s3 =
                     { s2 | rng = rng3 }
             in
             if implodeRoll < negate (expm1 (negate dt * (excess - 0.12) * 0.035)) then
                 let
+                    text : String
                     text =
                         "Pressure hull imploded beyond the damaged sub’s depth tolerance."
 
+                    lost : Boat a r
                     lost =
                         damageHull 100 s3
                             |> (\b -> { b | status = Lost, imploded = True, shock = 2 })

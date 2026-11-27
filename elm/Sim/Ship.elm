@@ -322,6 +322,7 @@ point3 p =
 encode : Ship -> E.Value
 encode s =
     let
+        field : String -> (a -> E.Value) -> Maybe a -> Maybe ( String, E.Value )
         field key enc =
             Maybe.map (\v -> ( key, enc v ))
     in

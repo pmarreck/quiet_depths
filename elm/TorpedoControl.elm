@@ -153,6 +153,7 @@ hint target =
 tubeView : Tube -> Html msg
 tubeView tube =
     let
+        state : TubeState
         state =
             tubeState tube
     in

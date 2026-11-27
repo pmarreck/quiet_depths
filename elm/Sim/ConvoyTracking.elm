@@ -36,6 +36,7 @@ trackingConvoy s c =
 
     else
         let
+            range : Float
             range =
                 c.listeningRange * Equipment.operatingFraction s.sonar
         in

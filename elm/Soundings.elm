@@ -90,9 +90,11 @@ initial =
 view : Reading -> Html Reading
 view r =
     let
+        level : Clearance
         level =
             clearance r.belowKeel
 
+        look : { caution : Bool, danger : Bool }
         look =
             styling level
     in

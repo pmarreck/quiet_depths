@@ -42,7 +42,7 @@ test('the status line and its dot are red for bad news, gold for lesser damage a
  const body=elm.match(/\nseverity r s =\n {4}case s of\n([\s\S]*?)\n\n\nseverityColor/)[1];
  const arms=Object.fromEntries([...body.matchAll(/^ {8}(\w+) ->\n {12}(Alarm|Caution|Clear)$/gm)].map(m=>[m[1],m[2]]));
  assert.deepEqual(arms,{FuelFire:'Alarm',FuelLeak:'Alarm',Flooding:'Alarm',PressureHullDamaged:'Alarm',OuterHullDamaged:'Caution',SubsystemDamage:'Caution',Nominal:'Clear'});
- assert.match(body,/ {8}Repairing ->\n {12}let\n {16}underlying =\n {20}\{ r \| repair = 0 \}\n {12}in\n {12}case severity underlying \(status underlying\) of\n {16}Clear ->\n {20}Caution\n\n {16}worst ->\n {20}worst$/,
+ assert.match(body,/ {8}Repairing ->\n {12}let\n {16}underlying : Reading\n {16}underlying =\n {20}\{ r \| repair = 0 \}\n {12}in\n {12}case severity underlying \(status underlying\) of\n {16}Clear ->\n {20}Caution\n\n {16}worst ->\n {20}worst$/,
   'damage control takes the color of the worst fault it is working on, and gold once only the work remains');
  const colors=Object.fromEntries([...elm.matchAll(/^ {8}(Alarm|Caution|Clear) ->\n {12}"(var\(--\w+\))"$/gm)].map(m=>[m[1],m[2]]));
  assert.deepEqual(colors,{Alarm:'var(--red)',Caution:'var(--gold)',Clear:'var(--green)'});

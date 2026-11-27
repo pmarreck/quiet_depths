@@ -4,18 +4,13 @@ module Sim.Environment exposing
     , Environment
     , Phase
     , Sky
-    , Soundings
     , Strike
     , Weather
     , WeatherId
-    , boatSurfacePose
     , defaultSeed
     , environmentAt
     , makeEnvironment
     , phaseName
-    , scopePosition
-    , scopeWashed
-    , soundings
     , timeHours
     , timeIds
     , weather
@@ -24,16 +19,15 @@ module Sim.Environment exposing
     )
 
 {-| The patrol's weather and light: fronts that change every five minutes,
-the sun and moon, morning fog, how far a lookout can see, lightning, and
-whether a wave washes over the periscope lens.
+the sun and moon, morning fog, how far a lookout can see, and lightning.
+What the boat's instruments register in these conditions is in
+`Sim.BoatSensors`.
 -}
 
 import Bitwise
-import Sim.HullDesign exposing (design)
 import Sim.Math as M
 import Sim.PatrolCalendar as Calendar
-import Sim.Periscope exposing (Scope, scopeEyeHeight)
-import Sim.SurfaceMotion exposing (Point, Pose, Sea, boatPoint, hash01, surfaceHeight, surfaceMotion)
+import Sim.SurfaceMotion exposing (hash01)
 
 
 type WeatherId
@@ -49,6 +43,7 @@ must be given its place in this chain before the module compiles.
 weatherIds : List WeatherId
 weatherIds =
     let
+        from : WeatherId -> List WeatherId
         from id =
             id
                 :: (case id of
@@ -157,6 +152,7 @@ random time and weather, and whether fronts change.
 makeEnvironment : Float -> { timeOfDay : Maybe String, weather : Maybe String, changing : Bool } -> Config
 makeEnvironment seed options =
     let
+        startHour : Float
         startHour =
             if options.timeOfDay == Just "random" then
                 nth (floor (hash01 seed 750 * 4)) timeIds |> Maybe.andThen timeHours |> Maybe.map .hour |> Maybe.withDefault (0 / 0)
@@ -164,6 +160,7 @@ makeEnvironment seed options =
             else
                 options.timeOfDay |> Maybe.andThen timeHours |> Maybe.map .hour |> Maybe.withDefault 18
 
+        startWeather : WeatherId
         startWeather =
             if options.weather == Just "random" then
                 nth (floor (hash01 seed 751 * 4)) weatherIds |> Maybe.withDefault Clear
@@ -261,6 +258,7 @@ mix a b t =
 smooth : Float -> Float -> Float -> Float
 smooth a b v =
     let
+        t : Float
         t =
             M.clamp 0 1 ((v - a) / (b - a))
     in
@@ -275,9 +273,11 @@ noOptions =
 environmentAt : Sky a -> Environment
 environmentAt s =
     let
+        cfg : Config
         cfg =
             Maybe.withDefault (makeEnvironment defaultSeed noOptions) s.environment
 
+        time : Float
         time =
             if M.truthy s.time then
                 s.time
@@ -285,6 +285,7 @@ environmentAt s =
             else
                 0
 
+        idAt : Float -> WeatherId
         idAt n =
             if n <= 0 then
                 cfg.startWeather
@@ -295,6 +296,7 @@ environmentAt s =
         ( earlier, later ) =
             if cfg.changing then
                 let
+                    slot : Float
                     slot =
                         toFloat (floor (time / 300))
                 in
@@ -303,14 +305,17 @@ environmentAt s =
             else
                 ( idAt 0, idAt 0 )
 
+        a : Weather
         a =
             weather earlier
 
+        b : Weather
         b =
             weather later
 
         -- Before the first change both sides are the starting weather, so
         -- blending them changes nothing.
+        blend : Float
         blend =
             if cfg.changing then
                 smooth 0 75 (M.remainder time 300)
@@ -318,27 +323,35 @@ environmentAt s =
             else
                 0
 
+        mixed : (Weather -> Float) -> Float
         mixed field =
             mix (field a) (field b) blend
 
+        hour : Float
         hour =
             M.remainder (M.remainder (cfg.startHour + time * 24 / Calendar.daySeconds) 24 + 24) 24
 
+        angle : Float
         angle =
             (hour - 6) * pi / 12
 
+        sunAltitude : Float
         sunAltitude =
             sin angle
 
+        daylight : Float
         daylight =
             smooth -0.14 0.18 sunAltitude
 
+        rain : Float
         rain =
             mixed .rain
 
+        mist : Float
         mist =
             hash01 cfg.seed (8150 + toFloat (floor ((cfg.startHour + time * 24 / Calendar.daySeconds) / 24)))
 
+        fog : Float
         fog =
             if mist < 0.46 then
                 (1 - smooth 0.05 0.55 rain) * smooth 4.5 5.75 hour * (1 - smooth 7 9 hour) * (0.64 + 0.3 * mist / 0.46)
@@ -346,36 +359,46 @@ environmentAt s =
             else
                 0
 
+        visibility : Float
         visibility =
             mixed .visibility * (1 - 0.79 * fog)
 
+        cloud : Float
         cloud =
             mixed .cloud
 
+        calendar : Calendar.Day
         calendar =
             Calendar.patrolCalendar (Maybe.withDefault (toFloat (Calendar.sailingDay cfg.seed)) cfg.startDay) cfg.startHour time
 
+        lunarAngle : Float
         lunarAngle =
             angle - 2 * pi * calendar.cycle
 
+        moonDirection : Direction
         moonDirection =
             { x = cos lunarAngle, y = sin lunarAngle, z = -0.32 * cos (2 * pi * calendar.cycle) }
 
+        clearLight : Float
         clearLight =
             (1 - cloud) ^ 2 * (1 - fog)
 
+        waveScale : Float
         waveScale =
             mixed .waveScale
 
+        flash : Float
         flash =
             List.foldl
                 (\strike brightest ->
                     let
+                        age : Float
                         age =
                             time - strike.time
                     in
                     if age >= 0 && age < 0.75 then
                         let
+                            pulse : Float
                             pulse =
                                 M.exp (negate age * 13) + 0.75 * M.exp (negate (((age - 0.22) / 0.05) ^ 2))
                         in
@@ -456,37 +479,3 @@ environmentAt s =
             6
     , flash = flash
     }
-
-
-{-| How the boat rides the sea in these conditions.
--}
-boatSurfacePose : { a | x : Float, y : Float, heading : Float, depth : Float, pitch : Float } -> Sea b -> Float -> Pose
-boatSurfacePose =
-    surfaceMotion
-
-
-{-| Where the periscope's eye is, raised as far as it has traveled.
--}
-scopePosition : Pose -> Scope a -> Point
-scopePosition pose s =
-    boatPoint pose { side = 0, forward = negate design.scopeZ, down = negate (scopeEyeHeight s) }
-
-
-{-| Whether the lens is under the passing wave, with a hand's breadth of spray.
--}
-scopeWashed : { a | scope : Bool, scopeTravel : Maybe Float, x : Float, y : Float, heading : Float, depth : Float, pitch : Float, time : Float } -> Environment -> Bool
-scopeWashed s e =
-    let
-        eye =
-            scopePosition (boatSurfacePose s e s.time) s
-    in
-    negate eye.depth <= surfaceHeight eye.x eye.y s.time e + 0.15
-
-
-type alias Soundings =
-    { waterDepth : Float, referenceDepth : Float, belowKeel : Float, keelOffset : Float }
-
-
-soundings : Float -> Float -> Float -> Soundings
-soundings waterDepth referenceDepth keelOffset =
-    { waterDepth = waterDepth, referenceDepth = referenceDepth, belowKeel = waterDepth - referenceDepth - keelOffset, keelOffset = keelOffset }

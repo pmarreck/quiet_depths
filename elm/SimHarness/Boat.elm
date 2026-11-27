@@ -138,6 +138,7 @@ encodePose p =
 offset : D.Decoder Motion.Offset
 offset =
     let
+        along : String -> D.Decoder Float
         along key =
             D.maybe (D.field key D.float) |> D.map (Maybe.withDefault 0)
     in

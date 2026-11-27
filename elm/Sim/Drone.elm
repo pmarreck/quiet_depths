@@ -109,6 +109,7 @@ decoder =
         |> D.andThen
             (\parts ->
                 let
+                    limit : String -> Float -> D.Decoder Float
                     limit key part =
                         D.field key percent
                             |> D.map

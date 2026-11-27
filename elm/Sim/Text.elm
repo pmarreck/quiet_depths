@@ -25,6 +25,7 @@ point, the high surrogate of a pair, and an unpaired surrogate as itself.
 codePointUnits : String -> List Int
 codePointUnits text =
     let
+        points : List Int -> List Int
         points units =
             case units of
                 high :: low :: rest ->
@@ -52,12 +53,14 @@ unitOf : String -> Int
 unitOf unit =
     if fromUnit 0xD800 <= unit && unit <= fromUnit 0xDFFF then
         let
+            search : Int -> Int -> Int
             search low high =
                 if high <= low then
                     low
 
                 else
                     let
+                        mid : Int
                         mid =
                             (low + high) // 2
                     in
@@ -83,9 +86,11 @@ unitOf unit =
 split : Float -> ( Float, Float )
 split a =
     let
+        c : Float
         c =
             134217729 * a
 
+        high : Float
         high =
             c - (c - a)
     in
@@ -99,6 +104,7 @@ to the true product (Dekker's TwoProduct). The scale is a whole number below
 twoProduct : Float -> Float -> ( Float, Float )
 twoProduct a scale =
     let
+        p : Float
         p =
             a * scale
 
@@ -125,9 +131,11 @@ toFixed digits x =
 
     else
         let
+            scale : Float
             scale =
                 toFloat (10 ^ digits)
 
+            whole : Float
             whole =
                 toFloat (floor x)
 
@@ -137,12 +145,15 @@ toFixed digits x =
             -- The scaled fraction is exactly p + err; round it half up on
             -- the exact remainder. A value just below a whole number rounds
             -- up to it, so the floor of p serves even when err is negative.
+            below : Float
             below =
                 toFloat (floor p)
 
+            up : Bool
             up =
                 negate err <= p - below - 0.5
 
+            n : Float
             n =
                 whole
                     * scale
@@ -154,6 +165,7 @@ toFixed digits x =
                         0
                       )
 
+            text : String
             text =
                 String.padLeft (digits + 1) '0' (String.fromFloat n)
         in

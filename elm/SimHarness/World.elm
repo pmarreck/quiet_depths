@@ -5,6 +5,7 @@ module SimHarness.World exposing (function)
 
 import Json.Decode as D
 import Json.Encode as E
+import Sim.BoatSensors as Sensors
 import Sim.Coast as Coast
 import Sim.Environment as Env
 import Sim.PatrolCalendar as Calendar
@@ -236,6 +237,7 @@ function name =
                                 (List.map
                                     (\id ->
                                         let
+                                            w : Env.Weather
                                             w =
                                                 Env.weather id
                                         in
@@ -271,21 +273,21 @@ function name =
             Just (call1 boat encodeEnvironment Env.environmentAt)
 
         "environment.boatSurfacePose" ->
-            Just (call1 boat encodePose (\s -> Env.boatSurfacePose s (Env.environmentAt s) s.time))
+            Just (call1 boat encodePose (\s -> Sensors.boatSurfacePose s (Env.environmentAt s) s.time))
 
         "environment.scopePosition" ->
             Just
-                (D.map2 (\p s -> (\eye -> E.object [ ( "x", E.float eye.x ), ( "y", E.float eye.y ), ( "depth", E.float eye.depth ) ]) (Env.scopePosition p s))
+                (D.map2 (\p s -> (\eye -> E.object [ ( "x", E.float eye.x ), ( "y", E.float eye.y ), ( "depth", E.float eye.depth ) ]) (Sensors.scopePosition p s))
                     (arg 0 pose)
                     (D.maybe (arg 1 (D.map2 (\scope travel -> { scope = scope, scopeTravel = travel }) (D.field "scope" D.bool) (optional "scopeTravel" D.float))) |> D.map (Maybe.withDefault { scope = True, scopeTravel = Nothing }))
                 )
 
         "environment.scopeWashed" ->
-            Just (call1 boat E.bool (\s -> Env.scopeWashed s (Env.environmentAt s)))
+            Just (call1 boat E.bool (\s -> Sensors.scopeWashed s (Env.environmentAt s)))
 
         "environment.soundings" ->
             Just
-                (D.map3 (\w r k -> (\d -> E.object [ ( "waterDepth", E.float d.waterDepth ), ( "referenceDepth", E.float d.referenceDepth ), ( "belowKeel", E.float d.belowKeel ), ( "keelOffset", E.float d.keelOffset ) ]) (Env.soundings w r k))
+                (D.map3 (\w r k -> (\d -> E.object [ ( "waterDepth", E.float d.waterDepth ), ( "referenceDepth", E.float d.referenceDepth ), ( "belowKeel", E.float d.belowKeel ), ( "keelOffset", E.float d.keelOffset ) ]) (Sensors.soundings w r k))
                     (arg 0 D.float)
                     (arg 1 D.float)
                     (D.maybe (arg 2 D.float) |> D.map (Maybe.withDefault 5))

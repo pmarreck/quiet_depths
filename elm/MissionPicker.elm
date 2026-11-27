@@ -103,6 +103,7 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
+        conditions : Conditions
         conditions =
             model.conditions
     in
@@ -169,9 +170,11 @@ update msg model =
 view : Model -> Html Msg
 view model =
     let
+        longer : Bool
         longer =
             Difficulty.longPatrolEnabled model.difficulty
 
+        selectedMission : PatrolMission.Briefing
         selectedMission =
             PatrolMission.briefing model.selected
     in
@@ -212,6 +215,7 @@ view model =
 conditionMenu : String -> String -> String -> List Choice -> String -> (String -> Msg) -> Html Msg
 conditionMenu title elementId accessible choices current change =
     let
+        item : Choice -> Html Msg
         item choice =
             option [ value choice.id, selected (choice.id == current) ] [ text choice.name ]
     in
@@ -227,12 +231,15 @@ conditionMenu title elementId accessible choices current change =
 slotView : Model -> Slot -> Html Msg
 slotView model slot =
     let
+        number : String
         number =
             String.fromInt slot.id
 
+        action : String -> Msg -> Bool -> Html Msg
         action label msg unavailable =
             button [ type_ "button", attribute "aria-label" (label ++ " slot " ++ number), disabled (model.busy || unavailable), onClick msg ] [ text label ]
 
+        buttons : List (Html Msg)
         buttons =
             if model.confirm == Just slot then
                 [ span [] [ text ("Replace slot " ++ number ++ "?") ], action "Overwrite" (Confirm slot) False, action "Cancel" Cancel False ]
@@ -259,9 +266,11 @@ slotView model slot =
 missionButton : Bool -> Mission -> Mission -> Html Msg
 missionButton longer selected choice =
     let
+        mission : PatrolMission.Briefing
         mission =
             PatrolMission.briefing choice
 
+        active : Bool
         active =
             selected == choice
     in

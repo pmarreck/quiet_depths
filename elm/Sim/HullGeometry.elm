@@ -67,14 +67,17 @@ is kind body =
 hullParts : Body -> List Part
 hullParts body =
     let
+        pose : Body
         pose =
             { body | depth = Just (Maybe.withDefault 3 body.depth) }
 
+        part : Offset -> Offset -> Float -> Part
         part a b r =
             { a = pointOn pose a, b = pointOn pose b, r = r }
     in
     if is "carrier" body then
         let
+            end : Float
             end =
                 carrierSize.halfLength - carrierSize.halfBeam
         in
@@ -82,6 +85,7 @@ hullParts body =
 
     else
         let
+            sub : Bool
             sub =
                 is "sub" body || is "wreck" body || body.kind == Nothing
         in
@@ -90,6 +94,7 @@ hullParts body =
 
         else
             let
+                size : Float
                 size =
                     if is "fishing" body || is "surface" body then
                         0.38
@@ -120,33 +125,43 @@ dot a b =
 closestContact : Part -> Part -> Float -> Maybe Contact
 closestContact a b heading =
     let
+        u : V3
         u =
             vector a.b a.a
 
+        v : V3
         v =
             vector b.b b.a
 
+        w : V3
         w =
             vector a.a b.a
 
+        uu : Float
         uu =
             dot u u
 
+        vv : Float
         vv =
             dot v v
 
+        uv : Float
         uv =
             dot u v
 
+        uw : Float
         uw =
             dot u w
 
+        vw : Float
         vw =
             dot v w
 
+        det : Float
         det =
             uu * vv - uv * uv
 
+        t0 : Float
         t0 =
             if det > 1.0e-8 then
                 M.clamp 0 1 ((uv * vw - vv * uw) / det)
@@ -154,27 +169,35 @@ closestContact a b heading =
             else
                 0
 
+        k : Float
         k =
             M.clamp 0 1 ((uv * t0 + vw) / vv)
 
+        t : Float
         t =
             M.clamp 0 1 ((uv * k - uw) / uu)
 
+        dx : Float
         dx =
             w.x + t * u.x - k * v.x
 
+        dy : Float
         dy =
             w.y + t * u.y - k * v.y
 
+        dz : Float
         dz =
             w.z + t * u.z - k * v.z
 
+        d : Float
         d =
             M.hypot3 dx dy dz
 
+        overlap : Float
         overlap =
             a.r + b.r - d
 
+        toward : Float -> Float
         toward n =
             if M.truthy d then
                 n / d
@@ -187,9 +210,11 @@ closestContact a b heading =
 
     else
         let
+            lateralGap : Float
             lateralGap =
                 sqrt (M.max 0 ((a.r + b.r) ^ 2 - dz * dz)) - M.hypot2 dx dy
 
+            point : Point
             point =
                 { x = a.a.x + t * u.x - toward dx * a.r, y = a.a.y + t * u.y - toward dy * a.r, depth = a.a.depth + t * u.z - toward dz * a.r }
         in
@@ -205,6 +230,7 @@ closestContact a b heading =
 hullContact : Body -> Body -> Maybe Contact
 hullContact a b =
     let
+        reach : Float
         reach =
             if is "carrier" a || is "carrier" b then
                 225
@@ -212,6 +238,7 @@ hullContact a b =
             else
                 145
 
+        deepest : Maybe Contact -> Maybe Contact -> Maybe Contact
         deepest hit found =
             case ( hit, found ) of
                 ( Just h, Just f ) ->
@@ -262,9 +289,11 @@ weight body isSite =
 keelLimit : Body -> Maybe Coastline -> Float
 keelLimit body chart =
     let
+        sub : Bool
         sub =
             body.kind == Nothing || is "sub" body
 
+        scale : Float
         scale =
             if is "fishing" body then
                 0.38
@@ -275,6 +304,7 @@ keelLimit body chart =
             else
                 1
 
+        half : Float
         half =
             if is "carrier" body then
                 carrierSize.halfLength
@@ -285,6 +315,7 @@ keelLimit body chart =
             else
                 52 * scale
 
+        draft : Float
         draft =
             if sub then
                 5
@@ -292,8 +323,10 @@ keelLimit body chart =
             else
                 5 * scale
 
+        floorAt : Float -> Float
         floorAt forward =
             let
+                pose : Point
                 pose =
                     pointOn body (along forward)
             in
@@ -321,15 +354,19 @@ orZero n =
 pushOffShoal : { b | x : Float, y : Float } -> Float -> Maybe Coastline -> { b | x : Float, y : Float }
 pushOffShoal body overlap chart =
     let
+        bottom : Float -> Float -> Float
         bottom x y =
             Coast.chartDepth chart x y
 
+        dx : Float
         dx =
             (bottom (body.x + 1) body.y - bottom (body.x - 1) body.y) / 2
 
+        dy : Float
         dy =
             (bottom body.x (body.y + 1) - bottom body.x (body.y - 1)) / 2
 
+        slope : Float
         slope =
             dx * dx + dy * dy
     in
@@ -338,6 +375,7 @@ pushOffShoal body overlap chart =
 
     else
         let
+            scale : Float
             scale =
                 M.min ((overlap + 0.01) / slope) (30 / sqrt slope)
         in

@@ -51,6 +51,7 @@ gameEcho :
     -> Echo
 gameEcho boat shot time speed =
     let
+        nearBoat : Bool
         nearBoat =
             shot.enemy
                 && not shot.diverted
@@ -108,6 +109,7 @@ observe boat echo active tracks =
 
             else
                 let
+                    secondFix : Bool
                     secondFix =
                         active && track.fixes == 1 && track.activeAt < echo.time
 
@@ -118,12 +120,15 @@ observe boat echo active tracks =
                         else
                             ( track.x, track.y, track.time )
 
+                    dx : Float
                     dx =
                         echo.x - previousX
 
+                    dy : Float
                     dy =
                         echo.y - previousY
 
+                    fixed : Track
                     fixed =
                         if active && track.activeAt < echo.time then
                             { track | fixes = 2, activeAt = echo.time, activeX = echo.x, activeY = echo.y }
@@ -131,6 +136,7 @@ observe boat echo active tracks =
                         else
                             track
 
+                    course : Maybe Int
                     course =
                         if fixed.fixes == 2 && (M.truthy dx || M.truthy dy) then
                             Just (remainderBy 360 (round (atan2 dx dy * 180 / pi) + 360))
@@ -138,20 +144,24 @@ observe boat echo active tracks =
                         else
                             fixed.course
 
+                    arrival : Maybe Float
                     arrival =
                         if not echo.inboundRun || course == Nothing then
                             Nothing
 
                         else
                             let
+                                elapsed : Float
                                 elapsed =
                                     echo.time - previousAt
                             in
                             if elapsed > 0 then
                                 let
+                                    range : Float
                                     range =
                                         M.hypot2 (echo.x - boat.x) (echo.y - boat.y)
 
+                                    decrease : Float
                                     decrease =
                                         M.hypot2 (previousX - boat.x) (previousY - boat.y) - range
                                 in
@@ -164,6 +174,7 @@ observe boat echo active tracks =
                             else
                                 fixed.arrival
 
+                    updated : Track
                     updated =
                         { fixed | id = echo.id, time = echo.time, x = echo.x, y = echo.y, depth = echo.depth, speed = echo.speed, inboundRun = echo.inboundRun, course = course, arrival = arrival }
                 in

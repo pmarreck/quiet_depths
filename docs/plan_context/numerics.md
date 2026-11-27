@@ -81,3 +81,42 @@ about 25 operations), in three representations:
    exceptions, a 128-bit fixed-point `Dec` with no NaN or Infinity) but is
    pre-1.0 with its compiler being rewritten. Worth it only if known
    precision becomes the deciding goal.
+5. Our own number type with defined semantics, in two levels. Level 1 needs
+   no compiler fork: Elm allows kernel JavaScript only in `elm/` and
+   `elm-explorations/` packages, but the Nix build lays out `ELM_HOME`
+   itself and can supply a small package under such a name with an opaque
+   `Num` whose functions run in JavaScript or WASM (64-bit or wider
+   mantissas, exact rounding, no NaN, independent of JavaScript's number
+   quirks). Arithmetic stays prefix (`Num.add a b`). Level 2 is a compiler
+   fork adding `Num` to the `number` class so operators work; the code
+   generator runs after types are erased and always emits JavaScript `+`, so
+   this needs type-directed generation, weeks of Haskell. WASM matters less
+   than it seems: per operation the cost is the call and representing a wide
+   number as a JavaScript value, and kernel JavaScript has `Math.clz32`,
+   `Math.imul` and typed-array bit access too. Estimate, unmeasured: 80 to
+   150 times Float for a double-precision kernel `Num`, against 257 for the
+   26-bit pure-Elm one; below about 43 times (the cost of any function per
+   operation, measured with the `Real` wrapper) needs compiler inlining.
+
+## Comparing against the TypeScript with a tolerance (owner's proposal)
+
+A software type could be checked against the TypeScript by converting to
+Float and allowing a tolerance, without adding the type to the TypeScript.
+That works for smooth outputs (positions, speeds, noise). It fails at the
+simulation's thresholds (`distance < 48`, `hull > 0`, a draw `< chance`):
+a value within rounding of one takes the other branch and the outcome
+differs by a whole event, so each such case needs hand triage. Bit-exact
+comparison has none, and this port's one-ulp bugs (hypot, grouping, signed
+zeros) are exactly what a tolerance would hide. Measure before deciding:
+convert one ported module, run its differential tests with a tolerance, and
+count branch flips and the time per call.
+
+## The Elm compiler crash met while annotating (2026-11-27)
+
+Annotating a let binding with type variables its enclosing signature does
+not bind crashed Elm 0.19.2 in `Type/Solve.hs` ("thread blocked
+indefinitely in an MVar operation") where it should report a type error.
+The class is long known and open upstream (elm/compiler #2206, #2100,
+#1639, #2014, #2185, #2301, from 2017 on). Upstream fixes are rare and
+outside pull requests seldom merged, so a fix would mean carrying a patch in
+our own Nix-built compiler; not worth it unless the bug keeps costing work.

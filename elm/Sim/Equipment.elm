@@ -223,6 +223,7 @@ damage amount part =
 
     else
         let
+            condition : Float
             condition =
                 M.max 0 (part.condition - amount)
         in
@@ -276,15 +277,19 @@ relative to the distance from the hull, never less than 30 m.
 hitSection : { a | x : Float, y : Float, heading : Float } -> { b | x : Float, y : Float } -> Section
 hitSection boat hit =
     let
+        angle : Float
         angle =
             boat.heading * pi / 180
 
+        dx : Float
         dx =
             hit.x - boat.x
 
+        dy : Float
         dy =
             hit.y - boat.y
 
+        longitudinal : Float
         longitudinal =
             (dx * sin angle + dy * cos angle) / M.max 30 (M.hypot2 dx dy)
     in
@@ -317,6 +322,7 @@ hitSystem section roll =
                     else
                         ( systems, (roll - 0.8) / 0.2 )
 
+        count : Int
         count =
             List.length pool
     in

@@ -54,6 +54,7 @@ touchdownDamage impact =
 seabedWear : Float -> Float -> Float
 seabedWear effortKnots dt =
     let
+        effort : Float
         effort =
             M.abs effortKnots
     in

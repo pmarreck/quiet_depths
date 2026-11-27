@@ -40,6 +40,7 @@ tetherAttachment s =
 recoveryDock : Hull a -> Point
 recoveryDock s =
     let
+        p : Point
         p =
             boatPoint s { side = 6.8, forward = 0, down = 2.5 }
     in
@@ -53,18 +54,23 @@ type alias DroneStatus =
 droneStatus : { a | x : Float, y : Float, depth : Float, speed : Float } -> { d | x : Float, y : Float, depth : Float, mode : String, mobility : Maybe Float } -> DroneStatus
 droneStatus s d =
     let
+        deployed : Bool
         deployed =
             d.mode == "remote" || d.mode == "return"
 
+        distance : Float
         distance =
             separation s d
 
+        returnSpeed : Float
         returnSpeed =
             droneReturnSpeed d.mobility
 
+        outrunning : Bool
         outrunning =
             deployed && returnSpeed <= M.abs s.speed
 
+        canRecover : Bool
         canRecover =
             deployed && M.abs s.speed <= 3
     in

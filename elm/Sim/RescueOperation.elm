@@ -57,6 +57,7 @@ speed; holding once the depth error is also strictly inside the tolerance.
 stationKeeping : Float -> Float -> Float -> RescueCriteria -> StationKeeping
 stationKeeping range speed depthError c =
     let
+        onStation : Bool
         onStation =
             c.closestRange <= range && range <= c.farthestRange && M.abs speed <= c.fastestKnots
     in

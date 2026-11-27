@@ -60,9 +60,11 @@ and the closing `| 0` keeps the low 32 bits.
 imul : Int -> Int -> Int
 imul a b =
     let
+        aLow : Int
         aLow =
             Bitwise.and a 0xFFFF
 
+        bLow : Int
         bLow =
             Bitwise.and b 0xFFFF
     in
@@ -161,9 +163,11 @@ clamp low high value =
 hypot2 : Float -> Float -> Float
 hypot2 x y =
     let
+        a : Float
         a =
             abs x
 
+        b : Float
         b =
             abs y
     in
@@ -175,6 +179,7 @@ hypot2 x y =
 
     else
         let
+            largest : Float
             largest =
                 max a b
         in
@@ -197,12 +202,15 @@ hypot2 x y =
 hypot3 : Float -> Float -> Float -> Float
 hypot3 x y z =
     let
+        a : Float
         a =
             abs x
 
+        b : Float
         b =
             abs y
 
+        c : Float
         c =
             abs z
     in
@@ -214,6 +222,7 @@ hypot3 x y z =
 
     else
         let
+            largest : Float
             largest =
                 max a (max b c)
         in
@@ -237,12 +246,15 @@ hypot3 x y z =
 kahan : Float -> Float -> ( Float, Float ) -> ( Float, Float )
 kahan magnitude largest ( sum, compensation ) =
     let
+        n : Float
         n =
             magnitude / largest
 
+        summand : Float
         summand =
             n * n - compensation
 
+        preliminary : Float
         preliminary =
             sum + summand
     in
@@ -271,6 +283,7 @@ tanh x =
 
     else
         let
+            e2 : Float
             e2 =
                 e ^ (2 * x)
         in
@@ -300,9 +313,11 @@ remainder x y =
 
     else
         let
+            target : Float
             target =
                 abs y
 
+            reduce : Float -> Float
             reduce r =
                 if r < target then
                     r
@@ -310,6 +325,7 @@ remainder x y =
                 else
                     reduce (r - largestMultiple target r)
 
+            magnitude : Float
             magnitude =
                 reduce (abs x)
         in
@@ -325,6 +341,7 @@ remainder x y =
 largestMultiple : Float -> Float -> Float
 largestMultiple y r =
     let
+        grow : Float -> Float
         grow t =
             if t * 2 <= r && not (isInfinite (t * 2)) then
                 grow (t * 2)

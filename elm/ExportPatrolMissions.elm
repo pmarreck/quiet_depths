@@ -15,6 +15,7 @@ port catalog : E.Value -> Cmd msg
 encodeObjective : Objective -> E.Value
 encodeObjective objective =
     let
+        rule : String -> List ( String, E.Value ) -> E.Value
         rule kind fields =
             E.object (( "kind", E.string kind ) :: fields)
     in
@@ -91,6 +92,7 @@ encodeObjective objective =
 encodeEarlyEnd : EarlyEnd -> E.Value
 encodeEarlyEnd earlyEnd =
     let
+        rule : String -> List ( String, E.Value ) -> E.Value
         rule kind fields =
             E.object (( "kind", E.string kind ) :: fields)
     in
@@ -135,6 +137,7 @@ encodeSinking c =
 encodeMission : PatrolMission.Mission -> E.Value
 encodeMission mission =
     let
+        b : PatrolMission.Briefing
         b =
             PatrolMission.briefing mission
     in

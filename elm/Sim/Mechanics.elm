@@ -46,12 +46,15 @@ the draw in [0, 1) and the next state.
 rand : Int -> ( Float, Int )
 rand rng =
     let
+        a : Int
         a =
             Bitwise.xor rng (Bitwise.shiftLeftBy 13 rng)
 
+        b : Int
         b =
             Bitwise.xor a (Bitwise.shiftRightZfBy 17 a)
 
+        c : Int
         c =
             Bitwise.xor b (Bitwise.shiftLeftBy 5 b)
     in
@@ -127,48 +130,63 @@ normal, using the same centerline and radius as the capsule's mesh.
 capsuleContact : { a | x : Float, y : Float, depth : Float } -> { b | x : Float, y : Float, depth : Float, heading : Float, pitch : Float } -> Float -> Float -> Float -> Maybe CapsuleContact
 capsuleContact point body halfLength radius pointRadius =
     let
+        a : Float
         a =
             rad body.heading
 
+        sn : Float
         sn =
             sin a
 
+        cs : Float
         cs =
             cos a
 
+        cp : Float
         cp =
             cos (orZero body.pitch)
 
+        sp : Float
         sp =
             sin (orZero body.pitch)
 
+        dx : Float
         dx =
             point.x - body.x
 
+        dy : Float
         dy =
             point.y - body.y
 
+        dz : Float
         dz =
             point.depth - body.depth
 
+        horizontal : Float
         horizontal =
             dx * sn + dy * cs
 
+        forward : Float
         forward =
             horizontal * cp - dz * sp
 
+        side : Float
         side =
             dx * cs - dy * sn
 
+        along : Float
         along =
             forward - M.clamp (negate halfLength) halfLength forward
 
+        down : Float
         down =
             horizontal * sp + dz * cp
 
+        length : Float
         length =
             M.hypot3 side along down
 
+        penetration : Float
         penetration =
             radius + pointRadius - length
     in
@@ -199,18 +217,23 @@ tuning.
 propellerState : Float -> Float -> Float -> { rpm : Float, sigma : Float, cavitation : Float }
 propellerState speed depth health =
     let
+        rpm : Float
         rpm =
             speed * 13 * operatingFraction health
 
+        radius : Float
         radius =
             design.propellerRadius
 
+        omega : Float
         omega =
             rpm * pi / 30
 
+        q : Float
         q =
             0.5 * 1025 * ((speed * 0.514444) ^ 2 + (omega * radius) ^ 2)
 
+        sigma : Float
         sigma =
             if q > 0 then
                 (101325 + 1025 * 9.81 * M.max 0 (depth - radius) - 2300) / q

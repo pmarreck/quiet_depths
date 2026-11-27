@@ -142,12 +142,15 @@ interface, found by bisection.
 airWaterPath : Float -> Float -> Float -> Float
 airWaterPath horizontal airHeight waterDepth =
     let
+        r : Float
         r =
             M.abs horizontal
 
+        h : Float
         h =
             M.max 0 airHeight
 
+        d : Float
         d =
             M.max 0 waterDepth
     in
@@ -159,15 +162,18 @@ airWaterPath horizontal airHeight waterDepth =
 
     else
         let
+            bisect : Int -> Float -> Float -> ( Float, Float )
             bisect i lo hi =
                 if i == 48 then
                     ( lo, hi )
 
                 else
                     let
+                        x : Float
                         x =
                             (lo + hi) / 2
 
+                        derivative : Float
                         derivative =
                             x / (airSoundSpeed * hypot2 x h) - (r - x) / (waterSoundSpeed * hypot2 (r - x) d)
                     in
@@ -180,6 +186,7 @@ airWaterPath horizontal airHeight waterDepth =
             ( low, high ) =
                 bisect 0 0 r
 
+            crossing : Float
             crossing =
                 (low + high) / 2
         in
@@ -189,9 +196,11 @@ airWaterPath horizontal airHeight waterDepth =
 propagationTime : Source a -> Listener -> Float
 propagationTime source listener =
     let
+        horizontal : Float
         horizontal =
             hypot2 (source.x - listener.x) (source.y - listener.y)
 
+        depth : Float
         depth =
             M.max 0 (or 0 listener.depth)
     in
@@ -209,6 +218,7 @@ propagationTime source listener =
 spatialPan : { a | x : Float, y : Float } -> Listener -> Float
 spatialPan source listener =
     let
+        absolute : Float
         absolute =
             atan2 (source.x - listener.x) (source.y - listener.y)
     in
@@ -218,17 +228,21 @@ spatialPan source listener =
 perceivedSound : Source a -> Listener -> Perceived
 perceivedSound source listener =
     let
+        depth : Float
         depth =
             M.max 0 (or 0 listener.depth)
 
+        horizontal : Float
         horizontal =
             hypot2 (source.x - listener.x) (source.y - listener.y)
 
+        distance : Float
         distance =
             hypot2 horizontal (or 0 source.depth - depth)
     in
     if airborne source.kind then
         let
+            under : Bool
             under =
                 depth > 1
         in
@@ -283,6 +297,7 @@ order they occur.
 update : Float -> Listener -> List (Heard a) -> ( List (Heard a), List (Event a) )
 update now listener sounds =
     let
+        listen : Heard a -> ( List (Heard a), Int, List (Event a) ) -> ( List (Heard a), Int, List (Event a) )
         listen source ( kept, count, events ) =
             let
                 ( sound, arrived ) =
@@ -291,12 +306,15 @@ update now listener sounds =
 
                     else
                         let
+                            perceived : Perceived
                             perceived =
                                 perceivedSound source listener
 
+                            heard : Heard a
                             heard =
                                 { source | heard = True, heardAt = Just now, perceived = Just perceived }
 
+                            blast : List (Event a)
                             blast =
                                 if source.kind == Blast then
                                     BlastAt heard perceived.distance :: events
@@ -318,6 +336,7 @@ update now listener sounds =
             else
                 ( kept, count, arrived )
 
+        settled : Int -> List (Heard a) -> Bool
         settled count list =
             case list of
                 [] ->

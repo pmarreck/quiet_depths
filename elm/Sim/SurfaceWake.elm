@@ -25,6 +25,19 @@ type alias Column =
     { forward : Float, top : Float, base : Float, beam : Float }
 
 
+{-| The leading crossing found so far, and how much of the boat is out.
+-}
+type alias Crossing =
+    { leading : Float, x : Float, y : Float, exposure : Float }
+
+
+{-| One station cut through the hull: its upper and lower points and their
+clearance above the water.
+-}
+type alias Cut =
+    { upper : Motion.Point, lower : Motion.Point, high : Float, low : Float }
+
+
 hullProfile : List Column
 hullProfile =
     List.map (\st -> { forward = negate st.z, top = st.radius, base = negate st.radius, beam = st.radius }) design.stations
@@ -37,12 +50,15 @@ sailProfile =
     List.map
         (\i ->
             let
+                angle : Float
                 angle =
                     toFloat i * pi / 8
 
+                cap : Float
                 cap =
                     design.sailRadius * sin angle
 
+                center : Float
                 center =
                     design.bridgeRoof - design.sailRadius - design.sailBarrel / 2
             in
@@ -76,6 +92,7 @@ spreads and how strong it is, or nothing when it is too deep or too slow.
 surfaceCrossing : Boat a c -> Sea b -> Maybe WakeSample
 surfaceCrossing s sea =
     let
+        speed : Float
         speed =
             M.abs s.speed
     in
@@ -84,32 +101,42 @@ surfaceCrossing s sea =
 
     else
         let
+            hull : Motion.Pose
             hull =
                 Motion.surfaceMotion s sea s.time
 
+            angle : Float
             angle =
                 s.heading * pi / 180
 
+            sign : Float
             sign =
                 M.sign s.speed
 
+            east : Float
             east =
                 sign * sin angle
 
+            north : Float
             north =
                 sign * cos angle
 
+            clearance : Motion.Point -> Float
             clearance p =
                 negate p.depth - surfaceHeight p.x p.y s.time sea
 
+            consider : Motion.Point -> Motion.Point -> Float -> Crossing -> Crossing
             consider a b f found =
                 let
+                    px : Float
                     px =
                         a.x + (b.x - a.x) * f
 
+                    py : Float
                     py =
                         a.y + (b.y - a.y) * f
 
+                    along : Float
                     along =
                         (px - s.x) * east + (py - s.y) * north
                 in
@@ -119,23 +146,29 @@ surfaceCrossing s sea =
                 else
                     found
 
+            section : Column -> Crossing -> ( Cut, Crossing )
             section col found =
                 let
+                    upper : Motion.Point
                     upper =
                         boatPoint hull { side = 0, forward = col.forward, down = negate col.top }
 
+                    lower : Motion.Point
                     lower =
                         boatPoint hull { side = 0, forward = col.forward, down = negate col.base }
 
+                    high : Float
                     high =
                         clearance upper
 
+                    low : Float
                     low =
                         clearance lower
                 in
                 ( { upper = upper, lower = lower, high = high, low = low }
                 , if high >= 0 && low <= 0 then
                     let
+                        met : Crossing
                         met =
                             consider upper
                                 lower
@@ -153,11 +186,13 @@ surfaceCrossing s sea =
                     found
                 )
 
+            only : Column -> Crossing -> Crossing
             only col found =
                 Tuple.second (section col found)
 
             -- The leading intersection usually falls between two model
             -- stations; a pitched-up bow can meet the water along its underside.
+            profile : List Column -> Crossing -> Crossing
             profile columns found =
                 case columns of
                     [] ->
@@ -170,6 +205,7 @@ surfaceCrossing s sea =
                                     ( b, cut ) =
                                         section col acc
 
+                                    withTop : Crossing
                                     withTop =
                                         if (a.high > 0) /= (b.high > 0) then
                                             consider a.upper b.upper (a.high / (a.high - b.high)) cut
@@ -177,6 +213,7 @@ surfaceCrossing s sea =
                                         else
                                             cut
 
+                                    withBottom : Crossing
                                     withBottom =
                                         if (a.low > 0) /= (b.low > 0) then
                                             consider a.lower b.lower (a.low / (a.low - b.low)) withTop
@@ -190,6 +227,7 @@ surfaceCrossing s sea =
                             rest
                             |> Tuple.second
 
+            scope : Crossing -> Crossing
             scope found =
                 if scopeExtension s > 0 && not (M.isZero s.systems.periscope) then
                     only { forward = negate design.scopeZ, top = scopeEyeHeight s, base = scopeEyeHeight s - 6, beam = 0.16 } found
@@ -197,6 +235,7 @@ surfaceCrossing s sea =
                 else
                     found
 
+            crossing : Crossing
             crossing =
                 { leading = -1 / 0, x = 0, y = 0, exposure = 0 }
                     |> profile hullProfile
@@ -214,6 +253,7 @@ surfaceCrossing s sea =
 
         else
             let
+                exposed : Float
                 exposed =
                     sqrt (crossing.exposure / design.hullRadius)
             in
@@ -243,6 +283,7 @@ boat breaks the surface.
 recordWake : Boat a c -> Sea b -> List WakeSample -> List WakeSample
 recordWake s sea wake =
     let
+        trimmed : List WakeSample
         trimmed =
             case wake of
                 first :: _ ->
@@ -255,6 +296,7 @@ recordWake s sea wake =
                 [] ->
                     wake
 
+        recent : Bool
         recent =
             case List.reverse trimmed of
                 last :: _ ->

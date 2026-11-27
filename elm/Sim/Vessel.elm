@@ -47,6 +47,7 @@ module compiles.
 kinds : List Kind
 kinds =
     let
+        from : Kind -> List Kind
         from kind =
             kind
                 :: (case kind of
@@ -82,6 +83,7 @@ sideName side =
 sides : List Side
 sides =
     let
+        from : Side -> List Side
         from side =
             side
                 :: (case side of

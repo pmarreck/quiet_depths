@@ -98,6 +98,7 @@ encodeTubes t =
 encodeDesign : E.Value
 encodeDesign =
     let
+        d : { bridgeEye : Float, bridgeRailRadius : Float, bridgeRoof : Float, bridgeZ : Float, hullRadius : Float, propellerBlades : Int, propellerPitch : Float, propellerRadius : Float, propellerZ : Float, sailBarrel : Float, sailRadius : Float, sailStretch : Float, scopeEye : Float, scopeZ : Float, shaftRadius : Float, stations : List HullDesign.Station, tubeDown : Float, tubeForward : Float, tubeSide : Float, year : Int }
         d =
             HullDesign.design
     in

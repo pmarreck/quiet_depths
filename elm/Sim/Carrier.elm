@@ -39,9 +39,11 @@ flood and stops her; further hits remove what buoyancy remains.
 registerCarrierHit : Carrier a -> Carrier a
 registerCarrierHit ship =
     let
+        hits : Int
         hits =
             ship.directHits + 1
 
+        hit : Carrier a
         hit =
             { ship
                 | directHits = hits
@@ -71,6 +73,7 @@ carrier keeps at least one point of hull.
 incidentalHull : { a | kind : Kind, hull : Float, directHits : Int } -> Float -> Float
 incidentalHull ship damage =
     let
+        lowest : Float
         lowest =
             if ship.kind == Surface Carrier && ship.directHits < fatalHits then
                 1

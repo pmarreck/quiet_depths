@@ -41,12 +41,15 @@ type alias Finding =
 disciplinaryFinding : Float -> List { v | name : String, military : Bool, side : Maybe String, playerDamaged : Bool, neutralHitAt : Maybe Float } -> Maybe Finding
 disciplinaryFinding seed ships =
     let
+        civilians : List { v | military : Bool, name : String, neutralHitAt : Maybe Float, playerDamaged : Bool, side : Maybe String }
         civilians =
             List.filter (\v -> not v.military && v.neutralHitAt /= Nothing) ships
 
+        allies : List { v | military : Bool, name : String, neutralHitAt : Maybe Float, playerDamaged : Bool, side : Maybe String }
         allies =
             List.filter (\v -> v.side == Just "friendly" && v.playerDamaged) ships
 
+        struck : String -> List { v | name : String, military : Bool, side : Maybe String, playerDamaged : Bool, neutralHitAt : Maybe Float } -> Maybe String
         struck heading vessels =
             if List.isEmpty vessels then
                 Nothing
@@ -99,9 +102,11 @@ hearWreck s source ships =
 
             else
                 let
+                    angle : Float
                     angle =
                         Mechanics.rad (Mechanics.bearing s source + (hash01 source.id 51 - 0.5) * 7)
 
+                    estimate : Float
                     estimate =
                         Mechanics.distance s source * (0.89 + 0.22 * hash01 source.id 52)
                 in

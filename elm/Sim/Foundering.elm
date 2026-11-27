@@ -33,6 +33,7 @@ profile kind =
 ease : Float -> Float -> Float -> Float
 ease from to value =
     let
+        t : Float
         t =
             M.max 0 (M.min 1 ((value - from) / (to - from)))
     in
@@ -45,15 +46,19 @@ farther onto its side and levels out along its length.
 founderingPose : SurfaceShip -> Float -> { roll : Float, pitch : Float, wave : Float }
 founderingPose kind drop =
     let
+        p : Profile
         p =
             profile kind
 
+        immersion : Float
         immersion =
             drop / p.scale
 
+        list : Float
         list =
             0.28 * ease 0 2 immersion + 0.72 * ease 2 16 immersion
 
+        deep : Float
         deep =
             ease (p.lastVisible + 3) (p.lastVisible + 40 * p.scale) drop
     in

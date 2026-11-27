@@ -116,18 +116,22 @@ type alias Propulsion =
 propulsion : Plant { a | dieselMode : DieselMode, targetSpeed : Float, silent : Bool } c -> Propulsion
 propulsion s =
     let
+        generator : Float
         generator =
             generatorOutput s
 
+        battery : Float
         battery =
             batteryOutput s
 
+        shaft : Float
         shaft =
             M.min (operatingFraction s.systems.engine) (operatingFraction s.systems.propeller)
     in
     case s.engine of
         Electric ->
             let
+                drive : Float
                 drive =
                     M.min battery shaft
             in
@@ -135,18 +139,23 @@ propulsion s =
 
         Diesel ->
             let
+                submerged : Float
                 submerged =
                     M.max 0 (M.min 1 ((s.depth - 1) / 4))
 
+                rating : Float -> Float -> Float
                 rating surface snorkeling =
                     surface + (snorkeling - surface) * submerged
 
+                dieselRating : Float
                 dieselRating =
                     rating surfaceKnots 13
 
+                space : Float
                 space =
                     M.max 0 (s.systems.batteryBank - s.battery)
 
+                charging : Float
                 charging =
                     if s.dieselMode == Charge && space > 0 then
                         operatingFraction s.systems.batteryBank
@@ -154,27 +163,33 @@ propulsion s =
                     else
                         0
 
+                reserve : Float
                 reserve =
                     charging * M.min 1 (space / 2)
 
+                drive : Float
                 drive =
                     M.min generator shaft
 
                 ( ahead, assistDrain ) =
                     if s.dieselMode == Assist && generator > 0 && battery > 0 then
                         let
+                            genKnots : Float
                             genKnots =
                                 drive * dieselRating
 
                             -- Shaft power goes roughly as speed cubed. Only demand above
                             -- the generator's capacity draws on the battery; both
                             -- sources share one motor.
+                            combined : Float
                             combined =
                                 cbrt (genKnots ^ 3 + (M.min battery shaft * electricKnots) ^ 3)
 
+                            assisted : Float
                             assisted =
                                 M.min (shaft * rating 22 17) combined
 
+                            demand : Float
                             demand =
                                 M.min
                                     (if s.silent then
@@ -189,11 +204,13 @@ propulsion s =
 
                     else
                         let
+                            allocated : Float
                             allocated =
                                 generator * (dieselRating - reserve * (dieselRating - rating 18.5 9))
                         in
                         ( M.min (shaft * dieselRating) allocated, 0 )
 
+                acceleration : Float
                 acceleration =
                     if reserve > 0 || assistDrain > 0 then
                         ahead / dieselRating
@@ -242,6 +259,7 @@ speed-power curve.
 energyDraw : Float -> Float -> Float -> { electric : Float, diesel : Float }
 energyDraw speed chargeRate assistDrain =
     let
+        knots : Float
         knots =
             M.abs speed
     in

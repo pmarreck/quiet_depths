@@ -40,6 +40,7 @@ type alias Approach =
 objectives : Mission -> List (Traffic a) -> List (Traffic a)
 objectives mission ships =
     let
+        keep : (Traffic a -> Bool) -> List (Traffic a)
         keep wanted =
             List.filter wanted ships
     in
@@ -79,9 +80,11 @@ included. Every mission but the covert transit also gets a pickup point.
 longPatrol : Mission -> Float -> Maybe Point -> List (Traffic a) -> Approach
 longPatrol mission seed site ships =
     let
+        goals : List (Traffic a)
         goals =
             objectives mission ships
 
+        points : List Point
         points =
             case site of
                 Just p ->
@@ -90,27 +93,34 @@ longPatrol mission seed site ships =
                 Nothing ->
                     List.map (\v -> { x = v.x, y = v.y }) goals
 
+        h : Float -> Float
         h n =
             hash01 seed (7100 + n)
 
+        count : Float
         count =
             toFloat (List.length points)
 
         ( meanX, meanY ) =
             List.foldl (\p ( mx, my ) -> ( mx + p.x / count, my + p.y / count )) ( 0, 0 ) points
 
+        angle : Float
         angle =
             h 0 * pi * 2
 
+        offset : Float
         offset =
             350 + 800 * h 1
 
+        x : Float
         x =
             meanX + cos angle * offset
 
+        y : Float
         y =
             meanY + sin angle * offset
 
+        margin : Float
         margin =
             if mission == Tiebreaker then
                 1200
@@ -118,15 +128,19 @@ longPatrol mission seed site ships =
             else
                 600
 
+        radius : Float
         radius =
             margin + List.foldl (\p widest -> M.max widest (M.hypot2 (p.x - x) (p.y - y))) 1400 points
 
+        startX : Float
         startX =
             meanX + (h 2 - 0.5) * 5600
 
+        startY : Float
         startY =
             List.foldl (\v lowest -> M.min lowest v.y) meanY ships - 6600 - 1300 * h 3
 
+        heading : Float
         heading =
             M.remainder (atan2 (x - startX) (y - startY) * 180 / pi + 360) 360
     in
@@ -178,6 +192,7 @@ advanceApproach dt timeRate search =
 
     else
         let
+            active : Float
             active =
                 search.activeSeconds + dt / M.max 1 timeRate
         in
@@ -206,6 +221,7 @@ recognized twice or outside them. Field types are the decoder's to check.
 validSearch : Mission -> Maybe Point -> List (Traffic a) -> Float -> SearchArea -> Bool
 validSearch mission site ships time a =
     let
+        expected : List String
         expected =
             if site == Nothing then
                 List.map .id (objectives mission (List.filter (not << .incidental) ships))
@@ -213,6 +229,7 @@ validSearch mission site ships time a =
             else
                 []
 
+        finite : Float -> Bool
         finite v =
             not (isNaN v || isInfinite v)
     in

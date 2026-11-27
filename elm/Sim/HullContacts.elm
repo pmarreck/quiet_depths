@@ -18,15 +18,18 @@ import Sim.Math as M
 import Sim.Mechanics as Mechanics exposing (LogKind(..))
 import Sim.PatrolReports as Reports
 import Sim.Periscope as Periscope
+import Sim.Ship exposing (Ship)
 import Sim.Vessel exposing (Kind(..), SurfaceShip(..))
 
 
 resolvePair : Hurt t c r -> Role -> Role -> Work t c r -> Work t c r
 resolvePair hurt roleA roleB work =
     let
+        a : Body
         a =
             bodyOf roleA work
 
+        b : Body
         b =
             bodyOf roleB work
     in
@@ -36,20 +39,25 @@ resolvePair hurt roleA roleB work =
 
         Just hit ->
             let
+                isSite : Role -> Bool
                 isSite role =
                     role == Site
 
+                wa : Float
                 wa =
                     weight a (isSite roleA)
 
+                wb : Float
                 wb =
                     weight b (isSite roleB)
 
+                sum : Float
                 sum =
                     wa + wb
 
                 -- Only a submerged hull gives way vertically. The TypeScript also
                 -- excludes the site, but a site weighs nothing unless it floats.
+                submerged : Body -> Float -> Float
                 submerged x w =
                     if x.kind == Nothing || is "sub" x then
                         w
@@ -57,15 +65,19 @@ resolvePair hurt roleA roleB work =
                     else
                         0
 
+                va : Float
                 va =
                     submerged a wa
 
+                vb : Float
                 vb =
                     submerged b wb
 
+                move0 : Float
                 move0 =
                     hit.overlap + 0.015
 
+                da0 : Float
                 da0 =
                     if M.truthy va then
                         move0 * hit.nd * va / (va + vb)
@@ -73,6 +85,7 @@ resolvePair hurt roleA roleB work =
                     else
                         0
 
+                db0 : Float
                 db0 =
                     if M.truthy vb then
                         negate move0 * hit.nd * vb / (va + vb)
@@ -80,8 +93,10 @@ resolvePair hurt roleA roleB work =
                     else
                         0
 
+                blocked : Body -> Float -> Bool
                 blocked x d =
                     let
+                        depth : Float
                         depth =
                             Maybe.withDefault nan x.depth
                     in
@@ -90,6 +105,7 @@ resolvePair hurt roleA roleB work =
                 ( n, move, ( da, db ) ) =
                     if not (M.truthy (va + vb)) || blocked a da0 || blocked b db0 then
                         let
+                            len : Float
                             len =
                                 M.hypot2 hit.nx hit.ny
                         in
@@ -98,6 +114,7 @@ resolvePair hurt roleA roleB work =
 
                           else
                             let
+                                angle : Float
                                 angle =
                                     Mechanics.rad a.heading
                             in
@@ -109,6 +126,7 @@ resolvePair hurt roleA roleB work =
                     else
                         ( { nx = hit.nx, ny = hit.ny }, move0, ( da0, db0 ) )
 
+                displace : Body -> Float -> Float -> Body
                 displace x amount vertical =
                     { x
                         | x = x.x + amount * n.nx
@@ -121,14 +139,17 @@ resolvePair hurt roleA roleB work =
                                 x.depth
                     }
 
+                pushed : Work t c r
                 pushed =
                     work
                         |> store roleA (displace a (move * wa / sum) da)
                         |> (\w -> store roleB (displace (bodyOf roleB w) (negate move * wb / sum) db) w)
 
+                key : String
                 key =
                     List.sort [ roleKey roleA a, roleKey roleB b ] |> String.join "/"
 
+                lastHit : Float
                 lastHit =
                     Dict.get key pushed.s.collisionHits |> Maybe.withDefault -99
             in
@@ -137,18 +158,22 @@ resolvePair hurt roleA roleB work =
 
             else
                 let
+                    closing : Float
                     closing =
                         M.hypot3 (sin (Mechanics.rad a.heading) * a.speed - sin (Mechanics.rad b.heading) * b.speed)
                             (cos (Mechanics.rad a.heading) * a.speed - cos (Mechanics.rad b.heading) * b.speed)
                             (orZero a.verticalSpeed - orZero b.verticalSpeed)
 
+                    noted : Work t c r
                     noted =
                         let
+                            s : Traffic t c r
                             s =
                                 pushed.s
                         in
                         { pushed | s = { s | collisionHits = Dict.insert key s.time s.collisionHits } }
 
+                    severity : Float
                     severity =
                         M.clamp 2 36 (2 + closing * 1.1)
                 in
@@ -158,10 +183,12 @@ resolvePair hurt roleA roleB work =
 strike : Hurt t c r -> Role -> Role -> Body -> Body -> Contact -> Float -> Role -> Work t c r -> Work t c r
 strike hurt roleA roleB a b hit severity role work =
     let
+        damaged : Work t c r
         damaged =
             case role of
                 Boat ->
                     let
+                        other : Body
                         other =
                             if roleA == Boat then
                                 b
@@ -169,9 +196,11 @@ strike hurt roleA roleB a b hit severity role work =
                             else
                                 a
 
+                        s : Traffic t c r
                         s =
                             work.s
 
+                        text : String
                         text =
                             if roleB == Site then
                                 "Hull contact with the casualty."
@@ -183,12 +212,15 @@ strike hurt roleA roleB a b hit severity role work =
 
                 _ ->
                     let
+                        x : Body
                         x =
                             bodyOf role work
 
+                        before : Float
                         before =
                             Maybe.withDefault 100 x.hull
 
+                        after : Float
                         after =
                             Carrier.incidentalHull
                                 { kind = carrierKind x
@@ -197,6 +229,7 @@ strike hurt roleA roleB a b hit severity role work =
                                 }
                                 severity
 
+                        hullStored : Work t c r
                         hullStored =
                             store role { x | hull = Just after } work
                     in
@@ -211,6 +244,7 @@ strike hurt roleA roleB a b hit severity role work =
 
     else
         let
+            x : Body
             x =
                 bodyOf role damaged
         in
@@ -270,9 +304,11 @@ each ship grounding last.
 resolveTraffic : Hurt t c r -> Traffic t c r -> Traffic t c r
 resolveTraffic hurt traffic =
     let
+        start : Work t c r
         start =
             { s = traffic, ships = Array.fromList traffic.ships }
 
+        afloat : List Int
         afloat =
             List.filterMap
                 (\( i, v ) ->
@@ -284,10 +320,12 @@ resolveTraffic hurt traffic =
                 )
                 (List.indexedMap Tuple.pair traffic.ships)
 
+        wrecks : Work t c r -> Work t c r
         wrecks w =
             List.foldl
                 (\v acc ->
                     let
+                        reach : Float
                         reach =
                             if v.kind == Surface Carrier then
                                 225
@@ -300,6 +338,7 @@ resolveTraffic hurt traffic =
 
                     else
                         let
+                            copy : Body
                             copy =
                                 shipBody v
                         in
@@ -325,6 +364,7 @@ resolveTraffic hurt traffic =
                 w
                 traffic.ships
 
+        withSite : Work t c r -> Work t c r
         withSite w =
             if w.s.site /= Nothing then
                 resolvePair hurt Boat Site w
@@ -332,6 +372,7 @@ resolveTraffic hurt traffic =
             else
                 w
 
+        eachShip : ( Int, Int ) -> Work t c r -> Work t c r
         eachShip ( order, i ) w =
             w
                 |> shearPeriscope i
@@ -346,9 +387,11 @@ resolveTraffic hurt traffic =
                 |> (\x -> List.foldl (\j acc -> resolvePair hurt (Afloat i) (Afloat j) acc) x (List.take order afloat))
                 |> ground i
 
+        done : Work t c r
         done =
             start |> wrecks |> withSite |> (\w -> List.foldl eachShip w (List.indexedMap Tuple.pair afloat))
 
+        s : Traffic t c r
         s =
             done.s
     in
@@ -360,14 +403,17 @@ shearPeriscope i w =
     case Array.get i w.ships of
         Just v ->
             let
+                s : Traffic t c r
                 s =
                     w.s
 
+                periscope : Float
                 periscope =
                     s.systems.periscope
             in
             if v.kind /= Submarine && Periscope.scopeExtension s > 0 && s.depth <= 15 && Mechanics.distance s v < 48 && periscope > 0 then
                 let
+                    part : Equipment.Part
                     part =
                         Equipment.damage 100 { condition = periscope, limit = s.repairLimits.periscope }
                 in
@@ -395,11 +441,13 @@ ground i w =
     case Array.get i w.ships of
         Just v ->
             let
+                seabed : Float
                 seabed =
                     keelLimit (shipBody v) w.s.chart
             in
             if seabed < Maybe.withDefault 0 v.depth then
                 let
+                    sunk : Ship
                     sunk =
                         if v.kind == Submarine then
                             { v | depth = Just (M.max 0 seabed) }
@@ -407,6 +455,7 @@ ground i w =
                         else
                             v
 
+                    pushed : Ship
                     pushed =
                         if seabed < 0 then
                             pushOffShoal sunk (negate seabed) w.s.chart
@@ -414,6 +463,7 @@ ground i w =
                         else
                             sunk
 
+                    hit : Ship
                     hit =
                         if 5 < w.s.time - Maybe.withDefault -99 pushed.groundedAt then
                             { pushed

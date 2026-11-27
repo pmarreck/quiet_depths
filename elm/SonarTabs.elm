@@ -53,6 +53,7 @@ main =
         , view =
             \selected ->
                 let
+                    tab : Instrument -> Html.Html Instrument
                     tab instrument =
                         button
                             [ type_ "button"

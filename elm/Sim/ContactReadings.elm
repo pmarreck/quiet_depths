@@ -30,6 +30,7 @@ does in JavaScript.
 observationBias : Float -> String -> Method -> Float
 observationBias seed id method =
     let
+        start : Int
         start =
             case method of
                 Visual ->
@@ -38,6 +39,7 @@ observationBias seed id method =
                 Passive ->
                     2
 
+        key : Int
         key =
             List.foldl (\unit k -> M.imul k 31 + unit) start (codeUnits id)
     in
@@ -112,9 +114,11 @@ estimateAt maybeContact time =
 
                         else
                             let
+                                major : Float
                                 major =
                                     if M.truthy contact.range then
                                         let
+                                            confidence : Float
                                             confidence =
                                                 M.min 1 (M.max 0 (orZero contact.confidence))
                                         in
@@ -127,19 +131,24 @@ estimateAt maybeContact time =
 
                     Just fix ->
                         let
+                            age : Float
                             age =
                                 M.max 0 (time - fix.time)
 
+                            speed : Float
                             speed =
                                 M.hypot2 fix.vx fix.vy
 
+                            maneuver : Float
                             maneuver =
                                 0.5 * fix.maneuverSigma * age * age
 
                             -- 95% uncertainty ellipse from the game's observation and drift settings.
+                            major : Float
                             major =
                                 2.448 * M.hypot3 fix.positionSigma (fix.velocitySigma * age) maneuver
 
+                            minor : Float
                             minor =
                                 2.448
                                     * M.hypot3 fix.positionSigma
@@ -154,6 +163,7 @@ estimateAt maybeContact time =
                                         )
                                         maneuver
 
+                            angle : Float
                             angle =
                                 if speed > 0.01 then
                                     bearingTo fix.vx fix.vy
@@ -161,6 +171,7 @@ estimateAt maybeContact time =
                                 else
                                     orZero contact.bearing
 
+                            at : { x : Float, y : Float }
                             at =
                                 projectedPosition fix age
                         in
@@ -173,6 +184,7 @@ measured point without a timestamped fix; with neither, only the bearing.
 sonarReading : { b | x : Float, y : Float, time : Float } -> Contact a -> { bearing : Float, range : Maybe Float }
 sonarReading observer contact =
     let
+        point : Maybe { x : Float, y : Float }
         point =
             case usableFix contact.fix of
                 Just fix ->
@@ -191,12 +203,15 @@ sonarReading observer contact =
 
         Just p ->
             let
+                dx : Float
                 dx =
                     p.x - observer.x
 
+                dy : Float
                 dy =
                     p.y - observer.y
 
+                range : Float
                 range =
                     M.hypot2 dx dy
             in

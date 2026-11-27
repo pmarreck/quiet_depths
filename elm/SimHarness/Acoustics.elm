@@ -77,6 +77,7 @@ sound =
 encodeSound : TestSound -> E.Value
 encodeSound s =
     let
+        extras : List ( String, D.Value )
         extras =
             D.decodeValue (D.keyValuePairs D.value) s.raw
                 |> Result.withDefault []

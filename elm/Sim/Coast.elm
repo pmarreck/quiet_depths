@@ -55,9 +55,11 @@ coastline seed =
                         ( countRoll, rd ) =
                             roll rc
 
+                        bearing : Float
                         bearing =
                             bearingRoll * pi * 2
 
+                        place : Int -> ( Float, Float, ( List Island, Rolls ) ) -> ( Float, Float, ( List Island, Rolls ) )
                         place i ( x, y, ( placed, rs ) ) =
                             if i <= 0 then
                                 ( x, y, ( placed, rs ) )
@@ -88,9 +90,11 @@ coastline seed =
                                     ( stepAcross, s8 ) =
                                         roll s7
 
+                                    tilt : Float
                                     tilt =
                                         bearing + (tiltRoll - 0.5) * 1.7
 
+                                    island : Island
                                     island =
                                         { x = x
                                         , y = y
@@ -130,12 +134,15 @@ saved before coastlines existed (no coastline).
 chartDepth : Maybe Coastline -> Float -> Float -> Float
 chartDepth chart x y =
     let
+        reef : Float
         reef =
             155 * exp (negate ((x - 1900) ^ 2 + (y - 700) ^ 2) / 470000)
 
+        greybank : Float
         greybank =
             460 * exp (negate ((x + 3800) ^ 2 + (y - 4000) ^ 2) / 1900000)
 
+        old : Float
         old =
             230 + 30 * sin (x / 1100) * cos (y / 900) - reef - greybank
     in
@@ -149,18 +156,23 @@ chartDepth chart x y =
 
             else
                 let
+                    blend : Float
                     blend =
                         M.min 1 (M.max (M.max (M.max 0 ((M.abs x - 4500) / 2800)) ((y - 5600) / 2600)) ((negate y - 4500) / 2600))
 
+                    shelf : Float
                     shelf =
                         243 + 33 * sin (x / 3700 + sin (y / 5900 + coast.phase)) + 24 * cos (y / 3100 + x / 7600 + coast.second)
 
+                    blended : Float
                     blended =
                         old + (shelf - old) * blend
 
+                    ashore : Float
                     ashore =
                         if coast.mainland - 5600 < y then
                             let
+                                shore : Float
                                 shore =
                                     coast.mainland + 2500 * sin (x / 5200 + coast.phase) + 1300 * sin (x / 1900 + coast.second) + 440 * sin (x / 670 + coast.phase)
                             in
@@ -169,14 +181,18 @@ chartDepth chart x y =
                         else
                             blended
 
+                    island : Island -> Float -> Float
                     island i depth =
                         let
+                            dx : Float
                             dx =
                                 x - i.x
 
+                            dy : Float
                             dy =
                                 y - i.y
 
+                            reach : Float
                             reach =
                                 i.length * 2.5 + i.width
                         in
@@ -185,12 +201,15 @@ chartDepth chart x y =
 
                         else
                             let
+                                u : Float
                                 u =
                                     (dx * i.cos + dy * i.sin) / i.length
 
+                                v : Float
                                 v =
                                     (dy * i.cos - dx * i.sin) / i.width
 
+                                bend : Float
                                 bend =
                                     v + 0.24 * sin (2.9 * u + i.phase) + 0.08 * sin (5 * u + i.phase)
                             in
@@ -211,9 +230,11 @@ shelfOutcrops site seed =
     List.map
         (\i ->
             let
+                angle : Float
                 angle =
                     hash01 seed (19800 + i) * pi * 2
 
+                range : Float
                 range =
                     65 + hash01 seed (19820 + i) * 310
             in

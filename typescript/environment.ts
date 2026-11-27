@@ -1,4 +1,5 @@
 // Mirrored in elm/Sim/Environment.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its boat pose, periscope wash and soundings are mirrored in elm/Sim/BoatSensors.elm.
 import {exp} from './sim-math.ts';
 import {scopeEyeHeight} from './periscope.ts';
 import {surfaceMotion, wavePhaseAt, surfaceHeight, WAVE_COMPONENTS, hash01, boatPoint} from './surface-motion.ts';

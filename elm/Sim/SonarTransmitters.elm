@@ -30,6 +30,7 @@ on one profile.
 decoder : D.Decoder Transmitters
 decoder =
     let
+        profile : D.Decoder Profile
         profile =
             D.string
                 |> D.andThen
@@ -75,6 +76,7 @@ exposure profile =
 notice : Transmitters -> Bool -> String
 notice t online =
     let
+        names : List String
         names =
             List.filterMap identity [ Maybe.map (\_ -> "Scribbler") t.scribbler, Maybe.map (\_ -> "Painter") t.painter ]
     in
@@ -102,12 +104,15 @@ the Scribbler sweeps a thin fan to either side and below.
 scanSector : { a | x : Float, y : Float, depth : Float, heading : Float } -> { b | x : Float, y : Float, depth : Maybe Float } -> Instrument -> Float -> Bool
 scanSector eye object mode reach =
     let
+        dx : Float
         dx =
             object.x - eye.x
 
+        dy : Float
         dy =
             object.y - eye.y
 
+        dz : Float
         dz =
             Maybe.withDefault 0 object.depth - eye.depth
     in
@@ -116,12 +121,15 @@ scanSector eye object mode reach =
 
     else
         let
+            angle : Float
             angle =
                 eye.heading * radians
 
+            along : Float
             along =
                 dx * sin angle + dy * cos angle
 
+            across : Float
             across =
                 dx * cos angle - dy * sin angle
         in

@@ -32,6 +32,32 @@
         elmVersion = elmConfig.elm-version;
         registryDat = nixpkgs.outPath + "/pkgs/development/compilers/elm/registry.dat";
       };
+      # elm-format and elm-review over every Elm module, offline. The site
+      # build names this derivation in its check phase, so ./test runs it.
+      elmChecks = pkgs.stdenvNoCC.mkDerivation {
+        name = "quiet-depths-elm-checks";
+        src = pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions [ ./elm.json ./elm ./review/elm.json ./review/src ];
+        };
+        nativeBuildInputs = [ pkgs.elmPackages.elm pkgs.elmPackages.elm-format pkgs.elmPackages.elm-review pkgs.nodejs ];
+        buildPhase = import ./nix/elm-home.nix {
+          inherit pkgs;
+          elm = pkgs.elmPackages.elm;
+          projects = [
+            { elmJson = ./elm.json; sources = elmDependencies; }
+            { elmJson = ./review/elm.json; sources = import ./review/elm-srcs.nix; }
+          ];
+        } + ''
+          export HOME="$TMPDIR"
+          elm-format --validate elm review/src
+          # Compiling every program builds the game's dependencies, whose
+          # docs elm-review reads offline, and type-checks every module.
+          elm make $(grep -rl --include='*.elm' '^main :' elm) --output=/dev/null
+          elm-review --offline --compiler "$(command -v elm)"
+        '';
+        installPhase = "touch $out";
+      };
       # Type declarations for the vendored Three r170 and the WebXR types they
       # reference, pinned to releases from November 2024. Only the type check
       # reads them; nothing from them reaches the site.
@@ -96,6 +122,7 @@
             export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
             export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
             mkdir -p -m 700 "$HOME" "$XDG_RUNTIME_DIR"
+            echo "Elm formatting and review passed: ${elmChecks}"
             node --test tests/*.test.mjs
           )
           runHook postCheck
@@ -120,8 +147,9 @@
       default = pkgs.lib.makeOverridable build { };
       patrol-catalog = patrolCatalog;
       three-types = threeTypes;
+      elm-checks = elmChecks;
     });
-    checks = each (system: { site = self.packages.${system}.default; });
+    checks = each (system: { site = self.packages.${system}.default; elm = self.packages.${system}.elm-checks; });
     devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
       default = pkgs.mkShell { packages = [ pkgs.nodejs pkgs.elmPackages.elm pkgs.elmPackages.elm-format pkgs.elmPackages.elm-review pkgs.elm2nix pkgs.typescript ]; };
       profiling = pkgs.mkShell { packages = [ pkgs.nodejs performance-profile.packages.${system}.default ]; };

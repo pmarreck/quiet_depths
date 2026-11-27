@@ -44,9 +44,11 @@ hold the present depth.
 changeNosePitch : Float -> Bool -> { a | nosePitch : Maybe Float, verticalSpeed : Float, targetDepth : Float, depth : Float } -> { a | nosePitch : Maybe Float, verticalSpeed : Float, targetDepth : Float, depth : Float }
 changeNosePitch degrees inverted drone =
     let
+        current : Float
         current =
             Maybe.withDefault (depthHoldPitch drone.verticalSpeed) drone.nosePitch
 
+        change : Float
         change =
             if inverted then
                 negate degrees

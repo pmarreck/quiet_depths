@@ -39,15 +39,19 @@ own frame. A sunk ship's box lowers with it; a submarine's sits at its depth,
 shipHit : Aloft -> Aloft -> { a | x : Float, y : Float, heading : Float, sinkDepth : Float, depth : Maybe Float } -> Maybe Kind -> Maybe Float
 shipHit from to ship kind =
     let
+        a : Float
         a =
             rad ship.heading
 
+        sn : Float
         sn =
             sin a
 
+        cs : Float
         cs =
             cos a
 
+        submerged : Float
         submerged =
             if kind == Just Submarine then
                 Maybe.withDefault 65 ship.depth
@@ -55,6 +59,7 @@ shipHit from to ship kind =
             else
                 0
 
+        local : Aloft -> ( Float, Float, Float )
         local p =
             ( (p.x - ship.x) * cs - (p.y - ship.y) * sn
             , (p.x - ship.x) * sn + (p.y - ship.y) * cs
@@ -67,12 +72,14 @@ shipHit from to ship kind =
         ( qx, qy, qz ) =
             local to
 
+        bounds : List ( Float, Float )
         bounds =
             if kind == Just (Surface Carrier) then
                 [ ( negate carrierSize.halfBeam, carrierSize.halfBeam ), ( negate carrierSize.halfLength, carrierSize.halfLength ), ( -7, carrierSize.deckHeight ) ]
 
             else
                 let
+                    scale : Float
                     scale =
                         case kind of
                             Just (Surface Fishing) ->
@@ -98,6 +105,7 @@ shipHit from to ship kind =
                   )
                 ]
 
+        axis : ( Float, Float, ( Float, Float ) ) -> Maybe ( Float, Float ) -> Maybe ( Float, Float )
         axis ( start, end, ( low, high ) ) span =
             case span of
                 Nothing ->
@@ -105,6 +113,7 @@ shipHit from to ship kind =
 
                 Just ( enter, leave ) ->
                     let
+                        v : Float
                         v =
                             end - start
                     in
@@ -117,9 +126,11 @@ shipHit from to ship kind =
 
                     else
                         let
+                            first : Float
                             first =
                                 (low - start) / v
 
+                            second : Float
                             second =
                                 (high - start) / v
 
@@ -130,9 +141,11 @@ shipHit from to ship kind =
                                 else
                                     ( first, second )
 
+                            entered : Float
                             entered =
                                 M.max enter lo
 
+                            left : Float
                             left =
                                 M.min leave hi
                         in
@@ -160,18 +173,23 @@ passes within its radius there.
 sphereHit : Aloft -> Aloft -> Aloft -> Float -> Maybe Float
 sphereHit from to body radius =
     let
+        x : Float
         x =
             to.x - from.x
 
+        y : Float
         y =
             to.y - from.y
 
+        z : Float
         z =
             to.altitude - from.altitude
 
+        q : Float
         q =
             x * x + y * y + z * z
 
+        t : Float
         t =
             if M.truthy q then
                 M.clamp 0 1 (((body.x - from.x) * x + (body.y - from.y) * y + (body.altitude - from.altitude) * z) / q)

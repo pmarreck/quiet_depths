@@ -119,9 +119,11 @@ decoder shipIds =
         |> D.andThen
             (\( time, k ) ->
                 let
+                    name : String
                     name =
                         Acoustics.kindName k
 
+                    namesShip : Bool
                     namesShip =
                         List.member name [ "sweep", "collapse", "settling" ]
                 in
@@ -160,6 +162,7 @@ decoder shipIds =
 encode : Sound -> E.Value
 encode s =
     let
+        field : String -> (a -> E.Value) -> Maybe a -> Maybe ( String, E.Value )
         field key enc =
             Maybe.map (\v -> ( key, enc v ))
     in

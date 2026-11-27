@@ -51,9 +51,11 @@ validEstimate p time =
 validCopy : Transmission { e | text : String } -> Float -> Bool
 validCopy m time =
     let
+        full : Int
         full =
             morseScript m.estimate.text |> Maybe.map (\script -> bit (List.length script.letters) - 1) |> Maybe.withDefault 0
 
+        since : Bool
         since =
             case m.since of
                 Nothing ->
@@ -62,6 +64,7 @@ validCopy m time =
                 Just s ->
                     finite s && s >= 0 && s <= m.elapsed
 
+        completed : Bool
         completed =
             case ( m.delivered, m.completedAt ) of
                 ( True, Just at ) ->
@@ -93,6 +96,7 @@ validTransmission m time =
 fixText : String -> Bool
 fixText text =
     let
+        field : List Char -> Int -> Int -> String -> Bool
         field letters fewest most part =
             case String.uncons part of
                 Just ( first, rest ) ->

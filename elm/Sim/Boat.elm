@@ -191,6 +191,7 @@ systemsDecoder =
 limitsDecoder : Float -> Systems -> D.Decoder Limits
 limitsDecoder hull s =
     let
+        limit : String -> Float -> D.Decoder Float
         limit key part =
             D.field key percent
                 |> D.map
@@ -317,9 +318,11 @@ systemFields p =
 encode : Boat -> List ( String, E.Value )
 encode b =
     let
+        field : String -> (Float -> E.Value) -> Maybe Float -> Maybe ( String, E.Value )
         field key enc =
             Maybe.map (\v -> ( key, enc v ))
 
+        number : ( String, Float ) -> ( String, E.Value )
         number ( key, v ) =
             ( key, E.float v )
     in

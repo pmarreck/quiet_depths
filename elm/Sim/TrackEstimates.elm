@@ -50,24 +50,31 @@ fixContact o contact =
 
     else
         let
+            vx : Float
             vx =
                 Maybe.withDefault 0 o.vx
 
+            vy : Float
             vy =
                 Maybe.withDefault 0 o.vy
 
+            positionSigma : Float
             positionSigma =
                 Maybe.withDefault 0 o.positionSigma
 
+            velocitySigma : Float
             velocitySigma =
                 Maybe.withDefault 0.25 o.velocitySigma
 
+            maneuverSigma : Float
             maneuverSigma =
                 Maybe.withDefault 0.008 o.maneuverSigma
 
+            sigmas : List Float
             sigmas =
                 [ positionSigma, velocitySigma, maneuverSigma ]
 
+            older : Bool
             older =
                 case contact.fix of
                     Just held ->
@@ -184,9 +191,11 @@ that cannot fix a contact changes nothing.
 applyReconPacket : Packet -> { s | time : Float, x : Float, y : Float, contacts : List Contact, nextId : Float } -> Maybe { s | time : Float, x : Float, y : Float, contacts : List Contact, nextId : Float }
 applyReconPacket packet s =
     let
+        observations : List ( Track, Observation )
         observations =
             List.map (\t -> ( t, observation packet.capturedAt t )) packet.tracks
 
+        sound : ( Track, Observation ) -> Bool
         sound ( _, o ) =
             M.notLess packet.capturedAt o.time && fixContact o { fix = Nothing } /= Nothing
     in
@@ -225,6 +234,7 @@ apply at ( track, o ) s =
 
                 [] ->
                     let
+                        fresh : Contact
                         fresh =
                             { id = track.id
                             , label = designation s.nextId
@@ -254,6 +264,7 @@ apply at ( track, o ) s =
                     in
                     ( fresh, s.contacts ++ [ fresh ], s.nextId + 1 )
 
+        fixed : Contact
         fixed =
             case fixContact o existing of
                 Just c ->
@@ -285,6 +296,7 @@ apply at ( track, o ) s =
                 Nothing ->
                     existing
 
+        named : Contact
         named =
             case ( track.identified, track.name ) of
                 ( True, Just name ) ->
@@ -351,17 +363,22 @@ chartContacts s =
 
     else
         let
+            identified : List String
             identified =
                 List.filter (\c -> c.identified == Just True || c.kind == Just Submarine && c.fix /= Nothing) s.contacts |> List.map .id
 
+            hostile : Ship -> Bool
             hostile ship =
                 ship.military == Just True && ship.side /= Just Friendly && (not s.searching || List.member ship.id identified)
 
+            hostileIds : List String
             hostileIds =
                 List.filter hostile s.ships |> List.map .id
 
+            exact : Ship -> ExactPosition
             exact ship =
                 let
+                    angle : Float
                     angle =
                         ship.heading * pi / 180
                 in
