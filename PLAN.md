@@ -13,7 +13,8 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 - [x] Move wreck-survey completion criteria into the Elm mission definition, shared by the briefing, rules, progress text and ROV photos (done 2026-11-27 01:24 EST; commit 2a6d92b).
 - [x] Move rescue station keeping and team timings into the Elm mission definitions, shared by the briefings, rules and progress text (done 2026-11-27 03:24 EST; commit e8c9d1f).
-- [x] Move convoy tracking range, noise and depth limits and the seeded tracking goal into the Elm mission definition (done 2026-11-27 03:32 EST).
+- [x] Move convoy tracking range, noise and depth limits and the seeded tracking goal into the Elm mission definition (done 2026-11-27 03:32 EST; commit 5e65857).
+- [x] Move reconnaissance photo framing and the seeded photograph goal into the Elm mission definition (done 2026-11-27 03:40 EST).
 - [ ] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks.
 - [x] Rebuild the desktop helm: controls only on Periscope & Controls and ROV, vertical speed and depth, heading-up Elm compass with drag-to-steer rim (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 02:47 EST; commit 1a885be).
 - [ ] Move the remaining helm controls (depth and speed sliders, turn buttons, propulsion) from JavaScript-wired markup into the Elm helm.

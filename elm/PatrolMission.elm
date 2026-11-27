@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), RescueCriteria, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), PhotoCriteria, RescueCriteria, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
@@ -21,7 +21,7 @@ type Mission
 
 
 type Objective
-    = Photographs
+    = Photographs PhotoCriteria
     | SinkShips String (List String)
     | Survive
     | ReachGate Float
@@ -30,6 +30,25 @@ type Objective
     | SurveyWreck SurveyCriteria
     | FleetLead Int
     | ProtectConvoy String Int
+
+
+{-| A merchant earns credit when its bearing is strictly within framingDegrees
+of the reticle. Each patrol needs fewestPhotos plus a seeded number of extra
+ships below goalSpread.
+-}
+type alias PhotoCriteria =
+    { framingDegrees : Float
+    , fewestPhotos : Int
+    , goalSpread : Int
+    }
+
+
+merchantPhotos : PhotoCriteria
+merchantPhotos =
+    { framingDegrees = 5
+    , fewestPhotos = 2
+    , goalSpread = 2
+    }
 
 
 {-| Tracking time accumulates while the sub is quieter than quieterThan,
@@ -216,7 +235,7 @@ briefing mission =
                 { standard = ( 8, 12 ), longer = ( 13, 22 ) }
                 "Photograph the briefed number of different merchant ships through your periscope. Leave the escort wondering if you were ever there."
                 "Photograph the merchant convoy"
-                Photographs
+                (Photographs merchantPhotos)
 
         Intercept ->
             Briefing "intercept" "The long way home" "INTERCEPTION" ActionStations Observe

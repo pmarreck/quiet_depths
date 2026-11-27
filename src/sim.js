@@ -19,6 +19,7 @@ import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from
 import {emitSound,launchNoise,updateAcoustics} from './acoustics.js';
 import {sweepClutter} from './seabed-rest.js';
 import {trackingConvoy,trackingCriteria} from './convoy-tracking.js';
+import {framed,photoCriteria} from './recon-photos.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets,updateFleetBattle} from './missions.js';
 import {isDieselMode} from './power-plant.js';
@@ -137,7 +138,7 @@ export function ping(s){
 }
 export function photograph(s,look){
  if(s.photoCooldown>0)return false;
- const seen=s.ships.filter(c=>!c.incidental&&isVisible(s,c,look)&&Math.abs(delta(bearing(s,c),look))<5&&c.kind==='merchant').sort((a,b)=>Math.abs(delta(bearing(s,a),look))-Math.abs(delta(bearing(s,b),look))).slice(0,1);
+ const seen=s.ships.filter(c=>!c.incidental&&isVisible(s,c,look)&&framed(delta(bearing(s,c),look),photoCriteria)&&c.kind==='merchant').sort((a,b)=>Math.abs(delta(bearing(s,a),look))-Math.abs(delta(bearing(s,b),look))).slice(0,1);
  if(!seen.length){log(s,'No merchant silhouette in the camera reticle.','warning');return false;}
  for(const ship of seen){contact(s,ship,'visual');if(!s.photos.includes(ship.id))s.photos.push(ship.id);}
  s.photoCooldown=4;log(s,`Photograph recorded. ${s.photos.length}/${s.patrol.photoGoal} merchant silhouettes.`, 'success');return true;

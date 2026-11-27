@@ -16,8 +16,12 @@ encodeObjective objective =
             E.object (( "kind", E.string kind ) :: fields)
     in
     case objective of
-        Photographs ->
-            rule "photographs" []
+        Photographs c ->
+            rule "photographs"
+                [ ( "framingDegrees", E.float c.framingDegrees )
+                , ( "fewestPhotos", E.int c.fewestPhotos )
+                , ( "goalSpread", E.int c.goalSpread )
+                ]
 
         SinkShips first rest ->
             rule "sink" [ ( "targets", E.list E.string (first :: rest) ) ]

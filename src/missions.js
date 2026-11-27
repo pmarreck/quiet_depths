@@ -11,6 +11,7 @@ import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-o
 import {addScan,scanRate,surveyComplete,surveyCriteria} from './wreck-survey.js';
 import {rescueCriteriaFor,stationKeeping} from './rescue-operation.js';
 import {trackingCriteria,trackingGoal} from './convoy-tracking.js';
+import {photoCriteria,photoGoal} from './recon-photos.js';
 export {MISSIONS};
 
 export function updateFleetBattle(s){
@@ -158,7 +159,7 @@ export function objectiveState(s){
 export const objectiveComplete=(s,dt)=>evaluateObjective(s,dt,{rescue:updateRescue,survey:updateSurvey});
 export function randomizePatrol(s,seed){
  const h=n=>hash01(seed,n),heading=220+h(21)*65,start={x:(h(22)-.5)*500,y:(h(23)-.5)*500};
- s.patrol={seed,startingTorpedoes:s.torps,photoGoal:2+Math.floor(h(24)*2),trackGoal:trackingGoal(h(25),trackingCriteria),variant:1+Math.floor(h(26)*999)};
+ s.patrol={seed,startingTorpedoes:s.torps,photoGoal:photoGoal(h(24),photoCriteria),trackGoal:trackingGoal(h(25),trackingCriteria),variant:1+Math.floor(h(26)*999)};
  Object.assign(s,{...start,heading:20+h(27)*35,targetHeading:20+h(27)*35});
  s.home={x:start.x-1100-h(28)*650,y:start.y-1000-h(29)*650};
  const convoy={x:start.x+1050+h(30)*650,y:start.y+1800+h(31)*650},speed=3.5+h(32)*3;
