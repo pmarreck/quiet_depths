@@ -125,3 +125,9 @@ validate them with the TypeScript, and hand Elm the rest.
 
 A test fails the build if any module the simulation reaches uses Three.js,
 the DOM, a canvas, browser storage or `navigator`.
+
+Level 1 so far: `Sim.ReconPhotos`, `Sim.ConvoyTracking`, `Sim.WreckSurvey` and
+`Sim.Periscope` read their criteria straight from `PatrolMission`, so the
+differential tests also confirm the generated catalog matches the Elm
+records. Vessel kinds live in `Sim.Vessel`. `applyScopePose` poses the mast
+model and stays with the renderer.

@@ -6,35 +6,7 @@ import Json.Decode as D
 import Json.Encode as E
 import Sim.Foundering as Foundering
 import Sim.TorpedoWatch as TorpedoWatch
-import SimHarness.Codec exposing (andMap, arg, call1, call2, flag, maybe, point, position3)
-
-
-surfaceShip : D.Decoder Foundering.SurfaceShip
-surfaceShip =
-    D.string
-        |> D.andThen
-            (\name ->
-                case name of
-                    "merchant" ->
-                        D.succeed Foundering.Merchant
-
-                    "escort" ->
-                        D.succeed Foundering.Escort
-
-                    "fishing" ->
-                        D.succeed Foundering.Fishing
-
-                    "carrier" ->
-                        D.succeed Foundering.Carrier
-
-                    _ ->
-                        D.fail ("not a surface ship: " ++ name)
-            )
-
-
-vesselKind : D.Decoder Foundering.VesselKind
-vesselKind =
-    D.oneOf [ D.string |> D.andThen (\k -> if k == "sub" then D.succeed Foundering.Submarine else D.fail "surface"), D.map Foundering.Surface surfaceShip ]
+import SimHarness.Codec exposing (andMap, arg, call1, call2, flag, maybe, point, position3, surfaceShip, vesselKind)
 
 
 vessel : D.Decoder (Foundering.Vessel {})

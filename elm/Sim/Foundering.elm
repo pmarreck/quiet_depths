@@ -1,22 +1,11 @@
-module Sim.Foundering exposing (SurfaceShip(..), Vessel, VesselKind(..), descentSpeed, founderingPose, submergedDepth, surfaceCollapseAge, wreckVisible)
+module Sim.Foundering exposing (Vessel, descentSpeed, founderingPose, submergedDepth, surfaceCollapseAge, wreckVisible)
 
 {-| How a sinking surface ship lists, trims and settles as it passes beneath
 the surface, and when its wreck can be seen. The bow is local -Z.
 -}
 
 import Sim.Math as M
-
-
-type SurfaceShip
-    = Merchant
-    | Escort
-    | Fishing
-    | Carrier
-
-
-type VesselKind
-    = Surface SurfaceShip
-    | Submarine
+import Sim.Vessel exposing (Kind(..), SurfaceShip(..))
 
 
 type alias Profile =
@@ -90,7 +79,7 @@ surfaceCollapseAge =
 
 type alias Vessel a =
     { a
-        | kind : VesselKind
+        | kind : Kind
         , hull : Float
         , sinkDepth : Maybe Float
         , sunkAt : Maybe Float

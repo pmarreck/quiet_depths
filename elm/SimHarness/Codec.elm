@@ -1,9 +1,10 @@
-module SimHarness.Codec exposing (andMap, arg, call1, call2, call3, call5, flag, maybe, point, position3)
+module SimHarness.Codec exposing (andMap, arg, call1, call2, call3, call5, flag, maybe, point, position3, surfaceShip, vesselKind)
 
 {-| Decoding a call's arguments and encoding its result, shared by the harness tables. -}
 
 import Json.Decode as D
 import Json.Encode as E
+import Sim.Vessel as Vessel
 
 
 arg : Int -> D.Decoder a -> D.Decoder a
@@ -54,3 +55,31 @@ position3 =
 flag : String -> D.Decoder Bool
 flag name =
     D.maybe (D.field name D.bool) |> D.map (Maybe.withDefault False)
+
+
+surfaceShip : D.Decoder Vessel.SurfaceShip
+surfaceShip =
+    D.string
+        |> D.andThen
+            (\name ->
+                case name of
+                    "merchant" ->
+                        D.succeed Vessel.Merchant
+
+                    "escort" ->
+                        D.succeed Vessel.Escort
+
+                    "fishing" ->
+                        D.succeed Vessel.Fishing
+
+                    "carrier" ->
+                        D.succeed Vessel.Carrier
+
+                    _ ->
+                        D.fail ("not a surface ship: " ++ name)
+            )
+
+
+vesselKind : D.Decoder Vessel.Kind
+vesselKind =
+    D.oneOf [ D.string |> D.andThen (\k -> if k == "sub" then D.succeed Vessel.Submarine else D.fail "surface"), D.map Vessel.Surface surfaceShip ]
