@@ -12,6 +12,7 @@ import {addScan, scanRate, surveyComplete, surveyCriteria, type SurveyCriteria} 
 import {casualtyDepth, initialSurvivors, nextLossDelay, rescueCriteriaFor, stationKeeping, surfaceRescue, type RescueCriteria} from './rescue-operation.ts';
 import {trackingCriteria, trackingGoal} from './convoy-tracking.ts';
 import {photoCriteria, photoGoal} from './recon-photos.ts';
+import {slice} from './world-slice.ts';
 export {MISSIONS};
 
 type MissionId = (typeof MISSIONS)[number]['id'];
@@ -38,9 +39,6 @@ export interface Patrol extends Point {
 }
 type Operating = Patrol & {site: Site; operation: Operation};
 
-// Each typed module declares the slice of patrol state it reads. Until the
-// simulation shares one world type, hand-offs between slices pass through here.
-const slice = <T>(value: object) => value as unknown as T;
 
 export function updateFleetBattle(s: Patrol): void {
   advanceFleetAction(slice(s), (ship, v, fired) => {

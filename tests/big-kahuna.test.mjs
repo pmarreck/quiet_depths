@@ -134,6 +134,13 @@ test('the carrier settles and sinks according to the catalog’s fatal hits, not
  assert.equal(carrierDoomed({directHits:2},3),false,'two hits are not fatal when three are');
  assert.equal(carrierDescentFactor({directHits:4},3),2);assert.equal(carrierDescentFactor({directHits:1},3),1);
  // The simulation must ask the carrier rules rather than restate the threshold.
- const combat=await readFile(new URL('../src/combat.js',import.meta.url),'utf8');
- assert.doesNotMatch(combat,/directHits\s*(>=|<|-)\s*\d/);
+ const {readdir}=await import('node:fs/promises');
+ for(const dir of ['src','typescript']){
+  const files=(await readdir(new URL('../'+dir+'/',import.meta.url))).filter(f=>/\.(js|ts)$/.test(f)&&!/^carrier\.(js|ts)$/.test(f));
+  assert.ok(files.length>10,dir+' sources found');
+  for(const file of files){
+   const source=await readFile(new URL('../'+dir+'/'+file,import.meta.url),'utf8');
+   assert.doesNotMatch(source,/directHits[^;\n]{0,24}?(>=|<=|<|>|-)\s*\d/,dir+'/'+file+' restates the fatal hit count');
+  }
+ }
 });

@@ -150,3 +150,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks. Answer: every objective's criteria, briefing numbers, patrol windows, transit timing and encounter odds now come from Elm, with characterization, mutation and document-drift tests; combat and AI tuning remains under the simulation item (done 2026-11-27 03:21 EST).
 - [x] [Elm migration] Convert the shared mechanics, debrief and loss-screen modules to strict TypeScript (done 2026-11-27 03:24 EST; commit 1a7ef42).
 - [x] [Elm migration] Convert the photo archive, vehicle status, seafloor surface and pressure modules to strict TypeScript (done 2026-11-27 03:25 EST; commit 7b40085).
+- [x] [Elm migration] Convert the service record, acoustics and contact track-estimate modules to strict TypeScript (done 2026-11-27 03:28 EST; commit 805e3a3).
