@@ -5,6 +5,7 @@ module SimHarness.Leaves exposing (function)
 import Json.Decode as D
 import Json.Encode as E
 import Sim.Debrief as Debrief
+import Sim.Difficulty as Difficulty
 import Sim.Equipment as Equipment
 import Sim.HullDesign as HullDesign
 import Sim.Math as SimMath
@@ -161,6 +162,9 @@ sectionName s =
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of
+        "difficulty.patrolDifficulty" ->
+            Just (D.map (Difficulty.decode >> Difficulty.encode) (arg 0 D.value))
+
         "equipment.systems" ->
             Just (D.succeed (E.list (Equipment.systemKey >> E.string) Equipment.systems))
 

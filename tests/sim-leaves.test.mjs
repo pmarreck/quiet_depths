@@ -70,3 +70,15 @@ test('the Elm hull design carries the TypeScript dimensions', async () => {
   const {hullColor, propellerColor, ...dimensions} = SUB_DESIGN;
   assert.deepEqual(await elm('hullDesign.design'), [dimensions]);
 });
+
+test('Elm reads difficulty settings as leniently as the TypeScript, with the same defaults and ranges', async () => {
+  const {difficultyControls, patrolDifficulty} = await import('../src/difficulty.js');
+  const random = seeded(15), inputs = [undefined, null, 7, 'hard', [], {}, {damage: '1'}, {damage: NaN}, {damage: Infinity}, {detection: -Infinity}];
+  for (const c of difficultyControls) {
+    if ('min' in c) for (const v of [c.min - 1, c.min, c.min + c.step, c.max, c.max + 5, -0]) inputs.push({[c.id]: v});
+    else for (const v of [true, false, 1, 'yes', null]) inputs.push({[c.id]: v});
+  }
+  for (let i = 0; i < 300; i++) inputs.push(Object.fromEntries(difficultyControls.filter(() => random() < .5).map(c => [c.id, 'min' in c ? (random() - .3) * 4 : random() < .5])));
+  // Ports carry no undefined; null stands for it, and the TypeScript treats both as no settings.
+  assert.deepEqual(await elm('difficulty.patrolDifficulty', inputs.map(v => [v ?? null])), inputs.map(v => patrolDifficulty(v)));
+});
