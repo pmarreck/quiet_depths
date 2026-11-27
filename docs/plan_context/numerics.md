@@ -120,3 +120,19 @@ The class is long known and open upstream (elm/compiler #2206, #2100,
 #1639, #2014, #2185, #2301, from 2017 on). Upstream fixes are rare and
 outside pull requests seldom merged, so a fix would mean carrying a patch in
 our own Nix-built compiler; not worth it unless the bug keeps costing work.
+
+## The fork's progress (elm-compiler agent, 2026-11-27 17:44)
+
+The fork builds under Nix and tracks upstream `main`, which reports 0.19.3.
+The let-annotation crash reduces to a single file: inside an unannotated
+`f x`, a let binding `y : a` whose body is `x` (the rigid `a` unifies with
+`x`'s type from the enclosing scope, which cannot be generalized; the solver
+then crashes in its post-generalization check). The planned fix reports it as
+a type error naming the annotation and the outer value. Order of work: the
+crash family, then a kernel-backed `Num` (kernel JavaScript only in the
+fork's own package, fuzzed against an exact rational oracle, arithmetic proved
+in Lean 4), then operators designed around the compiled-once polymorphism
+problem, then the WASM measurement. Decisions routed to the owner: the fork's
+version scheme, binary or decimal exponent, dedicated `Num` operators first
+(the fork's recommendation) or overloaded standard operators, and how number
+literals type.

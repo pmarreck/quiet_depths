@@ -1,7 +1,7 @@
 module Sim.Acoustics exposing
     ( Event(..)
     , Heard
-    , Kind
+    , Kind(..)
     , Listener
     , Perceived
     , Source

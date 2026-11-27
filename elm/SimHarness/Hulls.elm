@@ -1,4 +1,4 @@
-module SimHarness.Hulls exposing (function)
+module SimHarness.Hulls exposing (body, function, logKind)
 
 {-| Harness entries for hull contacts.
 -}

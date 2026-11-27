@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/Systems.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its drone orders are mirrored in elm/Sim/DroneOrders.elm, the boat's tick in BoatMotion.elm, DamageControl.elm and SeabedContact.elm, and the drone's flight in DroneFlight.elm, DroneReturn.elm and DroneCollisions.elm.
 import {exp, expm1, tanh} from './sim-math.ts';
 import {orderScope, advanceScope} from './periscope.ts';
 import {energyDraw, propulsion, throttlePercent, batteryOutput} from './power-plant.ts';

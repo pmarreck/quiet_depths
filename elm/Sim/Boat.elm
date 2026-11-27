@@ -1,4 +1,4 @@
-module Sim.Boat exposing (Boat, Limits, Parts, Systems, decoder, encode)
+module Sim.Boat exposing (Boat, Limits, Parts, Systems, condition, decoder, encode, setCondition)
 
 {-| The player's boat as current saves hold it: motion, hull, plant, stores,
 alarms, the periscope, the fourteen systems and fifteen repair limits as
@@ -11,6 +11,7 @@ import Dict exposing (Dict)
 import Json.Decode as D
 import Json.Encode as E
 import Sim.Drone as Drone exposing (Drone)
+import Sim.Equipment exposing (System(..))
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
 
 
@@ -26,6 +27,98 @@ type alias Limits =
 -}
 type alias Parts a =
     { a | diesel : Float, fuelTank : Float, batteryBank : Float, tubes : Float, engine : Float, propeller : Float, oxygen : Float, ballast : Float, planes : Float, rudder : Float, sonar : Float, periscope : Float, deckgun : Float, crew : Float }
+
+
+condition : System -> Parts a -> Float
+condition system p =
+    case system of
+        Diesel ->
+            p.diesel
+
+        FuelTank ->
+            p.fuelTank
+
+        BatteryBank ->
+            p.batteryBank
+
+        Tubes ->
+            p.tubes
+
+        Engine ->
+            p.engine
+
+        Propeller ->
+            p.propeller
+
+        Oxygen ->
+            p.oxygen
+
+        Ballast ->
+            p.ballast
+
+        Planes ->
+            p.planes
+
+        Rudder ->
+            p.rudder
+
+        Sonar ->
+            p.sonar
+
+        Periscope ->
+            p.periscope
+
+        Deckgun ->
+            p.deckgun
+
+        Crew ->
+            p.crew
+
+
+setCondition : System -> Float -> Parts a -> Parts a
+setCondition system v p =
+    case system of
+        Diesel ->
+            { p | diesel = v }
+
+        FuelTank ->
+            { p | fuelTank = v }
+
+        BatteryBank ->
+            { p | batteryBank = v }
+
+        Tubes ->
+            { p | tubes = v }
+
+        Engine ->
+            { p | engine = v }
+
+        Propeller ->
+            { p | propeller = v }
+
+        Oxygen ->
+            { p | oxygen = v }
+
+        Ballast ->
+            { p | ballast = v }
+
+        Planes ->
+            { p | planes = v }
+
+        Rudder ->
+            { p | rudder = v }
+
+        Sonar ->
+            { p | sonar = v }
+
+        Periscope ->
+            { p | periscope = v }
+
+        Deckgun ->
+            { p | deckgun = v }
+
+        Crew ->
+            { p | crew = v }
 
 
 type alias Boat =

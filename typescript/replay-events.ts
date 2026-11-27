@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/ReplayEvents.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Moments worth an instant replay. The simulation announces them here, and a
 // recorder listening to that patrol captures the frames around them.
 type Point={x:number;y:number;depth:number};

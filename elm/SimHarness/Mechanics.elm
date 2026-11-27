@@ -78,7 +78,7 @@ status =
     D.string
         |> D.andThen
             (\name ->
-                case List.filter (\s -> Status.statusName s == name) [ Status.Patrol, Status.Won, Status.Lost, Status.Partial, Status.Withdrawn ] of
+                case List.filter (\s -> Status.statusName s == name) Status.statuses of
                     s :: _ ->
                         D.succeed s
 

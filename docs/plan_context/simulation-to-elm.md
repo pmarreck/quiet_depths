@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Systems (327 lines, seven Elm modules) | about 35 min | every function matched on its first full run; the slices compose the earlier ports (pressure, power plant, periscope, hull geometry) unchanged |
 | Boat and drone records | about 20 min | systems and limits as records with exhaustive accessors; restore's eight boat migrations inventoried, not ported |
 | Sound record | about 13 min | fits the acoustics' `Heard` record as it is (`id : Int`, `power : Maybe Float`), so the ported update runs on saved sounds |
 | Hull contacts | about 20 min | identity became roles, mutation a threaded fold, `hurt` a parameter; three modules to stay under 500 lines; the Carrier port's `Int` hits met the ship record's `Maybe Float` |
@@ -415,3 +416,29 @@ TypeScript's sounds carry open extra fields (`own`, `shot`, and the
 ship and contact records were. This is the pattern the checkpoint should
 weigh: the large modules each pull in shared shapes, and those shapes are
 where the remaining cost concentrates, more than in the lines themselves.
+
+## Systems ported (2026-11-27)
+
+`systems.ts` (327 code lines, the largest module) is mirrored in seven Elm
+modules, each under 500 lines: `Sim.Systems` (system damage, `hurt`, onboard
+explosions), `Sim.DroneOrders` (launch, recall, drone damage and loss),
+`Sim.BoatMotion` (the tick: propulsion, steering, depth keeping, the plant),
+`Sim.DamageControl` (air, fuel leaks and fires, flooding, repairs),
+`Sim.SeabedContact` (landing and scraping), `Sim.DroneFlight` (the drone's
+tick), `Sim.DroneReturn` (the return lane) and `Sim.DroneCollisions`.
+`replay-events.ts` became `Sim.ReplayEvents`: the TypeScript announces to a
+listener found by object identity, the Elm patrol appends to an outbox the
+game will drain, and the tests compare the outbox against what the
+TypeScript's listener received. `Sim.Status` gained the compromised, expired
+and convoy-lost statuses with an exhaustive list. About 35 minutes from the
+first module to green tests, on top of the records designed earlier; every
+function matched on its first full run except one test-data slip.
+
+The differential tests run every saved patrol through each function, plus
+scenarios for every branch, with rare random events (vapor explosions, fire
+starts, cook-offs) forced by searching for random-stream seeds whose first
+draw falls below the event's odds. Both sides go through JSON, as saves do.
+
+Lesson: run `elm-review --fix-all` only on code whose callers exist. Run
+over modules written ahead of their users, it deleted their unused
+constructors and functions; fix specific rules with `--rules` instead.

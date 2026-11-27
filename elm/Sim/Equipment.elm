@@ -1,7 +1,7 @@
 module Sim.Equipment exposing
     ( Part
     , Section(..)
-    , System
+    , System(..)
     , compartment
     , conditionLabel
     , damage
