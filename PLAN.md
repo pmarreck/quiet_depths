@@ -18,7 +18,7 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [x] Owner decision: should the simulation (now strict TypeScript) also move to Elm, or stay TypeScript with Elm owning the rules catalog and the UI? Answer: move it to Elm as well (owner, 2026-11-27 09:05), in stages alongside the remaining UI (done 2026-11-27 09:35 EST).
 - [x] Owner decision: type the Three.js scene modules with a pinned @types/three fetched by Nix, or with hand-written declarations? Answer: pin @types/three through Nix (owner, 2026-11-27 09:05) (done 2026-11-27 09:35 EST).
 - [x] Pin @types/three 0.170.0 and @types/webxr 0.5.20 (November 2024 releases matching the vendored Three r170) as hash-checked Nix inputs read only by the type check, and type the submarine model and wreck damage against them; a misspelled Three method or wrong argument type now fails the build (done 2026-11-27 09:50 EST; commit df393c7).
-- [ ] Type the remaining Three.js modules against the pinned declarations: undersea and scene (marine life, photo capture, atmosphere, combat effects and every model are typed).
+- [ ] Type scene, the last Three.js module, against the pinned declarations (every other scene module and model is typed).
 - [ ] Migrate the remaining first-party browser code to strict TypeScript: app.js, after the Three.js scene modules are typed (simulation, audio, storage and UI helpers are done); app.js shrinks as its UI moves to Elm.
 
 ## New gameplay
