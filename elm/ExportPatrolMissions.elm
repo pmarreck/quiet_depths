@@ -28,8 +28,15 @@ encodeObjective objective =
         ReachGate radius ->
             rule "gate" [ ( "radius", E.float radius ) ]
 
-        TrackQuietly ->
-            rule "track" []
+        TrackQuietly c ->
+            rule "track"
+                [ ( "listeningRange", E.float c.listeningRange )
+                , ( "quieterThan", E.float c.quieterThan )
+                , ( "deeperThan", E.float c.deeperThan )
+                , ( "shortestGoal", E.int c.shortestGoal )
+                , ( "goalStep", E.int c.goalStep )
+                , ( "goalSteps", E.int c.goalSteps )
+                ]
 
         RecoverSurvivors c ->
             rule "rescue"

@@ -18,6 +18,7 @@ import {resolveTraffic} from './hull-contacts.js';
 import {makeEnvironment,environmentAt,scopeWashed,hash01,WEATHER,soundings} from './environment.js';
 import {emitSound,launchNoise,updateAcoustics} from './acoustics.js';
 import {sweepClutter} from './seabed-rest.js';
+import {trackingConvoy,trackingCriteria} from './convoy-tracking.js';
 import {clamp,rad,bearing,delta,distance,separation,bottom,rand,log} from './mechanics.js';
 import {MISSIONS,randomizePatrol,objectiveComplete,validMissionTargets,updateFleetBattle} from './missions.js';
 import {isDieselMode} from './power-plant.js';
@@ -350,10 +351,7 @@ function tick(s,dt,input){
    }
   }
  }
- if(s.mission==='shadow'&&s.noise<27&&s.depth>15){
-  const listeningRange=4000*operatingFraction(s.systems.sonar);
-  if(s.ships.some(c=>!c.incidental&&c.kind==='merchant'&&c.hull>0&&distance(s,c)<listeningRange))s.trackTime+=dt;
- }
+ if(s.mission==='shadow'&&trackingConvoy(s,trackingCriteria))s.trackTime+=dt;
  const done=objectiveComplete(s,dt);
  if(s.convoy&&s.status==='patrol'){
   const limit=MISSIONS.find(m=>m.id===s.mission).objective.lossLimit;

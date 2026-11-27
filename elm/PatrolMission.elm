@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), RescueCriteria, SurveyCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), RescueCriteria, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
@@ -25,11 +25,37 @@ type Objective
     | SinkShips String (List String)
     | Survive
     | ReachGate Float
-    | TrackQuietly
+    | TrackQuietly TrackingCriteria
     | RecoverSurvivors RescueCriteria
     | SurveyWreck SurveyCriteria
     | FleetLead Int
     | ProtectConvoy String Int
+
+
+{-| Tracking time accumulates while the sub is quieter than quieterThan,
+deeper than deeperThan and a convoy merchant is inside the listening range,
+which shrinks with sonar condition. Each patrol's goal is shortestGoal plus a
+seeded number of goalStep increments below goalSteps.
+-}
+type alias TrackingCriteria =
+    { listeningRange : Float
+    , quieterThan : Float
+    , deeperThan : Float
+    , shortestGoal : Int
+    , goalStep : Int
+    , goalSteps : Int
+    }
+
+
+convoyTracking : TrackingCriteria
+convoyTracking =
+    { listeningRange = 4000
+    , quieterThan = 27
+    , deeperThan = 15
+    , shortestGoal = 150
+    , goalStep = 30
+    , goalSteps = 4
+    }
 
 
 {-| The sub holds station while its separation from the casualty is within the
@@ -230,9 +256,9 @@ briefing mission =
         Shadow ->
             Briefing "shadow" "Just passing through" "SURVEILLANCE" RoutineWatch Observe
                 { standard = ( 8, 12 ), longer = ( 13, 23 ) }
-                "Quietly track the convoy inside 4 km. Bring the traffic intelligence home."
+                ("Quietly track the convoy inside " ++ String.fromFloat (convoyTracking.listeningRange / 1000) ++ " km. Bring the traffic intelligence home.")
                 "Quietly track the convoy"
-                TrackQuietly
+                (TrackQuietly convoyTracking)
 
         UnderseaRescue ->
             Briefing "undersea-rescue" "Someone is still knocking" "UNDERSEA RESCUE" RoutineWatch Observe
