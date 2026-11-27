@@ -153,3 +153,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Convert the service record, acoustics and contact track-estimate modules to strict TypeScript (done 2026-11-27 03:28 EST; commit 805e3a3).
 - [x] [Elm migration] Convert the weather, light and sea environment module to strict TypeScript, checked output-identical to the original across 35,876 comparisons (done 2026-11-27 03:31 EST; commit c4d9d6e).
 - [x] [Elm migration] Convert the ROV tether and patrol report modules to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:33 EST; commit 7f1b1a3).
+- [x] [Elm migration] Convert held-input tracking and hostile pursuit to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:35 EST; commit 20cd0af).
