@@ -169,3 +169,22 @@ misread unpaired surrogates (`Char.toCode` gives NaN for a lone high
 surrogate; folding over a lone low surrogate swallows its neighbor).
 JavaScript code that hashes IDs reads UTF-16 code units, so the simulation
 reads text through `Sim.Text.codeUnits`, exact for every string.
+
+## Dual implementation until the cutover (owner decision, 2026-11-27)
+
+The game keeps running the TypeScript simulation until every module is
+ported, then switches at once. Until then a ported module's rules exist in
+both languages, and the owner has asked to be reminded of it whenever they
+request a gameplay feature or fix. For any such change:
+
+1. Tell the owner the change will be made twice, in the TypeScript the game
+   runs today and in its Elm twin.
+2. Change both. Each mirrored TypeScript module names its twin on its first
+   line (`// Mirrored in elm/Sim/X.elm ...`); a test fails if a mirrored
+   module lacks that line.
+3. Extend the module's differential test (`tests/sim-*.test.mjs`) to cover
+   the new behavior, so the two cannot drift.
+
+A change to a module not yet ported needs only the TypeScript; the port
+then carries it over.
+

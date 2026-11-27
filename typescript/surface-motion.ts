@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/SurfaceMotion.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {SUB_DESIGN} from './hull-design.ts';
 
 interface Sea { waveScale: number; waveSpeed: number; wavePhase?: number; sampledAt?: number }

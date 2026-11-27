@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Foundering.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import type {HullClass} from './surface-hull.ts';
 
 export type SurfaceShip = Exclude<HullClass, 'launch'>;

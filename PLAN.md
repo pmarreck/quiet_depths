@@ -1,6 +1,7 @@
 # PLAN
 
 Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
+Until the simulation cutover to Elm, every gameplay feature or fix that touches a ported module must be made in both the TypeScript and the Elm; remind the owner whenever they request one (context: docs/plan_context/simulation-to-elm.md).
 
 ## Playtest fixes (owner feedback 2026-11-27)
 

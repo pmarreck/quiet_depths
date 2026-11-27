@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Periscope.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {SUB_DESIGN as hull} from './hull-design.ts';
 
 type Scope = {scope: boolean; scopeTravel?: number};

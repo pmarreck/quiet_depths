@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Math.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Transcendental functions the simulation shares with its Elm port. Elm has no
 // exp, expm1, tanh or cbrt, and its e ^ x (Math.pow) differs from Math.exp in
 // the last bits for most inputs, so both simulations compute these the same way

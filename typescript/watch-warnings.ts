@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/WatchWarnings.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // The watch remembers a critical battery at exactly 10% until it rises above it.
 export type BatteryWarning = 0 | 1 | 2;
 export interface WatchWarnings {bottom:boolean;battery:BatteryWarning}

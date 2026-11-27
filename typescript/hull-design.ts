@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/HullDesign.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Fictional 1972 patrol boat. Form references: USS Barbel/Blueback, NHHC.
 // The retained dual-purpose gun and compact CURV-style launch are game refits.
 const hullColor=0x24282b;

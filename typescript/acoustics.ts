@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Acoustics.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {exp} from './sim-math.ts';
 // Constant-speed, flat-interface approximation. Typical speeds: NOAA,
 // https://oceanservice.noaa.gov/facts/sound.html . Not a full ocean acoustic model.

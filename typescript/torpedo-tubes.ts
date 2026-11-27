@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/TorpedoTubes.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 export const RELOAD_SECONDS = 20;
 export type BowTube = 'port' | 'starboard';
 type ReadyTimes = Record<BowTube, number>;

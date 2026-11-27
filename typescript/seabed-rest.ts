@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/SeabedRest.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Resting on the seabed. A gentle landing is safe and a hard one risks damage.
 // A stopped sub on the bottom blends into it. Trying to move scrapes the outer hull.
 export const RESTING_KNOTS = 0.3;

@@ -103,3 +103,24 @@ test('Elm reads every string as the UTF-16 code units JavaScript does, unpaired 
   for (let i = 0; i < 2000; i++) texts.push(String.fromCharCode(...Array.from({length: Math.floor(random() * 12)}, () => random() < .3 ? 0xd800 + Math.floor(random() * 0x800) : Math.floor(random() * 0x10000))));
   assert.deepEqual(await elm('text.codeUnits', texts.map(t => [t])), texts.map(t => Array.from({length: t.length}, (_, i) => t.charCodeAt(i))));
 });
+
+// Until the game loop switches to Elm, a gameplay change to a ported module
+// must be made in both languages. Every TypeScript module the Elm harness
+// mirrors says so on its first line, and names its Elm twin, so nobody edits
+// one side unawares. The mirrored set comes from the harness itself.
+test('every TypeScript module mirrored in Elm says so and names its twin', () => {
+  const harness = new URL('../elm/SimHarness/', import.meta.url), prefixes = new Set();
+  for (const file of readdirSync(harness).filter(f => f.endsWith('.elm')))
+    for (const [, prefix] of readFileSync(new URL(file, harness), 'utf8').matchAll(/\n {8}"([a-zA-Z]+)\.\w+" ->/g)) prefixes.add(prefix);
+  // Harness prefixes with no TypeScript module of their own, and the one whose module is named differently.
+  const noModule = new Set(['text']), renamed = {math: ['sim-math', 'Math']};
+  const missing = [];
+  for (const prefix of [...prefixes].filter(p => !noModule.has(p))) {
+    const [file, elm] = renamed[prefix] ?? [prefix.replace(/[A-Z]/g, c => '-' + c.toLowerCase()), prefix[0].toUpperCase() + prefix.slice(1)];
+    const first = readFileSync(new URL(`../typescript/${file}.ts`, import.meta.url), 'utf8').split('\n')[0];
+    readFileSync(new URL(`../elm/Sim/${elm}.elm`, import.meta.url));
+    if (first !== `// Mirrored in elm/Sim/${elm}.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.`) missing.push(file);
+  }
+  assert.ok(prefixes.size > 20, 'the harness mirrors the ported modules');
+  assert.deepEqual(missing, []);
+});

@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/RescueOperation.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {missions} from './mission-catalog.ts';
 
 // The Elm mission definitions own these values. The briefing, station keeping,

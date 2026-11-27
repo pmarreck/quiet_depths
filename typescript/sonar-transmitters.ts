@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/SonarTransmitters.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // The imaging sonars as the simulation sees them: which instruments are
 // transmitting, how far each profile reaches, how much it exposes the boat to
 // a listening enemy, and what falls inside each instrument's beam. Drawing

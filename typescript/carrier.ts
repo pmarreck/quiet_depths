@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Carrier.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {missions} from './mission-catalog.ts';
 // Fictional patrol balance and silhouette proportions, in game units.
 export const carrierId = 'solstice';

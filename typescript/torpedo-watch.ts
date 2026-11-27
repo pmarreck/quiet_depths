@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/TorpedoWatch.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Observations of simulated game pieces. Keep them out of the vessel contact
 // list so a sonar return never becomes a selectable ship or weapon target.
 type Position = {x:number; y:number; depth:number};

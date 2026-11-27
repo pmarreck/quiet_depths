@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/PowerPlant.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {cbrt} from './sim-math.ts';
 import {operatingFraction} from './equipment.ts';
 

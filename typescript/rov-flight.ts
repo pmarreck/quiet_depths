@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/RovFlight.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Degrees above the horizon. A null order leaves the automatic depth controller in charge.
 import {boatPoint} from './surface-motion.ts';
 

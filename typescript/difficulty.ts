@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Difficulty.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 export const difficultyControls = [
   {id:'damage', label:'Damage advantage', min:-1, max:1, step:.1, initial:0, low:'Enemy advantage', high:'Player advantage'},
   {id:'detection', label:'Enemy detection sensitivity', min:.4, max:1.8, step:.1, initial:1, low:'Hard to detect', high:'Easy to detect'},

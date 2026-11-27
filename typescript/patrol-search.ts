@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/PatrolSearch.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {patrol} from './mission-catalog.ts';
 import {hash01} from './surface-motion.ts';
 

@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Debrief.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // The end-of-patrol debrief records what actually happened, newest last.
 export interface DebriefEntry {time: number; text: string}
 

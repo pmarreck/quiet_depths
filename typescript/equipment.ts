@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Equipment.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Condition and repair limits are independent. A light hit may leave more
 // working equipment intact than the crew could rebuild after a later hit.
 export const SYSTEM_NAMES = {

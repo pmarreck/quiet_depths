@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/ConvoyTracking.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {operatingFraction} from './equipment.ts';
 import {missions} from './mission-catalog.ts';
 
