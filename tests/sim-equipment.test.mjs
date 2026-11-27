@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as ts from '../src/equipment.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 
 // Every input is compared with the TypeScript it replaces. The edge values
 // sit on each rule's boundaries; the random ones cover the space between.
@@ -20,7 +20,7 @@ test('the Elm equipment list, names and compartments are the TypeScript ones, in
 
 test('the Elm operating fraction matches the TypeScript at and between its 20% threshold', async () => {
   const random = seeded(1), inputs = [...edges, ...Array.from({length: 400}, () => random() * 120 - 10)];
-  assert.deepEqual(await elm('equipment.operatingFraction', inputs.map(x => [x])), inputs.map(ts.operatingFraction));
+  sameResults(await elm('equipment.operatingFraction', inputs.map(x => [x])), inputs.map(ts.operatingFraction));
 });
 
 test('Elm damage and repair change a part exactly as the TypeScript does', async () => {
@@ -33,9 +33,9 @@ test('Elm damage and repair change a part exactly as the TypeScript does', async
     ts.damagePart(parts, limits, 'p', amount);
     return {condition: parts.p, limit: limits.p};
   });
-  assert.deepEqual(await elm('equipment.damage', cases), damaged);
+  sameResults(await elm('equipment.damage', cases), damaged);
   const repaired = cases.map(([amount, part]) => ({condition: ts.repairPart(part.condition, part.limit, amount), limit: part.limit}));
-  assert.deepEqual(await elm('equipment.repair', cases), repaired);
+  sameResults(await elm('equipment.repair', cases), repaired);
 });
 
 test('the Elm condition label reads exactly as the TypeScript one', async () => {
@@ -43,7 +43,7 @@ test('the Elm condition label reads exactly as the TypeScript one', async () => 
   for (const condition of [0, 0.4, 5, 19.99, 20, 64.5, 100]) for (const limit of [0, 61.4125, 72.25, 85, 99.999, 100]) for (const offline of [true, false])
     cases.push([offline, {condition, limit}]);
   for (let i = 0; i < 300; i++) cases.push([random() < .5, {condition: random() * 100, limit: random() * 100}]);
-  assert.deepEqual(await elm('equipment.conditionLabel', cases), cases.map(([offline, p]) => ts.conditionLabel(p.condition, p.limit, offline)));
+  sameResults(await elm('equipment.conditionLabel', cases), cases.map(([offline, p]) => ts.conditionLabel(p.condition, p.limit, offline)));
 });
 
 test('Elm hit location picks the same section and system as the TypeScript', async () => {
@@ -54,13 +54,13 @@ test('Elm hit location picks the same section and system as the TypeScript', asy
     hits.push([boat, {x: boat.x + Math.sin(angle) * range, y: boat.y + Math.cos(angle) * range}]);
   }
   hits.push([{x: 0, y: 0, heading: 0}, {x: 0, y: 0}], [{x: 0, y: 0, heading: 90}, {x: 30 * 0.34, y: 0}]);
-  assert.deepEqual(await elm('equipment.hitSection', hits), hits.map(([boat, hit]) => ts.hitSection(boat, hit)));
+  sameResults(await elm('equipment.hitSection', hits), hits.map(([boat, hit]) => ts.hitSection(boat, hit)));
   const rolls = [];
   for (const section of [null, 'bow', 'midships', 'stern']) {
     for (const roll of [0, 0.25, 0.5, 0.79999, 0.8, 0.80001, 0.99999]) rolls.push([section, roll]);
     for (let i = 0; i < 200; i++) rolls.push([section, random()]);
   }
-  assert.deepEqual(await elm('equipment.hitSystem', rolls), rolls.map(([section, roll]) => ts.hitSystem(section, roll)));
+  sameResults(await elm('equipment.hitSystem', rolls), rolls.map(([section, roll]) => ts.hitSystem(section, roll)));
 });
 
 test('the harness reports a function it does not know instead of answering', async () => {

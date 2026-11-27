@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as env from '../src/environment.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 
 const times = ['dawn', 'day', 'dusk', 'night'], weathers = ['clear', 'cloudy', 'rain', 'storm'];
 
@@ -28,7 +28,7 @@ test('Elm setup conditions match the TypeScript for every choice and seed', asyn
     calls.push([seed, {timeOfDay, weather, changing: [undefined, true, false, 0, null][Math.floor(random() * 5)]}]);
   const expected = calls.map(args => env.makeEnvironment(...args));
   assert.equal(new Set(expected.map(c => c.startHour)).size, 4, 'each start hour is drawn');
-  assert.deepEqual(await elm('environment.makeEnvironment', calls), expected);
+  sameResults(await elm('environment.makeEnvironment', calls), expected);
 });
 
 test('the Elm sky matches the TypeScript through fronts, fog, moonlight, holidays and lightning', async () => {
@@ -50,7 +50,7 @@ test('the Elm sky matches the TypeScript through fronts, fog, moonlight, holiday
   assert.ok(expected.some(e => e.flash > .5), 'lightning flashes nearby');
   assert.ok(expected.some(e => Number.isNaN(e.flash)), 'a strike seen from an unplaced sky');
   assert.ok(expected.some(e => !presets.includes(e.cloud)), 'fronts are caught mid-blend');
-  assert.deepEqual(await elm('environment.environmentAt', skies.map(s => [s])), expected);
+  sameResults(await elm('environment.environmentAt', skies.map(s => [s])), expected);
 });
 
 test('Elm hull motion, the periscope eye, the washed lens and soundings match the TypeScript', async () => {
@@ -63,12 +63,12 @@ test('Elm hull motion, the periscope eye, the washed lens and soundings match th
     if (i % 2) s.roll = (random() - .5) * .2;
     boats.push([s]);
   }
-  assert.deepEqual(await elm('environment.boatSurfacePose', boats), boats.map(([s]) => env.boatSurfacePose(s)));
+  sameResults(await elm('environment.boatSurfacePose', boats), boats.map(([s]) => env.boatSurfacePose(s)));
   const washed = boats.map(([s]) => env.scopeWashed(s));
   assert.ok(washed.filter(Boolean).length > 100 && washed.filter(w => !w).length > 100, 'lenses wash and clear');
-  assert.deepEqual(await elm('environment.scopeWashed', boats), washed);
+  sameResults(await elm('environment.scopeWashed', boats), washed);
   const eyes = boats.map(([s], i) => [{x: s.x, y: s.y, heading: s.heading, depth: s.depth, pitch: s.pitch, ...(i % 2 ? {roll: s.roll} : {})}, ...(i % 3 ? [{scope: s.scope, ...(s.scopeTravel === undefined ? {} : {scopeTravel: s.scopeTravel})}] : [])]);
-  assert.deepEqual(await elm('environment.scopePosition', eyes), eyes.map(args => env.scopePosition(...args)));
+  sameResults(await elm('environment.scopePosition', eyes), eyes.map(args => env.scopePosition(...args)));
   const soundings = [[230, 12], [230, 12, .7], [0, 0, 0], [NaN, 4], [80, 120, 32.5]];
-  assert.deepEqual(await elm('environment.soundings', soundings), soundings.map(args => env.soundings(...args)));
+  sameResults(await elm('environment.soundings', soundings), soundings.map(args => env.soundings(...args)));
 });

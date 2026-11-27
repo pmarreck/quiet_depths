@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, readdirSync} from 'node:fs';
 import * as shared from '../src/sim-math.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 import {simulationModules} from './sim-modules.mjs';
 
 // The Elm simulation's arithmetic must equal JavaScript's to the last bit,
@@ -101,7 +101,7 @@ test('Elm imul and toInt32 equal Math.imul and x | 0 bit for bit', async () => {
 test('Elm reads every string as the UTF-16 code units JavaScript does, unpaired surrogates included', async () => {
   const random = seeded(29), texts = ['', 'kestrel', 'Ünïcode', 'ship 🚢', '🚢', '\ud800', '\udc00', '\ud800lone', 'lone\udfff', 'a\udc00b', '􏿿', '\ud800𐀀', '￿퟿'];
   for (let i = 0; i < 2000; i++) texts.push(String.fromCharCode(...Array.from({length: Math.floor(random() * 12)}, () => random() < .3 ? 0xd800 + Math.floor(random() * 0x800) : Math.floor(random() * 0x10000))));
-  assert.deepEqual(await elm('text.codeUnits', texts.map(t => [t])), texts.map(t => Array.from({length: t.length}, (_, i) => t.charCodeAt(i))));
+  sameResults(await elm('text.codeUnits', texts.map(t => [t])), texts.map(t => Array.from({length: t.length}, (_, i) => t.charCodeAt(i))));
 });
 
 // Until the game loop switches to Elm, a gameplay change to a ported module
@@ -139,7 +139,7 @@ test('Elm writes numbers exactly as JavaScript toFixed does, rounding the binary
     const mid = (Math.floor(random() * 2e5) + .5) / 10 ** d;
     for (let s = -3; s <= 3; s++) cases.push([d, step(mid, s)]);
   }
-  assert.deepEqual(await elm('text.toFixed', cases), cases.map(([d, v]) => v.toFixed(d)));
+  sameResults(await elm('text.toFixed', cases), cases.map(([d, v]) => v.toFixed(d)));
 });
 
 // Elm compiles <, >, <= and >= to JavaScript's operators only when one side

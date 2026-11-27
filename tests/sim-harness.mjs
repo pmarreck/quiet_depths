@@ -10,6 +10,8 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
+import assert from 'node:assert/strict';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 let harness = null, nextId = 0;
@@ -63,6 +65,17 @@ export function elm(fn, batch = [[]]) {
 }
 
 // A seeded generator, so every run compares the same inputs.
+// The same check as assert.deepStrictEqual on the whole batch (same length,
+// each call's result strictly equal), reporting only the first differing
+// call. A full diff of thousands of differing results can take minutes and
+// gigabytes, long enough for a mutation run's timeout to cancel the test.
+export function sameResults(actual, expected) {
+  assert.ok(Array.isArray(actual) && Array.isArray(expected), 'both are batches');
+  for (let i = 0; i < Math.max(actual.length, expected.length); i++)
+    if (!isDeepStrictEqual(actual[i], expected[i])) assert.deepStrictEqual(actual[i], expected[i], `call ${i} of ${expected.length} differs`);
+  assert.equal(actual.length, expected.length);
+}
+
 export function seeded(seed) {
   let state = seed >>> 0;
   return () => {

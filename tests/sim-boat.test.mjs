@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as plant from '../src/power-plant.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 
 const pick = (random, list) => list[Math.floor(random() * list.length)];
 
@@ -23,29 +23,29 @@ function plants(random) {
 test('the Elm power plant matches the TypeScript generator, battery, propulsion and routing', async () => {
   assert.deepEqual((await elm('powerPlant.constants'))[0], {SURFACE_KNOTS: plant.SURFACE_KNOTS, ELECTRIC_KNOTS: plant.ELECTRIC_KNOTS});
   const modes = ['charge', 'drive', 'assist', 'Charge', 'toString', 'constructor', '', 7, null].map(v => [v]);
-  assert.deepEqual(await elm('powerPlant.isDieselMode', modes), modes.map(([v]) => plant.isDieselMode(v)));
+  sameResults(await elm('powerPlant.isDieselMode', modes), modes.map(([v]) => plant.isDieselMode(v)));
   const cases = plants(seeded(61)), one = cases.map(s => [s]);
-  assert.deepEqual(await elm('powerPlant.generatorOutput', one), cases.map(plant.generatorOutput));
-  assert.deepEqual(await elm('powerPlant.batteryOutput', one), cases.map(plant.batteryOutput));
+  sameResults(await elm('powerPlant.generatorOutput', one), cases.map(plant.generatorOutput));
+  sameResults(await elm('powerPlant.batteryOutput', one), cases.map(plant.batteryOutput));
   const expected = cases.map(plant.propulsion);
   assert.ok(expected.some(p => p.assistDrain > 0) && expected.some(p => p.chargeRate > 0), 'the corpus assists and charges');
-  assert.deepEqual(await elm('powerPlant.propulsion', one), expected);
+  sameResults(await elm('powerPlant.propulsion', one), expected);
   const routed = cases.map((s, i) => [s, expected[i]]), statuses = routed.map(([s, p]) => plant.dieselRoutingStatus(s, p));
   assert.deepEqual([...new Set(statuses)].sort(), ['', 'ASSIST UNAVAILABLE', 'BATTERY ASSIST ACTIVE', 'BATTERY ASSIST READY', 'BATTERY FULL', 'BATTERY OFFLINE', 'CHARGE OFF', 'CHARGING'], 'every routing status appears');
-  assert.deepEqual(await elm('powerPlant.dieselRoutingStatus', routed), statuses);
+  sameResults(await elm('powerPlant.dieselRoutingStatus', routed), statuses);
   // NaN conditions read as offline in both, as JavaScript's falsy NaN does.
   const offline = {generator: 1, drive: 1, ahead: 1, astern: 1, chargeRate: 0, assistDrain: 0}, broken = {...cases[0], battery: 50, systems: {...cases[0].systems, batteryBank: NaN}};
   const nan = ['charge', 'assist'].map(dieselMode => [{...broken, dieselMode}, offline]).concat([[broken, {...offline, generator: NaN}]]);
-  assert.deepEqual(await elm('powerPlant.dieselRoutingStatus', nan), nan.map(([s, p]) => plant.dieselRoutingStatus(s, p)));
+  sameResults(await elm('powerPlant.dieselRoutingStatus', nan), nan.map(([s, p]) => plant.dieselRoutingStatus(s, p)));
 });
 
 test('the Elm throttle lever and energy draw match the TypeScript', async () => {
   const random = seeded(62), levers = [-5, -4, -3.9999, -0, 0, 1, 16.9999, 17, 18, ...Array.from({length: 500}, () => random() * 30 - 8)].map(v => [v]);
-  assert.deepEqual(await elm('powerPlant.throttlePercent', levers), levers.map(([v]) => plant.throttlePercent(v)));
+  sameResults(await elm('powerPlant.throttlePercent', levers), levers.map(([v]) => plant.throttlePercent(v)));
   const percents = [-101, -100, -50, -0, 0, 50, 100, 101, ...Array.from({length: 500}, () => random() * 220 - 110)].map(v => [v]);
-  assert.deepEqual(await elm('powerPlant.throttleOrder', percents), percents.map(([v]) => plant.throttleOrder(v)));
+  sameResults(await elm('powerPlant.throttleOrder', percents), percents.map(([v]) => plant.throttleOrder(v)));
   const draws = [[0, 0, 0], [-16, 0, 0], [20.5, .12, 0], [20.5, 0, .2], [12, 0, .5], ...Array.from({length: 1000}, () => [random() * 44 - 22, random() * .12, random() * .3])];
-  assert.deepEqual(await elm('powerPlant.energyDraw', draws), draws.map(d => plant.energyDraw(...d)));
+  sameResults(await elm('powerPlant.energyDraw', draws), draws.map(d => plant.energyDraw(...d)));
 });
 
 test('the Elm sea surface, hull motion, boat axes and seeded hash match the TypeScript', async () => {
@@ -59,15 +59,15 @@ test('the Elm sea surface, hull motion, boat axes and seeded hash match the Type
     return s;
   };
   const phases = Array.from({length: 600}, () => [random() * 900, sea()]);
-  assert.deepEqual(await elm('surfaceMotion.wavePhaseAt', phases), phases.map(([t, s]) => motion.wavePhaseAt(t, s)));
+  sameResults(await elm('surfaceMotion.wavePhaseAt', phases), phases.map(([t, s]) => motion.wavePhaseAt(t, s)));
   const heights = Array.from({length: 3000}, () => [(random() - .5) * 20000, (random() - .5) * 20000, random() * 900, sea()]);
-  assert.deepEqual(await elm('surfaceMotion.surfaceHeight', heights), heights.map(([x, y, t, s]) => motion.surfaceHeight(x, y, t, s)));
+  sameResults(await elm('surfaceMotion.surfaceHeight', heights), heights.map(([x, y, t, s]) => motion.surfaceHeight(x, y, t, s)));
   // Depths across the periscope depth where the sea stops moving the hull.
   const hulls = [];
   for (const depth of [-2, 0, 3, 14.999, 15, 15.001, 40]) for (let i = 0; i < 40; i++)
     hulls.push([{x: (random() - .5) * 8000, y: (random() - .5) * 8000, heading: random() * 360, depth, pitch: (random() - .5) * .2}, sea(), random() * 900]);
   for (let i = 0; i < 2000; i++) hulls.push([{x: (random() - .5) * 8000, y: (random() - .5) * 8000, heading: random() * 360, depth: random() * 18 - 1, pitch: (random() - .5) * .3}, sea(), random() * 900]);
-  assert.deepEqual(await elm('surfaceMotion.surfaceMotion', hulls), hulls.map(([b, s, t]) => motion.surfaceMotion(b, s, t)));
+  sameResults(await elm('surfaceMotion.surfaceMotion', hulls), hulls.map(([b, s, t]) => motion.surfaceMotion(b, s, t)));
   const boat = () => {
     const b = {x: (random() - .5) * 4000, y: (random() - .5) * 4000, heading: random() * 360, depth: random() * 200, pitch: random() < .05 ? NaN : (random() - .5) * .6};
     if (random() < .8) b.roll = random() < .05 ? NaN : (random() - .5) * .8;
@@ -78,9 +78,9 @@ test('the Elm sea surface, hull motion, boat axes and seeded hash match the Type
     for (const key of ['side', 'forward', 'down']) if (random() < .8) o[key] = (random() - .5) * 60;
     return [boat(), o];
   });
-  assert.deepEqual(await elm('surfaceMotion.boatPoint', offsets), offsets.map(([b, o]) => motion.boatPoint(b, o)));
+  sameResults(await elm('surfaceMotion.boatPoint', offsets), offsets.map(([b, o]) => motion.boatPoint(b, o)));
   const locals = Array.from({length: 3000}, () => [boat(), {x: (random() - .5) * 4000, y: (random() - .5) * 4000, depth: random() * 300}]);
-  assert.deepEqual(await elm('surfaceMotion.boatLocal', locals), locals.map(([b, p]) => motion.boatLocal(b, p)));
+  sameResults(await elm('surfaceMotion.boatLocal', locals), locals.map(([b, p]) => motion.boatLocal(b, p)));
   const draws = [[0, 0], [1, 0], [-1, 0], [2 ** 31, 7], [2 ** 32 + 3, 7], [-(2 ** 40), 3], [1.5, 2.5], [NaN, 1], [42, -1], [42, 2 ** 31], [42, 1e12]];
   for (let i = 0; i < 20000; i++) draws.push([Math.floor(random() * 2 ** 32), Math.floor(random() * 5000)]);
   same(await elm('surfaceMotion.hash01', draws), draws.map(([seed, n]) => motion.hash01(seed, n)));
@@ -97,15 +97,15 @@ test('the Elm ROV nose, camera pitch and tether point match the TypeScript', asy
   const pitches = [];
   for (const vs of [-3, -1, -.5, -0, 0, .5, 1, 3]) for (const nose of [null, 0, -60, 60, 15]) pitches.push([vs, nose]);
   for (let i = 0; i < 300; i++) pitches.push([(random() - .5) * 4, random() < .5 ? null : (random() - .5) * 120]);
-  assert.deepEqual(await elm('rovFlight.droneCameraPitch', pitches), pitches.map(([vs, nose]) => rov.droneCameraPitch(vs, nose)));
+  sameResults(await elm('rovFlight.droneCameraPitch', pitches), pitches.map(([vs, nose]) => rov.droneCameraPitch(vs, nose)));
   const poses = Array.from({length: 1000}, () => [{x: (random() - .5) * 2000, y: (random() - .5) * 2000, depth: random() * 300, heading: random() * 360,
     verticalSpeed: (random() - .5) * 4, nosePitch: random() < .4 ? null : (random() - .5) * 120}]);
-  assert.deepEqual(await elm('rovFlight.droneTetherAttachment', poses), poses.map(([d]) => rov.droneTetherAttachment(d)));
+  sameResults(await elm('rovFlight.droneTetherAttachment', poses), poses.map(([d]) => rov.droneTetherAttachment(d)));
   const changes = [];
   for (const nose of [null, 55, -55, 0]) for (const degrees of [-10, 0, 4, 10]) for (const inverted of [false, true])
     changes.push([{nosePitch: nose, verticalSpeed: .7, targetDepth: 40, depth: 33}, degrees, inverted]);
   for (let i = 0; i < 300; i++) changes.push([{nosePitch: random() < .3 ? null : (random() - .5) * 120, verticalSpeed: (random() - .5) * 3, targetDepth: random() * 100, depth: random() * 100}, (random() - .5) * 40, random() < .5]);
-  assert.deepEqual(await elm('rovFlight.changeNosePitch', changes), changes.map(([d, degrees, inverted]) => {const c = {...d}; rov.changeNosePitch(c, degrees, inverted); return c;}));
+  sameResults(await elm('rovFlight.changeNosePitch', changes), changes.map(([d, degrees, inverted]) => {const c = {...d}; rov.changeNosePitch(c, degrees, inverted); return c;}));
 });
 
 test('the Elm wake finds the same surface crossings and keeps the same trail as the TypeScript', async () => {
@@ -136,7 +136,7 @@ test('the Elm wake finds the same surface crossings and keeps the same trail as 
   crossings.push([{...still, depth: 15, pitch: 0, speed: -5, scope: true}, flat], [{...still, depth: 15, pitch: 0, speed: 5, scope: true}, flat]);
   const expected = crossings.map(([b, s]) => wake.surfaceCrossing(b, s) ?? null);
   assert.ok(expected.filter(Boolean).length > 500 && expected.filter(e => !e).length > 500, 'the corpus finds and misses crossings');
-  assert.deepEqual(await elm('surfaceWake.surfaceCrossing', crossings), expected);
+  sameResults(await elm('surfaceWake.surfaceCrossing', crossings), expected);
   // A surfaced patrol recorded tick by tick, compared at every step.
   const s = createGame('recon', 9);
   Object.assign(s, {depth: 0, targetDepth: 0, speed: 9, targetSpeed: 17, engine: 'diesel', dieselMode: 'drive', ships: []});
@@ -153,5 +153,5 @@ test('the Elm wake finds the same surface crossings and keeps the same trail as 
   }
   const trails = steps.map(([b, e]) => {const c = structuredClone(b); wake.recordWake(c, e); return c.wake;});
   assert.ok(trails.some(t => t.length > 20) && trails.some((t, i) => i > 0 && t.length < trails[i - 1].length), 'the trail grows and ages');
-  assert.deepEqual(await elm('surfaceWake.recordWake', steps), trails);
+  sameResults(await elm('surfaceWake.recordWake', steps), trails);
 });

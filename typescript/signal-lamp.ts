@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/SignalLamp.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its save checks are mirrored in elm/Sim/SignalLampSaves.elm.
 import {hash01} from './surface-motion.ts';
 
 const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

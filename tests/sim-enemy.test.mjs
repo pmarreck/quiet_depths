@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as suspicion from '../src/suspicion.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 
 const kinds = ['merchant', 'escort', 'fishing', 'carrier', 'sub'];
 const ids = ['kestrel', 'gull-2', 'A', '', 'ship 🚢', '\ud800lone', 'lone\udc00', '🚢🚢x'];
@@ -22,19 +22,19 @@ function watcher(random, s, i) {
 
 test('Elm reads each code point as JavaScript for..of does', async () => {
   const texts = [...ids, '􏿿\ud800', '\udc00𐀀', ...Array.from({length: 2000}, (_, i) => String.fromCharCode(...Array.from({length: i % 9}, (_, j) => (i * 7919 + j * 104729) % 3 ? 0x61 + j : 0xd7f0 + ((i + j) * 37) % 0x830)))];
-  assert.deepEqual(await elm('text.codePointUnits', texts.map(t => [t])), texts.map(t => Array.from(t, c => c.charCodeAt(0))));
+  sameResults(await elm('text.codePointUnits', texts.map(t => [t])), texts.map(t => Array.from(t, c => c.charCodeAt(0))));
 });
 
 test('Elm suspicion labels, clues and imaging risk match the TypeScript', async () => {
   const random = seeded(91);
   const pursuits = [.4, 1, 2, NaN].map(p => [p]);
-  assert.deepEqual(await elm('suspicion.searchSeconds', pursuits), pursuits.map(([p]) => suspicion.searchSeconds(p)));
+  sameResults(await elm('suspicion.searchSeconds', pursuits), pursuits.map(([p]) => suspicion.searchSeconds(p)));
   const labels = [];
   for (const level of [0, 11.999, 12, 29.99, 30, 59.99, 60, 100, NaN]) for (const ships of [[], [{tracking: 'tracking'}], [{tracking: null}, {}], [{tracking: 'lost'}]]) labels.push([level, ships]);
-  assert.deepEqual(await elm('suspicion.suspicionLabel', labels), labels.map(([l, ships]) => suspicion.suspicionLabel(l, ships)));
+  sameResults(await elm('suspicion.suspicionLabel', labels), labels.map(([l, ships]) => suspicion.suspicionLabel(l, ships)));
   const leaves = Array.from({length: 600}, (_, i) => {const s = world(random); return [s, watcher(random, s, i), [0, 12, 24, 65, 120][i % 5], {x: (random() - .5) * 7000, y: (random() - .5) * 7000, time: random() * 900}];});
   leaves.push([world(random), {x: 0, y: 0, alert: 99, heading: 0, id: 'a', kind: 'sub'}, 12, {x: -600, y: 599.999, time: 3}]);
-  assert.deepEqual(await elm('suspicion.leaveClue', leaves), leaves.map(([s, v, amount, observed]) => {const c = structuredClone(v); suspicion.leaveClue(s, c, amount, observed); return touched(c);}));
+  sameResults(await elm('suspicion.leaveClue', leaves), leaves.map(([s, v, amount, observed]) => {const c = structuredClone(v); suspicion.leaveClue(s, c, amount, observed); return touched(c);}));
   // Transmissions at every range and beat, each instrument and profile, many watchers.
   const images = [];
   for (let i = 0; i < 6000; i++) {
@@ -44,7 +44,7 @@ test('Elm suspicion labels, clues and imaging risk match the TypeScript', async 
   }
   const imaged = images.map(([s, v, mode, profile, beat]) => {const c = structuredClone(v); suspicion.imagerClue(s, c, mode, profile, beat); return touched(c);});
   assert.ok(imaged.filter((c, i) => c.clue && c.clue !== images[i][1].clue && JSON.stringify(c.clue) !== JSON.stringify(images[i][1].clue)).length > 100, 'transmissions leave clues');
-  assert.deepEqual(await elm('suspicion.imagerClue', images), imaged);
+  sameResults(await elm('suspicion.imagerClue', images), imaged);
 });
 
 test('Elm watchers forget stale clues, steer toward fresh ones and inquire as the TypeScript does', async () => {
@@ -68,8 +68,8 @@ test('Elm watchers forget stale clues, steer toward fresh ones and inquire as th
   searches.push([edge, {x: 0, y: 0, alert: 5, heading: 90, id: 'e', kind: 'sub', nextInquiry: 200}, .25, {x: 0, y: 140, time: 199}], [edge, {x: 0, y: 0, alert: 5, heading: 90, id: 'e', kind: 'escort', nextInquiry: 200.001}, .25, {x: 0, y: 140.001, time: 199}]);
   const activeExpected = actives.map(([s, v]) => {const c = structuredClone(v), clue = suspicion.activeClue(s, c); return {clue: clue ?? null, watcher: touched(c)};});
   assert.ok(activeExpected.some(a => a.clue === null) && activeExpected.some(a => a.clue), 'clues are kept and forgotten');
-  assert.deepEqual(await elm('suspicion.activeClue', actives), activeExpected);
+  sameResults(await elm('suspicion.activeClue', actives), activeExpected);
   const searchExpected = searches.map(([s, v, dt, clue]) => {const c = structuredClone(v), due = suspicion.searchClue(s, c, dt, clue ?? undefined); return {due, watcher: touched(c)};});
   assert.ok(searchExpected.some(r => r.due) && searchExpected.some(r => !r.due), 'inquiries come due');
-  assert.deepEqual(await elm('suspicion.searchClue', searches), searchExpected);
+  sameResults(await elm('suspicion.searchClue', searches), searchExpected);
 });

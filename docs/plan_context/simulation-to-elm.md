@@ -276,3 +276,39 @@ low-memory guard after 26 of 50 mutants: 23 failed the tests, two were
 equivalent (the first front's blend guard, now removed from the Elm, and the
 dawn/dusk hour threshold, where no hour between 11 and 12 has mid daylight),
 and `weather-order` reported nothing. The other 24 have not run.
+
+## Checkpoint revised: run toward the hard parts (2026-11-27)
+
+A side agent pointed out, and the owner agreed in the spirit of "run toward
+the problem, not away from it", that leaf-first ports the easiest standalone
+pieces first, so the pace of the first third understates the rest. What
+remains holds the largest, most tangled modules (systems, missions, the
+patrol tick, save restore, combat), two shared data shapes the port has so
+far worked around (the 47-field ship record and the sonar contact record),
+and the switch of the game loop itself, which no line count includes. The
+port had already started steering around the contact record.
+
+So the checkpoint no longer fires at a third of the lines. Before it:
+
+1. Design the shared ship and contact records, with save decoders that
+   reject exactly what restore rejects (the JSON decoders must fall back only
+   when a field is absent, never when it is malformed).
+2. Port track estimates and one large tangled module on them, logging time.
+3. Spike the cutover: drive real ticks through Elm in the browser and
+   measure the boundary's per-frame cost.
+
+The checkpoint then brings a bottom-up estimate per remaining module and for
+the switch, not the early pace multiplied by three.
+
+## Tooling: a timed-out test is not a passing test (2026-11-27)
+
+Node's test runner, stopped by `timeout`, prints its summary with the
+unfinished tests counted as canceled and `fail 0`. The mutation script read only
+the fail count, so a mutant whose test was canceled looked like a survivor;
+`delivered-stops` in the signal lamp was one. Tests ran long because
+`assert.deepEqual` on a batch of thousands of differing results builds a
+full diff, which took minutes and plenty of memory, and may have added to the
+pressure that stopped the environment run. The tests now compare batches with
+`sameResults` (the same strict equality, reporting the first differing call),
+mutants fail in about five seconds, and the script counts a run as a survivor
+only when it finished with no failures and nothing canceled.

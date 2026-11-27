@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as ts from '../src/acoustics.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 
 // The Elm acoustics must hear the same sounds at the same moments, from the
 // same directions and as loud, as the TypeScript does.
@@ -29,14 +29,14 @@ test('the Elm air-to-water path matches the TypeScript bisection', async () => {
   const random = seeded(31), cases = [];
   for (const r of [-500, 0, 1, 2000]) for (const h of [-5, 0, 3, 900]) for (const d of [-1, 0, 1, 250]) cases.push([r, h, d]);
   for (let i = 0; i < 2000; i++) cases.push([(random() - .5) * 8000, random() * 2000, random() * 300]);
-  assert.deepEqual(await elm('acoustics.airWaterPath', cases), cases.map(c => ts.airWaterPath(...c)));
+  sameResults(await elm('acoustics.airWaterPath', cases), cases.map(c => ts.airWaterPath(...c)));
 });
 
 test('Elm propagation, pan and perceived loudness match the TypeScript for every kind of sound', async () => {
   const random = seeded(32), cases = Array.from({length: 4000}, (_, i) => [source(random, i), listener(random)]);
-  assert.deepEqual(await elm('acoustics.propagationTime', cases), cases.map(([s, l]) => ts.propagationTime(s, l)));
-  assert.deepEqual(await elm('acoustics.spatialPan', cases), cases.map(([s, l]) => ts.spatialPan(s, l)));
-  assert.deepEqual(await elm('acoustics.perceivedSound', cases), cases.map(([s, l]) => ts.perceivedSound(s, l)));
+  sameResults(await elm('acoustics.propagationTime', cases), cases.map(([s, l]) => ts.propagationTime(s, l)));
+  sameResults(await elm('acoustics.spatialPan', cases), cases.map(([s, l]) => ts.spatialPan(s, l)));
+  sameResults(await elm('acoustics.perceivedSound', cases), cases.map(([s, l]) => ts.perceivedSound(s, l)));
 });
 
 test('the Elm acoustics hear, record and forget sounds in the TypeScript order', async () => {
@@ -65,5 +65,5 @@ test('the Elm acoustics hear, record and forget sounds in the TypeScript order',
   });
   assert.ok(expected.some(r => r.sounds.length === 96), 'the corpus reaches the 96-sound limit');
   assert.ok(expected.some(r => r.events.some(e => e[0] === 'blast')), 'the corpus hears a blast');
-  assert.deepEqual(await elm('acoustics.update', cases), expected);
+  sameResults(await elm('acoustics.update', cases), expected);
 });

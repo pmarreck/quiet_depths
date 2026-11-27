@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as foundering from '../src/foundering.js';
 import * as watch from '../src/torpedo-watch.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 
 const surface = ['merchant', 'escort', 'fishing', 'carrier'];
 
@@ -12,10 +12,10 @@ test('Elm sinking poses, depths and descent match the TypeScript for every surfa
     for (const drop of [-1, 0, 0.76, 2, 5, 16, 30, 39.86, 42.86, 60, 120, 400]) poses.push([kind, drop]);
     for (let i = 0; i < 300; i++) poses.push([kind, random() * 140]);
   }
-  assert.deepEqual(await elm('foundering.founderingPose', poses), poses.map(([k, d]) => foundering.founderingPose(k, d)));
-  assert.deepEqual(await elm('foundering.submergedDepth', surface.map(k => [k])), surface.map(foundering.submergedDepth));
+  sameResults(await elm('foundering.founderingPose', poses), poses.map(([k, d]) => foundering.founderingPose(k, d)));
+  sameResults(await elm('foundering.submergedDepth', surface.map(k => [k])), surface.map(foundering.submergedDepth));
   const ages = [-1, 0, 13, 26, 40, ...Array.from({length: 200}, () => random() * 40)].map(a => [a]);
-  assert.deepEqual(await elm('foundering.descentSpeed', ages), ages.map(([a]) => foundering.descentSpeed(a)));
+  sameResults(await elm('foundering.descentSpeed', ages), ages.map(([a]) => foundering.descentSpeed(a)));
 });
 
 test('Elm wreck visibility matches the TypeScript for charted, settled, collapsed and sinking vessels', async () => {
@@ -31,7 +31,7 @@ test('Elm wreck visibility matches the TypeScript for charted, settled, collapse
       cases.push([v, now]);
     }
   for (let i = 0; i < 300; i++) cases.push([{kind: [...surface, 'sub'][i % 5], hull: 0, settled: random() < .5, sunkAt: random() * 100, sinkDepth: random() * 80}, random() * 300]);
-  assert.deepEqual(await elm('foundering.wreckVisible', cases), cases.map(([v, now]) => foundering.wreckVisible(v, now)));
+  sameResults(await elm('foundering.wreckVisible', cases), cases.map(([v, now]) => foundering.wreckVisible(v, now)));
 });
 
 test('Elm torpedo echoes and tracks follow the TypeScript fix by fix', async () => {
@@ -67,13 +67,13 @@ test('Elm torpedo echoes and tracks follow the TypeScript fix by fix', async () 
   step(0, 0, 100, true); step(1, 0, 99, true); step(2, 0, 97, false); step(3, 0, 96, true);
   steps.push([{...still, time: 10, torpedoTracks: [{id: 5, time: 2, x: 0, y: 30, depth: 50, speed: 30, inboundRun: true, fixes: 2, activeAt: 2, activeX: 0, activeY: 30, course: 180, arrival: 10}]},
     {id: 6, time: 10, x: 1, y: 1, depth: 1, speed: 1, inboundRun: false}, false]);
-  assert.deepEqual(await elm('torpedoWatch.gameEcho', echoes), echoes.map(([boat, shot, time, speed]) => watch.gameEcho(boat, shot, time, speed)));
+  sameResults(await elm('torpedoWatch.gameEcho', echoes), echoes.map(([boat, shot, time, speed]) => watch.gameEcho(boat, shot, time, speed)));
   const expected = steps.map(([s, echo, active]) => {const copy = structuredClone(s); watch.observeTorpedo(copy, echo, active); return copy.torpedoTracks;});
   assert.ok(expected.some(t => t.some(track => track.arrival !== null)), 'some runs earn an arrival estimate');
   assert.ok(expected.some(t => t.some(track => track.fixes === 2 && track.course !== null)), 'some runs earn a course');
-  assert.deepEqual(await elm('torpedoWatch.observe', steps), expected);
+  sameResults(await elm('torpedoWatch.observe', steps), expected);
   const threatCases = steps.map(([s]) => [s.time, s.torpedoTracks]);
-  assert.deepEqual(await elm('torpedoWatch.threats', threatCases), steps.map(([s]) => watch.threats(s)));
+  sameResults(await elm('torpedoWatch.threats', threatCases), steps.map(([s]) => watch.threats(s)));
 });
 
 test('Elm carrier hits, flooding, incidental damage and save checks match the TypeScript', async () => {
@@ -86,12 +86,12 @@ test('Elm carrier hits, flooding, incidental damage and save checks match the Ty
     let ship = {...start};
     for (let i = 0; i < 5; i++) {hits.push([{...ship}]); carrier.registerCarrierHit(ship);}
   }
-  assert.deepEqual(await elm('carrier.registerCarrierHit', hits), hits.map(([s]) => {const c = {...s}; carrier.registerCarrierHit(c); return c;}));
+  sameResults(await elm('carrier.registerCarrierHit', hits), hits.map(([s]) => {const c = {...s}; carrier.registerCarrierHit(c); return c;}));
   const floods = hits.flatMap(([s]) => [0, .5, 7, 300].map(dt => [s, dt]));
-  assert.deepEqual(await elm('carrier.advanceCarrierFlood', floods), floods.map(([s, dt]) => {const c = {...s}; carrier.advanceCarrierFlood(c, dt); return c;}));
+  sameResults(await elm('carrier.advanceCarrierFlood', floods), floods.map(([s, dt]) => {const c = {...s}; carrier.advanceCarrierFlood(c, dt); return c;}));
   const counts = [0, 1, 2, 3, 6].map(n => [{directHits: n}]);
-  assert.deepEqual(await elm('carrier.carrierDoomed', counts), counts.map(([s]) => carrier.carrierDoomed(s)));
-  assert.deepEqual(await elm('carrier.carrierDescentFactor', counts), counts.map(([s]) => carrier.carrierDescentFactor(s)));
+  sameResults(await elm('carrier.carrierDoomed', counts), counts.map(([s]) => carrier.carrierDoomed(s)));
+  sameResults(await elm('carrier.carrierDescentFactor', counts), counts.map(([s]) => carrier.carrierDescentFactor(s)));
   const struck = [];
   for (const kind of ['carrier', 'escort', 'merchant', 'fishing', 'sub']) for (const hull of [undefined, 100, 12, 1, 0]) for (const directHits of [undefined, 0, 1, 2])
     for (const damage of [0, 11, 12, 13, 150]) {
@@ -100,14 +100,14 @@ test('Elm carrier hits, flooding, incidental damage and save checks match the Ty
       if (directHits !== undefined) ship.directHits = directHits;
       struck.push([ship, damage]);
     }
-  assert.deepEqual(await elm('carrier.incidentalHull', struck), struck.map(([s, d]) => carrier.incidentalHull(s, d)));
+  sameResults(await elm('carrier.incidentalHull', struck), struck.map(([s, d]) => carrier.incidentalHull(s, d)));
   const saves = [];
   for (const fighterCount of [0, 1, 3, 4, 1.5, NaN]) for (const flood of [0, 4, -1, Infinity, NaN]) for (const directHits of [0, 1, 2, 3, -1, 1.5, 2 ** 53])
     for (const hull of [-1, 0, 0.5, 100, 100.5, NaN]) saves.push([{fighterCount, flood, directHits, hull}]);
   for (let i = 0; i < 300; i++) saves.push([{fighterCount: 1 + Math.floor(random() * 3), flood: random() * 10, directHits: Math.floor(random() * 4), hull: random() * 100}]);
   const valid = saves.map(([s]) => carrier.validCarrier(s));
   assert.ok(valid.filter(Boolean).length > 50, 'the corpus includes valid carriers');
-  assert.deepEqual(await elm('carrier.validCarrier', saves), valid);
+  sameResults(await elm('carrier.validCarrier', saves), valid);
 });
 
 test('Elm contact estimates, sonar readings and observation bias match the TypeScript', async () => {
@@ -116,7 +116,7 @@ test('Elm contact estimates, sonar readings and observation bias match the TypeS
   const biases = [];
   for (const id of ids) for (const method of ['visual', 'passive']) for (const seed of [0, 7, 2 ** 31 + 5]) biases.push([seed, id, method]);
   for (let i = 0; i < 1000; i++) biases.push([Math.floor(random() * 2 ** 32), 'c' + Math.floor(random() * 1e6), random() < .5 ? 'visual' : 'passive']);
-  assert.deepEqual(await elm('contactReadings.observationBias', biases), biases.map(([s, id, m]) => readings.observationBias(s, id, m)));
+  sameResults(await elm('contactReadings.observationBias', biases), biases.map(([s, id, m]) => readings.observationBias(s, id, m)));
   const fix = () => ({x: (random() - .5) * 9000, y: (random() - .5) * 9000, time: random() * 500, vx: random() < .2 ? 0 : (random() - .5) * 8,
     vy: random() < .2 ? 0 : (random() - .5) * 8, positionSigma: random() * 200, velocitySigma: random() * 3, maneuverSigma: random() * .05});
   const contact = () => {
@@ -135,9 +135,9 @@ test('Elm contact estimates, sonar readings and observation bias match the TypeS
   for (let i = 0; i < 3000; i++) estimates.push([contact(), random() * 700]);
   const expected = estimates.map(([c, t]) => readings.estimateAt(c, t));
   assert.ok(expected.some(e => e?.hasFix) && expected.some(e => e && !e.hasFix) && expected.includes(null), 'fixed, unfixed and unknown estimates appear');
-  assert.deepEqual(await elm('contactReadings.estimateAt', estimates), expected);
+  sameResults(await elm('contactReadings.estimateAt', estimates), expected);
   const sonar = [[{x: 5, y: 6, time: 10}, {x: 5, y: 6, bearing: 42, range: 9}], [{x: 0, y: 0, time: 10}, {x: 5, y: 6, bearing: 42, range: 0}],
     [{x: 0, y: 0, time: 10}, {x: 5, y: 6, bearing: 42}], [{x: 0, y: 0, time: 10}, {x: 5, y: 6, bearing: 42, range: NaN}]];
   for (let i = 0; i < 3000; i++) sonar.push([{x: (random() - .5) * 2000, y: (random() - .5) * 2000, time: random() * 700}, contact()]);
-  assert.deepEqual(await elm('contactReadings.sonarReading', sonar), sonar.map(([o, c]) => readings.sonarReading(o, c)));
+  sameResults(await elm('contactReadings.sonarReading', sonar), sonar.map(([o, c]) => readings.sonarReading(o, c)));
 });

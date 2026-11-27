@@ -4,7 +4,7 @@ import {photoCriteria, photoGoal, framed} from '../src/recon-photos.js';
 import {trackingCriteria, trackingGoal, trackingConvoy} from '../src/convoy-tracking.js';
 import {surveyCriteria, scanRate, addScan, surveyComplete} from '../src/wreck-survey.js';
 import * as periscope from '../src/periscope.js';
-import {elm, seeded} from './sim-harness.mjs';
+import {elm, sameResults, seeded} from './sim-harness.mjs';
 
 // Each Elm objective reads the mission definition's own criteria, so these
 // also confirm the Elm records are the ones the TypeScript reads.
@@ -12,14 +12,14 @@ const rolls = random => [0, .25, .4999999, .5, .75, .9999999, ...Array.from({len
 
 test('Elm merchant photo goals and framing match the TypeScript', async () => {
   const random = seeded(51), goals = rolls(random);
-  assert.deepEqual(await elm('reconPhotos.photoGoal', goals), goals.map(([r]) => photoGoal(r, photoCriteria)));
+  sameResults(await elm('reconPhotos.photoGoal', goals), goals.map(([r]) => photoGoal(r, photoCriteria)));
   const offsets = [-5, -4.9999, -0, 0, 4.9999, 5, 5.0001, NaN, ...Array.from({length: 300}, () => (random() - .5) * 30)].map(o => [o]);
-  assert.deepEqual(await elm('reconPhotos.framed', offsets), offsets.map(([o]) => framed(o, photoCriteria)));
+  sameResults(await elm('reconPhotos.framed', offsets), offsets.map(([o]) => framed(o, photoCriteria)));
 });
 
 test('Elm convoy tracking goals and listening match the TypeScript', async () => {
   const random = seeded(52), goals = rolls(random);
-  assert.deepEqual(await elm('convoyTracking.trackingGoal', goals), goals.map(([r]) => trackingGoal(r, trackingCriteria)));
+  sameResults(await elm('convoyTracking.trackingGoal', goals), goals.map(([r]) => trackingGoal(r, trackingCriteria)));
   const kinds = ['merchant', 'escort', 'fishing', 'carrier', 'sub'], cases = [];
   // A merchant exactly at the listening range and the noise and depth limits.
   const base = {x: 0, y: 0, noise: 20, depth: 40, systems: {sonar: 100}};
@@ -38,7 +38,7 @@ test('Elm convoy tracking goals and listening match the TypeScript', async () =>
   }
   const expected = cases.map(([s]) => trackingConvoy(s, trackingCriteria));
   assert.ok(expected.filter(Boolean).length > 50 && expected.filter(x => !x).length > 50, 'the corpus both tracks and loses the convoy');
-  assert.deepEqual(await elm('convoyTracking.trackingConvoy', cases), expected);
+  sameResults(await elm('convoyTracking.trackingConvoy', cases), expected);
 });
 
 test('Elm wreck survey scanning and completion match the TypeScript', async () => {
@@ -46,12 +46,12 @@ test('Elm wreck survey scanning and completion match the TypeScript', async () =
   for (const range of [99.999, 100]) for (const vertical of [31.999, 32]) for (const speed of [-3.0001, -3, -0.5, 0.4999, 0.5, 3, 3.0001])
     for (const sonar of [0, 19.999, 20, 64, 100]) passes.push([{range, vertical, speed, sonar}]);
   for (let i = 0; i < 1500; i++) passes.push([{range: random() * 150, vertical: random() * 50, speed: (random() - .5) * 8, sonar: random() * 100}]);
-  assert.deepEqual(await elm('wreckSurvey.scanRate', passes), passes.map(([p]) => scanRate(p, surveyCriteria)));
+  sameResults(await elm('wreckSurvey.scanRate', passes), passes.map(([p]) => scanRate(p, surveyCriteria)));
   const scans = [[44, 1, 1], [44.9, .5, .2], [45, 1, 1], [0, 0, 0], [10, NaN, 1], ...Array.from({length: 500}, () => [random() * 50, random(), random() * 3])];
-  assert.deepEqual(await elm('wreckSurvey.addScan', scans), scans.map(([scan, rate, dt]) => addScan(scan, rate, dt, surveyCriteria)));
+  sameResults(await elm('wreckSurvey.addScan', scans), scans.map(([scan, rate, dt]) => addScan(scan, rate, dt, surveyCriteria)));
   const ops = [];
   for (const scan of [0, 44.999, 45, 60, NaN]) for (const n of [0, 2, 3, 4]) ops.push([{scan, photoAngles: Array.from({length: n}, (_, i) => i * 60)}]);
-  assert.deepEqual(await elm('wreckSurvey.surveyComplete', ops), ops.map(([op]) => surveyComplete(op, surveyCriteria)));
+  sameResults(await elm('wreckSurvey.surveyComplete', ops), ops.map(([op]) => surveyComplete(op, surveyCriteria)));
 });
 
 test('the Elm periscope raises, lowers and reaches the eye height the TypeScript does', async () => {
@@ -59,13 +59,13 @@ test('the Elm periscope raises, lowers and reaches the eye height the TypeScript
   for (const scope of [false, true]) for (const travel of [undefined, 0, .1, .5, .9999, 1, 1.2, -.1]) scopes.push(travel === undefined ? {scope} : {scope, scopeTravel: travel});
   for (let i = 0; i < 400; i++) scopes.push(random() < .3 ? {scope: random() < .5} : {scope: random() < .5, scopeTravel: random() * 1.1 - .05});
   const one = scopes.map(s => [s]);
-  assert.deepEqual(await elm('periscope.scopeExtension', one), one.map(([s]) => periscope.scopeExtension(s)));
-  assert.deepEqual(await elm('periscope.scopeEyeHeight', one), one.map(([s]) => periscope.scopeEyeHeight(s)));
+  sameResults(await elm('periscope.scopeExtension', one), one.map(([s]) => periscope.scopeExtension(s)));
+  sameResults(await elm('periscope.scopeEyeHeight', one), one.map(([s]) => periscope.scopeEyeHeight(s)));
   const orders = scopes.flatMap(s => [[s, true], [s, false]]);
-  assert.deepEqual(await elm('periscope.orderScope', orders), orders.map(([s, raised]) => {const c = {...s}; periscope.orderScope(c, raised); return c;}));
+  sameResults(await elm('periscope.orderScope', orders), orders.map(([s, raised]) => {const c = {...s}; periscope.orderScope(c, raised); return c;}));
   // Steps that land exactly on, just short of and past the ordered end.
   const advances = scopes.flatMap(s => [0, .1, .3, 1.5, 2.9999, 3, 4, ...(s.scopeTravel === undefined ? [] : [3 * Math.abs(Number(s.scope) - s.scopeTravel)])].map(t => [s, t]));
-  assert.deepEqual(await elm('periscope.advanceScope', advances), advances.map(([s, t]) => {const c = {...s}; periscope.advanceScope(c, t); return c;}));
+  sameResults(await elm('periscope.advanceScope', advances), advances.map(([s, t]) => {const c = {...s}; periscope.advanceScope(c, t); return c;}));
 });
 
 test('Elm rescue rules match the TypeScript for both rescues', async () => {
@@ -73,11 +73,11 @@ test('Elm rescue rules match the TypeScript for both rescues', async () => {
   const kinds = ['surface', 'wreck', 'sub', null, 'Surface'].map(k => [k]);
   // The catalog tags each objective with its kind; the Elm record's constructor carries it instead.
   const untagged = ({kind, ...criteria}) => (assert.equal(kind, 'rescue'), criteria);
-  assert.deepEqual(await elm('rescueOperation.rescueCriteriaFor', kinds), kinds.map(([k]) => untagged(rescue.rescueCriteriaFor(k ?? undefined))));
+  sameResults(await elm('rescueOperation.rescueCriteriaFor', kinds), kinds.map(([k]) => untagged(rescue.rescueCriteriaFor(k ?? undefined))));
   const sink = rescue.surfaceRescue.sinking, depths = [];
   for (const age of [0, 500, 859.99, 860, 1080, 1500, 4000]) for (const roll of [0, .5, .999]) for (const resting of [2, 3.5, 20, 400]) depths.push([age, roll, resting]);
   for (let i = 0; i < 600; i++) depths.push([random() * 3000, random(), 5 + random() * 300]);
-  assert.deepEqual(await elm('rescueOperation.casualtyDepth', depths), depths.map(([age, roll, resting]) => rescue.casualtyDepth(age, roll, sink, resting)));
+  sameResults(await elm('rescueOperation.casualtyDepth', depths), depths.map(([age, roll, resting]) => rescue.casualtyDepth(age, roll, sink, resting)));
   const named = {surface: rescue.surfaceRescue, undersea: rescue.underseaRescue}, survivors = [], losses = [], stations = [];
   for (const name of Object.keys(named)) {
     for (const empty of [0, .0799999, .08, .5]) for (const count of [0, .124, .125, .999]) survivors.push([empty, count, name]);
@@ -86,9 +86,9 @@ test('Elm rescue rules match the TypeScript for both rescues', async () => {
       stations.push([range, speed, error, name]);
     for (let i = 0; i < 400; i++) stations.push([random() * 120, (random() - .5) * 2, (random() - .5) * 14, name]);
   }
-  assert.deepEqual(await elm('rescueOperation.initialSurvivors', survivors), survivors.map(([e, c, n]) => rescue.initialSurvivors(e, c, named[n])));
-  assert.deepEqual(await elm('rescueOperation.nextLossDelay', losses), losses.map(([d, r, n]) => rescue.nextLossDelay(d, r, named[n])));
-  assert.deepEqual(await elm('rescueOperation.stationKeeping', stations), stations.map(([r, s, e, n]) => rescue.stationKeeping(r, s, e, named[n])));
+  sameResults(await elm('rescueOperation.initialSurvivors', survivors), survivors.map(([e, c, n]) => rescue.initialSurvivors(e, c, named[n])));
+  sameResults(await elm('rescueOperation.nextLossDelay', losses), losses.map(([d, r, n]) => rescue.nextLossDelay(d, r, named[n])));
+  sameResults(await elm('rescueOperation.stationKeeping', stations), stations.map(([r, s, e, n]) => rescue.stationKeeping(r, s, e, named[n])));
 });
 
 test('the Elm long patrol search matches the TypeScript on every mission and on saved search areas', async () => {
@@ -111,15 +111,15 @@ test('the Elm long patrol search matches the TypeScript on every mission and on 
   const setups = games.map(g => [setupOf(g)]);
   const expected = setups.map(([s]) => search.longPatrol(s));
   assert.ok(expected.some(e => !('home' in e)) && expected.some(e => e.search.targets.length > 1), 'transits without a pickup and multi-target searches appear');
-  assert.deepEqual(await elm('patrolSearch.longPatrol', setups), expected);
+  sameResults(await elm('patrolSearch.longPatrol', setups), expected);
   const areas = expected.map(e => e.search);
   const advances = [];
   for (const [active, protectedTime] of [[0, 0], [179.99999999, 50], [180, 1199], [180, 1200], [179, 1300], [180 - 5e-9, 0]])
     for (const [dt, rate] of [[.25, 1], [.25, .5], [1, 20], [0, 1]]) advances.push([{...areas[0], activeSeconds: active, protectedTime}, dt, rate]);
   for (let i = 0; i < 500; i++) advances.push([{...areas[i % areas.length], activeSeconds: random() * 200, protectedTime: random() * 1400}, random() * 2, 1 + random() * 30]);
-  assert.deepEqual(await elm('patrolSearch.advanceApproach', advances), advances.map(([a, dt, rate]) => {const c = structuredClone(a); return {advanced: search.advanceApproach(c, dt, rate), search: c};}));
+  sameResults(await elm('patrolSearch.advanceApproach', advances), advances.map(([a, dt, rate]) => {const c = structuredClone(a); return {advanced: search.advanceApproach(c, dt, rate), search: c};}));
   const progress = advances.map(([a]) => [a]);
-  assert.deepEqual(await elm('patrolSearch.approachProgress', progress), progress.map(([a]) => search.approachProgress(a)));
+  sameResults(await elm('patrolSearch.approachProgress', progress), progress.map(([a]) => search.approachProgress(a)));
   // Saved areas, intact and broken in each way the check rejects.
   const saves = [];
   games.forEach((g, i) => {
@@ -132,5 +132,5 @@ test('the Elm long patrol search matches the TypeScript on every mission and on 
   });
   const valid = saves.map(([s]) => search.validSearch(s));
   assert.ok(valid.filter(Boolean).length > 50 && valid.filter(v => !v).length > 200, 'the corpus has valid and invalid areas');
-  assert.deepEqual(await elm('patrolSearch.validSearch', saves.map(([s]) => [JSON.parse(JSON.stringify(s, (k, v) => Number.isNaN(v) ? '__nan' : v), (k, v) => v === '__nan' ? NaN : v)])), valid);
+  sameResults(await elm('patrolSearch.validSearch', saves.map(([s]) => [JSON.parse(JSON.stringify(s, (k, v) => Number.isNaN(v) ? '__nan' : v), (k, v) => v === '__nan' ? NaN : v)])), valid);
 });

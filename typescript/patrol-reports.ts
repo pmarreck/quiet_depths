@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/PatrolReports.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {bearing, distance, log, rad, type LogEntry} from './mechanics.ts';
 import {hash01} from './environment.ts';
 import {addDebrief, type DebriefEntry} from './debrief.ts';
