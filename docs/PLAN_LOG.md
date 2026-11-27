@@ -145,3 +145,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Move the carrier’s fatal direct-hit count into the Elm mission definition, shared by the briefing and carrier rules (done 2026-11-27 03:10 EST; commit 5a3fb49).
 - [x] [Elm migration] Move the standard and longer patrol windows and the protected-transit search timing into the Elm patrol definition (done 2026-11-27 03:13 EST; commit 381d117).
 - [x] [Elm migration] Move rescue survivor counts and casualty pacing into the Elm rescue criteria (done 2026-11-27 03:16 EST; commit 5e48486).
+- [x] [Elm migration] Move the surface casualty’s settling, foundering and loss depth into the Elm rescue criteria (done 2026-11-27 03:18 EST; commit 3b5f2d9).

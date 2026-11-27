@@ -36,7 +36,8 @@ function picture(s:World){
     impacts:copies(s.impacts),lightning:copies(s.lightning),blasts:copies(s.blasts),shells:copies(s.shells),gunRounds:copies(s.gunRounds)};
 }
 const observers=new WeakMap<object,ReplayRecorder>();
-export function replayEvent(s:World,event:ReplayEvent){observers.get(s)?.mark(s.time,event);}
+// Any patrol object can mark an event; recorders are found by identity.
+export function replayEvent(s:{time:number},event:ReplayEvent){observers.get(s)?.mark(s.time,event);}
 const waitTime={ground:1.2,collision:1.2,blast:5,torpedo:3,'near-miss':.15,collapse:2,sinking:1};
 const lead=5, aftermath=1.2;
 export class ReplayRecorder {
