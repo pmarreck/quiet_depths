@@ -25,7 +25,7 @@ import Sim.SurfaceMotion exposing (Point)
 import Sim.Vessel as Vessel exposing (Kind(..), SurfaceShip(..))
 
 
-resolvePair : Hurt t -> Role -> Role -> Work t -> Work t
+resolvePair : Hurt t c r -> Role -> Role -> Work t c r -> Work t c r
 resolvePair hurt roleA roleB work =
     let
         a =
@@ -158,7 +158,7 @@ resolvePair hurt roleA roleB work =
                 List.foldl (strike hurt roleA roleB a b hit severity) noted [ roleA, roleB ]
 
 
-strike : Hurt t -> Role -> Role -> Body -> Body -> Contact -> Float -> Role -> Work t -> Work t
+strike : Hurt t c r -> Role -> Role -> Body -> Body -> Contact -> Float -> Role -> Work t c r -> Work t c r
 strike hurt roleA roleB a b hit severity role work =
     let
         damaged =
@@ -245,7 +245,7 @@ carrierKind x =
         Surface Merchant
 
 
-recordHit : Role -> Body -> Work t -> Work t
+recordHit : Role -> Body -> Work t c r -> Work t c r
 recordHit role x work =
     case role of
         Afloat i ->
@@ -269,7 +269,7 @@ against settled wrecks nearby, then the site, then each ship afloat (after
 the periscope check) against the boat, the site and the ships before it,
 each ship grounding last.
 -}
-resolveTraffic : Hurt t -> Traffic t -> Traffic t
+resolveTraffic : Hurt t c r -> Traffic t c r -> Traffic t c r
 resolveTraffic hurt traffic =
     let
         start =
@@ -357,7 +357,7 @@ resolveTraffic hurt traffic =
     { s | ships = Array.toList done.ships }
 
 
-shearPeriscope : Int -> Work t -> Work t
+shearPeriscope : Int -> Work t c r -> Work t c r
 shearPeriscope i w =
     case Array.get i w.ships of
         Just v ->
@@ -366,20 +366,20 @@ shearPeriscope i w =
                     w.s
 
                 periscope =
-                    Dict.get "periscope" s.systems |> Maybe.withDefault nan
+                    s.systems.periscope
             in
             if v.kind /= Submarine && Periscope.scopeExtension s > 0 && s.depth <= 15 && Mechanics.distance s v < 48 && periscope > 0 then
                 let
                     part =
-                        Equipment.damage 100 { condition = periscope, limit = Dict.get "periscope" s.repairLimits |> Maybe.withDefault nan }
+                        Equipment.damage 100 { condition = periscope, limit = s.repairLimits.periscope }
                 in
                 { w
                     | s =
                         Mechanics.log "Periscope sheared away under a vessel."
                             Damage
                             { s
-                                | systems = Dict.insert "periscope" part.condition s.systems
-                                , repairLimits = Dict.insert "periscope" part.limit s.repairLimits
+                                | systems = setPeriscope part.condition s.systems
+                                , repairLimits = setPeriscope part.limit s.repairLimits
                                 , scope = False
                                 , scopeTravel = Nothing
                             }
@@ -392,7 +392,7 @@ shearPeriscope i w =
             w
 
 
-ground : Int -> Work t -> Work t
+ground : Int -> Work t c r -> Work t c r
 ground i w =
     case Array.get i w.ships of
         Just v ->
@@ -433,3 +433,8 @@ ground i w =
 
         Nothing ->
             w
+
+
+setPeriscope : Float -> { a | periscope : Float } -> { a | periscope : Float }
+setPeriscope value parts =
+    { parts | periscope = value }

@@ -142,8 +142,8 @@ traffic =
                     |> andMap (D.field "ships" (D.list (Ship.decoder now)))
                     |> andMap (D.at [ "environment", "chartSeed" ] D.float)
                     |> andMap (D.field "collisionHits" (D.dict D.float))
-                    |> andMap (D.field "systems" (D.dict D.float))
-                    |> andMap (D.field "repairLimits" (D.dict D.float))
+                    |> andMap (D.field "systems" (D.map (\p -> { periscope = p }) (D.field "periscope" D.float)))
+                    |> andMap (D.field "repairLimits" (D.map (\p -> { periscope = p }) (D.field "periscope" D.float)))
                     |> andMap (D.field "scope" D.bool)
                     |> andMap (optional "scopeTravel" D.float)
                     |> andMap (D.field "events" (D.list (D.map3 Mechanics.LogEntry (D.field "t" D.float) (D.field "text" D.string) (D.field "kind" logKind))))
@@ -153,7 +153,7 @@ traffic =
             )
 
 
-encodeTraffic : { a | x : Float, y : Float, depth : Float, speed : Float, verticalSpeed : Float, site : Maybe Body, ships : List Ship.Ship, collisionHits : Dict.Dict String Float, systems : Dict.Dict String Float, repairLimits : Dict.Dict String Float, scope : Bool, scopeTravel : Maybe Float, events : List Mechanics.LogEntry, debrief : List Debrief.Entry, collisions : List { target : Maybe String, point : { x : Float, y : Float, depth : Float } }, hurts : List Recorded, hull : Float } -> E.Value
+encodeTraffic : { a | x : Float, y : Float, depth : Float, speed : Float, verticalSpeed : Float, site : Maybe Body, ships : List Ship.Ship, collisionHits : Dict.Dict String Float, systems : { periscope : Float }, repairLimits : { periscope : Float }, scope : Bool, scopeTravel : Maybe Float, events : List Mechanics.LogEntry, debrief : List Debrief.Entry, collisions : List { target : Maybe String, point : { x : Float, y : Float, depth : Float } }, hurts : List Recorded, hull : Float } -> E.Value
 encodeTraffic s =
     E.object
         [ ( "x", E.float s.x )
@@ -164,8 +164,8 @@ encodeTraffic s =
         , ( "site", Maybe.map encodeBody s.site |> Maybe.withDefault E.null )
         , ( "ships", E.list Ship.encode s.ships )
         , ( "collisionHits", E.dict identity E.float s.collisionHits )
-        , ( "systems", E.dict identity E.float s.systems )
-        , ( "repairLimits", E.dict identity E.float s.repairLimits )
+        , ( "systems", E.object [ ( "periscope", E.float s.systems.periscope ) ] )
+        , ( "repairLimits", E.object [ ( "periscope", E.float s.repairLimits.periscope ) ] )
         , ( "scope", E.bool s.scope )
         , ( "scopeTravel", Maybe.map E.float s.scopeTravel |> Maybe.withDefault E.null )
         , ( "events", E.list (\e -> E.object [ ( "t", E.float e.t ), ( "text", E.string e.text ), ( "kind", E.string (Mechanics.logKindName e.kind) ) ]) s.events )

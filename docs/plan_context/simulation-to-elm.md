@@ -391,12 +391,14 @@ types independently, and the shared records expose the disagreements:
 
 - `Sim.Carrier` takes `directHits : Int` (the TypeScript's `?? 0`); the ship
   record holds `Maybe Float`. Hull contacts adapts at the call.
-- `Sim.Pressure` takes `repairLimits` as a record with a `hull` field;
-  `Sim.HullContacts` takes it as a `Dict String Float`. The boat record must
-  satisfy both, so `systems` and `repairLimits` become `Dict String Float`
-  throughout, mirroring the TypeScript's records (which mix the hull's limit
-  in with the fourteen systems and are walked by key), and `Sim.Pressure`
-  changes to match.
+- `Sim.Pressure` takes `repairLimits` as a record with a `hull` field and
+  `Sim.PowerPlant` takes `systems` as a record of named systems, while
+  `Sim.HullContacts` took both as `Dict String Float`. Records win: a missing
+  or misspelled system fails to compile instead of reading NaN at run time
+  (the fleet's omission rule), and the older ports already use them.
+  `Sim.HullContacts` now names the one system it touches. A first attempt
+  went the other way, moving `Sim.Pressure` to a map (`3fcadcf`); it was
+  undone once the power plant showed the pattern.
 
 Each seam is small, but the integration work is real and grows with the
 number of ported modules; a line count never shows it.

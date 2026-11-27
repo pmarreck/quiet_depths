@@ -18,8 +18,8 @@ import Sim.Vessel as Vessel
 
 
 {-| `hurt severity text part` applies damage to the boat, as `systems` does. -}
-type alias Hurt t =
-    Float -> String -> String -> Traffic t -> Traffic t
+type alias Hurt t c r =
+    Float -> String -> String -> Traffic t c r -> Traffic t c r
 
 
 {-| A collision the replay should show. -}
@@ -27,7 +27,7 @@ type alias Collision =
     { target : Maybe String, point : Point }
 
 
-type alias Traffic t =
+type alias Traffic t c r =
     { t
         | x : Float
         , y : Float
@@ -42,8 +42,8 @@ type alias Traffic t =
         , ships : List Ship
         , chart : Maybe Coastline
         , collisionHits : Dict String Float
-        , systems : Dict String Float
-        , repairLimits : Dict String Float
+        , systems : { c | periscope : Float }
+        , repairLimits : { r | periscope : Float }
         , scope : Bool
         , scopeTravel : Maybe Float
         , events : List LogEntry
@@ -66,18 +66,18 @@ shipBody v =
     }
 
 
-boatBody : Traffic t -> Body
+boatBody : Traffic t c r -> Body
 boatBody s =
     { x = s.x, y = s.y, depth = Just s.depth, heading = s.heading, pitch = Just s.pitch, roll = s.roll, speed = s.speed, verticalSpeed = Just s.verticalSpeed
     , kind = Nothing, id = Nothing, name = Nothing, hull = Nothing, military = Nothing, fixedWreck = False, directHits = Nothing
     }
 
 
-type alias Work t =
-    { s : Traffic t, ships : Array Ship }
+type alias Work t c r =
+    { s : Traffic t c r, ships : Array Ship }
 
 
-bodyOf : Role -> Work t -> Body
+bodyOf : Role -> Work t c r -> Body
 bodyOf role w =
     case role of
         Boat ->
@@ -96,7 +96,7 @@ bodyOf role w =
 {-| Writes a body's motion and hull back to what it stands for; a wreck copy
 is thrown away, as the TypeScript throws away its spread copy.
 -}
-store : Role -> Body -> Work t -> Work t
+store : Role -> Body -> Work t c r -> Work t c r
 store role b w =
     case role of
         Boat ->
