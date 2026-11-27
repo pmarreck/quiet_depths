@@ -1,4 +1,4 @@
-module Sim.SeabedRest exposing (restingKnots, restingStealth, seabedWear, sweepClutter, touchdownChance, touchdownDamage, touchdownImpact)
+module Sim.SeabedRest exposing (restingStealth, seabedWear, sweepClutter, touchdownChance, touchdownDamage, touchdownImpact)
 
 {-| Resting on the seabed. A gentle landing is safe and a hard one risks
 damage. A stopped sub on the bottom blends into it; trying to move scrapes the

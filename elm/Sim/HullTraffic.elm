@@ -1,4 +1,4 @@
-module Sim.HullTraffic exposing (Collision, Hurt, Role(..), Traffic, Work, boatBody, bodyOf, roleKey, shipBody, store)
+module Sim.HullTraffic exposing (Collision, Hurt, Role(..), Traffic, Work, bodyOf, roleKey, shipBody, store)
 
 {-| The patrol as hull contacts sees it, and the roles that stand in for the
 TypeScript's object identity: the boat, the site, a ship afloat (by its place

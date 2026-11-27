@@ -48,20 +48,6 @@ shipHit from to ship kind =
         cs =
             cos a
 
-        scale =
-            case kind of
-                Just (Surface Fishing) ->
-                    0.38
-
-                Just (Surface Escort) ->
-                    0.78
-
-                Just Submarine ->
-                    0.5
-
-                _ ->
-                    1
-
         submerged =
             if kind == Just Submarine then
                 Maybe.withDefault 65 ship.depth
@@ -86,6 +72,21 @@ shipHit from to ship kind =
                 [ ( negate carrierSize.halfBeam, carrierSize.halfBeam ), ( negate carrierSize.halfLength, carrierSize.halfLength ), ( -7, carrierSize.deckHeight ) ]
 
             else
+                let
+                    scale =
+                        case kind of
+                            Just (Surface Fishing) ->
+                                0.38
+
+                            Just (Surface Escort) ->
+                                0.78
+
+                            Just Submarine ->
+                                0.5
+
+                            _ ->
+                                1
+                in
                 [ ( -14 * scale, 14 * scale )
                 , ( -65 * scale, 65 * scale )
                 , ( -7

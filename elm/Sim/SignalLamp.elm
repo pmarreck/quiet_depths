@@ -358,14 +358,15 @@ matchingBearing pin observer time contacts =
 
                                 range =
                                     M.hypot2 dx dy
-
-                                halfWidth =
-                                    asin (radius / range) * 180 / pi + 4
                             in
                             if c.side == Just "friendly" || c.identified && c.kind /= Just "sub" || time - at > 18 || range <= radius then
                                 False
 
                             else
+                                let
+                                    halfWidth =
+                                        asin (radius / range) * 180 / pi + 4
+                                in
                                 M.abs (M.remainder (passiveBearing - atan2 dx dy * 180 / pi + 540) 360 - 180) <= halfWidth
 
                         _ ->

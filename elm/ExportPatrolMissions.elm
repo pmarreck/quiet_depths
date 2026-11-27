@@ -3,7 +3,6 @@ port module ExportPatrolMissions exposing (main)
 import Json.Encode as E
 import PatrolCriteria
 import PatrolMission exposing (EarlyEnd(..), Objective(..), PartialCredit(..))
-import Platform
 
 
 

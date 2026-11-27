@@ -1,4 +1,4 @@
-module Sim.SurfaceWake exposing (WakeSample, recordWake, surfaceCrossing, wakeLifetime)
+module Sim.SurfaceWake exposing (Boat, WakeSample, recordWake, surfaceCrossing, wakeLifetime)
 
 {-| The boat's wake: where the hull, sail and masts break the surface as it
 moves, recorded once a second as a trail the renderer draws foam along.
@@ -7,7 +7,7 @@ moves, recorded once a second as a trail the renderer draws foam along.
 import Sim.HullDesign exposing (design)
 import Sim.Math as M
 import Sim.Periscope exposing (scopeExtension, scopeEyeHeight)
-import Sim.SurfaceMotion as Motion exposing (Point, Sea, boatPoint, surfaceHeight)
+import Sim.SurfaceMotion as Motion exposing (Sea, boatPoint, surfaceHeight)
 
 
 type alias WakeSample =
@@ -68,16 +68,6 @@ type alias Boat a c =
         , systems : { c | periscope : Float }
         , time : Float
     }
-
-
-{-| The leading crossing found so far, and how much of the boat is out.
--}
-type alias Crossing =
-    { leading : Float, x : Float, y : Float, exposure : Float }
-
-
-type alias Cut =
-    { upper : Point, lower : Point, high : Float, low : Float }
 
 
 {-| Where the moving boat's leading edge meets the surface, how wide its wake

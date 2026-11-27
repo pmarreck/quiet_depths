@@ -1,4 +1,4 @@
-port module HelmAxis exposing (main)
+port module HelmAxis exposing (Flags, Model, Msg, Nudge, Preset, Reading, main)
 
 {-| One axis of the helm (heading, depth or speed): its readout, optional
 turn buttons beside it, a slider whose gold thumb is the requested value with

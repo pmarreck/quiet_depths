@@ -1,4 +1,4 @@
-port module TorpedoControl exposing (main)
+port module TorpedoControl exposing (Flags, Model, Msg, Reading, Target, Tube, main)
 
 {-| Torpedo control: torpedoes aboard, the two bow tubes, the maximum run for
 the next torpedo, the launch order with a hint about the selected target, and

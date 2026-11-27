@@ -114,7 +114,7 @@ view r =
             , strong [ id "below-keel" ] [ text r.belowKeelText ]
             ]
         , div [] [ span [] [ text "WATER DEPTH" ], strong [ id "water-depth" ] [ text r.waterDepthText ] ]
-        , div [ classList [ ( "soundings-advice", True ) ] ]
+        , div [ Html.Attributes.class "soundings-advice" ]
             -- The virtual DOM rewrites this text only when the advice changes,
             -- so screen readers hear each change once.
             [ span [ id "seabed-advice", attribute "aria-live" "polite" ] [ text (advice level) ]

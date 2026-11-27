@@ -1,4 +1,4 @@
-module Sim.Drone exposing (Drone, Mode(..), decoder, encode)
+module Sim.Drone exposing (Drone, Limits, Mode, decoder, encode)
 
 {-| The inspection drone as current saves hold it.
 -}

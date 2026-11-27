@@ -75,7 +75,7 @@ validCopy m time =
     in
     finite m.elapsed
         && (m.elapsed >= 0)
-        && not (time + 0.001 < m.elapsed)
+        && M.notLess (time + 0.001) m.elapsed
         && since
         && (m.copied >= 0)
         && (m.copied <= full)

@@ -1,4 +1,4 @@
-module Sim.TorpedoTubes exposing (Tube(..), Tubes, exitPitch, reloadSeconds, tubes)
+module Sim.TorpedoTubes exposing (Tube(..), Tubes, exitPitch, tubes)
 
 {-| The two bow tubes: which hold a round, how long each has left to reload,
 and which fires next. A torpedo leaving the tube clears the bow before it
@@ -11,11 +11,6 @@ import Sim.Math as M
 type Tube
     = Port
     | Starboard
-
-
-reloadSeconds : Float
-reloadSeconds =
-    20
 
 
 {-| Each tube's remaining reload in seconds, or Nothing when it holds no

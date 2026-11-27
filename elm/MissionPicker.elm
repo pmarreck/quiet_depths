@@ -1,4 +1,4 @@
-port module MissionPicker exposing (main)
+port module MissionPicker exposing (Choice, Conditions, Flags, Model, Msg, Slot, Slots, main)
 
 import Browser
 import Html exposing (Html, b, button, details, div, fieldset, img, input, label, legend, option, p, select, small, span, summary, text)

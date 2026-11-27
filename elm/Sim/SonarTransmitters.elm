@@ -1,4 +1,4 @@
-module Sim.SonarTransmitters exposing (Instrument(..), Profile(..), Transmitters, decoder, exposure, fresh, notice, range, scanSector)
+module Sim.SonarTransmitters exposing (Instrument(..), Profile(..), Transmitters, decoder, exposure, notice, range, scanSector)
 
 {-| The imaging sonars as the simulation sees them: which instruments are
 transmitting, how far each profile reaches, how readily a transmission gives
@@ -22,11 +22,6 @@ type Profile
 
 type alias Transmitters =
     { scribbler : Maybe Profile, painter : Maybe Profile }
-
-
-fresh : Transmitters
-fresh =
-    { scribbler = Nothing, painter = Nothing }
 
 
 {-| A saved transmitter state: both instruments present, each off (null) or
@@ -113,15 +108,6 @@ scanSector eye object mode reach =
         dy =
             object.y - eye.y
 
-        angle =
-            eye.heading * radians
-
-        along =
-            dx * sin angle + dy * cos angle
-
-        across =
-            dx * cos angle - dy * sin angle
-
         dz =
             Maybe.withDefault 0 object.depth - eye.depth
     in
@@ -129,6 +115,16 @@ scanSector eye object mode reach =
         False
 
     else
+        let
+            angle =
+                eye.heading * radians
+
+            along =
+                dx * sin angle + dy * cos angle
+
+            across =
+                dx * cos angle - dy * sin angle
+        in
         case mode of
             Painter ->
                 -- The cone admits only objects ahead: |across| < 1.2 along fails when along <= 0.

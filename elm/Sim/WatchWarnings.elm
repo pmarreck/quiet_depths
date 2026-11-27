@@ -1,4 +1,4 @@
-module Sim.WatchWarnings exposing (Battery(..), Warnings, batteryCall, batteryWarning, bottomCall, bottomThreshold, warnings)
+module Sim.WatchWarnings exposing (Battery(..), Warnings, batteryCall, bottomCall, warnings)
 
 {-| The watch's standing warnings: too little water under the keel, and a low
 or critical battery. A critical battery at exactly 10% stays critical until

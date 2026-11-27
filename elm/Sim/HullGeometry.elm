@@ -67,19 +67,6 @@ is kind body =
 hullParts : Body -> List Part
 hullParts body =
     let
-        sub =
-            is "sub" body || is "wreck" body || body.kind == Nothing
-
-        size =
-            if is "fishing" body || is "surface" body then
-                0.38
-
-            else if is "escort" body then
-                0.78
-
-            else
-                1
-
         pose =
             { body | depth = Just (Maybe.withDefault 3 body.depth) }
 
@@ -93,11 +80,27 @@ hullParts body =
         in
         [ part (along (negate end)) (along end) carrierSize.halfBeam ]
 
-    else if sub then
-        [ part (along -27.5) (along 27.5) 5, part { side = 0, forward = 5, down = -4 } { side = 0, forward = 5, down = -11 } 2.1 ]
-
     else
-        [ part (along (-52 * size)) (along (52 * size)) (12 * size) ]
+        let
+            sub =
+                is "sub" body || is "wreck" body || body.kind == Nothing
+        in
+        if sub then
+            [ part (along -27.5) (along 27.5) 5, part { side = 0, forward = 5, down = -4 } { side = 0, forward = 5, down = -11 } 2.1 ]
+
+        else
+            let
+                size =
+                    if is "fishing" body || is "surface" body then
+                        0.38
+
+                    else if is "escort" body then
+                        0.78
+
+                    else
+                        1
+            in
+            [ part (along (-52 * size)) (along (52 * size)) (12 * size) ]
 
 
 type alias V3 =
@@ -329,12 +332,13 @@ pushOffShoal body overlap chart =
 
         slope =
             dx * dx + dy * dy
-
-        scale =
-            M.min ((overlap + 0.01) / slope) (30 / sqrt slope)
     in
     if slope < 1.0e-8 then
         body
 
     else
+        let
+            scale =
+                M.min ((overlap + 0.01) / slope) (30 / sqrt slope)
+        in
         { body | x = body.x + dx * scale, y = body.y + dy * scale }

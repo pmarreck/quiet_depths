@@ -1,4 +1,4 @@
-module Sim.Math exposing (abs, cbrt, clamp, exp, expm1, hypot2, hypot3, imul, isZero, max, min, remainder, sign, tanh, toInt32, truthy)
+module Sim.Math exposing (abs, cbrt, clamp, exp, expm1, hypot2, hypot3, imul, isZero, max, min, notLess, remainder, sign, tanh, toInt32, truthy)
 
 {-| Arithmetic the simulation needs exactly as JavaScript computes it, so the
 Elm simulation reproduces the TypeScript one bit for bit in V8.
@@ -24,6 +24,16 @@ these through `typescript/sim-math.ts` with the same formulas, so both agree.
 -}
 
 import Bitwise
+
+
+{-| JavaScript's `!(a < b)`: true when either is NaN. Between two variables
+Elm compiles `>=` to exactly this, but it reads as JavaScript's `a >= b`,
+which is false for NaN, so the simulation never writes `>=` and asks for this
+by name (elm-review's Simplify would turn `not (a < b)` back into `>=`).
+-}
+notLess : Float -> Float -> Bool
+notLess a b =
+    a >= b
 
 
 {-| JavaScript's `x === 0`: true for 0 and -0, false for NaN.

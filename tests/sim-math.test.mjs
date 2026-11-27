@@ -147,10 +147,17 @@ test('Elm writes numbers exactly as JavaScript toFixed does, rounding the binary
 // as greater, so `a > b` and `a >= b` are true when either is NaN, where
 // JavaScript says false. `<` and `<=` keep JavaScript's meaning, so the
 // simulation writes `b < a` for `a > b`, and `>` or `>=` only before a literal.
+// The one exception is Sim.Math's notLess, which names Elm's `>=` as what it
+// is, JavaScript's `!(a < b)`; the test removes exactly that body and no more.
 test('Elm simulation modules compare two values only with < and <=, which NaN cannot fool', () => {
-  const dir = new URL('../elm/Sim/', import.meta.url), offenders = [];
+  const dir = new URL('../elm/Sim/', import.meta.url), offenders = [], notLess = 'notLess a b =\n    a >= b\n';
   for (const file of readdirSync(dir).filter(f => f.endsWith('.elm'))) {
-    const code = readFileSync(new URL(file, dir), 'utf8').replace(/\{-[\s\S]*?-\}/g, '').replace(/--.*$/gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''");
+    let source = readFileSync(new URL(file, dir), 'utf8');
+    if (file === 'Math.elm') {
+      assert.ok(source.includes(notLess), 'Sim.Math defines notLess as the sanctioned >=');
+      source = source.replace(notLess, '');
+    }
+    const code = source.replace(/\{-[\s\S]*?-\}/g, '').replace(/--.*$/gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''");
     for (const m of code.matchAll(/(?<![-|>=<])>=?(?!>)\s+(?!\(?-?\d)(\S+)/g)) offenders.push(`${file}: ${m[0].trim().slice(0, 30)}`);
   }
   assert.deepEqual(offenders, []);

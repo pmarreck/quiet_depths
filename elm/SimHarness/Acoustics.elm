@@ -6,7 +6,7 @@ module SimHarness.Acoustics exposing (function)
 import Json.Decode as D
 import Json.Encode as E
 import Sim.Acoustics as Acoustics
-import SimHarness.Codec exposing (andMap, arg, call2, call3, point)
+import SimHarness.Codec exposing (andMap, call2, call3, point)
 
 
 kind : D.Decoder Acoustics.Kind

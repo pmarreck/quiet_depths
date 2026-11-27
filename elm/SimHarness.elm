@@ -9,7 +9,6 @@ in order.
 
 import Json.Decode as D
 import Json.Encode as E
-import Platform
 import SimHarness.Acoustics
 import SimHarness.Boat
 import SimHarness.Crew

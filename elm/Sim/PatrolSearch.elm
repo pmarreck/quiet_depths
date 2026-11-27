@@ -1,4 +1,4 @@
-module Sim.PatrolSearch exposing (Approach, Point, SearchArea, Traffic, advanceApproach, approachProgress, longPatrol, objectives, validSearch)
+module Sim.PatrolSearch exposing (Approach, Point, SearchArea, Traffic, advanceApproach, approachProgress, longPatrol, validSearch)
 
 {-| The long patrol: the boat starts well away from its objective and must
 find it within a search area, earning protected transit time on the way.

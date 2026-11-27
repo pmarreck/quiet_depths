@@ -2,12 +2,12 @@ module Sim.Environment exposing
     ( Config
     , Direction
     , Environment
-    , Phase(..)
+    , Phase
     , Sky
     , Soundings
     , Strike
     , Weather
-    , WeatherId(..)
+    , WeatherId
     , boatSurfacePose
     , defaultSeed
     , environmentAt
@@ -33,7 +33,7 @@ import Sim.HullDesign exposing (design)
 import Sim.Math as M
 import Sim.PatrolCalendar as Calendar
 import Sim.Periscope exposing (Scope, scopeEyeHeight)
-import Sim.SurfaceMotion as Motion exposing (Point, Pose, Sea, boatPoint, hash01, surfaceHeight, surfaceMotion)
+import Sim.SurfaceMotion exposing (Point, Pose, Sea, boatPoint, hash01, surfaceHeight, surfaceMotion)
 
 
 type WeatherId
@@ -285,9 +285,6 @@ environmentAt s =
             else
                 0
 
-        slot =
-            toFloat (floor (time / 300))
-
         idAt n =
             if n <= 0 then
                 cfg.startWeather
@@ -297,6 +294,10 @@ environmentAt s =
 
         ( earlier, later ) =
             if cfg.changing then
+                let
+                    slot =
+                        toFloat (floor (time / 300))
+                in
                 ( idAt (slot - 1), idAt slot )
 
             else

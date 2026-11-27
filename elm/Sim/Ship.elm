@@ -1,4 +1,4 @@
-module Sim.Ship exposing (Order(..), Parley, Pursuit(..), Report, Ship, decoder, encode)
+module Sim.Ship exposing (Order, Parley, Pursuit, Report, Ship, decoder, encode)
 
 {-| One vessel at sea, as saves hold it. The record mirrors the TypeScript
 field for field while both implementations change together: the fields a

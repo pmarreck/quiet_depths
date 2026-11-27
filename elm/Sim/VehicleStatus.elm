@@ -1,4 +1,4 @@
-module Sim.VehicleStatus exposing (DroneStatus, droneReturnSpeed, droneStatus, isSurfaced, recoveryDock, surfaceDepth, tetherAttachment)
+module Sim.VehicleStatus exposing (DroneStatus, Hull, droneReturnSpeed, droneStatus, isSurfaced, recoveryDock, surfaceDepth, tetherAttachment)
 
 {-| Whether the boat is surfaced, where the ROV's tether and recovery dock
 attach, and whether a deployed ROV can still be recovered.

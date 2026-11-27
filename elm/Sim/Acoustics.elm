@@ -1,10 +1,10 @@
 module Sim.Acoustics exposing
     ( Event(..)
-    , Kind(..)
+    , Heard
+    , Kind
     , Listener
     , Perceived
     , Source
-    , airSoundSpeed
     , airWaterPath
     , kindName
     , kinds
@@ -12,7 +12,6 @@ module Sim.Acoustics exposing
     , propagationTime
     , spatialPan
     , update
-    , waterSoundSpeed
     )
 
 {-| Sound in the water and the air: when a sound reaches the listener, from
@@ -227,11 +226,12 @@ perceivedSound source listener =
 
         distance =
             hypot2 horizontal (or 0 source.depth - depth)
-
-        under =
-            depth > 1
     in
     if airborne source.kind then
+        let
+            under =
+                depth > 1
+        in
         { distance = distance
         , delay = propagationTime source listener
         , pan = spatialPan source listener

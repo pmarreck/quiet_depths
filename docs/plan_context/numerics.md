@@ -71,3 +71,13 @@ about 25 operations), in three representations:
    ns per operation and prefix arithmetic everywhere. If wanted, first
    convert one hot module and time a real tick.
 3. Both: option 1 everywhere, `Num` only where precision must be known.
+4. A WASM simulation (Rust, Zig or Roc). WASM has native 64-bit integers
+   (Rust and Zig also 128-bit), so a full-precision software number would
+   cost a few nanoseconds per operation. But Elm cannot call WASM inside a
+   computation: applications get no kernel JavaScript, and ports are
+   asynchronous messages. WASM would have to own the whole tick, which means
+   writing the simulation in a WASM language instead of Elm and redoing the
+   ported modules. Roc fits the owner's criteria best (Elm-like, no runtime
+   exceptions, a 128-bit fixed-point `Dec` with no NaN or Infinity) but is
+   pre-1.0 with its compiler being rewritten. Worth it only if known
+   precision becomes the deciding goal.

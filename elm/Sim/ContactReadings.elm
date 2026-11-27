@@ -112,11 +112,12 @@ estimateAt maybeContact time =
 
                         else
                             let
-                                confidence =
-                                    M.min 1 (M.max 0 (orZero contact.confidence))
-
                                 major =
                                     if M.truthy contact.range then
+                                        let
+                                            confidence =
+                                                M.min 1 (M.max 0 (orZero contact.confidence))
+                                        in
                                         (1 - confidence) * 1500 + 100
 
                                     else

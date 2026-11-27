@@ -1,4 +1,4 @@
-module PatrolDifficulty exposing (Model, Msg, longPatrolEnabled, update, view)
+module PatrolDifficulty exposing (Model, Msg, Slider, Switch, longPatrolEnabled, update, view)
 
 import Html exposing (Html, details, div, input, label, output, small, summary, text)
 import Html.Attributes exposing (attribute, checked, class, disabled, id, type_, value)

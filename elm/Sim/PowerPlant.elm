@@ -144,15 +144,12 @@ propulsion s =
                 dieselRating =
                     rating surfaceKnots 13
 
-                bank =
-                    operatingFraction s.systems.batteryBank
-
                 space =
                     M.max 0 (s.systems.batteryBank - s.battery)
 
                 charging =
                     if s.dieselMode == Charge && space > 0 then
-                        bank
+                        operatingFraction s.systems.batteryBank
 
                     else
                         0
@@ -163,15 +160,12 @@ propulsion s =
                 drive =
                     M.min generator shaft
 
-                genKnots =
-                    drive * dieselRating
-
-                allocated =
-                    generator * (dieselRating - reserve * (dieselRating - rating 18.5 9))
-
                 ( ahead, assistDrain ) =
                     if s.dieselMode == Assist && generator > 0 && battery > 0 then
                         let
+                            genKnots =
+                                drive * dieselRating
+
                             -- Shaft power goes roughly as speed cubed. Only demand above
                             -- the generator's capacity draws on the battery; both
                             -- sources share one motor.
@@ -194,6 +188,10 @@ propulsion s =
                         ( assisted, 0.2 * M.max 0 (demand ^ 3 - genKnots ^ 3) / electricKnots ^ 3 )
 
                     else
+                        let
+                            allocated =
+                                generator * (dieselRating - reserve * (dieselRating - rating 18.5 9))
+                        in
                         ( M.min (shaft * dieselRating) allocated, 0 )
 
                 acceleration =

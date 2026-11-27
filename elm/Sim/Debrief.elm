@@ -1,4 +1,4 @@
-module Sim.Debrief exposing (Entry, add, limit)
+module Sim.Debrief exposing (Entry, add)
 
 {-| The end-of-patrol debrief: what actually happened, oldest first. A line
 repeated within four patrol seconds is recorded once, and only the latest 48

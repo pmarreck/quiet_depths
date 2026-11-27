@@ -8,21 +8,17 @@ order, since a ship pushed in one pair is the ship the next pair sees. The
 geometry is in `Sim.HullGeometry`, the roles in `Sim.HullTraffic`.
 -}
 
-import Array exposing (Array)
-import Dict exposing (Dict)
+import Array
+import Dict
 import Sim.Carrier as Carrier
-import Sim.Coast exposing (Coastline)
-import Sim.Debrief as Debrief
 import Sim.Equipment as Equipment
 import Sim.HullGeometry exposing (Body, Contact, hullContact, is, keelLimit, nan, orZero, pushOffShoal, weight)
 import Sim.HullTraffic exposing (Hurt, Role(..), Traffic, Work, bodyOf, roleKey, shipBody, store)
 import Sim.Math as M
-import Sim.Mechanics as Mechanics exposing (LogEntry, LogKind(..))
+import Sim.Mechanics as Mechanics exposing (LogKind(..))
 import Sim.PatrolReports as Reports
 import Sim.Periscope as Periscope
-import Sim.Ship exposing (Ship)
-import Sim.SurfaceMotion exposing (Point)
-import Sim.Vessel as Vessel exposing (Kind(..), SurfaceShip(..))
+import Sim.Vessel exposing (Kind(..), SurfaceShip(..))
 
 
 resolvePair : Hurt t c r -> Role -> Role -> Work t c r -> Work t c r
@@ -94,9 +90,6 @@ resolvePair hurt roleA roleB work =
                 ( n, move, ( da, db ) ) =
                     if not (M.truthy (va + vb)) || blocked a da0 || blocked b db0 then
                         let
-                            angle =
-                                Mechanics.rad a.heading
-
                             len =
                                 M.hypot2 hit.nx hit.ny
                         in
@@ -104,6 +97,10 @@ resolvePair hurt roleA roleB work =
                             { nx = hit.nx / len, ny = hit.ny / len }
 
                           else
+                            let
+                                angle =
+                                    Mechanics.rad a.heading
+                            in
                             { nx = cos angle, ny = negate (sin angle) }
                         , hit.lateralGap + 0.015
                         , ( 0, 0 )
@@ -111,11 +108,6 @@ resolvePair hurt roleA roleB work =
 
                     else
                         ( { nx = hit.nx, ny = hit.ny }, move0, ( da0, db0 ) )
-
-                closing =
-                    M.hypot3 (sin (Mechanics.rad a.heading) * a.speed - sin (Mechanics.rad b.heading) * b.speed)
-                        (cos (Mechanics.rad a.heading) * a.speed - cos (Mechanics.rad b.heading) * b.speed)
-                        (orZero a.verticalSpeed - orZero b.verticalSpeed)
 
                 displace x amount vertical =
                     { x
@@ -145,6 +137,11 @@ resolvePair hurt roleA roleB work =
 
             else
                 let
+                    closing =
+                        M.hypot3 (sin (Mechanics.rad a.heading) * a.speed - sin (Mechanics.rad b.heading) * b.speed)
+                            (cos (Mechanics.rad a.heading) * a.speed - cos (Mechanics.rad b.heading) * b.speed)
+                            (orZero a.verticalSpeed - orZero b.verticalSpeed)
+
                     noted =
                         let
                             s =

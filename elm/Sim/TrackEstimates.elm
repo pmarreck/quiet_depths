@@ -1,4 +1,4 @@
-module Sim.TrackEstimates exposing (ChartContact(..), ExactPosition, Observation, Packet, Track, applyReconPacket, chartContacts, designation, fixContact, readingFix)
+module Sim.TrackEstimates exposing (ChartContact(..), ExactPosition, Observation, Packet, Track, applyReconPacket, chartContacts, designation, fixContact)
 
 {-| Timestamped observations of contacts, independent of live vessel state:
 fixing a contact from an observation, folding a reconnaissance packet into
@@ -45,67 +45,68 @@ fix the contact already holds.
 -}
 fixContact : Observation -> { c | fix : Maybe SavedFix } -> Maybe { c | fix : Maybe SavedFix }
 fixContact o contact =
-    let
-        vx =
-            Maybe.withDefault 0 o.vx
-
-        vy =
-            Maybe.withDefault 0 o.vy
-
-        positionSigma =
-            Maybe.withDefault 0 o.positionSigma
-
-        velocitySigma =
-            Maybe.withDefault 0.25 o.velocitySigma
-
-        maneuverSigma =
-            Maybe.withDefault 0.008 o.maneuverSigma
-
-        sigmas =
-            [ positionSigma, velocitySigma, maneuverSigma ]
-
-        older =
-            case contact.fix of
-                Just held ->
-                    finite held.time && o.time < held.time
-
-                Nothing ->
-                    False
-    in
     if not (finite o.x && finite o.y && finite o.time) || o.time < 0 then
         Nothing
 
-    else if not (List.all finite (vx :: vy :: sigmas)) || List.any (\n -> n < 0) sigmas || older then
-        Nothing
-
     else
-        Just
-            { contact
-                | fix =
-                    Just
-                        { x = o.x
-                        , y = o.y
-                        , time = o.time
-                        , vx = Just vx
-                        , vy = Just vy
-                        , positionSigma = Just positionSigma
-                        , velocitySigma = Just velocitySigma
-                        , maneuverSigma = Just maneuverSigma
-                        , source =
-                            Just
-                                (case o.source of
-                                    Just source ->
-                                        if String.isEmpty source then
+        let
+            vx =
+                Maybe.withDefault 0 o.vx
+
+            vy =
+                Maybe.withDefault 0 o.vy
+
+            positionSigma =
+                Maybe.withDefault 0 o.positionSigma
+
+            velocitySigma =
+                Maybe.withDefault 0.25 o.velocitySigma
+
+            maneuverSigma =
+                Maybe.withDefault 0.008 o.maneuverSigma
+
+            sigmas =
+                [ positionSigma, velocitySigma, maneuverSigma ]
+
+            older =
+                case contact.fix of
+                    Just held ->
+                        finite held.time && o.time < held.time
+
+                    Nothing ->
+                        False
+        in
+        if not (List.all finite (vx :: vy :: sigmas)) || List.any (\n -> n < 0) sigmas || older then
+            Nothing
+
+        else
+            Just
+                { contact
+                    | fix =
+                        Just
+                            { x = o.x
+                            , y = o.y
+                            , time = o.time
+                            , vx = Just vx
+                            , vy = Just vy
+                            , positionSigma = Just positionSigma
+                            , velocitySigma = Just velocitySigma
+                            , maneuverSigma = Just maneuverSigma
+                            , source =
+                                Just
+                                    (case o.source of
+                                        Just source ->
+                                            if String.isEmpty source then
+                                                "observation"
+
+                                            else
+                                                source
+
+                                        Nothing ->
                                             "observation"
-
-                                        else
-                                            source
-
-                                    Nothing ->
-                                        "observation"
-                                )
-                        }
-            }
+                                    )
+                            }
+                }
 
 
 {-| A saved fix as the contact readings take it; an older fix without its
@@ -187,7 +188,7 @@ applyReconPacket packet s =
             List.map (\t -> ( t, observation packet.capturedAt t )) packet.tracks
 
         sound ( _, o ) =
-            not (packet.capturedAt < o.time) && fixContact o { fix = Nothing } /= Nothing
+            M.notLess packet.capturedAt o.time && fixContact o { fix = Nothing } /= Nothing
     in
     if
         not (finite s.time && finite s.x && finite s.y && finite packet.capturedAt && finite packet.receivedAt)

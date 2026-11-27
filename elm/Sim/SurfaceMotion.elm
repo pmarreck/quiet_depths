@@ -1,4 +1,4 @@
-module Sim.SurfaceMotion exposing (Offset, Point, Pose, Sea, boatLocal, boatPoint, hash01, periscopeDepth, surfaceHeight, surfaceMotion, waveComponents, wavePhaseAt)
+module Sim.SurfaceMotion exposing (Offset, Point, Pose, Sea, Wave, boatLocal, boatPoint, hash01, periscopeDepth, surfaceHeight, surfaceMotion, waveComponents, wavePhaseAt)
 
 {-| The sea surface, how a hull near it rides the waves, conversions between
 the boat's own axes and the world, and the seeded hash the whole patrol draws

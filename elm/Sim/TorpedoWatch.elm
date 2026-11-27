@@ -138,28 +138,31 @@ observe boat echo active tracks =
                         else
                             fixed.course
 
-                    range =
-                        M.hypot2 (echo.x - boat.x) (echo.y - boat.y)
-
-                    decrease =
-                        M.hypot2 (previousX - boat.x) (previousY - boat.y) - range
-
-                    elapsed =
-                        echo.time - previousAt
-
                     arrival =
                         if not echo.inboundRun || course == Nothing then
                             Nothing
 
-                        else if elapsed > 0 then
-                            if decrease > 1 then
-                                Just (echo.time + toFloat (ceiling (range * elapsed / decrease)))
+                        else
+                            let
+                                elapsed =
+                                    echo.time - previousAt
+                            in
+                            if elapsed > 0 then
+                                let
+                                    range =
+                                        M.hypot2 (echo.x - boat.x) (echo.y - boat.y)
+
+                                    decrease =
+                                        M.hypot2 (previousX - boat.x) (previousY - boat.y) - range
+                                in
+                                if decrease > 1 then
+                                    Just (echo.time + toFloat (ceiling (range * elapsed / decrease)))
+
+                                else
+                                    Nothing
 
                             else
-                                Nothing
-
-                        else
-                            fixed.arrival
+                                fixed.arrival
 
                     updated =
                         { fixed | id = echo.id, time = echo.time, x = echo.x, y = echo.y, depth = echo.depth, speed = echo.speed, inboundRun = echo.inboundRun, course = course, arrival = arrival }

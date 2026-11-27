@@ -32,6 +32,13 @@ port reply : E.Value -> Cmd msg
 -- FLOAT
 
 
+{-| A named zero, so the polynomial keeps the additions the other kernels make.
+-}
+zero : Float
+zero =
+    0
+
+
 floatRun : Int -> Float -> Float -> Float -> Float
 floatRun n x vx h =
     if n <= 0 then
@@ -41,7 +48,7 @@ floatRun n x vx h =
         let
             p : Float
             p =
-                ((((((-0.000198 * h + 0) * h + 0.0083333) * h + 0) * h - 0.1666667) * h + 0) * h + 1) * h + 0
+                ((((((-0.000198 * h + zero) * h + 0.0083333) * h + zero) * h - 0.1666667) * h + zero) * h + 1) * h + zero
 
             vx2 : Float
             vx2 =

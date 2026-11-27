@@ -13,7 +13,7 @@ import Sim.Pressure as Pressure
 import Sim.Seafloor as Seafloor
 import Sim.Status as Status
 import Sim.VehicleStatus as Vehicle
-import SimHarness.Codec exposing (andMap, arg, call1, call2, call3, call5, flag, point, position3, vesselKind)
+import SimHarness.Codec exposing (andMap, arg, call1, call2, call3, call5, point, position3, vesselKind)
 
 
 lenient : String -> D.Decoder Float
