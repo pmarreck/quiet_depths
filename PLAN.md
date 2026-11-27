@@ -8,7 +8,6 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## Elm migration
 
-- [x] Move rescue survivor counts and casualty pacing into the Elm rescue criteria (done 2026-11-27 03:16 EST; commit 5e48486).
 - [x] Move the surface casualty’s settling, foundering and loss depth into the Elm rescue criteria (done 2026-11-27 03:18 EST; commit 3b5f2d9).
 - [x] Move passing-traffic odds and the holiday restraint on hostile initiative into the Elm patrol definition (done 2026-11-27 03:20 EST; commit 418b4d6).
 - [x] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks. Answer: every objective's criteria, briefing numbers, patrol windows, transit timing and encounter odds now come from Elm, with characterization, mutation and document-drift tests; combat and AI tuning remains under the simulation item (done 2026-11-27 03:21 EST).
@@ -19,7 +18,8 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [x] Convert the service record, acoustics and contact track-estimate modules to strict TypeScript (done 2026-11-27 03:28 EST; commit 805e3a3).
 - [x] Convert the weather, light and sea environment module to strict TypeScript, checked output-identical to the original across 35,876 comparisons (done 2026-11-27 03:31 EST; commit c4d9d6e).
 - [x] Convert the ROV tether and patrol report modules to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:33 EST; commit 7f1b1a3).
-- [x] Convert held-input tracking and hostile pursuit to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:35 EST).
+- [x] Convert held-input tracking and hostile pursuit to strict TypeScript, checked output-identical to the originals (done 2026-11-27 03:35 EST; commit 20cd0af).
+- [x] Convert satellite reconnaissance and its save validation to strict TypeScript, checked identical to the original across every relay phase and 341,557 mutated saves (done 2026-11-27 03:38 EST).
 - [ ] Migrate remaining first-party browser code to strict TypeScript, including the Three.js, Web Audio and persistence adapters.
 
 ## New gameplay
