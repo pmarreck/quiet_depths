@@ -2,7 +2,7 @@
 // the Reading record that its Elm view decodes. The figures are formatted here,
 // exactly as the page wrote them before those panels moved to Elm; the views
 // decide what the measurements mean.
-import {clamp, separation} from './mechanics.ts';
+import {clamp, separation, distance, bearing} from './mechanics.ts';
 import {wrapHeading} from './controls.ts';
 import {isSurfaced} from './vehicle-status.ts';
 import {conditionLabel, SYSTEM_NAMES, DRONE_PARTS} from './equipment.ts';
@@ -112,4 +112,19 @@ export const logTime = (t: number) => String(Math.floor(t / 60)).padStart(2, '0'
 export function logReading(events: {t: number; kind?: unknown; text?: unknown}[], keyOf: (event: object) => number): LogReading {
   return {count: String(events.length).padStart(2, '0'),
     entries: events.map(e => ({key: String(keyOf(e)), kind: String(e.kind), time: logTime(e.t), text: String(e.text ?? '')}))};
+}
+
+export interface MissionReading {
+  missionType: string; missionName: string; short: string; pickup: boolean; returning: boolean; convoy: boolean;
+  objectiveLabel: string; objectiveText: string; objectiveProgress: string; homeDistance: string;
+}
+
+/** Missions whose extraction phase does not bring the boat home. */
+const STAYS_OUT = ['tiebreaker', 'seek-and-destroy-sub', 'seek-and-destroy', 'intercept', 'big-kahuna'];
+
+export function missionReading(s: {mission: string; convoy?: unknown; x: number; y: number; home: {x: number; y: number}}, m: {type: string; name: string; short: string},
+  objective: {label: string; text: string; progress: string}, extract: boolean, pickup: boolean): MissionReading {
+  return {missionType: String(m.type), missionName: String(m.name), short: String(m.short), pickup, returning: extract && !STAYS_OUT.includes(s.mission), convoy: !!s.convoy,
+    objectiveLabel: String(objective.label), objectiveText: String(objective.text), objectiveProgress: String(objective.progress),
+    homeDistance: s.mission === 'tiebreaker' && !extract ? 'Awaiting fleet clearance' : (distance(s, s.home) / 1000).toFixed(1) + ' km · ' + deg(bearing(s, s.home)) + '°'};
 }

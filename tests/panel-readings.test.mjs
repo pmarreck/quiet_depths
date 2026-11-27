@@ -101,3 +101,17 @@ test('log entries keep their keys and read as the log always showed them',async(
  assert.deepEqual(next.entries.map(e=>e.key),['3','1','2'],'existing rows keep their keys when an entry arrives');
  assert.deepEqual(logReading([{t:0}],keyOf).entries[0],{key:'4',kind:'undefined',time:'00:00',text:''});
 });
+
+test('the mission reading knows which missions return home and when the fleet is awaited',async()=>{
+ const {missionReading}=await import('../src/panel-readings.js');
+ const {MISSIONS,bearing}=await import('../src/sim.js');
+ const objective={label:'L',text:'T',progress:'1/2'},at=(mission,extra={})=>({mission,x:0,y:0,home:{x:1200,y:-1600},...extra});
+ const m=MISSIONS[0];
+ const returns=MISSIONS.filter(x=>missionReading(at(x.id),m,objective,true,false).returning).map(x=>x.id).sort();
+ assert.deepEqual(returns,['recon','shadow','sneaky-seamen','surface-rescue','survey','undersea-rescue','wolf-in-the-henhouse']);
+ assert.equal(missionReading(at('recon'),m,objective,false,false).returning,false,'only the extraction phase returns home');
+ assert.equal(missionReading(at('recon'),m,objective,false,false).homeDistance,'2.0 km · '+String(Math.round(bearing({x:0,y:0},{x:1200,y:-1600}))).padStart(3,'0')+'°');
+ assert.equal(missionReading(at('tiebreaker'),m,objective,false,false).homeDistance,'Awaiting fleet clearance');
+ assert.equal(missionReading(at('tiebreaker'),m,objective,true,false).homeDistance.endsWith('°'),true,'cleared fleets get a bearing home');
+ assert.deepEqual([missionReading(at('recon',{convoy:{}}),m,objective,false,true).convoy,missionReading(at('recon'),m,objective,false,true).pickup],[true,true]);
+});

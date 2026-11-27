@@ -31,7 +31,7 @@ import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
-import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading} from './panel-readings.js';
+import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading,missionReading} from './panel-readings.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
@@ -254,6 +254,7 @@ const droneBay=globalThis.Elm.DroneBay.init({node:$('drone-bay-root')});
 const stationStrip=globalThis.Elm.StationStrip.init({node:$('station-strip-root')});
 const helmCaption=globalThis.Elm.HelmCaption.init({node:$('helm-caption-root')});
 const captainsLog=globalThis.Elm.CaptainsLog.init({node:$('captains-log-root')});
+const missionBlock=globalThis.Elm.MissionBlock.init({node:$('mission-block-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
@@ -742,14 +743,9 @@ function updateUI(){
  document.querySelector('[data-view=drone]').classList.toggle('hidden',!s.difficulty.drone);
  $('show-recon-chart').classList.toggle('hidden',!s.difficulty.satellite);
  $('recon-panel').classList.toggle('hidden',!s.difficulty.satellite);
- $('mission-type').textContent=m.type;$('mission-name').innerHTML=esc(m.name).replace('observation','<br>observation.').replace('home','<br>home.').replace('through','<br>through.');
- const returning=extract&&!['tiebreaker','seek-and-destroy-sub','seek-and-destroy','intercept','big-kahuna'].includes(s.mission);
- $('plot-home').hidden=!!s.convoy;document.querySelector('.extraction').hidden=!!s.convoy;
+ missionBlock.ports.missionReading.send(missionReading(s,m,objective,extract,pickup));
+ $('plot-home').hidden=!!s.convoy;
  $('plot-home').textContent=s.mission==='sneaky-seamen'?'PLOT GATE B':s.mission==='tiebreaker'&&!extract?'AWAIT FLEET CLEARANCE':'PLOT EXTRACTION';
- $('mission-desc').textContent=returning?'Your work is done. Bring everyone home.':m.short;
- $('objective-label').textContent=pickup?'SURFACE FOR PICKUP':returning?'RETURN TO EXTRACTION':objective.label;
- $('objective-text').textContent=pickup?'Request 0 m and wait until surfaced':returning?'Reach the green circle and surface':objective.text;
- $('progress').textContent=returning?'✓':objective.progress;
  $('operation-card').classList.toggle('hidden',!s.operation);$('operation-range').textContent=s.site?(s.search&&!s.search.located?'POSITION UNCONFIRMED':Math.round(distance(s,s.site))+' M'):'';$('operation-advice').textContent=objective.advice;$('approach-site').textContent=s.mission==='survey'?'PLOT SURVEY APPROACH':'PLOT RESCUE APPROACH';
  $('start-rescue').hidden=!s.operation||s.mission==='survey'||s.operation.completed;
  $('start-rescue').textContent=s.operation?.active?'RESCUE UNDERWAY':'START RESCUE HERE';
@@ -758,7 +754,7 @@ function updateUI(){
  $('pressure-warning').hidden=view!=='orbit'||!pressure||s.status!=='patrol';
  $('pressure-warning').classList.toggle('critical',pressure===2);
  $('pressure-warning').textContent=(pressure===2?'CRITICAL · IMPLOSION RISK':'PRESSURE ALARM')+' · Rise above '+limit+' m';
- document.querySelector('.top-coords b').textContent=String(s.patrol.seed);$('home-distance').textContent=s.mission==='tiebreaker'&&!extract?'Awaiting fleet clearance':(distance(s,s.home)/1000).toFixed(1)+' km · '+deg(bearing(s,s.home))+'°';
+ document.querySelector('.top-coords b').textContent=String(s.patrol.seed);
  boatCondition.ports.boatReading.send(boatReading(s,limit,canIssue(s,context())));
  updatePatrolLog(s.events);
  droneBay.ports.droneBayReading.send(droneBayReading(s));
