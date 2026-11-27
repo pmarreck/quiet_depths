@@ -11,7 +11,6 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [x] Make the carrier's flooding settle and sinking rate follow the catalog's fatal hits instead of a fixed count of two, with a guard against restating the threshold (done 2026-11-27 03:55 EST; commit 175c79c).
 - [ ] Move the remaining helm controls (depth and speed sliders, turn buttons, propulsion) from JavaScript-wired markup into the Elm helm.
 - [ ] Move simulation and the remaining game UI to Elm in stages, preserving existing patrol saves.
-- [x] Convert convoy lamp signals, the hunter's raids and allied telegrams to strict TypeScript, checked identical to the original through 40 full convoy patrols (done 2026-11-27 03:44 EST; commit 821bf6a).
 - [x] Convert boat and drone systems (propulsion, depth control, damage, fuel fires, flooding, drone flight and recovery) to strict TypeScript, checked identical to the original through scripted patrols covering every logged branch (done 2026-11-27 03:48 EST; commit 3745d17).
 - [x] Convert mission setup, rescue and survey rules and objective readouts to strict TypeScript, checked identical to the original by running every mission through both versions of the simulation (done 2026-11-27 03:53 EST; commit 9caf376).
 - [x] Convert combat to strict TypeScript, split into torpedo runs, air support, hit geometry and the combat core, checked identical to the original through combat-heavy patrols and 94,544 mutated torpedo saves (done 2026-11-27 04:02 EST; commit a0edb00).
@@ -19,7 +18,8 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [x] Convert patrol persistence and the IndexedDB save slots to strict TypeScript, exercised in Chromium for round trips, stale-revision refusal and backup rollback (done 2026-11-27 04:17 EST; commit c46c502).
 - [x] Convert helm, scope, drone and chart controls to strict TypeScript, checked identical to the original across 37,200 comparisons (done 2026-11-27 04:19 EST; commit 2c7114a).
 - [x] Convert patrol notices, sonar layout and contact rows to strict TypeScript, checked identical to the original across 48,310 comparisons (done 2026-11-27 04:20 EST; commit 8f26661).
-- [x] Convert the crew's mess-deck ambience to strict TypeScript, with its voice clips verified loading in Chromium (done 2026-11-27 04:22 EST).
+- [x] Convert the crew's mess-deck ambience to strict TypeScript, with its voice clips verified loading in Chromium (done 2026-11-27 04:22 EST; commit fdd5527).
+- [x] Convert the sound system to strict TypeScript, exercised in Chromium through a combat patrol, alarms and the loss implosion (done 2026-11-27 04:24 EST).
 - [ ] Owner decision: type the Three.js scene modules with a pinned @types/three 0.170 fetched by Nix (new dev-only dependency, full API coverage) or with hand-written declarations for only the Three r170 API the game uses (no dependency, more upkeep)? Blocks typing scene, undersea, atmosphere, combat-scene, submarine-model, marine-life, wrecks and photo-capture.
 - [ ] Migrate remaining first-party browser code to strict TypeScript, including the Three.js, Web Audio and persistence adapters.
 
