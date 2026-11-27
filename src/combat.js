@@ -36,7 +36,7 @@ export function chargeAltitude(charge){
 }
 export function firingBearing(s,contact){const estimate=contact.fix?estimateAt(contact,s.time):null;return estimate?bearing(s,estimate):contact.bearing;}
 function torpedoOrders(s,id,heading,depth){
- return {orderedHeading:heading,orderedDepth:depth,pitch:0,tubeSide:0,searchAge:0,
+ return {orderedHeading:heading,orderedDepth:depth,pitch:0,tubeSide:0,searchAge:0,runOut:0,
   searchDirection:hash01(s.patrol.seed,id+673)<.5?-1:1,decoysChecked:[],decoyTarget:null,diverted:false};
 }
 function putTorpedoInWater(s,owner,origin,heading,depth,launch){
@@ -59,7 +59,11 @@ export function launchTorpedo(s,id){
  const pose=boatSurfacePose(s);
  const origin=boatPoint(pose,{side:tubeSide*D.tubeSide,down:D.tubeDown,forward:D.tubeForward});
  const heading=firingBearing(s,c),depth=c.kind==='sub'?c.depthEstimate??s.depth:SURFACE_RUN_DEPTH;
- putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:pose.heading,pitch:pose.pitch,tubeSide});
+ // Hold the gyro course out to the estimated range before circling. A bearing
+ // alone gives no range, so that shot runs half its distance down the bearing.
+ const estimate=c.fix?estimateAt(c,s.time):null;
+ const runOut=Math.min(s.runSetting,estimate?distance(origin,estimate):s.runSetting/2);
+ putTorpedoInWater(s,'player',origin,heading,depth,{intended:id,heading:pose.heading,pitch:pose.pitch,tubeSide,runOut});
  const target=s.ships.find(v=>v.id===id);
  if(target&&distance(s,target)<3500)playerSignal(s,target,s.runSetting+50>=distance(origin,target));
  recordLocalLaunch(s,s);launchNoise(s,s,true);
@@ -89,7 +93,7 @@ export function restoreTorpedo(s,p){
  const depth=p.depth??Math.min(s.depth,6);
  for(const [k,v] of Object.entries({runLimit:MAX_RUN,traveled:Math.min(MAX_RUN,p.age*TORPEDO_SPEED),owner:'player',intended:p.lock??null,lock:null,depth,pingAge:99,path:[{x:p.x,y:p.y,depth,time:s.time}],
   ...torpedoOrders(s,p.id,p.heading,depth)}))if(p[k]===undefined)p[k]=v;
- return Number.isFinite(p.runLimit)&&p.runLimit>=100&&p.runLimit<=MAX_RUN&&Number.isFinite(p.traveled)&&p.traveled>=0&&p.traveled<=p.runLimit&&['id','depth','pingAge','orderedHeading','orderedDepth','pitch','searchAge'].every(k=>Number.isFinite(p[k]))&&
+ return Number.isFinite(p.runLimit)&&p.runLimit>=100&&p.runLimit<=MAX_RUN&&Number.isFinite(p.traveled)&&p.traveled>=0&&p.traveled<=p.runLimit&&['id','depth','pingAge','orderedHeading','orderedDepth','pitch','searchAge','runOut'].every(k=>Number.isFinite(p[k]))&&p.runOut>=0&&
   (p.owner==='player'||p.owner==='enemy'&&(p.launcher===null||typeof p.launcher==='string')&&
    (p.aim===null||p.aim&&Number.isFinite(p.aim.x)&&Number.isFinite(p.aim.y)))&&
   [-1,1].includes(p.searchDirection)&&[-1,0,1].includes(p.tubeSide)&&typeof p.diverted==='boolean'&&
@@ -251,10 +255,12 @@ function torpedoCourse(s,p,dt){
  p.lock=p.decoyTarget?null:best?.id??null;
  const target=p.decoyTarget??best;
  if(target){
-  p.searchAge=0;
+  // After an acquisition, a lost return starts the search where it was lost.
+  p.searchAge=0;p.runOut=0;
   if(p.lock)p.orderedDepth=targetRunDepth(best);
   return{heading:bearing(p,target),depth:target===best?targetRunDepth(best):target.depth};
  }
+ if(p.traveled<(p.runOut??0))return{heading:p.orderedHeading,depth:p.orderedDepth};
  return searchCourse(p,dt);
 }
 function torpedoStrike(s,p,from){

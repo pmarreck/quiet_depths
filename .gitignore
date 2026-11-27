@@ -6,3 +6,4 @@ elm-stuff/
 .sites/
 *.tar.gz
 _site/
+HANDOFF*
