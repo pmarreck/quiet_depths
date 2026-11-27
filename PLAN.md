@@ -8,7 +8,6 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## Elm migration
 
-- [x] Move reconnaissance photo framing and the seeded photograph goal into the Elm mission definition (done 2026-11-27 03:08 EST; commit 34c206b).
 - [x] Move the carrier’s fatal direct-hit count into the Elm mission definition, shared by the briefing and carrier rules (done 2026-11-27 03:10 EST; commit 5a3fb49).
 - [x] Move the standard and longer patrol windows and the protected-transit search timing into the Elm patrol definition (done 2026-11-27 03:13 EST; commit 381d117).
 - [x] Move rescue survivor counts and casualty pacing into the Elm rescue criteria (done 2026-11-27 03:16 EST; commit 5e48486).
@@ -19,7 +18,8 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [ ] Move simulation and the remaining game UI to Elm in stages, preserving existing patrol saves.
 - [x] Convert the shared mechanics, debrief and loss-screen modules to strict TypeScript (done 2026-11-27 03:24 EST; commit 1a7ef42).
 - [x] Convert the photo archive, vehicle status, seafloor surface and pressure modules to strict TypeScript (done 2026-11-27 03:25 EST; commit 7b40085).
-- [x] Convert the service record, acoustics and contact track-estimate modules to strict TypeScript (done 2026-11-27 03:28 EST).
+- [x] Convert the service record, acoustics and contact track-estimate modules to strict TypeScript (done 2026-11-27 03:28 EST; commit 805e3a3).
+- [x] Convert the weather, light and sea environment module to strict TypeScript, checked output-identical to the original across 35,876 comparisons (done 2026-11-27 03:31 EST).
 - [ ] Migrate remaining first-party browser code to strict TypeScript, including the Three.js, Web Audio and persistence adapters.
 
 ## New gameplay

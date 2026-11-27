@@ -141,3 +141,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [New gameplay] Add TorpedoCam, an Orbit-dependent option to follow the player’s torpedoes in the water (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 02:59 EST; commit 789f3e6).
 - [x] [Elm migration] Move rescue station keeping and team timings into the Elm mission definitions, shared by the briefings, rules and progress text (done 2026-11-27 03:03 EST; commit e8c9d1f).
 - [x] [Elm migration] Move convoy tracking range, noise and depth limits and the seeded tracking goal into the Elm mission definition (done 2026-11-27 03:06 EST; commit 5e65857).
+- [x] [Elm migration] Move reconnaissance photo framing and the seeded photograph goal into the Elm mission definition (done 2026-11-27 03:08 EST; commit 34c206b).
