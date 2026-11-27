@@ -1,6 +1,6 @@
 result
 result-*
-node_modules/
+node_modules
 elm-stuff/
 .DS_Store
 .sites/
