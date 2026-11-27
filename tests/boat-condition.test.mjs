@@ -22,7 +22,7 @@ test('damage control from the Elm view is the only order and keeps its guard',()
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
  assignDamageControl();updateUI();
 });`));
- assert.match(app,/repairEnabled:canIssue\(s,context\(\)\)\}\);/);
+ assert.ok(app.includes(' boatCondition.ports.boatReading.send(boatReading(s,limit,canIssue(s,context())));'),'the repair button follows the same command guard');
 });
 
 test('the status line names faults in their established order and colors',()=>{

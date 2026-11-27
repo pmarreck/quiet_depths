@@ -31,6 +31,7 @@ import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
+import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading} from './panel-readings.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
@@ -48,7 +49,6 @@ import {patrolKills,serviceRecord} from './service-record.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const tubeLabels={port:$('tube-port'),starboard:$('tube-starboard')};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const deg=n=>String(Math.round(wrapHeading(n))%360).padStart(3,'0');
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
 let installingBackup=false;
@@ -274,7 +274,6 @@ const headingAxis=mountAxis('heading',{title:'HEADING',unit:'° TRUE',presetsCla
  {id:'port',label:'−',aria:'Turn 15 degrees to port',by:-15,before:true},{id:'starboard',label:'+',aria:'Turn 15 degrees to starboard',by:15,before:false}]});
 const depthAxis=mountAxis('depth',{title:'DEPTH',unit:'METERS',presetsClass:'depth-presets',sublabelId:'depth-label',nudges:[]});
 const speedAxis=mountAxis('speed',{title:'SPEED',unit:'KNOTS',presetsClass:'speed-presets',sublabelId:'noise-label',nudges:[]});
-const depthPresets=[{label:'SURFACE',value:0},{label:'SCOPE',value:12},{label:'DIVE',value:90}];
 let engineHint='';
 attachCompassSteering($('helm-compass'),()=>helmFor(state,view).heading,heading=>{if(view==='orbit'||!canIssue(state,context())||!pilotEnabled())return;order('heading',heading);updateUI();});
 telegraph.ports.ringTelegraph.subscribe(({lever,quiet})=>{
@@ -759,18 +758,11 @@ function updateUI(){
  $('start-rescue').textContent=s.operation?.active?'RESCUE UNDERWAY':'START RESCUE HERE';
  if(s.site&&(!s.search||s.search.located))$('operation-range').textContent+=' · Hull '+Math.ceil(s.site.hull)+'%';
  const limit=depthLimit(s),pressure=pressureLevel(s);
- const hullLimits='Outer hull '+Math.floor(s.outerHull)+'% · Pressure hull '+conditionLabel(s.hull,s.repairLimits.hull,false)+' · Depth limit '+limit+' m';
  $('pressure-warning').hidden=view!=='orbit'||!pressure||s.status!=='patrol';
  $('pressure-warning').classList.toggle('critical',pressure===2);
  $('pressure-warning').textContent=(pressure===2?'CRITICAL · IMPLOSION RISK':'PRESSURE ALARM')+' · Rise above '+limit+' m';
  document.querySelector('.top-coords b').textContent=String(s.patrol.seed);$('home-distance').textContent=s.mission==='tiebreaker'&&!extract?'Awaiting fleet clearance':(distance(s,s.home)/1000).toFixed(1)+' km · '+deg(bearing(s,s.home))+'°';
- // Number() keeps each comparison exactly as JavaScript made it; the flooding
- // figures are formatted only while flooding, as before.
- boatCondition.ports.boatReading.send({hull:Number(s.hull),hullText:String(Math.round(s.hull)),hullLimits,outerHull:Number(s.outerHull),flood:Number(s.flood),
-  floodText:s.flood>0?s.flood.toFixed(1):'',waterText:s.flood>0?s.water.toFixed(1):'',fuelFire:!!s.fuelFire,fuelLeak:!!s.fuelLeak,repair:Number(s.repair),
-  systemConditions:Object.values(s.systems).map(Number),
-  subsystems:Object.entries(SYSTEM_NAMES).map(([key,name])=>({name,condition:Number(s.systems[key]),label:String(conditionLabel(s.systems[key],s.repairLimits[key],key!=='crew'))})),
-  ballast:Number(s.ballast),ballastText:Math.abs(s.ballast*100).toFixed(0),verticalText:s.verticalSpeed.toFixed(2),rpmText:s.propRpm.toFixed(0),cavitation:Number(s.cavitation),repairEnabled:canIssue(s,context())});
+ boatCondition.ports.boatReading.send(boatReading(s,limit,canIssue(s,context())));
  updatePatrolLog(s.events);
  $('drone-bay-mode').textContent=s.drone.mode.toUpperCase();$('drone-bay-mode').classList.toggle('damaged',s.drone.mode==='lost');$('drone-bay-metrics').innerHTML=`<span>CHARGE <b>${Math.round(s.drone.battery)}%</b></span>${DRONE_PARTS.map(key=>`<span>${key.toUpperCase()} <b>${conditionLabel(s.drone[key],s.drone.repairLimits[key],key!=='hull')}</b></span>`).join('')}`;$('drone-bay-advice').textContent=s.drone.mode==='lost'?s.drone.lostReason:s.drone.mode==='stowed'?(droneDeployReason(s)||'READY · 280 M MAX · DEPLOY ≤3 KN'):Math.round(separation(s,s.drone))+' / 100 M LINK · BUOYANCY '+Math.round(s.drone.buoyancy)+'%';
  const plant=propulsion(s);
@@ -784,16 +776,8 @@ function updateUI(){
  updateFollowButtons(s);
  compass.ports.compassReading.send({heading:v.heading,requested:v.targetHeading});
  $('helm-mode').textContent=drone?(v.mode==='remote'?'DRONE HELM':v.mode==='return'?'DRONE · AUTO RETURN':'DRONE · OFFLINE'):'SUBMARINE HELM';
- headingAxis.send({value:deg(v.heading),sublabel:'',sublabelColor:'',min:0,max:359.9,step:.1,requested:v.targetHeading,actual:v.heading,actualPercent:clamp(v.heading/359.9*100,0,100),
-  valueText:`Actual ${v.heading.toFixed(1)}; requested ${v.targetHeading.toFixed(1)}`,ariaLabel:'Requested heading',act:`ACT ${deg(v.heading)}°`,req:`REQ ${deg(v.targetHeading)}°`,enabled:canIssue(s,context())&&pilotEnabled(),presets:[]});
- depthAxis.send({value:String(Math.round(v.depth)),sublabelColor:'',sublabel:isSurfaced(v)?'SURFACED':drone?'ROV':v.depth<=15?'SCOPE':v.depth>220?'STRAIN':'SUBMERGED',
-  min:0,max:280,step:1,requested:v.targetDepth,actual:v.depth,actualPercent:clamp(v.depth/280*100,0,100),valueText:`Actual ${v.depth.toFixed(1)}; requested ${v.targetDepth.toFixed(1)}`,
-  ariaLabel:'Requested depth',act:`ACT ${v.depth.toFixed(0)} m`,req:`REQ ${v.targetDepth.toFixed(0)} m`,enabled:canIssue(s,context())&&pilotEnabled(),presets:depthPresets});
- {const lo=drone?-3:-4,hi=drone?10:17,throttle=Math.round(throttlePercent(v.targetSpeed));
-  speedAxis.send({value:v.speed.toFixed(1),sublabel:drone?(v.speed<0?'ASTERN':'ROV'):s.noise<28?'QUIET':s.noise<55?'AUDIBLE':'LOUD',sublabelColor:!drone&&s.noise>55?'var(--red)':'var(--green)',
-   min:lo,max:hi,step:.1,requested:v.targetSpeed,actual:v.speed,actualPercent:clamp(((!drone&&v.speed>0?v.speed*17/SURFACE_KNOTS:v.speed)-lo)/(hi-lo)*100,0,100),
-   valueText:drone?`Actual ${v.speed.toFixed(1)}; requested ${v.targetSpeed.toFixed(1)}`:throttle+'% throttle, actual '+v.speed.toFixed(1)+' knots',ariaLabel:drone?'Requested ROV speed':'Submarine throttle',
-   act:`ACT ${v.speed.toFixed(1)} kn`,req:drone?'REQ '+v.targetSpeed.toFixed(1)+' kn':'THR '+throttle+'%',enabled:canIssue(s,context())&&pilotEnabled(),presets:[]});}
+ {const steer=canIssue(s,context())&&pilotEnabled();
+  headingAxis.send(headingReading(v,steer));depthAxis.send(depthReading(v,drone,steer));speedAxis.send(speedReading(v,drone,s.noise,steer));}
  engineHint=drone?'Sub holds its own helm orders.':powerStatus+' · '+(s.silent?Math.min(3,plant.ahead):plant.ahead).toFixed(1)+' kn available'+(s.depth>14&&s.engine==='diesel'?' · Rise to 14 m or select electric.':'');
  {const able=enabled=>canIssue(s,context())&&enabled();
   propulsionPanel.ports.propulsionReading.send({engine:s.engine,silent:s.silent,dieselMode:s.dieselMode,modes:dieselModeOptions,routing:s.engine==='diesel'&&!drone,hint:engineHint,
@@ -844,8 +828,7 @@ function updateUI(){
  $('viewport').dataset.lastLightning=s.lightning.at(-1)?.id||'';$('viewport').dataset.heardThunder=s.acoustics.filter(a=>a.type==='thunder'&&a.heard).length;
  $('viewport').dataset.visibleBolt=String(!!scene?.boltVisible);
  const droneSounding=view==='drone'&&['remote','return'].includes(s.drone.mode),seabed=getSoundings(s,droneSounding);
- soundingsStrip.ports.soundingsReading.send({drone:droneSounding,belowKeel:seabed.belowKeel,belowKeelText:seabed.belowKeel.toFixed(0)+' m',
-  waterDepthText:seabed.waterDepth>0?seabed.waterDepth.toFixed(0)+' m':'LAND',windText:Math.round(env.wind)+' km/h WIND'});
+ soundingsStrip.ports.soundingsReading.send(soundingsReading(seabed,droneSounding,env.wind));
  $('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
  $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
  const lampContact=matchingBearing(s.convoy?.pin,s,s.time,s.contacts);

@@ -21,7 +21,7 @@ test('the soundings strip is drawn only by its Elm view',()=>{
 
 test('each frame sends the measured clearance with the figures formatted as before',()=>{
  assert.match(app,/const soundingsStrip=globalThis\.Elm\.Soundings\.init\(\{node:\$\('soundings-root'\)\}\);/);
- assert.ok(app.includes("soundingsStrip.ports.soundingsReading.send({drone:droneSounding,belowKeel:seabed.belowKeel,belowKeelText:seabed.belowKeel.toFixed(0)+' m',\n  waterDepthText:seabed.waterDepth>0?seabed.waterDepth.toFixed(0)+' m':'LAND',windText:Math.round(env.wind)+' km/h WIND'});"));
+ assert.ok(app.includes(' soundingsStrip.ports.soundingsReading.send(soundingsReading(seabed,droneSounding,env.wind));'));
 });
 
 test('clearance advice keeps its thresholds, wording and styling',()=>{
