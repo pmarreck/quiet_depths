@@ -1,4 +1,4 @@
-module Sim.Math exposing (abs, cbrt, clamp, exp, expm1, hypot2, hypot3, isZero, max, min, remainder, sign, tanh)
+module Sim.Math exposing (abs, cbrt, clamp, exp, expm1, hypot2, hypot3, isZero, max, min, remainder, sign, tanh, truthy)
 
 {-| Arithmetic the simulation needs exactly as JavaScript computes it, so the
 Elm simulation reproduces the TypeScript one bit for bit in V8.
@@ -27,6 +27,12 @@ these through `typescript/sim-math.ts` with the same formulas, so both agree.
 isZero : Float -> Bool
 isZero x =
     not (isNaN x) && x == 0
+
+
+{-| JavaScript's truthiness of a number: false for 0, -0 and NaN. -}
+truthy : Float -> Bool
+truthy x =
+    not (isZero x || isNaN x)
 
 
 isNegativeZero : Float -> Bool

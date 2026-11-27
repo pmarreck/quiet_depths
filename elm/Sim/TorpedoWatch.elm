@@ -39,12 +39,6 @@ orZero value =
         value
 
 
-{-| JavaScript's truthiness of a number. -}
-truthy : Float -> Bool
-truthy value =
-    not (M.isZero value || isNaN value)
-
-
 {-| The arcade warning uses an enemy torpedo's scripted destination; one left
 behind by the boat, or a diverted run, cancels the prediction.
 -}
@@ -126,7 +120,7 @@ observe boat echo active tracks =
                             track
 
                     course =
-                        if fixed.fixes == 2 && (truthy dx || truthy dy) then
+                        if fixed.fixes == 2 && (M.truthy dx || M.truthy dy) then
                             Just (remainderBy 360 (round (atan2 dx dy * 180 / pi) + 360))
 
                         else
