@@ -102,6 +102,18 @@ vertical space well and has a vertical speed control. On widescreen, the other
 tabs show a slim read-only strip with actual and ordered heading, depth and
 speed.
 
+**Layout decision (2026-11-27).** A compact band below the view. The
+periscope view stays full width and grows to about 420 px tall. Below it, a
+band of about 190 px holds the compass (about 160 px), short vertical depth
+and speed sliders, and propulsion. The ROV tab uses the same band to steer the
+ROV. The tab label reads Periscope & Controls on widescreen only.
+
+**Layout principle (owner, 2026-11-27).** The main gameplay view belongs in
+the center, with ancillary controls arranged around it rather than pushing it
+to one side. In the band, the compass sits centered beneath the view, the
+depth slider on one side, the speed slider on the other, and propulsion and
+keel readouts toward the outer edges.
+
 ## 3. Resting on the seafloor
 
 **Request.** Bottoming should be a strategic, risky option that greatly

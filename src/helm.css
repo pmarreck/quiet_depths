@@ -1,0 +1,9 @@
+.wide-label,.helm-status{display:none}
+/* Widescreen: the helm belongs to Periscope & Controls and the ROV. Other
+   stations take the full height and keep a one-line status. */
+@media (min-width:1101px){
+.stations button .wide-label{display:block;font-size:inherit;color:inherit;margin:0;white-space:nowrap}
+body:not(.orbiting):is([data-station=sonar],[data-station=chart],[data-station=tower],[data-station=gun],[data-station=photos]) :is(.soundings-strip,.helm-caption,.helm){display:none}
+body:not(.orbiting):is([data-station=sonar],[data-station=chart],[data-station=tower],[data-station=gun],[data-station=photos]) .helm-status{display:flex}
+.helm-status{height:34px;flex-shrink:0;align-items:center;padding:0 18px;border-top:1px solid var(--line);background:#101b21;font:.8125rem var(--mono);letter-spacing:.6px;color:#b3c7bc;white-space:nowrap;overflow:hidden}
+}

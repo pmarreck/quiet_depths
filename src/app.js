@@ -10,6 +10,7 @@ import {dieselModes,isDieselMode,dieselRoutingStatus,propulsion,batteryOutput,ge
 import {torpedoTubes} from './torpedo-tubes.js';
 import {bindBriefingNavigation} from './briefing-navigation.js';
 import {ReplayRecorder,ReplayPlayback,replayLabels} from './instant-replay.js';
+import {helmStatusText} from './helm-status.js';
 import {seriousRepairs} from './red-alert.js';
 import {threats} from './torpedo-watch.js';
 import {conditionLabel,DRONE_PARTS,operatingFraction} from './equipment.js';
@@ -715,6 +716,7 @@ function updateUI(){
  $('engine-status').textContent=powerStatus;
 
  const drone=view==='drone',v=helmFor(s,view),actual={heading:v.heading,depth:v.depth,speed:v.speed},requested={heading:v.targetHeading,depth:v.targetDepth,speed:v.targetSpeed};
+ $('helm-status').textContent=helmStatusText(s,throttlePercent(s.targetSpeed));
  $('helm-mode').textContent=drone?(v.mode==='remote'?'DRONE HELM':v.mode==='return'?'DRONE · AUTO RETURN':'DRONE · OFFLINE'):'SUBMARINE HELM';
  $('heading-value').textContent=deg(v.heading);$('depth-value').textContent=Math.round(v.depth);$('speed-value').textContent=v.speed.toFixed(1);
  $('heading-order').innerHTML=`<span>ACT ${deg(v.heading)}°</span><span>REQ ${deg(v.targetHeading)}°</span>`;
