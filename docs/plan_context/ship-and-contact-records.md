@@ -80,3 +80,13 @@ traffic, so that rule stays with the patrol decoder.
 The wider lesson for the checkpoint: restore also fills defaults (a site's
 hull, resumed traffic, watch warnings) and rewrites old shapes, so the Elm
 save decoder has to carry restore's migrations, not only its checks.
+
+## The sound record (survey, 2026-11-27)
+
+3,946 saved sounds across every mission: ten types (sweep, gunfire, launch,
+splashdown, blast, seeker, creak, detonation, collapse, settling) and 19
+fields: always id, time, type, x, y, power, heard; nearly always depth,
+heardAt and a nested `perceived`; sometimes altitude, vessel, friendly, own,
+touched, missed, warning, ownHit and a nested `echo`. `systems` also writes
+`droneHit`, never seen in these patrols. Restore checks sounds separately.
+Not yet designed.

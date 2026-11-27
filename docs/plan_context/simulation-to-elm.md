@@ -402,3 +402,14 @@ types independently, and the shared records expose the disagreements:
 
 Each seam is small, but the integration work is real and grows with the
 number of ported modules; a line count never shows it.
+
+**Systems pulls in more shared records (2026-11-27 14:05).** Every module
+`systems` calls is ported, but `systems` itself needs three shapes no port
+has pinned down: the player's boat (the `Boat` interface, about 60 fields),
+its drone (about 25), and the acoustic sound. The Elm acoustics takes sounds
+as an extensible record (`Heard a`) and never ported `emitSound`; the
+TypeScript's sounds carry open extra fields (`own`, `shot`, and the
+`droneHit` flag `systems` reads). Each must be surveyed and decoded as the
+ship and contact records were. This is the pattern the checkpoint should
+weigh: the large modules each pull in shared shapes, and those shapes are
+where the remaining cost concentrates, more than in the lines themselves.
