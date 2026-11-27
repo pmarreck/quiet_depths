@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), PatrolTiming, PhotoCriteria, RescueCriteria, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, patrolTiming, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), PatrolTiming, PhotoCriteria, RescueCriteria, SinkingCasualty, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, patrolTiming, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
@@ -123,6 +123,22 @@ type alias RescueCriteria =
     , firstLossSpread : Float
     , laterLossDelay : Float
     , laterLossSpread : Float
+    , sinking : Maybe SinkingCasualty
+    }
+
+
+{-| A sinking casualty starts at startDepth and settles one meter per
+settleSeconds. After foundersAfter plus a seeded share of foundersSpread
+seconds it goes down at sinkRate meters per second. Below lostBelow, nobody
+left aboard can be saved.
+-}
+type alias SinkingCasualty =
+    { startDepth : Float
+    , settleSeconds : Float
+    , foundersAfter : Float
+    , foundersSpread : Float
+    , sinkRate : Float
+    , lostBelow : Float
     }
 
 
@@ -143,12 +159,25 @@ underseaRescue =
     , firstLossSpread = 90
     , laterLossDelay = 105
     , laterLossSpread = 110
+    , sinking = Nothing
     }
 
 
 surfaceRescue : RescueCriteria
 surfaceRescue =
-    { underseaRescue | farthestRange = 85, depthTolerance = 1 }
+    { underseaRescue
+        | farthestRange = 85
+        , depthTolerance = 1
+        , sinking =
+            Just
+                { startDepth = 2
+                , settleSeconds = 500
+                , foundersAfter = 860
+                , foundersSpread = 220
+                , sinkRate = 0.35
+                , lostBelow = 15
+                }
+    }
 
 
 separation : RescueCriteria -> String

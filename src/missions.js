@@ -9,7 +9,7 @@ import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanic
 import {hash01,TIMES} from './environment.js';
 import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-objective.js';
 import {addScan,scanRate,surveyComplete,surveyCriteria} from './wreck-survey.js';
-import {initialSurvivors,nextLossDelay,rescueCriteriaFor,stationKeeping} from './rescue-operation.js';
+import {casualtyDepth,initialSurvivors,nextLossDelay,rescueCriteriaFor,stationKeeping,surfaceRescue} from './rescue-operation.js';
 import {trackingCriteria,trackingGoal} from './convoy-tracking.js';
 import {photoCriteria,photoGoal} from './recon-photos.js';
 export {MISSIONS};
@@ -65,7 +65,7 @@ export function setupOperation(s,seed){
  s.site=null;s.operation=null;
  if(!['undersea-rescue','surface-rescue','survey'].includes(s.mission))return;
  const surface=s.mission==='surface-rescue',survey=s.mission==='survey',x=1430+hash01(seed,801)*330,y=420+hash01(seed,802)*450;
- s.site={x,y,hull:100,depth:surface?2:bottom(x,y,s.environment.chartSeed)-5,heading:35+hash01(seed,803)*100,kind:surface?'surface':survey?'wreck':'sub',name:surface?['R/V Halcyon','M/V Solway','R/V Northstar'][Math.floor(hash01(seed,804)*3)]:survey?['SS Aster, 1912','SS Caledonia, 1906','SS Pelican, 1921'][Math.floor(hash01(seed,804)*3)]:['SS-118 Lantern','SS-142 Cormorant','SS-107 Narwhal'][Math.floor(hash01(seed,804)*3)],speed:0};
+ s.site={x,y,hull:100,depth:surface?surfaceRescue.sinking.startDepth:bottom(x,y,s.environment.chartSeed)-5,heading:35+hash01(seed,803)*100,kind:surface?'surface':survey?'wreck':'sub',name:surface?['R/V Halcyon','M/V Solway','R/V Northstar'][Math.floor(hash01(seed,804)*3)]:survey?['SS Aster, 1912','SS Caledonia, 1906','SS Pelican, 1921'][Math.floor(hash01(seed,804)*3)]:['SS-118 Lantern','SS-142 Cormorant','SS-107 Narwhal'][Math.floor(hash01(seed,804)*3)],speed:0};
  const rules=rescueCriteriaFor(s.site.kind);
  s.operation={rescued:0,remaining:initialSurvivors(hash01(seed,811),hash01(seed,812),rules),dead:0,known:false,assessment:0,boarding:0,diverReturn:0,holding:false,active:false,scan:0,photoAngles:[],lastCasualty:rules.casualtyClockStart,completed:false,find:null};
  const start={x:x-260-hash01(seed,805)*120,y:y-200-hash01(seed,806)*180},heading=bearing(start,s.site),depth=surface?0:35+Math.floor(hash01(seed,807)*20);
@@ -131,10 +131,11 @@ export function updateRescue(s,dt,rules){
   if(o.known&&o.remaining===0){o.diverReturn+=dt;if(o.diverReturn>=rules.returnSeconds){o.completed=true;o.active=false;log(s,o.rescued?`Rescue team recovered. ${o.rescued} survivors safe aboard.`:'Rescue search complete. No survivors found. Team recovered.',o.rescued?'success':'warning');}}
  }else{o.active=false;o.boarding=0;o.diverReturn=0;}
  if(s.time>casualtyDeadline(s)&&o.remaining>0){o.lastCasualty=s.time;o.remaining--;o.dead++;if(o.known)log(s,'A survivor’s signal has stopped. Rescue window is narrowing.','warning');}
- if(s.site.kind==='surface'){
+ if(s.site.kind==='surface'&&rules.sinking){
   const age=s.time-(s.search?.protectedTime??0);
-  s.site.depth=Math.min(bottom(s.site.x,s.site.y,s.environment.chartSeed)-5,2+age/500+Math.max(0,age-(860+hash01(s.patrol.seed,820)*220))*.35);
-  if(s.site.depth>15&&o.remaining>0){o.dead+=o.remaining;o.remaining=0;log(s,'The casualty has gone under. No further survivor signals. Recover the rescue team.','damage');}
+  const sink=rules.sinking;
+  s.site.depth=casualtyDepth(age,hash01(s.patrol.seed,820),sink,bottom(s.site.x,s.site.y,s.environment.chartSeed)-5);
+  if(s.site.depth>sink.lostBelow&&o.remaining>0){o.dead+=o.remaining;o.remaining=0;log(s,'The casualty has gone under. No further survivor signals. Recover the rescue team.','damage');}
  }
  return o.completed;
 }

@@ -18,6 +18,21 @@ export interface RescueCriteria {
   firstLossSpread: number;
   laterLossDelay: number;
   laterLossSpread: number;
+  sinking: SinkingCasualty | null;
+}
+
+export interface SinkingCasualty {
+  startDepth: number;
+  settleSeconds: number;
+  foundersAfter: number;
+  foundersSpread: number;
+  sinkRate: number;
+  lostBelow: number;
+}
+
+// Depth of a sinking casualty, never below its resting place on the seabed.
+export function casualtyDepth(age: number, roll: number, sink: SinkingCasualty, restingDepth: number): number {
+  return Math.min(restingDepth, sink.startDepth + age / sink.settleSeconds + Math.max(0, age - (sink.foundersAfter + roll * sink.foundersSpread)) * sink.sinkRate);
 }
 
 export const underseaRescue: RescueCriteria = missions.find(m => m.id === 'undersea-rescue')!.objective;

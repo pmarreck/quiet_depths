@@ -62,6 +62,7 @@ encodeObjective objective =
                 , ( "firstLossSpread", E.float c.firstLossSpread )
                 , ( "laterLossDelay", E.float c.laterLossDelay )
                 , ( "laterLossSpread", E.float c.laterLossSpread )
+                , ( "sinking", Maybe.withDefault E.null (Maybe.map encodeSinking c.sinking) )
                 ]
 
         SurveyWreck c ->
@@ -80,6 +81,18 @@ encodeObjective objective =
 
         ProtectConvoy hunter limit ->
             rule "protectConvoy" [ ( "hunter", E.string hunter ), ( "lossLimit", E.int limit ) ]
+
+
+encodeSinking : PatrolMission.SinkingCasualty -> E.Value
+encodeSinking c =
+    E.object
+        [ ( "startDepth", E.float c.startDepth )
+        , ( "settleSeconds", E.float c.settleSeconds )
+        , ( "foundersAfter", E.float c.foundersAfter )
+        , ( "foundersSpread", E.float c.foundersSpread )
+        , ( "sinkRate", E.float c.sinkRate )
+        , ( "lostBelow", E.float c.lostBelow )
+        ]
 
 
 encodeMission : PatrolMission.Mission -> E.Value

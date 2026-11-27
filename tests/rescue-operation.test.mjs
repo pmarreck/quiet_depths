@@ -65,8 +65,9 @@ test('the Elm mission definitions supply the rescue criteria used by the briefin
  const team={assessmentSeconds:22,transferSeconds:9,returnSeconds:9,closestRange:30,fastestKnots:.6,
   emptySiteChance:.08,fewestSurvivors:8,survivorSpread:8,casualtyClockStart:240,firstLossDelay:145,firstLossSpread:90,laterLossDelay:105,laterLossSpread:110};
  const undersea=MISSIONS.find(m=>m.id==='undersea-rescue'),surface=MISSIONS.find(m=>m.id==='surface-rescue');
- assert.deepEqual(undersea.objective,{kind:'rescue',...team,farthestRange:75,depthTolerance:5});
- assert.deepEqual(surface.objective,{kind:'rescue',...team,farthestRange:85,depthTolerance:1});
+ assert.deepEqual(undersea.objective,{kind:'rescue',...team,farthestRange:75,depthTolerance:5,sinking:null});
+ assert.deepEqual(surface.objective,{kind:'rescue',...team,farthestRange:85,depthTolerance:1,
+  sinking:{startDepth:2,settleSeconds:500,foundersAfter:860,foundersSpread:220,sinkRate:.35,lostBelow:15}});
  assert.equal(underseaRescue,undersea.objective);assert.equal(surfaceRescue,surface.objective);
  assert.equal(rescueCriteriaFor('surface'),surfaceRescue);assert.equal(rescueCriteriaFor('sub'),underseaRescue);
  for(const [mission,c] of [[undersea,underseaRescue],[surface,surfaceRescue]])
@@ -112,4 +113,37 @@ test('survivor counts and loss timing follow whatever rescue criteria they are g
  assert.equal(nextLossDelay(0,0,c),145);assert.equal(nextLossDelay(0,1,c),235);
  assert.equal(nextLossDelay(2,0,c),105);assert.equal(nextLossDelay(2,1,c),215);
  assert.equal(nextLossDelay(0,.5,{...c,firstLossDelay:60,firstLossSpread:20}),70);
+});
+
+test('the surface casualty settles, founders after a seeded delay, and takes the remaining survivors when lost',async()=>{
+ const {hash01}=await import('../src/environment.js');
+ const {bottom}=await import('../src/mechanics.js');
+ for(const seed of [0,1972,4294967295]){
+  const s=createGame('surface-rescue',seed),site=s.site;s.ships=[];
+  assert.equal(site.depth,2);
+  Object.assign(s,{x:site.x+500,y:site.y});
+  const floor=bottom(site.x,site.y,s.environment.chartSeed)-5;
+  for(const age of [0,400,900,1100,1300]){
+   s.time=age;updateOperation(s,.25);
+   const expected=Math.min(floor,2+age/500+Math.max(0,age-(860+hash01(seed,820)*220))*.35);
+   assert.equal(site.depth,expected,seed+' at '+age);
+  }
+  const lost=createGame('surface-rescue',seed);lost.ships=[];Object.assign(lost,{x:lost.site.x+500,y:lost.site.y});
+  const aboard=lost.operation.remaining;
+  for(let t=0;t<2000&&lost.site.depth<=15;t+=5){lost.time=t;updateOperation(lost,5);}
+  assert.ok(lost.site.depth>15);
+  assert.equal(lost.operation.remaining,0);
+  if(aboard>0)assert.ok(lost.events.some(e=>e.text.startsWith('The casualty has gone under.')));
+ }
+ assert.ok(createGame('undersea-rescue',3).site.depth>15,'a disabled sub rests on the shelf and does not sink further');
+});
+
+test('a sinking casualty follows whatever sinking record it is given',async()=>{
+ const {casualtyDepth,surfaceRescue}=await import('../src/rescue-operation.js');
+ const sink=surfaceRescue.sinking;
+ assert.equal(casualtyDepth(0,.5,sink,80),2);
+ assert.equal(casualtyDepth(500,.5,sink,80),3);
+ assert.equal(casualtyDepth(1070,.5,sink,80),2+1070/500+100*.35);
+ assert.equal(casualtyDepth(5000,.5,sink,80),80,'it comes to rest on the seabed');
+ assert.equal(casualtyDepth(100,0,{...sink,foundersAfter:50,foundersSpread:0,sinkRate:1},80),2+100/500+50);
 });
