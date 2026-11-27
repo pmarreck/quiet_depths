@@ -93,3 +93,35 @@ touched, missed, warning, ownHit and a nested `echo`. `systems` also writes
 record, so the ported update runs on saved sounds unchanged. Its decoder
 takes the patrol's ship ids, since a sweep, collapse or settling must name a
 ship, and matches restore on each rule; an echo belongs only to a seeker.
+
+## The boat and drone records: what restore does (inventory, 2026-11-27)
+
+The checker prints 61 fields for systems' `Boat`, but the boat proper is
+about 46 of the player's own fields (motion, hull, plant, stores, alarms,
+the periscope), the fourteen systems and fifteen repair limits as records,
+and the 25-field drone; the rest (ships, sounds, events, the site and so on)
+are patrol-wide and have records or belong to the patrol.
+
+For the boat, restore is mostly migration. It checks generically against a
+fresh game of the same mission (every number finite, every flag a boolean,
+every list a list), then applies specific rules: fuel leak 0 to 1 and fire
+0 to 24 on the current plant version, whole non-negative torpedoes, outer
+hull 0 to 100, pressure alarm 0, 1 or 2, collision times within the patrol,
+a known diesel mode and engine, every system 0 to 100, the periscope's
+travel 0 to 1, and power loss dated within the patrol. Before checking it
+migrates:
+
+1. saves without a plant version: the diesel takes the engine's condition
+   and the fuel tank, battery bank and tubes start whole;
+2. missing combat fields from a fresh combat state;
+3. a missing outer hull from the pressure hull;
+4. missing motion fields (and tower angle, tower pitch, cavitation, propeller
+   speed) from fresh values;
+5. missing systems, or a missing deck gun;
+6. missing drone fields from a fresh drone holding its depth and heading;
+7. repair limits rebuilt from the parts' conditions where missing or invalid;
+8. older fleet-action saves short of torpedoes topped up to the template.
+
+An Elm save decoder needs all eight before it can load every save the game
+accepts today. The Elm boat record decodes current saves exactly; the
+migrations are counted as remaining work.
