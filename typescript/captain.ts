@@ -21,18 +21,25 @@ export function transferFilename(name:string,mission?:string){
   const part=(s:string)=>s.normalize('NFC').replace(/[^\p{L}\p{N}\p{M}]+/gu,'_').replace(/^_+|_+$/g,'');
   return 'Captain_'+(part(name)||'Skipper')+(mission?'-'+(part(mission)||'Patrol')+'.qdsave.json':'.qdstate.json');
 }
-interface Outcome {captain:string;won:boolean}
+// A patrol ended early with part of its objective met is a partial success:
+// not won, and kept apart from failures.
+interface Outcome {captain:string;won:boolean;partial?:boolean}
 export function validOutcome(row:unknown):row is Outcome {
   if(!row||typeof row!=='object')return false;
   const r=row as Partial<Outcome>;
-  return !!r.captain&&r.captain===captainName(r.captain)&&typeof r.won==='boolean';
+  return !!r.captain&&r.captain===captainName(r.captain)&&typeof r.won==='boolean'&&
+    (r.partial===undefined||typeof r.partial==='boolean'&&!(r.partial&&r.won));
 }
 export function recordOutcome(storage:Storage,s:{patrolId?:string;captain?:string;patrol:{seed:number};status:string}){
   if(!s.patrolId||s.status==='patrol')return;
   const key=outcomePrefix+s.patrolId;
-  if(storage.getItem(key)===null)storage.setItem(key,JSON.stringify({captain:patrolCaptain(s),won:s.status==='won'}));
+  const captain=patrolCaptain(s);
+  if(storage.getItem(key)===null)storage.setItem(key,JSON.stringify(s.status==='partial'?{captain,won:false,partial:true}:{captain,won:s.status==='won'}));
 }
-const totals=()=>({completed:0,succeeded:0,failed:0});
+const totals=()=>({completed:0,succeeded:0,partial:0,failed:0});
+// Each partial success counts as half a success toward service stars. The
+// half credit is never shown; only whole stars are.
+export const serviceCredit=(r:{succeeded:number;partial:number}|undefined)=>r?r.succeeded+r.partial/2:0;
 export const serviceStars=(successes:number)=>Math.floor(successes/5);
 export function starLabel(successes:number){
   const stars=serviceStars(successes);
@@ -45,7 +52,7 @@ export function captainRecords(storage:Storage){
     let row;try{row=JSON.parse(storage.getItem(key)??'null');}catch{continue;}
     if(!validOutcome(row))continue;
     const id=row.captain.toLowerCase(),r=captains.get(id)??{...totals(),name:row.captain};
-    for(const tally of [fleet,r]){tally.completed++;if(row.won)tally.succeeded++;else tally.failed++;}
+    for(const tally of [fleet,r]){tally.completed++;if(row.won)tally.succeeded++;else if(row.partial)tally.partial++;else tally.failed++;}
     captains.set(id,r);
   }
   return {fleet,captains};

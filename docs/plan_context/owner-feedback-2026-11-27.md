@@ -63,7 +63,10 @@ a success toward service stars (one star per five successes). The half-credit
 accounting is tracked but not displayed. Each mission needs its own partial
 rule, which belongs with the objective in the Elm mission definition.
 
-**Open before implementation.** The owner reviews the per-mission partial
+**Rules confirmed (2026-11-27 09:05).** The owner confirmed partial credit
+for ending early, so the draft rules below were adopted as written.
+
+**Draft rules (now adopted).** The owner reviews the per-mission partial
 rules. Draft rules, not yet approved: at least one required photograph (A
 quiet observation), at least one of the three transports (Convoy),
 irreversible flooding started on Solstice (Big Kahuna), at least one survivor
@@ -72,6 +75,31 @@ half the required tracking time (Just passing through). A single-target
 interception with no sinking is a failure. Check how Tiebreaker, Wolf in the
 Henhouse and Sneaky Seamen use extraction before drafting their rules. Also
 confirm how the debrief labels a partial success.
+
+**As built (2026-11-27).** Each mission's rule sits beside its objective in
+`elm/PatrolMission.elm` as an `EarlyEnd` value and reaches the simulation
+through the generated catalog.
+
+- Recon: one photograph. Convoy: one transport sunk. Big Kahuna: two direct
+  hits on Solstice. Just passing through: half the tracking goal. Both
+  rescues: one survivor aboard. Survey: half the 45 s scan or one ROV
+  photograph. Interception: no partial credit.
+- Never asked: Sub Hunt (extraction already wins), Sneaky Seamen (Gate B is
+  the extraction and the objective), Tiebreaker (extraction stays closed until
+  the lead is earned, after which surfacing there is a full success), and Wolf
+  in the Henhouse (no extraction).
+- The question appears when the sub is surfaced (1 m or shallower) inside the
+  400 m pickup circle with the objective open, once per entry. It is a modal
+  dialog, so the patrol is paused while it is open. Focus starts on its
+  heading, so a helm key still held cannot answer it. Esc or Keep Patrolling
+  declines.
+- The debrief titles are "Home, short of the goal." (partial, with what came
+  home and "Recorded as a partial success.") and "Home, empty-handed."
+  (failure). The log and debrief entries record the early end.
+- The captain record line shows a partial count once a captain has one. Each
+  partial success counts half toward stars. The fraction is not shown
+  anywhere in the game, and the README says only that partial successes
+  count toward stars.
 
 ## 6, 7, 4 and 10. Desktop helm redesign
 

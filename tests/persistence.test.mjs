@@ -88,8 +88,8 @@ test('each ended patrol counts once for its captain, including losses with no si
   s.status=won?'won':['lost','expired','compromised','convoy-lost'][i%4];recordOutcome(store,s);
   recordOutcome(store,s);recordOutcome(store,{...s,status:won?'lost':'won'});
  }
- const {fleet,captains}=captainRecords(store);assert.deepEqual(fleet,{completed:11,succeeded:5,failed:6});
- assert.deepEqual(captains.get('rita bilge'),{name:'Rita Bilge',completed:10,succeeded:5,failed:5});
+ const {fleet,captains}=captainRecords(store);assert.deepEqual(fleet,{completed:11,succeeded:5,partial:0,failed:6});
+ assert.deepEqual(captains.get('rita bilge'),{name:'Rita Bilge',completed:10,succeeded:5,partial:0,failed:5});
  assert.deepEqual([0,4,5,9,10].map(starLabel),['','','★ 1 service star','★ 1 service star','★ 2 service stars']);
  assert.equal(captainName('  Captain   Captain Rita   Bilge  '),'Rita Bilge');
  assert.equal(transferFilename('Nell / Hāddock','What the sea remembers'),'Captain_Nell_Hāddock-What_the_sea_remembers.qdsave.json');

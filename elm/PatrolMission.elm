@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), EncounterOdds, PatrolTiming, PhotoCriteria, RescueCriteria, SinkingCasualty, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, encounterOdds, patrolTiming, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EarlyEnd(..), PartialCredit(..), EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), EncounterOdds, PatrolTiming, PhotoCriteria, RescueCriteria, SinkingCasualty, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, encounterOdds, patrolTiming, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
@@ -75,6 +75,29 @@ type Objective
     | SurveyWreck SurveyCriteria
     | FleetLead Int
     | ProtectConvoy String Int
+
+
+{-| Surfacing at extraction before the objective is met asks whether to end
+the patrol. Missions that never ask: those whose extraction already ends the
+patrol or is itself the objective, those without an extraction, and those that
+open extraction only once the objective is met.
+-}
+type EarlyEnd
+    = NoEarlyEnd
+    | EndEarly PartialCredit
+
+
+{-| What an early end must already have achieved to count as a partial
+success rather than a failure.
+-}
+type PartialCredit
+    = NoPartialCredit
+    | PhotographsTaken Int
+    | TargetsSunk Int
+    | CarrierFoundering
+    | SurvivorsAboard Int
+    | ScanShareOrPhotographs Float Int
+    | TrackingShare Float
 
 
 {-| A merchant earns credit when its bearing is strictly within framingDegrees
@@ -306,6 +329,7 @@ type alias Briefing =
     , description : String
     , short : String
     , objective : Objective
+    , earlyEnd : EarlyEnd
     }
 
 
@@ -340,6 +364,7 @@ briefing mission =
                 "Photograph the briefed number of different merchant ships through your periscope. Leave the escort wondering if you were ever there."
                 "Photograph the merchant convoy"
                 (Photographs merchantPhotos)
+                (EndEarly (PhotographsTaken 1))
 
         Intercept ->
             Briefing "intercept" "The long way home" "INTERCEPTION" ActionStations Observe
@@ -347,6 +372,7 @@ briefing mission =
                 "Intercept the briefed military freighter. Confirm her silhouette before firing. The fishing boats are neutral."
                 "Identify and sink the military freighter"
                 (SinkShips "cobalt" [])
+                (EndEarly NoPartialCredit)
 
         Convoy ->
             Briefing "seek-and-destroy" "Seek and Destroy: Convoy" "SEEK AND DESTROY" ActionStations Observe
@@ -354,6 +380,7 @@ briefing mission =
                 "Find the escorted convoy and sink all three military transports. Fishing boats are neutral. Surface at extraction when the convoy is down."
                 "Find and sink three military transports"
                 (SinkShips "cobalt" [ "meridian", "alder" ])
+                (EndEarly (TargetsSunk 1))
 
         BigKahuna ->
             Briefing "big-kahuna" "Big Kahuna" "CARRIER HUNT" ActionStations Observe
@@ -361,6 +388,7 @@ briefing mission =
                 ("Fleet carrier Solstice is sailing with a small escort. They are not expecting you. " ++ capitalized (countWord carrierFatalHits) ++ " direct torpedo hits will start her sinking. Further hits shorten the wait. Her fighters can launch as soon as the alarm goes up. Surface at extraction to bring your crew home.")
                 "Sink the carrier and return to extraction"
                 (SinkCarrier "solstice" carrierFatalHits)
+                (EndEarly CarrierFoundering)
 
         SubHunt ->
             Briefing "seek-and-destroy-sub" "Seek and Destroy: Sub" "SUBMARINE HUNT" ActionStations Observe
@@ -368,6 +396,8 @@ briefing mission =
                 "Find the hostile submarine. A second sub may be in the area. Sink what you can and surface at extraction to survive the patrol."
                 "Hunt enemy submarines or withdraw to extraction"
                 Survive
+                NoEarlyEnd
+
 
         Transit ->
             Briefing "sneaky-seamen" "Sneaky Seamen" "COVERT TRANSIT" RoutineWatch Engage
@@ -375,6 +405,7 @@ briefing mission =
                 "Cross from Gate A to Gate B through a convoy patrol. At least one submarine is listening. Reach the far gate at any depth and bring your crew through alive."
                 "Cross the patrol area to Gate B"
                 (ReachGate 200)
+                NoEarlyEnd
 
         Shadow ->
             Briefing "shadow" "Just passing through" "SURVEILLANCE" RoutineWatch Observe
@@ -382,6 +413,7 @@ briefing mission =
                 ("Quietly track the convoy inside " ++ String.fromFloat (convoyTracking.listeningRange / 1000) ++ " km. Bring the traffic intelligence home.")
                 "Quietly track the convoy"
                 (TrackQuietly convoyTracking)
+                (EndEarly (TrackingShare 0.5))
 
         UnderseaRescue ->
             Briefing "undersea-rescue" "Someone is still knocking" "UNDERSEA RESCUE" RoutineWatch Observe
@@ -389,6 +421,7 @@ briefing mission =
                 ("A disabled submarine lies on the reef shelf. Hold " ++ separation underseaRescue ++ " from her at rescue depth, below " ++ String.fromFloat underseaRescue.fastestKnots ++ " knots, while divers assess and recover survivors. Hostile patrols may still be nearby.")
                 "Hold at the wreck; recover survivors"
                 (RecoverSurvivors underseaRescue)
+                (EndEarly (SurvivorsAboard 1))
 
         SurfaceRescue ->
             Briefing "surface-rescue" "A light in the swell" "SURFACE RESCUE" RoutineWatch Observe
@@ -396,6 +429,7 @@ briefing mission =
                 ("A damaged research vessel is sinking. Surface and hold " ++ separation surfaceRescue ++ " away, below " ++ String.fromFloat surfaceRescue.fastestKnots ++ " knots. Rescue launches bring survivors aboard. Enemy gunfire or ramming may force you to move.")
                 "Surface beside the casualty; hold position"
                 (RecoverSurvivors surfaceRescue)
+                (EndEarly (SurvivorsAboard 1))
 
         Survey ->
             Briefing "survey" "What the sea remembers" "WRECK SURVEY" RoutineWatch Observe
@@ -403,6 +437,7 @@ briefing mission =
                 (surveyDescription surveyCriteria)
                 ("Scan the wreck or take " ++ String.fromInt surveyCriteria.photographs ++ " ROV photographs")
                 (SurveyWreck surveyCriteria)
+                (EndEarly (ScanShareOrPhotographs 0.5 1))
 
         Tiebreaker ->
             Briefing "tiebreaker" "Tiebreaker" "FLEET ACTION" ActionStations Engage
@@ -410,6 +445,7 @@ briefing mission =
                 "Two fleets are already exchanging fire. Each has three ships and one submarine. Your chart shows the areas assigned to our units before the battle. Ping or look for fresh evidence before committing a torpedo. Give our fleet a two-vessel lead, excluding your own sub. Once command opens extraction, you may leave or stay to help."
                 "Give the friendly fleet a two-vessel lead"
                 (FleetLead 2)
+                NoEarlyEnd
 
         Henhouse ->
             Briefing "wolf-in-the-henhouse" "Wolf in the Henhouse" "CONVOY DEFENSE" RoutineWatch Engage
@@ -417,3 +453,4 @@ briefing mission =
                 "Plover is already on the bottom. A submarine is hunting the rest of our convoy. Surface near the ships to be hailed, then keep the signaling ship in your periscope or tower binoculars. Her lamp repeats an estimate. Your listeners may be able to match it to a bearing. You can also hunt on your own. Sink the hunter before two more friendly vessels go down."
                 "Sink the hunter before two more convoy losses"
                 (ProtectConvoy "wolf" 2)
+                NoEarlyEnd

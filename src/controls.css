@@ -166,3 +166,8 @@ dialog{font-size:1rem;max-height:92dvh;overflow-y:auto}
 }
 .touch-only kbd,.touch-only .key-only,.touch-only .key-guide{display:none!important}
 html:not(.touch-only) .touch-hint{display:none}
+#end-mission-dialog{width:470px;max-width:92vw;padding:40px}
+#end-mission-dialog h2{font:50px var(--serif);margin:15px 0 20px;font-weight:400}
+#end-mission-dialog p{color:#a7bab6;font-size:1rem;line-height:1.7}
+#end-mission-dialog .end-mission-note{font-size:.8125rem;color:var(--muted)}
+.end-mission-actions{margin-top:26px}

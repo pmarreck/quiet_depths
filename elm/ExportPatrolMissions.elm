@@ -1,7 +1,7 @@
 port module ExportPatrolMissions exposing (main)
 
 import Json.Encode as E
-import PatrolMission exposing (Objective(..))
+import PatrolMission exposing (EarlyEnd(..), Objective(..), PartialCredit(..))
 import Platform
 
 
@@ -83,6 +83,39 @@ encodeObjective objective =
             rule "protectConvoy" [ ( "hunter", E.string hunter ), ( "lossLimit", E.int limit ) ]
 
 
+{-| Missions that never offer an early end encode null. -}
+encodeEarlyEnd : EarlyEnd -> E.Value
+encodeEarlyEnd earlyEnd =
+    let
+        rule kind fields =
+            E.object (( "kind", E.string kind ) :: fields)
+    in
+    case earlyEnd of
+        NoEarlyEnd ->
+            E.null
+
+        EndEarly NoPartialCredit ->
+            rule "none" []
+
+        EndEarly (PhotographsTaken count) ->
+            rule "photographs" [ ( "atLeast", E.int count ) ]
+
+        EndEarly (TargetsSunk count) ->
+            rule "sunk" [ ( "atLeast", E.int count ) ]
+
+        EndEarly CarrierFoundering ->
+            rule "carrierFoundering" []
+
+        EndEarly (SurvivorsAboard count) ->
+            rule "survivors" [ ( "atLeast", E.int count ) ]
+
+        EndEarly (ScanShareOrPhotographs share count) ->
+            rule "scanOrPhotographs" [ ( "scanShare", E.float share ), ( "photographs", E.int count ) ]
+
+        EndEarly (TrackingShare share) ->
+            rule "tracking" [ ( "share", E.float share ) ]
+
+
 encodeSinking : PatrolMission.SinkingCasualty -> E.Value
 encodeSinking c =
     E.object
@@ -112,6 +145,7 @@ encodeMission mission =
         , ( "short", E.string b.short )
         , ( "torps", E.int PatrolMission.startingTorpedoes )
         , ( "objective", encodeObjective b.objective )
+        , ( "earlyEnd", encodeEarlyEnd b.earlyEnd )
         ]
 
 

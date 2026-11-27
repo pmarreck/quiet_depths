@@ -41,11 +41,12 @@ import {sonarReading} from './contact-readings.js';
 import {lossPresentation} from './loss.js';
 import {persistPatrol,resumablePatrol} from './persistence.js';
 import {SLOT_COUNT,listSlots,writeSlot,readSlotEntry,allSlotEntries,unpackSlot,installBackup,importedSession} from './patrol-slots.js';
-import {captainName,humorousName,patrolCaptain,legacyPatrolId,transferFilename,captainRecords,captainPreference,starLabel} from './captain.js';
+import {captainName,humorousName,patrolCaptain,legacyPatrolId,transferFilename,captainRecords,captainPreference,serviceCredit,starLabel} from './captain.js';
 import {readStorage,saveDocument,stateDocument,decodeFile,checkStation,downloadJson} from './patrol-transfer.js';
 import {difficultyPanel,patrolDifficulty} from './difficulty.js';
 import {actionForKey,shortcutConflict,allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
+import {endPatrolEarly,extractionPrompt,partialCredit,partialSummary} from './early-end.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
@@ -66,7 +67,7 @@ function currentPaper(mode=instrument,profile=selectedProfiles[mode]){
  return imagerPapers.get(key);
 }
 let sonarRange=SONAR_RANGES.at(-1);
-let orbit=null,recorder=null,replay=null,returnFocus=null,lossSoundPlayed=false;
+let orbit=null,recorder=null,replay=null,returnFocus=null,lossSoundPlayed=false,extractionArmed=true;
 const NO_FOLLOW={follow:null,last:null,lostAt:null};
 let follow=NO_FOLLOW,followButtons='';
 let bindings=shortcutBindings(),remapping=null,invertRovPitch=false;
@@ -155,13 +156,13 @@ function renderServiceRecord(){
  try{const record=serviceRecord(localStorage);$('service-record').textContent=`${record.ships} ships sunk · ${record.submarines} submarines sunk · ${record.doubleHunts} two-submarine patrols`;}catch{}
  renderCaptainRecords();
 }
-let captainRoster={captains:new Map(),fleet:{completed:0,succeeded:0,failed:0}};
+let captainRoster={captains:new Map(),fleet:{completed:0,succeeded:0,partial:0,failed:0}};
 function showCaptainRecord(){
  const name=captainName($('captain-name').value)||$('captain-name').placeholder;
  const row=captainRoster.captains.get(name.toLowerCase());
- const counts=r=>`${r?.completed??0} completed · ${r?.succeeded??0} succeeded · ${r?.failed??0} failed`;
+ const counts=r=>`${r?.completed??0} completed · ${r?.succeeded??0} succeeded${r?.partial?' · '+r.partial+' partial':''} · ${r?.failed??0} failed`;
  $('captain-record').textContent='Captain '+name+' · '+counts(row);
- $('captain-stars').textContent=starLabel(row?.succeeded??0)||'First service star at 5 successes.';
+ $('captain-stars').textContent=starLabel(serviceCredit(row))||'First service star at 5 successes.';
  $('fleet-record').textContent='All captains · '+counts(captainRoster.fleet);
 }
 function renderCaptainRecords(){
@@ -210,7 +211,7 @@ function start(setup=null,snapshot=null,station=null){
  }
  if(state!==previousPatrol||!patrolStarted){
   for(const mode of instruments)selectedProfiles[mode]=state.imagers[mode]??'survey';
-  orbit=null;lossSoundPlayed=false;
+  orbit=null;lossSoundPlayed=false;extractionArmed=true;
   recorder=scene&&state.difficulty.instantReplay?new ReplayRecorder(state):null;
  }
  renderClock=state.time;patrolStarted=true;document.body.classList.remove('standby');
@@ -258,6 +259,7 @@ const operationCard=globalThis.Elm.OperationCard.init({node:$('operation-card-ro
 const footerStatus=globalThis.Elm.FooterStatus.init({node:$('footer-status-root')});
 const resourcePanel=globalThis.Elm.ResourcePanel.init({node:$('resources-root')});
 const torpedoControl=globalThis.Elm.TorpedoControl.init({node:$('torpedo-control-root'),flags:{maxRun:MAX_RUN}});
+const endMission=globalThis.Elm.EndMission.init({node:$('end-mission-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
@@ -518,6 +520,15 @@ function assignDamageControl(){
 bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}},()=>state.decoys>0);
 // Torpedo orders from the Elm panel, checked as the button and slider were. Every
 // order counts as handled, refused or not, so the panel stops holding the run.
+function askEndMission(){
+ setRate(1);
+ endMission.ports.endMissionReading.send({objective:MISSIONS.find(m=>m.id===state.mission).short,partial:partialCredit(state)});
+ $('end-mission-dialog').showModal();
+}
+endMission.ports.endMissionOrder.subscribe(answer=>{
+ $('end-mission-dialog').close();
+ if(answer==='end'&&canIssue(state,context())&&endPatrolEarly(state))updateUI();
+});
 const torpedoOrders={
  fire:{enabled:()=>!!state.contacts.find(c=>c.id===selected)&&operatingFraction(state.systems.tubes)>0&&torpedoTubes(state).next!==null&&state.depth<=100,run:()=>launchSelected()},
  run:{enabled:()=>true,run:value=>{state.runSetting=clamp(value,100,MAX_RUN);}},
@@ -1043,9 +1054,9 @@ function showResult(){
  resultShown=true;
  if(state.status==='lost'){lossStartedAt=performance.now();document.body.classList.add('loss');$('loss-layer').classList.remove('hidden');if(!lossSoundPlayed)sound.loss(state);}
  persist();
- const win=state.status==='won';
+ const win=state.status==='won',partial=state.status==='partial';
  renderCaptainRecords();
- const captain=patrolCaptain(state),stars=starLabel(captainRoster.captains.get(captain.toLowerCase())?.succeeded??0);
+ const captain=patrolCaptain(state),stars=starLabel(serviceCredit(captainRoster.captains.get(captain.toLowerCase())));
  $('result-captain').textContent=['Captain '+captain,stars].filter(Boolean).join(' · ');
  $('result-title').textContent=win?'Home, quietly.':state.status==='compromised'?'A costly mistake.':state.status==='expired'?'The window has closed.':'The sea falls silent.';
  $('result-body').textContent=win?patrolVictory(state):state.cookoff?'A torpedo detonated aboard the submarine. The crew lost the sub.':state.imploded?'Your pressure hull collapsed at '+Math.round(state.depth)+' m.':state.status==='compromised'?'A neutral vessel was lost. Your patrol has been recalled. Identify a silhouette before trusting a seeker.':state.status==='expired'?(state.search?'The extended patrol window closed. Command recalled the sub.':'Command has recalled the patrol after 30 simulated minutes. Time compression is useful, but keep an eye on the clock.'):'Your sub could take no more. A quieter speed, a little more water under the keel, or one fewer look might change the next patrol.';
@@ -1053,6 +1064,8 @@ function showResult(){
  if(state.mission==='tiebreaker'&&state.status==='expired'&&sidesAfloat(state.ships).friendly<2){$('result-title').textContent='Fleet recalled.';$('result-body').textContent='Fewer than two friendly vessels survived to earn extraction clearance.';}
  if(state.convoy&&win)$('result-title').textContent='Convoy secured.';
  if(state.status==='convoy-lost'){$('result-title').textContent='Convoy broken.';$('result-body').textContent='Two more friendly ships went down after Plover.';}
+ if(partial){$('result-title').textContent='Home, short of the goal.';$('result-body').textContent=partialSummary(state)+' The crew is safe. Recorded as a partial success.';}
+ if(state.status==='withdrawn'){$('result-title').textContent='Home, empty-handed.';$('result-body').textContent='You ended the patrol at extraction before any part of the objective was met. The crew is safe.';}
  const kills=patrolKills(state),medals=$('patrol-medals');
  medals.hidden=kills.submarines===0;
  medals.textContent=kills.submarines>=2?'✦ Two-submarine patrol commendation':'✦ Submarine patrol commendation';
@@ -1099,6 +1112,7 @@ function frame(now){
   if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}
   if(hadRoute&&!state.route){setRate(1);toast('Waypoint reached. All stop. Time compression disengaged.');}
   if(wasOutsidePickup&&!['intercept','seek-and-destroy','big-kahuna'].includes(state.mission)&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
+  const extraction=extractionPrompt(extractionArmed,state);extractionArmed=extraction.armed;if(extraction.ask)askEndMission();
   if(state.difficulty.showSuspicion&&state.alert>40&&priorAlert<=40){setRate(1);toast('Possible detection. Time compression disengaged.');sound.tone('contact');}
   if(before!==state.events[0]){const e=state.events[0];if(e.kind==='contact'||e.kind==='damage'||e.text.startsWith('Drone link')||(state.difficulty.showSuspicion&&state.alert>40&&rate>1))setRate(1);if(e.text.startsWith('Drone link')){toast(e.text);sound.tone('contact');}if(e.kind==='damage'&&!e.text.includes('Depth charge shock'))sound.tone(e.text.includes('in the water')?'contact':'damage');if(e.kind==='contact')sound.tone('contact');if(e.kind==='success'&&lastToast!==e.text){toast(e.text);lastToast=e.text;}}
   sound.update(state,ctx);

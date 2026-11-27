@@ -45,12 +45,19 @@ test('every statically required application control exists in the HTML exactly o
 });
 
 test('each modal takes its accessible name from its own heading',async()=>{
- const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
+ const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8'),app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
  const dialogs=[...html.matchAll(/<dialog\s+([^>]+)>([\s\S]*?)<\/dialog>/g)];
  assert.ok(dialogs.length>0);
  for(const [,attributes,content] of dialogs){
   const label=/\baria-labelledby="([^"]+)"/.exec(attributes)?.[1];
-  assert.ok(label&&content.includes(`<h2 id="${label}">`),attributes);
+  assert.ok(label,attributes);
+  // A dialog holding only an Elm mount node takes its heading from the view mounted there.
+  const mount=/^<div id="([^"]+)"><\/div>$/.exec(content)?.[1];
+  if(!mount){assert.ok(content.includes(`<h2 id="${label}">`),attributes);continue;}
+  const view=new RegExp(`globalThis\\.Elm\\.(\\w+)\\.init\\(\\{node:\\$\\('${mount}'\\)`).exec(app)?.[1];
+  assert.ok(view,`no Elm view is mounted in ${mount}`);
+  const source=await readFile(new URL(`../elm/${view}.elm`,import.meta.url),'utf8');
+  assert.ok(source.includes(`h2 [ id "${label}" ]`),`${view} must render the h2 that names ${attributes}`);
  }
 });
 

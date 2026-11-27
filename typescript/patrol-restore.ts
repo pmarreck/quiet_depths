@@ -1,4 +1,5 @@
 import {captainName} from './captain.ts';
+import {earlyEndRule} from './early-end.ts';
 import {freshTransmitters, validTransmitters} from './sonar-imager.ts';
 import {watchWarnings, validWarnings} from './watch-warnings.ts';
 import {sailingDay} from './patrol-calendar.ts';
@@ -36,10 +37,11 @@ export function restore(raw: string): World | null {
   try {
     const parsed: unknown = JSON.parse(raw);
     const s = parsed as World, fields = parsed as Fields;
-    if (!s || s.version !== 1 || !MISSIONS.some(m => m.id === s.mission) || !['patrol', 'won', 'lost', 'compromised', 'expired', 'convoy-lost'].includes(s.status)) return null;
+    if (!s || s.version !== 1 || !MISSIONS.some(m => m.id === s.mission) || !['patrol', 'won', 'partial', 'withdrawn', 'lost', 'compromised', 'expired', 'convoy-lost'].includes(s.status)) return null;
     if (s.scopeTravel !== undefined && (!finite(s.scopeTravel) || s.scopeTravel < 0 || s.scopeTravel > 1)) return null;
     if (s.captain !== undefined && (typeof s.captain !== 'string' || !s.captain || s.captain !== captainName(s.captain))) return null;
     if (s.mission !== 'wolf-in-the-henhouse' && (s.convoy !== undefined || s.status === 'convoy-lost')) return null;
+    if (['partial', 'withdrawn'].includes(s.status) && (s.phase !== 'objective' || earlyEndRule(s.mission) === null)) return null;
     if (s.imagers === undefined) s.imagers = freshTransmitters();
     if (!validTransmitters(s.imagers)) return null;
     if (s.imagingTime !== undefined && (!finite(s.imagingTime) || s.imagingTime < 0 || s.imagingTime > s.time + .001)) return null;
