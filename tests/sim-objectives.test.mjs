@@ -90,3 +90,47 @@ test('Elm rescue rules match the TypeScript for both rescues', async () => {
   assert.deepEqual(await elm('rescueOperation.nextLossDelay', losses), losses.map(([d, r, n]) => rescue.nextLossDelay(d, r, named[n])));
   assert.deepEqual(await elm('rescueOperation.stationKeeping', stations), stations.map(([r, s, e, n]) => rescue.stationKeeping(r, s, e, named[n])));
 });
+
+test('the Elm long patrol search matches the TypeScript on every mission and on saved search areas', async () => {
+  const search = await import('../src/patrol-search.js'), {createGame, MISSIONS} = await import('../src/sim.js'), random = seeded(56);
+  const setupOf = s => ({mission: s.mission, patrol: {seed: s.patrol.seed}, ships: s.ships, site: s.site ? {x: s.site.x, y: s.site.y} : null});
+  const games = [];
+  for (const m of MISSIONS) for (const seed of [1, 7, 42, 2 ** 31 + 3, 99991]) games.push(createGame(m.id, seed));
+  // Synthetic fleets with sides, incidental traffic and military merchants, for every mission.
+  const kinds = ['merchant', 'escort', 'fishing', 'carrier', 'sub'];
+  for (let i = 0; i < 300; i++) {
+    const ships = Array.from({length: Math.floor(random() * 7)}, (_, j) => {
+      const v = {id: ['cobalt', 'plover', 'v' + j][Math.floor(random() * 3)] + (random() < .5 ? '' : '-' + j), x: (random() - .5) * 9000, y: (random() - .5) * 9000,
+        kind: kinds[Math.floor(random() * 5)], military: random() < .5};
+      if (random() < .4) v.side = random() < .5 ? 'friendly' : 'hostile';
+      if (random() < .2) v.incidental = true;
+      return v;
+    });
+    games.push({mission: MISSIONS[i % MISSIONS.length].id, patrol: {seed: Math.floor(random() * 2 ** 32)}, ships, site: random() < .2 ? {x: (random() - .5) * 4000, y: (random() - .5) * 4000} : null});
+  }
+  const setups = games.map(g => [setupOf(g)]);
+  const expected = setups.map(([s]) => search.longPatrol(s));
+  assert.ok(expected.some(e => !('home' in e)) && expected.some(e => e.search.targets.length > 1), 'transits without a pickup and multi-target searches appear');
+  assert.deepEqual(await elm('patrolSearch.longPatrol', setups), expected);
+  const areas = expected.map(e => e.search);
+  const advances = [];
+  for (const [active, protectedTime] of [[0, 0], [179.99999999, 50], [180, 1199], [180, 1200], [179, 1300], [180 - 5e-9, 0]])
+    for (const [dt, rate] of [[.25, 1], [.25, .5], [1, 20], [0, 1]]) advances.push([{...areas[0], activeSeconds: active, protectedTime}, dt, rate]);
+  for (let i = 0; i < 500; i++) advances.push([{...areas[i % areas.length], activeSeconds: random() * 200, protectedTime: random() * 1400}, random() * 2, 1 + random() * 30]);
+  assert.deepEqual(await elm('patrolSearch.advanceApproach', advances), advances.map(([a, dt, rate]) => {const c = structuredClone(a); return {advanced: search.advanceApproach(c, dt, rate), search: c};}));
+  const progress = advances.map(([a]) => [a]);
+  assert.deepEqual(await elm('patrolSearch.approachProgress', progress), progress.map(([a]) => search.approachProgress(a)));
+  // Saved areas, intact and broken in each way the check rejects.
+  const saves = [];
+  games.forEach((g, i) => {
+    const s = {...setupOf(g), time: 300, search: structuredClone(expected[i].search)}, a = s.search, first = a.targets[0];
+    saves.push([s], [{...s, search: undefined}], [{...s, search: {...a, radius: 0}}], [{...s, search: {...a, x: NaN}}], [{...s, search: {...a, activeSeconds: 180.001}}],
+      [{...s, search: {...a, protectedTime: 300.001}}], [{...s, search: {...a, protectedTime: 300.0009}}], [{...s, search: {...a, targets: [...a.targets, 'stranger']}}],
+      [{...s, search: {...a, located: 'yes'}}], [{...s, time: 100, search: {...a, protectedTime: -1}}]);
+    if (first !== undefined) saves.push([{...s, search: {...a, recognized: [first]}}], [{...s, search: {...a, recognized: [first, first]}}], [{...s, search: {...a, targets: a.targets.slice(1).concat('x')}}]);
+    saves.push([{...s, search: {...a, recognized: ['nobody']}}]);
+  });
+  const valid = saves.map(([s]) => search.validSearch(s));
+  assert.ok(valid.filter(Boolean).length > 50 && valid.filter(v => !v).length > 200, 'the corpus has valid and invalid areas');
+  assert.deepEqual(await elm('patrolSearch.validSearch', saves.map(([s]) => [JSON.parse(JSON.stringify(s, (k, v) => Number.isNaN(v) ? '__nan' : v), (k, v) => v === '__nan' ? NaN : v)])), valid);
+});

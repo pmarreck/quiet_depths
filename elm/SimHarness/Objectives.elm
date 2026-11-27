@@ -8,10 +8,12 @@ import Json.Decode as D
 import Json.Encode as E
 import PatrolMission
 import Sim.ConvoyTracking as ConvoyTracking
+import Sim.PatrolSearch as Search
 import Sim.Periscope as Periscope
 import Sim.ReconPhotos as ReconPhotos
 import Sim.RescueOperation as Rescue
 import Sim.Site as Site
+import Sim.Vessel as Vessel
 import Sim.WreckSurvey as WreckSurvey
 import SimHarness.Codec exposing (andMap, arg, call1, call2, call3, flag, vesselKind)
 
@@ -112,6 +114,81 @@ encodeRescue c =
         ]
 
 
+mission : D.Decoder PatrolMission.Mission
+mission =
+    D.string |> D.andThen (\id -> PatrolMission.fromId id |> Maybe.map D.succeed |> Maybe.withDefault (D.fail ("unknown mission " ++ id)))
+
+
+{-| A ship as the search reads it. A missing flag is false and an unknown
+side is none, as the TypeScript's comparisons treat them.
+-}
+traffic : D.Decoder (Search.Traffic {})
+traffic =
+    D.succeed (\x y id kind military incidental side -> { x = x, y = y, id = id, kind = kind, military = military, incidental = incidental, side = side })
+        |> andMap (D.field "x" D.float)
+        |> andMap (D.field "y" D.float)
+        |> andMap (D.field "id" D.string)
+        |> andMap (D.field "kind" vesselKind)
+        |> andMap (flag "military")
+        |> andMap (flag "incidental")
+        |> andMap
+            (D.maybe (D.field "side" D.string)
+                |> D.map
+                    (Maybe.andThen
+                        (\side ->
+                            case side of
+                                "friendly" ->
+                                    Just Vessel.Friendly
+
+                                "hostile" ->
+                                    Just Vessel.Hostile
+
+                                _ ->
+                                    Nothing
+                        )
+                    )
+            )
+
+
+{-| The patrol setup: mission, seed, ships and an optional site. -}
+setup : D.Decoder { mission : PatrolMission.Mission, seed : Float, ships : List (Search.Traffic {}), site : Maybe Search.Point }
+setup =
+    D.map4 (\m seed ships site -> { mission = m, seed = seed, ships = ships, site = site })
+        (D.field "mission" mission)
+        (D.at [ "patrol", "seed" ] D.float)
+        (D.field "ships" (D.list traffic))
+        (D.field "site" (D.nullable (D.map2 Search.Point (D.field "x" D.float) (D.field "y" D.float))))
+
+
+searchArea : D.Decoder Search.SearchArea
+searchArea =
+    D.succeed Search.SearchArea
+        |> andMap (D.field "x" D.float)
+        |> andMap (D.field "y" D.float)
+        |> andMap (D.field "radius" D.float)
+        |> andMap (D.field "targets" (D.list D.string))
+        |> andMap (D.field "recognized" (D.list D.string))
+        |> andMap (D.field "located" D.bool)
+        |> andMap (D.field "activeSeconds" D.float)
+        |> andMap (D.field "protectedTime" D.float)
+
+
+encodeSearch : Search.SearchArea -> E.Value
+encodeSearch a =
+    E.object
+        [ ( "x", E.float a.x ), ( "y", E.float a.y ), ( "radius", E.float a.radius ), ( "targets", E.list E.string a.targets ), ( "recognized", E.list E.string a.recognized )
+        , ( "located", E.bool a.located ), ( "activeSeconds", E.float a.activeSeconds ), ( "protectedTime", E.float a.protectedTime )
+        ]
+
+
+encodeApproach : Search.Approach -> E.Value
+encodeApproach a =
+    E.object
+        ([ ( "x", E.float a.x ), ( "y", E.float a.y ), ( "heading", E.float a.heading ), ( "targetHeading", E.float a.targetHeading ), ( "search", encodeSearch a.search ) ]
+            ++ (a.home |> Maybe.map (\p -> [ ( "home", E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ) ] ) ]) |> Maybe.withDefault [])
+        )
+
+
 encodeScope : Periscope.Scope {} -> E.Value
 encodeScope s =
     E.object (( "scope", E.bool s.scope ) :: (s.scopeTravel |> Maybe.map (\t -> [ ( "scopeTravel", E.float t ) ]) |> Maybe.withDefault []))
@@ -173,6 +250,24 @@ function name =
                     (arg 1 D.float)
                     (arg 2 D.float)
                     (arg 3 rescue)
+                )
+
+        "patrolSearch.longPatrol" ->
+            Just (call1 setup encodeApproach (\s -> Search.longPatrol s.mission s.seed s.site s.ships))
+
+        "patrolSearch.advanceApproach" ->
+            Just (call3 searchArea D.float D.float (\( advanced, a ) -> E.object [ ( "advanced", E.bool advanced ), ( "search", encodeSearch a ) ]) (\a dt rate -> Search.advanceApproach dt rate a))
+
+        "patrolSearch.approachProgress" ->
+            Just (call1 searchArea E.float Search.approachProgress)
+
+        "patrolSearch.validSearch" ->
+            Just
+                (D.map3
+                    (\s time area -> E.bool (Maybe.map (Search.validSearch s.mission s.site s.ships time) area |> Maybe.withDefault False))
+                    (arg 0 setup)
+                    (arg 0 (D.field "time" D.float))
+                    (arg 0 (D.maybe (D.field "search" searchArea)))
                 )
 
         "periscope.scopeExtension" ->
