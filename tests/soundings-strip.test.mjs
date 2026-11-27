@@ -7,7 +7,7 @@ const [page,app,elm]=await Promise.all([read('src/index.html'),read('src/app.js'
 const ids=['soundings','below-label','below-keel','water-depth','seabed-advice','wind-value'];
 
 test('the soundings strip is drawn only by its Elm view',()=>{
- assert.match(page,/<div id="helm-status" class="helm-status"><\/div><div id="soundings-root"><\/div><div class="helm-caption">/);
+ assert.match(page,/<div id="helm-status" class="helm-status"><\/div><div id="soundings-root"><\/div><div id="helm-caption-root"><\/div>/);
  for(const id of ids){
   assert.doesNotMatch(page,new RegExp(`id="${id}"`),'index.html must not keep a static #'+id);
   assert.match(elm,new RegExp(`id "${id}"`),'the Elm view renders #'+id);

@@ -165,3 +165,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Convert patrol persistence and the IndexedDB save slots to strict TypeScript, exercised in Chromium for round trips, stale-revision refusal and backup rollback (done 2026-11-27 04:17 EST; commit c46c502).
 - [x] [Elm migration] Convert helm, scope, drone and chart controls to strict TypeScript, checked identical to the original across 37,200 comparisons (done 2026-11-27 04:19 EST; commit 2c7114a).
 - [x] [Elm migration] Convert patrol notices, sonar layout and contact rows to strict TypeScript, checked identical to the original across 48,310 comparisons (done 2026-11-27 04:20 EST; commit 8f26661).
+- [x] [Elm migration] Convert the crew's mess-deck ambience to strict TypeScript, with its voice clips verified loading in Chromium (done 2026-11-27 04:22 EST; commit fdd5527).

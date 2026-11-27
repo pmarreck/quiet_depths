@@ -92,3 +92,11 @@ export function droneBayReading(s: World): DroneBayReading {
     lostReason: d.mode === 'lost' ? String(d.lostReason ?? '') : '', deployReason: d.mode === 'stowed' ? droneDeployReason(s) : '',
     link: outside ? String(Math.round(separation(s, d))) : '', buoyancy: outside ? String(Math.round(d.buoyancy)) : ''};
 }
+
+export interface StationReading {bottomed: boolean; surfaced: boolean; depth: number; silent: boolean; weather: string; time: string}
+
+/** `clock` is the simulated time of day as HHMM. */
+export function stationReading(s: {bottomed?: unknown; depth: number; silent?: unknown}, env: {phase: string; weather: string; seaState: number; date: string}, clock: string): StationReading {
+  return {bottomed: !!s.bottomed, surfaced: isSurfaced(s), depth: Number(s.depth), silent: !!s.silent,
+    weather: env.phase + ' · ' + env.weather + ' · SEA ' + env.seaState, time: env.date + ' · ' + clock + 'Z'};
+}

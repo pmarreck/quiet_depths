@@ -76,3 +76,13 @@ test('the drone bay reading works out only the advice its mode needs',async()=>{
  assert.deepEqual([droneBayReading(s).lostReason,droneBayReading(s).link],['Tether cut.','']);
  delete s.drone.lostReason;assert.equal(droneBayReading(s).lostReason,'','a missing reason reads blank, as textContent showed it');
 });
+
+test('the station reading formats weather and time as the strip showed them',async()=>{
+ const {stationReading}=await import('../src/panel-readings.js');
+ const env={phase:'DUSK',weather:'RAIN',seaState:4,date:'05 MAR 1972'};
+ assert.deepEqual(stationReading({depth:12.4,silent:0,bottomed:undefined},env,'1802'),
+  {bottomed:false,surfaced:false,depth:12.4,silent:false,weather:'DUSK · RAIN · SEA 4',time:'05 MAR 1972 · 1802Z'});
+ const r=stationReading({depth:0,silent:true,bottomed:1},env,'0000');
+ assert.deepEqual([r.bottomed,r.surfaced,r.silent],[true,true,true]);
+ assert.equal(stationReading({depth:NaN},env,'0000').surfaced,false,'an unknown depth is not surfaced');
+});

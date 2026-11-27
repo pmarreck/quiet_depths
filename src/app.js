@@ -31,7 +31,7 @@ import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
-import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading} from './panel-readings.js';
+import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading} from './panel-readings.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
@@ -251,6 +251,8 @@ const compass=globalThis.Elm.HelmCompass.init({node:$('helm-compass-root')});
 const soundingsStrip=globalThis.Elm.Soundings.init({node:$('soundings-root')});
 const boatCondition=globalThis.Elm.BoatCondition.init({node:$('boat-condition-root')});
 const droneBay=globalThis.Elm.DroneBay.init({node:$('drone-bay-root')});
+const stationStrip=globalThis.Elm.StationStrip.init({node:$('station-strip-root')});
+const helmCaption=globalThis.Elm.HelmCaption.init({node:$('helm-caption-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
@@ -776,7 +778,7 @@ function updateUI(){
  $('helm-status').textContent=helmStatusText(s,throttlePercent(s.targetSpeed));
  updateFollowButtons(s);
  compass.ports.compassReading.send({heading:v.heading,requested:v.targetHeading});
- $('helm-mode').textContent=drone?(v.mode==='remote'?'DRONE HELM':v.mode==='return'?'DRONE · AUTO RETURN':'DRONE · OFFLINE'):'SUBMARINE HELM';
+ helmCaption.ports.helmCaptionReading.send({drone,mode:drone?String(v.mode):''});
  {const steer=canIssue(s,context())&&pilotEnabled();
   headingAxis.send(headingReading(v,steer));depthAxis.send(depthReading(v,drone,steer));speedAxis.send(speedReading(v,drone,s.noise,steer));}
  engineHint=drone?'Sub holds its own helm orders.':powerStatus+' · '+(s.silent?Math.min(3,plant.ahead):plant.ahead).toFixed(1)+' kn available'+(s.depth>14&&s.engine==='diesel'?' · Rise to 14 m or select electric.':'');
@@ -818,13 +820,11 @@ function updateUI(){
  if(drone)$('rov-key-hint').textContent=rovKeyHint();
  $('view-hint').textContent=gun?'DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING':tower?'DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS':view==='scope'?(active?'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM':'NO OPTICAL SIGNAL'):view==='sonar'?'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL':view==='chart'?'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT':active?'CAMERA FIXED TO ROV NOSE':'NO DRONE SIGNAL';
  $('view-range').textContent=drone?(active?`HDG ${deg(v.heading)}° · ${v.speed.toFixed(1)} KN · ${v.depth.toFixed(0)} M`:''):view==='chart'?`ZOOM ${chart.zoom.toFixed(1)}×`:'VISIBILITY '+(env.opticalRange/1000).toFixed(1)+' KM';
- $('station-status').textContent=s.bottomed?'RESTING ON THE BOTTOM':isSurfaced(s)?'SURFACED · EXPOSED':s.depth<=15?'PERISCOPE DEPTH':s.silent?'SILENT RUNNING':'SUBMERGED';
  const clock=new Date(Math.floor(env.hour*3600)*1000).toISOString().slice(11,16).replace(':','');
- $('sim-time').textContent=env.date+' · '+clock+'Z';
  $('watch-time').textContent=env.date+' '+clock+'Z';
  $('watch-elapsed').textContent=String(Math.floor(s.time/60)).padStart(2,'0')+':'+String(Math.floor(s.time%60)).padStart(2,'0');
  $('watch-limit').textContent=limit+' m';
- $('weather').textContent=env.phase+' · '+env.weather+' · SEA '+env.seaState;
+ stationStrip.ports.stationReading.send(stationReading(s,env,clock));
  $('viewport').dataset.weather=env.weatherId;$('viewport').dataset.dayPhase=env.phase;$('viewport').dataset.lightningActive=String(env.flash>.1);$('viewport').dataset.simSeconds=s.time.toFixed(2);
  $('viewport').dataset.lastLightning=s.lightning.at(-1)?.id||'';$('viewport').dataset.heardThunder=s.acoustics.filter(a=>a.type==='thunder'&&a.heard).length;
  $('viewport').dataset.visibleBolt=String(!!scene?.boltVisible);
