@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Suspicion.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {transmitterProfiles,scanSector,type Instrument,type Profile} from './sonar-transmitters.ts';
 import {hash01} from './surface-motion.ts';
 

@@ -254,6 +254,9 @@ function name =
         "text.toFixed" ->
             Just (call2 D.int D.float E.string Text.toFixed)
 
+        "text.codePointUnits" ->
+            Just (call1 D.string (E.list E.int) Text.codePointUnits)
+
         "text.codeUnits" ->
             Just (call1 D.string (E.list E.int) Text.codeUnits)
 

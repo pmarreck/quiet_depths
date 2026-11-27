@@ -1,4 +1,4 @@
-module Sim.Text exposing (codeUnits, toFixed)
+module Sim.Text exposing (codePointUnits, codeUnits, toFixed)
 
 {-| Strings as JavaScript sees them. Elm's string functions read characters,
 and read an unpaired surrogate wrongly: `Char.toCode` gives NaN for a lone
@@ -15,6 +15,27 @@ exact binary value half up: 0.15 is stored as 0.1499... and gives "0.1".
 codeUnits : String -> List Int
 codeUnits text =
     List.map (\i -> unitOf (String.slice i (i + 1) text)) (List.range 0 (String.length text - 1))
+
+
+{-| What `for (const c of text) c.charCodeAt(0)` reads: one unit per code
+point, the high surrogate of a pair, and an unpaired surrogate as itself.
+-}
+codePointUnits : String -> List Int
+codePointUnits text =
+    let
+        points units =
+            case units of
+                high :: low :: rest ->
+                    if 0xD800 <= high && high <= 0xDBFF && 0xDC00 <= low && low <= 0xDFFF then
+                        high :: points rest
+
+                    else
+                        high :: points (low :: rest)
+
+                _ ->
+                    units
+    in
+    points (codeUnits text)
 
 
 fromUnit : Int -> String
