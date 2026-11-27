@@ -19,11 +19,11 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 - [x] Move mission and patrol rules to Elm with seeded replay, objective and save compatibility checks. Answer: every objective's criteria, briefing numbers, patrol windows, transit timing and encounter odds now come from Elm, with characterization, mutation and document-drift tests; combat and AI tuning remains under the simulation item (done 2026-11-27 03:21 EST).
 - [ ] Move the remaining helm controls (depth and speed sliders, turn buttons, propulsion) from JavaScript-wired markup into the Elm helm.
 - [ ] Move simulation and the remaining game UI to Elm in stages, preserving existing patrol saves.
+- [x] Convert the shared mechanics, debrief and loss-screen modules to strict TypeScript (done 2026-11-27 03:24 EST).
 - [ ] Migrate remaining first-party browser code to strict TypeScript, including the Three.js, Web Audio and persistence adapters.
 
 ## New gameplay
 
-- [x] Add TorpedoCam, an Orbit-dependent option to follow the player’s torpedoes in the water (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 02:59 EST; commit 789f3e6).
 
 ## Future features
 
