@@ -34,7 +34,7 @@ export interface Boat {
   collisionCooldown: number; collisionHits: Record<string, number>; bottomed: boolean; torps: number; cookoff: boolean; engine: string; dieselMode: DieselMode;
   pressureAlarm: number; criticalExposure: number; imploded: boolean; scope: boolean; scopeTravel?: number;
   impacts: {id: number; x: number; y: number; altitude: number; time: number; kind: string}[]; weaponSequence: number;
-  events: LogEntry[]; debrief?: DebriefEntry[]; acoustics: Sound[]; soundSequence: number; ships: Ship[]; site?: Hull & {kind: string};
+  events: LogEntry[]; debrief?: DebriefEntry[]; acoustics: Sound[]; soundSequence: number; ships: Ship[]; site?: (Hull & {kind: string}) | null;
 }
 
 export const freshSystems = () => fullCondition(SYSTEM_KEYS);

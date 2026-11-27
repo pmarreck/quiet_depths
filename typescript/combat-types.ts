@@ -28,7 +28,10 @@ export interface Aircraft extends Aloft {
   bombDropped: boolean; previous?: Aloft; egress?: number;
 }
 export interface AirSupport {status: string; requestedAt: number | null; launchAt: number | null; base: Point; lastKnown: Report | null}
-export interface Blast extends Point3 {id: number; delay: number; totalDelay: number; airTime?: number; airHeight?: number; age: number; exploded: boolean; kind: string}
+export interface Blast extends Point3 {
+  id: number; delay: number; totalDelay: number; airTime?: number; airHeight?: number; age: number; exploded: boolean; kind: string;
+  splashed?: boolean; explodedAt?: number; convoyCharge?: boolean;
+}
 export interface Impact extends Aloft {id: number; time: number; kind: string}
 export interface CombatWorld extends Point3 {
   time: number; heading: number; pitch: number; roll?: number; speed: number; status: string; mission: string; rng: number;

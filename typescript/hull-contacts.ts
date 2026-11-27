@@ -16,7 +16,7 @@ interface Body {
 }
 type Ship = Body & {id: string; name: string; hull: number; sunkAt?: number; sinkDepth: number; groundedAt?: number; neutralHitAt?: number};
 interface Patrol extends Body {
-  depth: number; time: number; site?: Body; ships: Ship[]; environment: {chartSeed: number}; collisionHits: Record<string, number>;
+  depth: number; time: number; site?: Body | null; ships: Ship[]; environment: {chartSeed: number}; collisionHits: Record<string, number>;
   systems: Record<string, number>; repairLimits: Record<string, number>; scope: boolean; scopeTravel?: number; events: LogEntry[]; debrief?: DebriefEntry[];
 }
 type Hurt = (s: Patrol, severity: number, text: string, part: string) => void;
@@ -66,7 +66,7 @@ export function hullContact(a: Body, b: Body): Contact | null {
   return deepest;
 }
 
-function weight(body: Body, site?: Body) {
+function weight(body: Body, site?: Body | null) {
   if (body.fixedWreck || body === site && body.kind !== 'surface') return 0;
   if (body.kind === 'carrier') return .15;
   if (body.kind === 'merchant') return .28;

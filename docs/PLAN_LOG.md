@@ -151,3 +151,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Convert the shared mechanics, debrief and loss-screen modules to strict TypeScript (done 2026-11-27 03:24 EST; commit 1a7ef42).
 - [x] [Elm migration] Convert the photo archive, vehicle status, seafloor surface and pressure modules to strict TypeScript (done 2026-11-27 03:25 EST; commit 7b40085).
 - [x] [Elm migration] Convert the service record, acoustics and contact track-estimate modules to strict TypeScript (done 2026-11-27 03:28 EST; commit 805e3a3).
+- [x] [Elm migration] Convert the weather, light and sea environment module to strict TypeScript, checked output-identical to the original across 35,876 comparisons (done 2026-11-27 03:31 EST; commit c4d9d6e).

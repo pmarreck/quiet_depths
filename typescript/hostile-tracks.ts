@@ -9,7 +9,7 @@ type Difficulty = {pursuit?: number; depthStealth?: number; detection?: number};
 export interface Report {x: number; y: number; depth?: number; heading?: number; speed?: number; time: number; reason?: string; [key: string]: unknown}
 export type Track = Report & {age: number};
 type Noisemaker = {x: number; y: number; depth?: number; time: number};
-type Shell = {id: number; x: number; y: number; depth: number; delay: number; fromX: number; fromY: number; total: number};
+type Shell = {id: number; x: number; y: number; depth: number; delay: number; fromX: number; fromY: number; total: number; hit?: boolean};
 interface Patrol {
   x: number; y: number; depth: number; heading: number; speed: number; targetSpeed?: number; time: number; rng: number;
   difficulty?: Difficulty; systems: {periscope: number}; scope: boolean; scopeTravel?: number; noise: number; bottomed: boolean;

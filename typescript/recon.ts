@@ -95,7 +95,7 @@ function makePacket(s: Patrol & {recon: Recon}, first: Frame, second: Frame): Pa
     image: {width: 640, height: 640, mode: night ? 'night-lights' : 'daylight', firstFrameAt: first.time, secondFrameAt: second.time, footprintMeters: s.recon.area!.size}};
 }
 
-export function updateRecon(s: Patrol | null | undefined, dt: number): Packet | null {
+export function updateRecon(s: Patrol | null | undefined, dt: number): (Packet & {receivedAt: number}) | null {
   if (!s || s.status !== 'patrol' || !finite(s.time) || !s.recon || !finite(dt) || dt <= 0) return null;
   const tasked = s as Patrol & {recon: Recon}, r = tasked.recon, link = reconLink(s);
   if (r.phase === 'queued') {
@@ -134,7 +134,7 @@ export function updateRecon(s: Patrol | null | undefined, dt: number): Packet | 
     if (r.progress < 1) return null;
     const packet = r.packet!;
     packet.receivedAt = s.time; r.phase = 'complete'; r.progress = 1; r.cooldownUntil = Math.max(r.cooldownUntil, s.time + RECON_LIMITS.cooldown);
-    return structuredClone(packet);
+    return structuredClone(packet) as Packet & {receivedAt: number};
   }
   return null;
 }
