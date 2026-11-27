@@ -1,25 +1,10 @@
+import type * as Three from './vendor/three.module.js';
 import {cableGland} from './rov-flight.ts';
 
 type Triple = [number,number,number];
-interface Node3D {
-  name:string;
-  position:{set(...values:Triple):unknown};
-  scale:{set(...values:Triple):unknown};
-  rotation:{x:number};
-  add(child:Node3D):unknown;
-}
-interface ModelKit {
-  Group:new()=>Node3D;
-  Mesh:new(shape:object,material:object)=>Node3D;
-  BoxGeometry:new(...size:Triple)=>object;
-  SphereGeometry:new(radius:number,around:number,rows:number)=>object;
-  TorusGeometry:new(radius:number,tube:number,radial:number,tubular:number)=>object;
-  MeshStandardMaterial:new(options:{color:number;metalness:number;roughness:number})=>object;
-  MeshBasicMaterial:new(options:{color:number;toneMapped:boolean})=>object;
-}
 
 // The camera faces local -Z. Dimensions are in the same meters as the tether.
-export function makeRov(T:ModelKit) {
+export function makeRov(T:typeof Three):Three.Group {
   const vehicle=new T.Group();
   vehicle.name='Inspection ROV';
   const paint=(color:number)=>new T.MeshStandardMaterial({color,metalness:.2,roughness:.65});
@@ -27,7 +12,7 @@ export function makeRov(T:ModelKit) {
   const lamp=new T.MeshBasicMaterial({color:0xffedb8,toneMapped:false});
   const box=new T.BoxGeometry(1,1,1),sphere=new T.SphereGeometry(1,16,10);
   const duct=new T.TorusGeometry(.25,.065,8,18);
-  function part(name:string,shape:object,material:object,at:Triple,size:Triple=[1,1,1]) {
+  function part(name:string,shape:Three.BufferGeometry,material:Three.Material,at:Triple,size:Triple=[1,1,1]) {
     const mesh=new T.Mesh(shape,material);
     mesh.name=name;mesh.position.set(...at);mesh.scale.set(...size);vehicle.add(mesh);
     return mesh;

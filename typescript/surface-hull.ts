@@ -1,3 +1,5 @@
+import type * as Three from './vendor/three.module.js';
+
 export type HullClass='merchant'|'escort'|'fishing'|'carrier'|'launch';
 
 interface Lines {
@@ -14,17 +16,8 @@ const lines:Record<HullClass,Lines>={
   carrier:{halfLength:105,beam:16.5,draft:10.2,freeboard:8.5,flare:.25,sheer:1.4,widths:[.015,.27,.59,.88,.99,1,1,.98,.88,.70,.52],paint:[0x546269,0x29363c,0x734438,0x596568]},
   launch:{halfLength:3.05,beam:1.05,draft:.44,freeboard:.55,flare:.34,sheer:.33,widths:[.018,.21,.47,.74,.94,1,.99,.93,.81,.73,.66],paint:[0xb86a34,0xe6c995,0x814831,0xa88961]},
 };
-interface Geometry {
-  setAttribute(name:string,attribute:object):unknown;
-  setIndex(indices:number[]):unknown;computeVertexNormals():unknown;
-}
-export interface HullKit {
-  BufferGeometry:new()=>Geometry;
-  Float32BufferAttribute:new(values:number[],size:number)=>object;
-  Color:new(hex:number)=>{r:number;g:number;b:number};
-}
 type Point=[number,number,number];
-export function surfaceHull(T:HullKit,kind:HullClass){
+export function surfaceHull(T:typeof Three,kind:HullClass):Three.BufferGeometry{
   const l=lines[kind],geometry=new T.BufferGeometry(),positions:number[]=[],colors:number[]=[],indices:number[]=[];
   const palette=l.paint.map(hex=>new T.Color(hex));
   function vertex(point:Point,paint:number){

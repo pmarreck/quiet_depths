@@ -1,44 +1,26 @@
-import {surfaceHull,type HullKit} from './surface-hull.ts';
+import type * as Three from './vendor/three.module.js';
+import {surfaceHull} from './surface-hull.ts';
 import {carrierSize,carrierDeck} from './carrier.ts';
 
-// The renderer supplies its existing Three.js instance, including in offline
-// builds. These are the constructors and transforms used by this artwork.
+// The renderer supplies its existing Three.js instance, including in offline builds.
 type Triple = [number, number, number];
-interface Transform {x: number; y: number; z: number; set(...values: Triple): unknown}
-interface ModelNode {
-  name: string; position: Transform; rotation: Transform; scale: Transform;
-  add(...children: ModelNode[]): unknown;
-  userData: {body?: ModelNode; lights?: ModelNode; hull?: ModelNode; parked?: ModelNode};
-}
-interface ModelKit extends HullKit {
-  Group: new() => ModelNode;
-  Mesh: new(geometry: object, material: object) => ModelNode;
-  Vector2: new(x: number,y: number) => object;
-  Shape: new(points: object[]) => object;
-  ExtrudeGeometry: new(shape: object, settings: {depth: number; bevelEnabled: boolean}) => {rotateX(angle: number): object};
-  MeshStandardMaterial: new(settings: {color: number; roughness: number; metalness: number; vertexColors?: boolean}) => object;
-  MeshBasicMaterial: new(settings: {color: number; toneMapped: boolean}) => object;
-  SphereGeometry: new(...values: Triple) => object;
-  BoxGeometry: new(...size: Triple) => object;
-  ConeGeometry: new(...values: Triple) => object;
-}
 
-function plate(T: ModelKit, points: readonly (readonly [number,number])[], thickness: number){
+function plate(T: typeof Three, points: readonly (readonly [number,number])[], thickness: number){
  const shape=new T.Shape(points.map(([x,z])=>new T.Vector2(x,-z)));
  const geometry=new T.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:false});
  return geometry.rotateX(-Math.PI/2);
 }
-function part(T: ModelKit, group: ModelNode, geometry: object, material: object, x=0,y=0,z=0){
+function part(T: typeof Three, group: Three.Object3D, geometry: Three.BufferGeometry, material: Three.Material, x=0,y=0,z=0){
  const mesh=new T.Mesh(geometry,material);mesh.position.set(x,y,z);group.add(mesh);return mesh;
 }
-const paint=(T: ModelKit,color: number)=>new T.MeshStandardMaterial({color,roughness:.8,metalness:.12});
+const paint=(T: typeof Three,color: number)=>new T.MeshStandardMaterial({color,roughness:.8,metalness:.12});
 
 // Both jets face -Z, the same convention used by the deck and flight renderer.
-export function periodJet(T: ModelKit, phantom: boolean){
+export function periodJet(T: typeof Three, phantom: boolean){
  const jet=new T.Group(),gray=paint(T,phantom?0x89969d:0x78868b),underside=paint(T,0xb9c3bd);
  const dark=paint(T,0x323a40),glass=paint(T,0x3f6574),steel=paint(T,0x515458);
  jet.name=phantom?'F-4 Phantom II':'A-4 Skyhawk';
- const ellipsoid=(name:string,m:object,x:number,y:number,z:number,w:number,h:number,l:number)=>{
+ const ellipsoid=(name:string,m:Three.Material,x:number,y:number,z:number,w:number,h:number,l:number)=>{
   const node=part(T,jet,new T.SphereGeometry(1,18,12),m,x,y,z);
   node.scale.set(w,h,l);node.name=name;return node;
  };
@@ -69,13 +51,13 @@ export function periodJet(T: ModelKit, phantom: boolean){
  fin.rotation.z=Math.PI/2;fin.name='swept fin';
  return jet;
 }
-export const carrierFighter=(T:ModelKit)=>periodJet(T,true);
+export const carrierFighter=(T:typeof Three)=>periodJet(T,true);
 
-export function makeCarrier(T: ModelKit){
+export function makeCarrier(T: typeof Three){
  const root=new T.Group(),body=new T.Group(),lights=new T.Group();
  root.add(body,lights);root.userData.body=body;root.userData.lights=lights;
  const hullPaint=paint(T,0x48555b),islandPaint=paint(T,0x8a9290),deckPaint=paint(T,0x44494a),stripe=paint(T,0xc7c4ae);
- const box=(size: Triple,xyz: Triple,material: object)=>part(T,body,new T.BoxGeometry(...size),material,...xyz);
+ const box=(size: Triple,xyz: Triple,material: Three.Material)=>part(T,body,new T.BoxGeometry(...size),material,...xyz);
  const hull=part(T,body,surfaceHull(T,'carrier'),new T.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.86,metalness:.15}));
  root.userData.hull=hull;
  const hangar=[[-4,-103],[5,-103],[16,-70],[17,75],[12,98],[-12,98],[-17,77],[-17,-64]] as const;
