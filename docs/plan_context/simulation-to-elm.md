@@ -152,3 +152,14 @@ fails on any class or typed array the simulation reaches.
 `Sim.Math` gained `imul` (Elm's `*` multiplies as doubles) and `toInt32`
 (JavaScript's `| 0`, which is what Elm's `truncate` compiles to), each checked
 against JavaScript on 20,000 inputs and every 32-bit edge.
+
+**Porting trap: compound assignment.** `y += a + b` computes `y + (a + b)`,
+not `(y + a) + b`, and the two round differently. The coast port first got
+this wrong and differed in the last bits on 36 of 12,224 chart points. Keep
+the whole right-hand side grouped. Every `+=` ported so far adds one term.
+
+`Sim.PatrolCalendar` turns day numbers into dates with Howard Hinnant's
+civil-from-days algorithm, the proleptic Gregorian calendar JavaScript's
+Date uses, checked across the century boundaries of the 400-year cycle.
+`Sim.Coast` builds a seed's coastline once (`coastline`) for the model to
+keep, where the TypeScript memoizes it.
