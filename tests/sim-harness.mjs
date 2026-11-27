@@ -1,0 +1,72 @@
+// Runs the Elm simulation's functions from Node so a ported module can be
+// compared with the TypeScript it replaces. The harness is compiled with the
+// project's Elm on first use; the Nix build provides Elm and its packages, and
+// `nix develop` provides them locally. Test files run in parallel processes
+// and Elm keeps its build state in the project's elm-stuff, so compilations
+// take turns behind an atomic lock directory, and each writes its output to a
+// private temporary directory.
+import {execFileSync} from 'node:child_process';
+import {mkdirSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const root = fileURLToPath(new URL('..', import.meta.url));
+let harness = null, nextId = 0;
+const pending = new Map();
+
+function exclusively(work) {
+  const lock = join(root, 'elm-stuff', 'sim-harness.lock'), deadline = Date.now() + 120_000;
+  mkdirSync(join(root, 'elm-stuff'), {recursive: true});
+  for (;;) {
+    try { mkdirSync(lock); break; } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      if (Date.now() > deadline) throw new Error('Another process has held ' + lock + ' for two minutes; remove it if no test is running.');
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    }
+  }
+  try { return work(); } finally { rmSync(lock, {recursive: true, force: true}); }
+}
+
+function load() {
+  if (harness) return harness;
+  const dir = mkdtempSync(join(tmpdir(), 'quiet-depths-sim-'));
+  try {
+    const output = join(dir, 'sim-harness.js');
+    try {
+      exclusively(() => execFileSync('elm', ['make', 'elm/SimHarness.elm', '--optimize', '--output=' + output], {cwd: root, stdio: 'pipe'}));
+    } catch (error) {
+      throw new Error('Could not compile elm/SimHarness.elm. Run the tests through ./test or nix develop, which provide Elm.\n' + (error.stderr ?? error.message));
+    }
+    const scope = {};
+    new Function('scope', readFileSync(output, 'utf8').replace(/\}\(this\)\);\s*$/, '}(scope));'))(scope);
+    if (!scope.Elm?.SimHarness) throw new Error('The compiled harness did not define Elm.SimHarness');
+    harness = scope.Elm.SimHarness.init();
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
+  harness.ports.results.subscribe(({id, results, error}) => {
+    const request = pending.get(id);
+    pending.delete(id);
+    if (error) request.reject(new Error(error)); else request.resolve(results);
+  });
+  return harness;
+}
+
+// Runs `fn` on each argument list in `batch` and resolves with the results in order.
+export function elm(fn, batch = [[]]) {
+  const app = load(), id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, {resolve, reject});
+    app.ports.calls.send({id, fn, batch});
+  });
+}
+
+// A seeded generator, so every run compares the same inputs.
+export function seeded(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
