@@ -163,3 +163,9 @@ civil-from-days algorithm, the proleptic Gregorian calendar JavaScript's
 Date uses, checked across the century boundaries of the 400-year cycle.
 `Sim.Coast` builds a seed's coastline once (`coastline`) for the model to
 keep, where the TypeScript memoizes it.
+
+**Porting trap: strings.** Elm's string functions read characters and
+misread unpaired surrogates (`Char.toCode` gives NaN for a lone high
+surrogate; folding over a lone low surrogate swallows its neighbor).
+JavaScript code that hashes IDs reads UTF-16 code units, so the simulation
+reads text through `Sim.Text.codeUnits`, exact for every string.

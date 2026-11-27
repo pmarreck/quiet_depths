@@ -5,10 +5,11 @@ module SimHarness.Watch exposing (function)
 import Json.Decode as D
 import Json.Encode as E
 import Sim.Carrier as Carrier
+import Sim.ContactReadings as Readings
 import Sim.Foundering as Foundering
 import Sim.TorpedoWatch as TorpedoWatch
 import Sim.Vessel as Vessel
-import SimHarness.Codec exposing (andMap, arg, call1, call2, flag, maybe, point, position3, safeInt, surfaceShip, vesselKind, wholeNumber)
+import SimHarness.Codec exposing (andMap, arg, call1, call2, call3, flag, maybe, point, position3, safeInt, surfaceShip, vesselKind, wholeNumber)
 
 
 vessel : D.Decoder (Foundering.Vessel {})
@@ -61,6 +62,56 @@ validCarrier value =
         )
         value
         |> Result.withDefault False
+
+
+{-| A number an old save may lack reads as NaN, which the readings treat as
+JavaScript treats undefined.
+-}
+lenient : String -> D.Decoder Float
+lenient key =
+    D.oneOf [ D.field key D.float, D.succeed (0 / 0) ]
+
+
+fix : D.Decoder Readings.Fix
+fix =
+    D.succeed Readings.Fix
+        |> andMap (lenient "x")
+        |> andMap (lenient "y")
+        |> andMap (lenient "time")
+        |> andMap (lenient "vx")
+        |> andMap (lenient "vy")
+        |> andMap (lenient "positionSigma")
+        |> andMap (lenient "velocitySigma")
+        |> andMap (lenient "maneuverSigma")
+
+
+contact : D.Decoder (Readings.Contact {})
+contact =
+    D.succeed (\x y range bearing confidence age f -> { x = x, y = y, range = range, bearing = bearing, confidence = confidence, age = age, fix = f })
+        |> andMap (lenient "x")
+        |> andMap (lenient "y")
+        |> andMap (lenient "range")
+        |> andMap (D.field "bearing" D.float)
+        |> andMap (lenient "confidence")
+        |> andMap (lenient "age")
+        |> andMap (D.maybe (D.field "fix" fix))
+
+
+method : D.Decoder Readings.Method
+method =
+    D.string
+        |> D.andThen
+            (\m ->
+                case m of
+                    "visual" ->
+                        D.succeed Readings.Visual
+
+                    "passive" ->
+                        D.succeed Readings.Passive
+
+                    _ ->
+                        D.fail m
+            )
 
 
 encodePose : { roll : Float, pitch : Float, wave : Float } -> E.Value
@@ -168,6 +219,25 @@ function name =
 
         "carrier.validCarrier" ->
             Just (D.map (validCarrier >> E.bool) (arg 0 D.value))
+
+        "contactReadings.observationBias" ->
+            Just (call3 D.float D.string method E.float Readings.observationBias)
+
+        "contactReadings.estimateAt" ->
+            Just
+                (call2 (D.nullable contact)
+                    D.float
+                    (Maybe.map (\e -> E.object [ ( "x", E.float e.x ), ( "y", E.float e.y ), ( "major", E.float e.major ), ( "minor", E.float e.minor ), ( "angle", E.float e.angle ), ( "age", E.float e.age ), ( "hasFix", E.bool e.hasFix ) ]) >> Maybe.withDefault E.null)
+                    Readings.estimateAt
+                )
+
+        "contactReadings.sonarReading" ->
+            Just
+                (call2 (D.map3 (\x y time -> { x = x, y = y, time = time }) (D.field "x" D.float) (D.field "y" D.float) (D.field "time" D.float))
+                    contact
+                    (\r -> E.object [ ( "bearing", E.float r.bearing ), ( "range", Maybe.map E.float r.range |> Maybe.withDefault E.null ) ])
+                    Readings.sonarReading
+                )
 
         "torpedoWatch.gameEcho" ->
             Just (D.map4 (\b s t v -> encodeEcho (TorpedoWatch.gameEcho b s t v)) (arg 0 position3) (arg 1 shot) (arg 2 D.float) (arg 3 D.float))

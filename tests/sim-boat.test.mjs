@@ -90,3 +90,20 @@ function same(actual, expected) {
   const differ = expected.flatMap((e, i) => Object.is(e, actual[i]) ? [] : [i]);
   assert.equal(differ.length, 0, `${differ.length} hash results differ, first at ${differ[0]}: ${actual[differ[0]]} vs ${expected[differ[0]]}`);
 }
+
+test('the Elm ROV nose, camera pitch and tether point match the TypeScript', async () => {
+  const rov = await import('../src/rov-flight.js'), random = seeded(64);
+  assert.deepEqual((await elm('rovFlight.constants'))[0], {maxNosePitch: rov.maxNosePitch, cableGland: {...rov.cableGland}});
+  const pitches = [];
+  for (const vs of [-3, -1, -.5, -0, 0, .5, 1, 3]) for (const nose of [null, 0, -60, 60, 15]) pitches.push([vs, nose]);
+  for (let i = 0; i < 300; i++) pitches.push([(random() - .5) * 4, random() < .5 ? null : (random() - .5) * 120]);
+  assert.deepEqual(await elm('rovFlight.droneCameraPitch', pitches), pitches.map(([vs, nose]) => rov.droneCameraPitch(vs, nose)));
+  const poses = Array.from({length: 1000}, () => [{x: (random() - .5) * 2000, y: (random() - .5) * 2000, depth: random() * 300, heading: random() * 360,
+    verticalSpeed: (random() - .5) * 4, nosePitch: random() < .4 ? null : (random() - .5) * 120}]);
+  assert.deepEqual(await elm('rovFlight.droneTetherAttachment', poses), poses.map(([d]) => rov.droneTetherAttachment(d)));
+  const changes = [];
+  for (const nose of [null, 55, -55, 0]) for (const degrees of [-10, 0, 4, 10]) for (const inverted of [false, true])
+    changes.push([{nosePitch: nose, verticalSpeed: .7, targetDepth: 40, depth: 33}, degrees, inverted]);
+  for (let i = 0; i < 300; i++) changes.push([{nosePitch: random() < .3 ? null : (random() - .5) * 120, verticalSpeed: (random() - .5) * 3, targetDepth: random() * 100, depth: random() * 100}, (random() - .5) * 40, random() < .5]);
+  assert.deepEqual(await elm('rovFlight.changeNosePitch', changes), changes.map(([d, degrees, inverted]) => {const c = {...d}; rov.changeNosePitch(c, degrees, inverted); return c;}));
+});

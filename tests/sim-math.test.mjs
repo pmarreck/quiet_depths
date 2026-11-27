@@ -97,3 +97,9 @@ test('Elm imul and toInt32 equal Math.imul and x | 0 bit for bit', async () => {
   const values = [...specials, 2 ** 31, 2 ** 31 - 1, -(2 ** 31), -(2 ** 31) - 1, 2 ** 32, 2 ** 32 + 5, -1.5, 1.5, 1e20, -1e20, 2 ** 53 + 2, ...Array.from({length: 20000}, () => (random() - .5) * 2 ** (random() * 70))];
   same(await elm('math.toInt32', values.map(v => [v])), values.map(v => v | 0), 'toInt32');
 });
+
+test('Elm reads every string as the UTF-16 code units JavaScript does, unpaired surrogates included', async () => {
+  const random = seeded(29), texts = ['', 'kestrel', 'Ünïcode', 'ship 🚢', '🚢', '\ud800', '\udc00', '\ud800lone', 'lone\udfff', 'a\udc00b', '􏿿', '\ud800𐀀', '￿퟿'];
+  for (let i = 0; i < 2000; i++) texts.push(String.fromCharCode(...Array.from({length: Math.floor(random() * 12)}, () => random() < .3 ? 0xd800 + Math.floor(random() * 0x800) : Math.floor(random() * 0x10000))));
+  assert.deepEqual(await elm('text.codeUnits', texts.map(t => [t])), texts.map(t => Array.from({length: t.length}, (_, i) => t.charCodeAt(i))));
+});

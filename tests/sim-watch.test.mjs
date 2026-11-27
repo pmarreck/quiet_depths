@@ -109,3 +109,35 @@ test('Elm carrier hits, flooding, incidental damage and save checks match the Ty
   assert.ok(valid.filter(Boolean).length > 50, 'the corpus includes valid carriers');
   assert.deepEqual(await elm('carrier.validCarrier', saves), valid);
 });
+
+test('Elm contact estimates, sonar readings and observation bias match the TypeScript', async () => {
+  const readings = await import('../src/contact-readings.js'), random = seeded(45);
+  const ids = ['kestrel', 'freighter-2', 'A', '', 'a-very-long-contact-identifier-that-overflows-thirty-two-bits', 'ship 🚢', '\ud800lone', 'Ünïcode'];
+  const biases = [];
+  for (const id of ids) for (const method of ['visual', 'passive']) for (const seed of [0, 7, 2 ** 31 + 5]) biases.push([seed, id, method]);
+  for (let i = 0; i < 1000; i++) biases.push([Math.floor(random() * 2 ** 32), 'c' + Math.floor(random() * 1e6), random() < .5 ? 'visual' : 'passive']);
+  assert.deepEqual(await elm('contactReadings.observationBias', biases), biases.map(([s, id, m]) => readings.observationBias(s, id, m)));
+  const fix = () => ({x: (random() - .5) * 9000, y: (random() - .5) * 9000, time: random() * 500, vx: random() < .2 ? 0 : (random() - .5) * 8,
+    vy: random() < .2 ? 0 : (random() - .5) * 8, positionSigma: random() * 200, velocitySigma: random() * 3, maneuverSigma: random() * .05});
+  const contact = () => {
+    const c = {x: (random() - .5) * 9000, y: (random() - .5) * 9000, bearing: random() * 360};
+    for (const [key, make] of [['range', () => random() < .3 ? 0 : random() * 5000], ['confidence', () => random() * 1.4 - .2], ['age', () => random() * 90 - 5]])
+      if (random() < .85) c[key] = random() < .05 ? NaN : make();
+    if (random() < .6) c.fix = fix();
+    return c;
+  };
+  const estimates = [[null, 10], [contact(), NaN], [contact(), Infinity], [{x: NaN, y: 3, bearing: 4}, 10], [{x: 3, y: Infinity, bearing: 4}, 10]];
+  // Fixes too slow for a heading, at each speed threshold, unusable, and from the future.
+  for (const [vx, vy] of [[0, 0], [.006, .008], [.0061, .008], [.06, .08], [.0601, .08]]) estimates.push([{x: 0, y: 0, bearing: 77, range: 100, fix: {...fix(), vx, vy}}, 600]);
+  estimates.push([{x: 1, y: 2, bearing: 5, range: 300, confidence: .7, fix: {...fix(), vx: NaN}}, 50], [{x: 1, y: 2, bearing: 5, fix: {...fix(), time: 900}}, 50]);
+  // A NaN or negative-zero bearing reads as 0, as `bearing || 0` does.
+  for (const bearing of [NaN, -0]) estimates.push([{x: 1, y: 2, bearing}, 9], [{x: 1, y: 2, bearing, range: 40}, 9], [{x: 0, y: 0, bearing, fix: {...fix(), vx: 0, vy: 0}}, 9]);
+  for (let i = 0; i < 3000; i++) estimates.push([contact(), random() * 700]);
+  const expected = estimates.map(([c, t]) => readings.estimateAt(c, t));
+  assert.ok(expected.some(e => e?.hasFix) && expected.some(e => e && !e.hasFix) && expected.includes(null), 'fixed, unfixed and unknown estimates appear');
+  assert.deepEqual(await elm('contactReadings.estimateAt', estimates), expected);
+  const sonar = [[{x: 5, y: 6, time: 10}, {x: 5, y: 6, bearing: 42, range: 9}], [{x: 0, y: 0, time: 10}, {x: 5, y: 6, bearing: 42, range: 0}],
+    [{x: 0, y: 0, time: 10}, {x: 5, y: 6, bearing: 42}], [{x: 0, y: 0, time: 10}, {x: 5, y: 6, bearing: 42, range: NaN}]];
+  for (let i = 0; i < 3000; i++) sonar.push([{x: (random() - .5) * 2000, y: (random() - .5) * 2000, time: random() * 700}, contact()]);
+  assert.deepEqual(await elm('contactReadings.sonarReading', sonar), sonar.map(([o, c]) => readings.sonarReading(o, c)));
+});

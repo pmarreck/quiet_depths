@@ -12,6 +12,7 @@ import Sim.Math as SimMath
 import Sim.SeabedRest as SeabedRest
 import Sim.SonarTransmitters as Sonar
 import Sim.TorpedoTubes as TorpedoTubes
+import Sim.Text as Text
 import Sim.WatchWarnings as WatchWarnings
 import SimHarness.Codec exposing (arg, call1, call2, call3, call5, maybe, point)
 
@@ -249,6 +250,9 @@ function name =
 
         "math.toInt32" ->
             Just (call1 D.float E.int SimMath.toInt32)
+
+        "text.codeUnits" ->
+            Just (call1 D.string (E.list E.int) Text.codeUnits)
 
         "math.remainder" ->
             Just (call2 D.float D.float E.float SimMath.remainder)

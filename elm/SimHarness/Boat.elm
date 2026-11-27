@@ -5,6 +5,7 @@ module SimHarness.Boat exposing (function)
 import Json.Decode as D
 import Json.Encode as E
 import Sim.PowerPlant as Plant
+import Sim.RovFlight as Rov
 import Sim.SurfaceMotion as Motion
 import SimHarness.Codec exposing (andMap, arg, call1, call2, call3)
 
@@ -171,6 +172,39 @@ function name =
                         ]
                     )
                 )
+
+        "rovFlight.droneCameraPitch" ->
+            Just (call2 D.float (D.nullable D.float) E.float Rov.droneCameraPitch)
+
+        "rovFlight.droneTetherAttachment" ->
+            Just
+                (call1
+                    (D.map6 (\x y depth heading vs nose -> { x = x, y = y, depth = depth, heading = heading, verticalSpeed = vs, nosePitch = nose })
+                        (D.field "x" D.float)
+                        (D.field "y" D.float)
+                        (D.field "depth" D.float)
+                        (D.field "heading" D.float)
+                        (D.field "verticalSpeed" D.float)
+                        (D.field "nosePitch" (D.nullable D.float))
+                    )
+                    (\p -> E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ), ( "depth", E.float p.depth ) ])
+                    Rov.droneTetherAttachment
+                )
+
+        "rovFlight.changeNosePitch" ->
+            Just
+                (D.map3
+                    (\d degrees inverted ->
+                        (\c -> E.object [ ( "nosePitch", Maybe.map E.float c.nosePitch |> Maybe.withDefault E.null ), ( "verticalSpeed", E.float c.verticalSpeed ), ( "targetDepth", E.float c.targetDepth ), ( "depth", E.float c.depth ) ])
+                            (Rov.changeNosePitch degrees inverted d)
+                    )
+                    (arg 0 (D.map4 (\nose vs target depth -> { nosePitch = nose, verticalSpeed = vs, targetDepth = target, depth = depth }) (D.field "nosePitch" (D.nullable D.float)) (D.field "verticalSpeed" D.float) (D.field "targetDepth" D.float) (D.field "depth" D.float)))
+                    (arg 1 D.float)
+                    (arg 2 D.bool)
+                )
+
+        "rovFlight.constants" ->
+            Just (D.succeed (E.object [ ( "maxNosePitch", E.float Rov.maxNosePitch ), ( "cableGland", E.object [ ( "side", E.float Rov.cableGland.side ), ( "down", E.float Rov.cableGland.down ), ( "forward", E.float Rov.cableGland.forward ) ] ) ]))
 
         "powerPlant.constants" ->
             Just (D.succeed (E.object [ ( "SURFACE_KNOTS", E.float Plant.surfaceKnots ), ( "ELECTRIC_KNOTS", E.float Plant.electricKnots ) ]))
