@@ -312,3 +312,21 @@ pressure that stopped the environment run. The tests now compare batches with
 `sameResults` (the same strict equality, reporting the first differing call),
 mutants fail in about five seconds, and the script counts a run as a survivor
 only when it finished with no failures and nothing canceled.
+
+## Hard-part log (agent wall-clock, for the checkpoint)
+
+| Item | Time | Notes |
+|---|---|---|
+| Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
+| Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Track estimates | about 15 min | first port on the shared records; the omniscient chart's exact marks became their own type, since they are not contacts |
+
+The early leaf ports ran about 10 to 20 minutes each for 30 to 150 lines.
+
+**Track estimates.** The omniscient chart's exact marks carry no bearing,
+confidence or method, so they are `Exact` entries beside `Observed`
+contacts rather than contacts. A reconnaissance track's untyped fields are
+trusted only with the right type, as the TypeScript's `typeof` checks do;
+one difference remains: a track naming a kind the game does not have leaves
+the contact's kind as it was, where the TypeScript would copy the string.
+Recon builds tracks from real ships, so no patrol can produce one.

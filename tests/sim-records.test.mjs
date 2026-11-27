@@ -93,7 +93,7 @@ test('saved contacts round-trip through the Elm contact record, with old labels 
   }
   sameResults(await elm('contact.roundTrip', calls), expected);
   const indices = [...Array.from({length: 3000}, (_, i) => i + 1), 2 ** 31 - 1, 2 ** 31, 5e9, 2 ** 53 - 1];
-  sameResults(await elm('contact.designation', indices.map(i => [i])), indices.map(designation));
+  sameResults(await elm('trackEstimates.designation', indices.map(i => [i])), indices.map(designation));
 });
 
 test('the Elm contact decoder rejects what restore rejects, and is stricter only on wrong types', async () => {

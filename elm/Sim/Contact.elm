@@ -1,4 +1,4 @@
-module Sim.Contact exposing (Contact, SavedFix, Sighting(..), SweepArea, decoder, designation, encode)
+module Sim.Contact exposing (Contact, SavedFix, Sighting(..), SweepArea, decoder, designation, encode, encodeFix, savedFix)
 
 {-| A sonar or visual contact, as saves hold it. Like `Sim.Ship` it mirrors
 the TypeScript field for field while both implementations change together;
@@ -323,21 +323,7 @@ encode c =
                 , field "kind" (Vessel.kindName >> E.string) c.kind
                 , field "military" E.bool c.military
                 , field "method" (sightingName >> E.string) c.method
-                , field "fix"
-                    (\f ->
-                        E.object
-                            ([ ( "x", E.float f.x ), ( "y", E.float f.y ), ( "time", E.float f.time ) ]
-                                ++ List.filterMap identity
-                                    [ field "vx" E.float f.vx
-                                    , field "vy" E.float f.vy
-                                    , field "positionSigma" E.float f.positionSigma
-                                    , field "velocitySigma" E.float f.velocitySigma
-                                    , field "maneuverSigma" E.float f.maneuverSigma
-                                    , field "source" E.string f.source
-                                    ]
-                            )
-                    )
-                    c.fix
+                , field "fix" encodeFix c.fix
                 , field "lastSweep" E.float c.lastSweep
                 , field "sweepArea" (\a -> E.object [ ( "x", E.float a.x ), ( "y", E.float a.y ), ( "size", E.float a.size ), ( "time", E.float a.time ) ]) c.sweepArea
                 , field "passiveAt" E.float c.passiveAt
@@ -346,5 +332,24 @@ encode c =
                 , field "passiveY" E.float c.passiveY
                 , field "depthEstimate" E.float c.depthEstimate
                 , field "courseEstimated" E.bool c.courseEstimated
+                ]
+        )
+
+
+encodeFix : SavedFix -> E.Value
+encodeFix f =
+    let
+        field key enc =
+            Maybe.map (\v -> ( key, enc v ))
+    in
+    E.object
+        ([ ( "x", E.float f.x ), ( "y", E.float f.y ), ( "time", E.float f.time ) ]
+            ++ List.filterMap identity
+                [ field "vx" E.float f.vx
+                , field "vy" E.float f.vy
+                , field "positionSigma" E.float f.positionSigma
+                , field "velocitySigma" E.float f.velocitySigma
+                , field "maneuverSigma" E.float f.maneuverSigma
+                , field "source" E.string f.source
                 ]
         )

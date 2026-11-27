@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/TrackEstimates.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {estimateAt} from './contact-readings.ts';
 export {estimateAt};
 // Timestamped observations are independent of live vessel state. All distances
