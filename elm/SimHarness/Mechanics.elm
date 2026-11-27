@@ -2,6 +2,7 @@ module SimHarness.Mechanics exposing (function)
 
 {-| Harness entries for mechanics and the small modules built on it. -}
 
+import Dict
 import Json.Decode as D
 import Json.Encode as E
 import Sim.Coast
@@ -92,7 +93,7 @@ type alias PressureBoat =
     , pressureAlarm : Int
     , criticalExposure : Float
     , flood : Float
-    , repairLimits : { hull : Float }
+    , repairLimits : Dict.Dict String Float
     , status : Status.Status
     , imploded : Bool
     , shock : Float
@@ -112,7 +113,7 @@ pressureBoat =
         |> andMap (D.field "pressureAlarm" D.int)
         |> andMap (D.field "criticalExposure" D.float)
         |> andMap (D.field "flood" D.float)
-        |> andMap (D.field "repairLimits" (D.map (\h -> { hull = h }) (D.field "hull" D.float)))
+        |> andMap (D.field "repairLimits" (D.dict D.float))
         |> andMap (D.field "status" status)
         |> andMap (D.field "imploded" D.bool)
         |> andMap (D.field "shock" D.float)
@@ -126,7 +127,7 @@ encodePressureBoat : PressureBoat -> E.Value
 encodePressureBoat s =
     E.object
         [ ( "outerHull", E.float s.outerHull ), ( "hull", E.float s.hull ), ( "depth", E.float s.depth ), ( "pressureAlarm", E.int s.pressureAlarm )
-        , ( "criticalExposure", E.float s.criticalExposure ), ( "flood", E.float s.flood ), ( "repairLimits", E.object [ ( "hull", E.float s.repairLimits.hull ) ] )
+        , ( "criticalExposure", E.float s.criticalExposure ), ( "flood", E.float s.flood ), ( "repairLimits", E.dict identity E.float s.repairLimits )
         , ( "status", E.string (Status.statusName s.status) ), ( "imploded", E.bool s.imploded ), ( "shock", E.float s.shock ), ( "rng", E.int s.rng )
         , ( "events", E.list encodeLog s.events ), ( "time", E.float s.time )
         , ( "debrief", E.list (\d -> E.object [ ( "time", E.float d.time ), ( "text", E.string d.text ) ]) s.debrief )

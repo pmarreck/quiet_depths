@@ -384,3 +384,19 @@ mutants, two survive by explanation: the near-parallel determinant guard
 equally deep part pairs (an exact floating tie needs a measure-zero
 arrangement). The TypeScript's `a !== s.site` in the vertical push is
 redundant, since a site weighs nothing unless it floats; the Elm drops it.
+
+**Seams between slice-based ports (evidence for the checkpoint).** Ports
+that each took an extensible record naming only their own fields chose
+types independently, and the shared records expose the disagreements:
+
+- `Sim.Carrier` takes `directHits : Int` (the TypeScript's `?? 0`); the ship
+  record holds `Maybe Float`. Hull contacts adapts at the call.
+- `Sim.Pressure` takes `repairLimits` as a record with a `hull` field;
+  `Sim.HullContacts` takes it as a `Dict String Float`. The boat record must
+  satisfy both, so `systems` and `repairLimits` become `Dict String Float`
+  throughout, mirroring the TypeScript's records (which mix the hull's limit
+  in with the fourteen systems and are walked by key), and `Sim.Pressure`
+  changes to match.
+
+Each seam is small, but the integration work is real and grows with the
+number of ported modules; a line count never shows it.

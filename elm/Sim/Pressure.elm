@@ -6,6 +6,7 @@ twenty seconds past the critical depth. Gameplay limits for this fictional
 boat; wear on the outer shell lasts the patrol.
 -}
 
+import Dict exposing (Dict)
 import Sim.Debrief as Debrief
 import Sim.Equipment as Equipment
 import Sim.Math as M exposing (expm1)
@@ -31,7 +32,7 @@ pressureLevel s =
         0
 
 
-type alias Boat a r =
+type alias Boat a =
     { a
         | outerHull : Float
         , hull : Float
@@ -39,7 +40,7 @@ type alias Boat a r =
         , pressureAlarm : Int
         , criticalExposure : Float
         , flood : Float
-        , repairLimits : { r | hull : Float }
+        , repairLimits : Dict String Float
         , status : Status
         , imploded : Bool
         , shock : Float
@@ -50,19 +51,19 @@ type alias Boat a r =
     }
 
 
-damageHull : Float -> Boat a r -> Boat a r
+{-| The repair limits are keyed as the TypeScript's are, the hull's among the
+systems'; a missing limit is NaN, as `undefined` is in arithmetic.
+-}
+damageHull : Float -> Boat a -> Boat a
 damageHull amount s =
     let
-        limits =
-            s.repairLimits
-
         part =
-            Equipment.damage amount { condition = s.hull, limit = limits.hull }
+            Equipment.damage amount { condition = s.hull, limit = Dict.get "hull" s.repairLimits |> Maybe.withDefault (0 / 0) }
     in
-    { s | hull = part.condition, repairLimits = { limits | hull = part.limit } }
+    { s | hull = part.condition, repairLimits = Dict.insert "hull" part.limit s.repairLimits }
 
 
-updatePressure : Float -> Boat a r -> Boat a r
+updatePressure : Float -> Boat a -> Boat a
 updatePressure dt s0 =
     let
         level =
