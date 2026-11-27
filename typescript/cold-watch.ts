@@ -1,7 +1,7 @@
 import {incidentalHull} from './carrier.ts';
 import {chartDepth} from './coast.ts';
 import {hash01} from './surface-motion.ts';
-import {missions} from './mission-catalog.ts';
+import {encounters, missions} from './mission-catalog.ts';
 import {DAY_SECONDS} from './patrol-calendar.ts';
 import type {Volley} from './fleet-action.ts';
 
@@ -32,9 +32,11 @@ export function resumeTraffic(time:number,seed:number){
  if(time>=encounterTime(seed,window))traffic.window=window;
  return traffic;
 }
+// The Elm patrol definition owns the traffic odds and the holiday restraint.
+export const encounterOdds = encounters;
 export function encounterGroups(seed:number,window:number){
- const roll=(i:number)=>hash01(seed,81000+100*window+i);
- return {friendlySub:roll(1)<.28,hostileSub:roll(2)<.30,friendlySurface:roll(3)<.30,hostileSurface:roll(4)<.30};
+ const roll=(i:number)=>hash01(seed,81000+100*window+i),odds=encounterOdds;
+ return {friendlySub:roll(1)<odds.friendlySub,hostileSub:roll(2)<odds.hostileSub,friendlySurface:roll(3)<odds.friendlySurface,hostileSurface:roll(4)<odds.hostileSurface};
 }
 function visitors(s:Patrol,window:number,signal:Signal){
  const seed=s.patrol.seed,g=encounterGroups(seed,window);
@@ -128,7 +130,7 @@ export function advanceTraffic(s:Patrol,holiday:boolean,signal:Signal){
   const d=range(v,target),p=stand(s,v,target.id,d);
   const key=identity(v.id)+turn*9;
   const roll=(n:number)=>hash01(s.patrol.seed,key+n);
-  const aggression=temperament(s.patrol.seed,v.id),initiative=holiday?.25:1;
+  const aggression=temperament(s.patrol.seed,v.id),initiative=holiday?encounterOdds.holidayInitiative:1;
   const damage=clamp((100-v.hull)/100+(v.flood??0)*.035+(v.disabled?.48:0));
   const help=sideOf(v)==='friendly'&&other?.id===target.id&&attackingPlayer(s,other);
   const leaving=p.level>0&&d>p.range+75;

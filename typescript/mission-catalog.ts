@@ -14,3 +14,4 @@ export const missions = [
   {"id":"wolf-in-the-henhouse","name":"Wolf in the Henhouse","type":"CONVOY DEFENSE","actionStations":false,"engaged":true,"minutes":"6–12 MIN","longMinutes":"11–22 MIN","desc":"Plover is already on the bottom. A submarine is hunting the rest of our convoy. Surface near the ships to be hailed, then keep the signaling ship in your periscope or tower binoculars. Her lamp repeats an estimate. Your listeners may be able to match it to a bearing. You can also hunt on your own. Sink the hunter before two more friendly vessels go down.","short":"Sink the hunter before two more convoy losses","torps":6,"objective":{"kind":"protectConvoy","hunter":"wolf","lossLimit":2}},
 ] as const;
 export const patrol = {"standardWindow":1800,"longerWindow":5400,"protectedTransit":1200,"searchSeconds":180} as const;
+export const encounters = {"friendlySub":0.28,"hostileSub":0.3,"friendlySurface":0.3,"hostileSurface":0.3,"holidayInitiative":0.25} as const;

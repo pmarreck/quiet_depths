@@ -115,6 +115,17 @@ encodeMission mission =
         ]
 
 
+encodeOdds : PatrolMission.EncounterOdds -> E.Value
+encodeOdds o =
+    E.object
+        [ ( "friendlySub", E.float o.friendlySub )
+        , ( "hostileSub", E.float o.hostileSub )
+        , ( "friendlySurface", E.float o.friendlySurface )
+        , ( "hostileSurface", E.float o.hostileSurface )
+        , ( "holidayInitiative", E.float o.holidayInitiative )
+        ]
+
+
 encodeTiming : PatrolMission.PatrolTiming -> E.Value
 encodeTiming t =
     E.object
@@ -128,7 +139,7 @@ encodeTiming t =
 main : Program () () Never
 main =
     Platform.worker
-        { init = \() -> ( (), catalog (E.object [ ( "missions", E.list encodeMission PatrolMission.all ), ( "patrol", encodeTiming PatrolMission.patrolTiming ) ]) )
+        { init = \() -> ( (), catalog (E.object [ ( "missions", E.list encodeMission PatrolMission.all ), ( "patrol", encodeTiming PatrolMission.patrolTiming ), ( "encounters", encodeOdds PatrolMission.encounterOdds ) ]) )
         , update = \msg _ -> never msg
         , subscriptions = \_ -> Sub.none
         }

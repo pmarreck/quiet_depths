@@ -1,4 +1,4 @@
-module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), PatrolTiming, PhotoCriteria, RescueCriteria, SinkingCasualty, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, patrolTiming, startingTorpedoes, surveyCriteria)
+module PatrolMission exposing (Briefing, EncounterOrders(..), CrewWatch(..), Mission(..), Objective(..), EncounterOdds, PatrolTiming, PhotoCriteria, RescueCriteria, SinkingCasualty, SurveyCriteria, TrackingCriteria, all, briefing, estimatedMinutes, fromId, encounterOdds, patrolTiming, startingTorpedoes, surveyCriteria)
 
 startingTorpedoes : Int
 startingTorpedoes =
@@ -14,6 +14,29 @@ type alias PatrolTiming =
     , longerWindow : Int
     , protectedTransit : Int
     , searchSeconds : Int
+    }
+
+
+{-| Each twelve-hour watch rolls independent chances for each kind of passing
+traffic. On December 25 and January 1, hostile captains keep only
+holidayInitiative of their usual readiness to start trouble.
+-}
+type alias EncounterOdds =
+    { friendlySub : Float
+    , hostileSub : Float
+    , friendlySurface : Float
+    , hostileSurface : Float
+    , holidayInitiative : Float
+    }
+
+
+encounterOdds : EncounterOdds
+encounterOdds =
+    { friendlySub = 0.28
+    , hostileSub = 0.3
+    , friendlySurface = 0.3
+    , hostileSurface = 0.3
+    , holidayInitiative = 0.25
     }
 
 
