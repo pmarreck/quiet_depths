@@ -38,3 +38,11 @@ test('the status line names faults in their established order and colors',()=>{
  assert.match(elm,/if sub\.condition < 60 then\s+"damaged"/);
  assert.match(elm,/if r\.cavitation > 0\.05 then\s+" · CAVITATING"/);
 });
+
+test('the status line keeps its dot, drawn in the status color, in every state',async()=>{
+ const css=await read('src/style.css');
+ assert.match(elm,/span \[ id "system-status", style "color" \(statusColor r\) \] \[ i \[\] \[\], text \(" " \+\+ statusText r \(status r\)\) \]/);
+ assert.match(elm,/span \[ id "system-status" \] \[ i \[\] \[\], text " ALL SYSTEMS NOMINAL" \]/);
+ const dot=css.match(/\.systems i\{([^}]*)\}/)[1];
+ assert.match(dot,/width:4px;height:4px;background:currentColor;border-radius:50%/);
+});

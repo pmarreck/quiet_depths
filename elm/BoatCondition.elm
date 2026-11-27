@@ -186,7 +186,7 @@ view reading =
         , div [ class "systems" ]
             [ case reading of
                 Just r ->
-                    span [ id "system-status", style "color" (statusColor r) ] [ text (statusText r (status r)) ]
+                    span [ id "system-status", style "color" (statusColor r) ] [ i [] [], text (" " ++ statusText r (status r)) ]
 
                 Nothing ->
                     span [ id "system-status" ] [ i [] [], text " ALL SYSTEMS NOMINAL" ]
