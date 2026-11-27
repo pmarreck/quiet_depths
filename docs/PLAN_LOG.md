@@ -129,3 +129,7 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 ## Retired 2026-11-25
 
 - [x] [Future features] Add portable patrol and complete-game export and import using versioned cleartext JSON (done 2026-11-25 23:36 EST, commit 794084b).
+
+## Retired 2026-11-27
+
+- [x] [Playtest fixes (owner feedback 2026-11-27)] Fix torpedoes that veer off and search instead of running to a selected target; debug from the exported convoy save with a regression that fails on r83 (context: docs/plan_context/owner-feedback-2026-11-27.md; done 2026-11-27 01:03 EST; commit ba09d65).

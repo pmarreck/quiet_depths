@@ -26,6 +26,9 @@ encodeObjective objective =
         SinkShips first rest ->
             rule "sink" [ ( "targets", E.list E.string (first :: rest) ) ]
 
+        SinkCarrier carrier fatalHits ->
+            rule "sink" [ ( "targets", E.list E.string [ carrier ] ), ( "fatalHits", E.int fatalHits ) ]
+
         Survive ->
             rule "survive" []
 

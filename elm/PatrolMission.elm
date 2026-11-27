@@ -23,6 +23,7 @@ type Mission
 type Objective
     = Photographs PhotoCriteria
     | SinkShips String (List String)
+    | SinkCarrier String Int
     | Survive
     | ReachGate Float
     | TrackQuietly TrackingCriteria
@@ -165,6 +166,17 @@ countWord count =
             String.fromInt count
 
 
+{-| Direct torpedo hits that start a carrier's irreversible flooding. -}
+carrierFatalHits : Int
+carrierFatalHits =
+    2
+
+
+capitalized : String -> String
+capitalized words =
+    String.toUpper (String.left 1 words) ++ String.dropLeft 1 words
+
+
 surveyDescription : SurveyCriteria -> String
 surveyDescription c =
     "Survey an old wreck on the reef shelf. Pass within "
@@ -254,9 +266,9 @@ briefing mission =
         BigKahuna ->
             Briefing "big-kahuna" "Big Kahuna" "CARRIER HUNT" ActionStations Observe
                 { standard = ( 10, 16 ), longer = ( 15, 26 ) }
-                "Fleet carrier Solstice is sailing with a small escort. They are not expecting you. Two direct torpedo hits will start her sinking. Further hits shorten the wait. Her fighters can launch as soon as the alarm goes up. Surface at extraction to bring your crew home."
+                ("Fleet carrier Solstice is sailing with a small escort. They are not expecting you. " ++ capitalized (countWord carrierFatalHits) ++ " direct torpedo hits will start her sinking. Further hits shorten the wait. Her fighters can launch as soon as the alarm goes up. Surface at extraction to bring your crew home.")
                 "Sink the carrier and return to extraction"
-                (SinkShips "solstice" [])
+                (SinkCarrier "solstice" carrierFatalHits)
 
         SubHunt ->
             Briefing "seek-and-destroy-sub" "Seek and Destroy: Sub" "SUBMARINE HUNT" ActionStations Observe

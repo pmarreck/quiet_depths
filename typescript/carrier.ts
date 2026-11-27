@@ -1,3 +1,4 @@
+import {missions} from './mission-catalog.ts';
 // Fictional patrol balance and silhouette proportions, in game units.
 export const carrierId = 'solstice';
 export const carrierSize = {halfLength: 108, halfBeam: 16, deckHeight: 17} as const;
@@ -20,28 +21,31 @@ export function carrierGroup(x: number, y: number, heading: number, speed: numbe
   return group;
 }
 
+// The Elm mission definition owns how many direct hits doom the carrier.
+export const fatalHits: number = missions.find(m => m.id === 'big-kahuna')!.objective.fatalHits;
+
 interface Carrier {directHits: number; hull: number; flood: number; disabled: boolean; speed: number}
-export function registerCarrierHit(ship: Carrier) {
+export function registerCarrierHit(ship: Carrier, fatal = fatalHits) {
   ship.directHits++;
-  // The first hit is survivable. Two open a permanent flood. Further hits
-  // remove remaining buoyancy and increase its loss per simulation second.
-  ship.hull = Math.max(1, ship.hull - (ship.directHits <= 2 ? 30 : 10));
+  // Hits before the fatal one are survivable. The fatal hit opens a permanent
+  // flood. Further hits remove remaining buoyancy and speed the loss.
+  ship.hull = Math.max(1, ship.hull - (ship.directHits <= fatal ? 30 : 10));
   ship.flood = Math.max(ship.flood, ship.directHits * 2);
-  if(ship.directHits >= 2){ship.disabled=true;ship.speed=0;}
+  if(ship.directHits >= fatal){ship.disabled=true;ship.speed=0;}
 }
 
-export function incidentalHull(ship: {kind?: string; hull?: number; directHits?: number}, damage: number) {
-  const floor = ship.kind === 'carrier' && (ship.directHits ?? 0) < 2 ? 1 : 0;
+export function incidentalHull(ship: {kind?: string; hull?: number; directHits?: number}, damage: number, fatal = fatalHits) {
+  const floor = ship.kind === 'carrier' && (ship.directHits ?? 0) < fatal ? 1 : 0;
   return Math.max(floor, (ship.hull ?? 100) - damage);
 }
 
-export function advanceCarrierFlood(ship: Carrier, dt: number) {
-  if (ship.directHits >= 2) ship.hull = Math.max(0, ship.hull - dt * (ship.directHits - 1));
+export function advanceCarrierFlood(ship: Carrier, dt: number, fatal = fatalHits) {
+  if (ship.directHits >= fatal) ship.hull = Math.max(0, ship.hull - dt * (ship.directHits - fatal + 1));
 }
 
-export function validCarrier(ship: Carrier & {fighterCount: number}) {
+export function validCarrier(ship: Carrier & {fighterCount: number}, fatal = fatalHits) {
   return Number.isInteger(ship.fighterCount) && ship.fighterCount >= 1 && ship.fighterCount <= 3 &&
-    Number.isFinite(ship.flood) && ship.flood >= 0 && (ship.directHits < 2 || ship.flood > 0) &&
+    Number.isFinite(ship.flood) && ship.flood >= 0 && (ship.directHits < fatal || ship.flood > 0) &&
     Number.isSafeInteger(ship.directHits) && ship.directHits >= 0 &&
-    ship.hull >= 0 && ship.hull <= 100 && (ship.hull > 0 || ship.directHits >= 2);
+    ship.hull >= 0 && ship.hull <= 100 && (ship.hull > 0 || ship.directHits >= fatal);
 }

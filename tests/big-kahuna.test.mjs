@@ -103,3 +103,25 @@ test('the carrier has a long overhanging deck, an offset bridge, and visible fig
   assert.ok(size.x>9&&size.z>10);assert.ok(jet.position.y>deckBox.max.y);
  }
 });
+
+test('the Elm mission definition supplies the carrier’s fatal hits to the rules, briefing and player guide',async()=>{
+ const {MISSIONS}=await import('../src/missions.js');
+ const {advanceCarrierFlood,fatalHits,incidentalHull,registerCarrierHit}=await import('../src/carrier.js');
+ const {readFile}=await import('node:fs/promises');
+ const kahuna=MISSIONS.find(m=>m.id==='big-kahuna');
+ assert.deepEqual(kahuna.objective,{kind:'sink',targets:['solstice'],fatalHits:2});
+ assert.equal(fatalHits,kahuna.objective.fatalHits);
+ const words={2:'Two'};
+ assert.ok(kahuna.desc.includes(`${words[fatalHits]} direct torpedo hits will start her sinking.`));
+ const guide=await readFile(new URL('../README.md',import.meta.url),'utf8');
+ assert.ok(guide.includes(`${words[fatalHits]} direct torpedo hits start irreversible flooding.`));
+ // The rules follow whatever threshold they are given.
+ const carrier=()=>({kind:'carrier',directHits:0,hull:100,flood:0,disabled:false,speed:8});
+ const three=carrier();registerCarrierHit(three,3);registerCarrierHit(three,3);
+ assert.equal(three.disabled,false,'two hits are survivable when three are fatal');
+ const before=three.hull;advanceCarrierFlood(three,10,3);assert.equal(three.hull,before);
+ assert.equal(incidentalHull(three,500,3),1,'incidental damage cannot sink a carrier short of the fatal hits');
+ registerCarrierHit(three,3);assert.equal(three.disabled,true);
+ const doomed=three.hull;advanceCarrierFlood(three,10,3);assert.equal(three.hull,doomed-10);
+ const two=carrier();registerCarrierHit(two);registerCarrierHit(two);assert.equal(two.disabled,true);
+});
