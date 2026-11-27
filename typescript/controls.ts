@@ -82,7 +82,7 @@ export const orbitDrag = (orbit: {yaw: number; pitch: number}, dx: number, dy: n
 
 // Explicit yaw/pitch/roll order preserves a world-up horizon through all azimuths.
 // Never modify a single XYZ Euler component after lookAt's quaternion conversion.
-export const cameraEuler = (heading: number, pitch = 0, roll = 0) => ({x: pitch, y: -rad(wrapHeading(heading)), z: roll, order: 'YXZ'});
+export const cameraEuler = (heading: number, pitch = 0, roll = 0) => ({x: pitch, y: -rad(wrapHeading(heading)), z: roll, order: 'YXZ' as const});
 
 export function chartTransform(chart: Chart, w: number, h: number, boat: Point) {
   const scale = Math.min(w, h) / 12500 * chart.zoom, x = chart.follow ? boat.x : chart.x, y = chart.follow ? boat.y : chart.y;

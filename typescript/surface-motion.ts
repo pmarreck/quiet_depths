@@ -26,7 +26,7 @@ export function surfaceHeight(x: number, y: number, time: number, sea: Sea): num
   return sea.waveScale * sum;
 }
 
-export function surfaceMotion(boat: Hull, sea: Sea, time: number): Hull {
+export function surfaceMotion(boat: Hull, sea: Sea, time: number): Hull & {roll: number} {
   const hullRadius = SUB_DESIGN.hullRadius;
   const {x, y, heading} = boat;
   const response = Math.max(0, 1 - Math.max(0, boat.depth) / periscopeDepth) ** 2;

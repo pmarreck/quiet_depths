@@ -1,7 +1,8 @@
 import type {HullClass} from './surface-hull.ts';
 
-type SurfaceShip = Exclude<HullClass, 'launch'>;
-type Vessel = {kind: SurfaceShip | 'sub'; hull: number; sinkDepth?: number;
+export type SurfaceShip = Exclude<HullClass, 'launch'>;
+// The patrol names vessel kinds as plain strings; the surface ones are checked against the profiles.
+type Vessel = {kind: string; hull: number; sinkDepth?: number;
   sunkAt?: number; settled?: boolean; collapsed?: boolean; wreckMark?: {observed?: boolean}};
 
 // Final list and trim while passing beneath the surface. The bow is local -Z.
@@ -11,6 +12,9 @@ const profiles = {
   fishing:  {scale: .38, list: -.82, trim: -.44, lastVisible: 13.36},
   carrier:  {scale: 1.55, list: .57, trim: -.32, lastVisible: 53.36}
 } satisfies Record<SurfaceShip, {scale:number; list:number; trim:number; lastVisible:number}>;
+
+// The profiles above name every surface ship, so this cannot miss one.
+export const isSurfaceShip = (kind: string): kind is SurfaceShip => Object.hasOwn(profiles, kind);
 
 function ease(from: number, to: number, value: number) {
   const t = Math.max(0, Math.min(1, (value - from) / (to - from)));
@@ -39,6 +43,7 @@ export function wreckVisible(v: Vessel, now: number) {
   // Preexisting charted casualties and older saves without a sinking clock.
   if (v.settled && (v.sunkAt === undefined || (v.sunkAt === 0 && v.wreckMark?.observed))) return true;
   if (v.kind === 'sub') return !!(v.collapsed || v.settled);
+  if (!isSurfaceShip(v.kind)) throw new Error('Unknown vessel kind ' + v.kind);
   return !!(v.collapsed || v.settled) && now - (v.sunkAt ?? now) >= surfaceCollapseAge
     && (v.sinkDepth ?? 0) > submergedDepth(v.kind);
 }

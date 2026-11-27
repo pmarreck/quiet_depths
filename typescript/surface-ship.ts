@@ -3,6 +3,9 @@ import {surfaceHull,type HullClass} from './surface-hull.ts';
 
 type Triple=[number,number,number];
 type Class=Exclude<HullClass,'carrier'|'launch'>;
+const classes={merchant:true,escort:true,fishing:true} satisfies Record<Class,true>;
+// Vessels this module can build; a new hull class must be added above.
+export const isShipClass=(kind:string):kind is Class=>Object.hasOwn(classes,kind);
 export function surfaceShip(T:typeof Three,kind:Class):Three.Group{
   const root=new T.Group(),body=new T.Group(),lights=new T.Group();root.add(body,lights);
   root.userData.body=body;root.userData.lights=lights;

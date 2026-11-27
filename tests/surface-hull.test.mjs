@@ -2,12 +2,12 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from '../vendor/three.module.js';
 import {surfaceHull} from '../src/surface-hull.js';
-import {surfaceShip} from '../src/surface-ship.js';
+import {surfaceShip,isShipClass} from '../src/surface-ship.js';
 import {damageWreck} from '../src/wrecks.js';
 import {makeCarrier} from '../src/carrier-model.js';
 import {createSubmarine} from '../src/submarine-model.js';
 import {SUB_DESIGN as d} from '../src/hull-design.js';
-import {founderingPose,submergedDepth,wreckVisible} from '../src/foundering.js';
+import {founderingPose,isSurfaceShip,submergedDepth,wreckVisible} from '../src/foundering.js';
 
 function mesh(kind){return new T.Mesh(surfaceHull(T,kind),new T.MeshBasicMaterial());}
 function firstHit(model,origin,direction){
@@ -87,4 +87,14 @@ test('each foundering surface model heels before trimming, exposes just one end,
   assert.equal(wreckVisible({...vessel,settled:true},150),true);
   assert.equal(wreckVisible({...vessel,settled:true,sinkDepth:2},150),false);
  }
+});
+
+test('only modeled vessel kinds reach the ship models, and an unknown kind fails by name',()=>{
+ assert.deepEqual(['merchant','escort','fishing','carrier','sub','launch','tanker'].filter(isShipClass),['merchant','escort','fishing']);
+ assert.deepEqual(['merchant','escort','fishing','carrier','sub','launch','tanker'].filter(isSurfaceShip),['merchant','escort','fishing','carrier']);
+ assert.equal(isShipClass('toString'),false,'inherited names are not vessel kinds');
+ const sunk={hull:0,settled:true,collapsed:true,sunkAt:0,sinkDepth:200};
+ assert.equal(wreckVisible({...sunk,kind:'sub'},500),true);
+ assert.equal(wreckVisible({...sunk,kind:'merchant'},500),true);
+ assert.throws(()=>wreckVisible({...sunk,kind:'tanker'},500),/Unknown vessel kind tanker/);
 });
