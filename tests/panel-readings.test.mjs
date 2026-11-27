@@ -115,3 +115,14 @@ test('the mission reading knows which missions return home and when the fleet is
  assert.equal(missionReading(at('tiebreaker'),m,objective,true,false).homeDistance.endsWith('°'),true,'cleared fleets get a bearing home');
  assert.deepEqual([missionReading(at('recon',{convoy:{}}),m,objective,false,true).convoy,missionReading(at('recon'),m,objective,false,true).pickup],[true,true]);
 });
+
+test('the operation range reads unconfirmed until the site is located, then adds its hull',async()=>{
+ const {operationReading}=await import('../src/panel-readings.js');
+ const base={mission:'undersea-rescue',x:0,y:0,operation:{active:false,completed:false},site:{x:300,y:400,hull:72.2}};
+ assert.equal(operationReading({...base,search:{located:false}},'Search.').range,'POSITION UNCONFIRMED');
+ assert.equal(operationReading({...base,search:{located:true}},'x').range,'500 M · Hull 73%');
+ assert.equal(operationReading(base,'x').range,'500 M · Hull 73%','a site with no search is known');
+ assert.deepEqual(operationReading({mission:'recon',x:0,y:0,operation:null,site:null},'').range,'');
+ const r=operationReading({...base,mission:'survey',operation:{active:1,completed:1}},'Advice.');
+ assert.deepEqual([r.operation,r.survey,r.completed,r.underway,r.advice],[true,true,true,true,'Advice.']);
+});

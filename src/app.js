@@ -31,7 +31,7 @@ import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
 import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,helmFor,setHelmOrder,nudgeHelm,throttleDetent,applyHelmKeys,steerDrone,initialOrbit,orbitDrag,chartTransform,chartWorldAt,panChart,zoomChart,opticalZoomLimit} from './controls.js';
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
-import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading,missionReading} from './panel-readings.js';
+import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading,missionReading,operationReading} from './panel-readings.js';
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
@@ -255,6 +255,7 @@ const stationStrip=globalThis.Elm.StationStrip.init({node:$('station-strip-root'
 const helmCaption=globalThis.Elm.HelmCaption.init({node:$('helm-caption-root')});
 const captainsLog=globalThis.Elm.CaptainsLog.init({node:$('captains-log-root')});
 const missionBlock=globalThis.Elm.MissionBlock.init({node:$('mission-block-root')});
+const operationCard=globalThis.Elm.OperationCard.init({node:$('operation-card-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
  if(kind!=='repair'||view==='orbit'||!canIssue(state,context()))return;
@@ -520,11 +521,19 @@ function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
 bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');if(!compactLayout.matches)toast(rovKeyHint());}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
 bindCommand('drone-photo','click',takePhoto,()=>feedActive(state,'drone')&&state.photoCooldown===0);
-bindCommand('approach-site','click',()=>{const p=operationApproach(state);if(!p)return;state.route={x:p.x,y:p.y,radius:p.radius};state.targetDepth=p.depth;state.targetSpeed=3;state.silent=false;toast('Approach plotted. Sub will stop beside the site. Watch clearance.');},()=>!!operationApproach(state));
-bindCommand('start-rescue','click',()=>{
- if(startRescue(state)){setRate(1);toast(state.events[0].text);}
-},()=>!!state.operation&&!state.operation.completed&&state.mission!=='survey'&&operationConditions(state).onStation);
-bindCommand('hold-position','click',()=>{state.route=null;state.targetSpeed=0;state.targetDepth=operationApproach(state)?.depth??state.depth;toast('All stop. Ballast and planes holding ordered depth.');});
+// The Elm operation card sends orders; each is checked against the moment it arrives.
+const operationOrders={
+ 'start-rescue':{enabled:()=>!!state.operation&&!state.operation.completed&&state.mission!=='survey'&&operationConditions(state).onStation,run:()=>{
+  if(startRescue(state)){setRate(1);toast(state.events[0].text);}
+ }},
+ approach:{enabled:()=>!!operationApproach(state),run:()=>{const p=operationApproach(state);if(!p)return;state.route={x:p.x,y:p.y,radius:p.radius};state.targetDepth=p.depth;state.targetSpeed=3;state.silent=false;toast('Approach plotted. Sub will stop beside the site. Watch clearance.');}},
+ hold:{enabled:()=>true,run:()=>{state.route=null;state.targetSpeed=0;state.targetDepth=operationApproach(state)?.depth??state.depth;toast('All stop. Ballast and planes holding ordered depth.');}},
+};
+operationCard.ports.operationOrder.subscribe(kind=>{
+ const command=operationOrders[kind];
+ if(!command||view==='orbit'||!canIssue(state,context())||!command.enabled())return;
+ command.run();updateUI();
+});
 bindCommand('recall-drone','click',()=>recallDrone(state),()=>state.drone.mode==='remote');
 bindCommand('clear-route','click',()=>{state.route=null;toast('Waypoint cleared. Holding ordered heading.');});
 bindCommand('plot-home','click',()=>{state.route={...state.home};state.targetSpeed=6;state.silent=false;toast(state.mission==='sneaky-seamen'?'Gate B plotted. Cross at any depth.':'Extraction plotted. Surface inside the pickup circle to finish.');},()=>!state.convoy&&(state.mission!=='tiebreaker'||state.phase==='extract'));
@@ -746,10 +755,9 @@ function updateUI(){
  missionBlock.ports.missionReading.send(missionReading(s,m,objective,extract,pickup));
  $('plot-home').hidden=!!s.convoy;
  $('plot-home').textContent=s.mission==='sneaky-seamen'?'PLOT GATE B':s.mission==='tiebreaker'&&!extract?'AWAIT FLEET CLEARANCE':'PLOT EXTRACTION';
- $('operation-card').classList.toggle('hidden',!s.operation);$('operation-range').textContent=s.site?(s.search&&!s.search.located?'POSITION UNCONFIRMED':Math.round(distance(s,s.site))+' M'):'';$('operation-advice').textContent=objective.advice;$('approach-site').textContent=s.mission==='survey'?'PLOT SURVEY APPROACH':'PLOT RESCUE APPROACH';
- $('start-rescue').hidden=!s.operation||s.mission==='survey'||s.operation.completed;
- $('start-rescue').textContent=s.operation?.active?'RESCUE UNDERWAY':'START RESCUE HERE';
- if(s.site&&(!s.search||s.search.located))$('operation-range').textContent+=' · Hull '+Math.ceil(s.site.hull)+'%';
+ {const able=enabled=>canIssue(s,context())&&enabled();
+  operationCard.ports.operationReading.send({...operationReading(s,objective.advice),startEnabled:able(operationOrders['start-rescue'].enabled),
+   approachEnabled:able(operationOrders.approach.enabled),holdEnabled:able(operationOrders.hold.enabled)});}
  const limit=depthLimit(s),pressure=pressureLevel(s);
  $('pressure-warning').hidden=view!=='orbit'||!pressure||s.status!=='patrol';
  $('pressure-warning').classList.toggle('critical',pressure===2);

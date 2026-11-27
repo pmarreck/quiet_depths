@@ -168,3 +168,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 - [x] [Elm migration] Convert the crew's mess-deck ambience to strict TypeScript, with its voice clips verified loading in Chromium (done 2026-11-27 04:22 EST; commit fdd5527).
 - [x] [Elm migration] Convert the sound system to strict TypeScript, exercised in Chromium through a combat patrol, alarms and the loss implosion (done 2026-11-27 04:24 EST; commit aa62dee).
 - [x] [Elm migration] Render the helm's propulsion group (electric, diesel, routing, silent running) from Elm, with a test that every order it sends has a guarded handler (done 2026-11-27 04:29 EST; commit 81b23a6).
+- [x] [Elm migration] Render the helm's depth axis (readout, slider, presets) from a reusable Elm HelmAxis view whose slider orders carry sequence numbers, matching the previous build's pointer, keyboard and orbit behavior in Chromium (done 2026-11-27 04:38 EST; commit e836965).

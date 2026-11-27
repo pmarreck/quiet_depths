@@ -128,3 +128,14 @@ export function missionReading(s: {mission: string; convoy?: unknown; x: number;
     objectiveLabel: String(objective.label), objectiveText: String(objective.text), objectiveProgress: String(objective.progress),
     homeDistance: s.mission === 'tiebreaker' && !extract ? 'Awaiting fleet clearance' : (distance(s, s.home) / 1000).toFixed(1) + ' km · ' + deg(bearing(s, s.home)) + '°'};
 }
+
+export interface OperationReading {operation: boolean; survey: boolean; completed: boolean; underway: boolean; range: string; advice: string}
+
+/** The range reads unconfirmed until a searched-for site is located, and adds
+ * the casualty's hull once the site is known. */
+export function operationReading(s: {mission: string; x: number; y: number; operation?: {active?: unknown; completed?: unknown} | null;
+  site?: {x: number; y: number; hull: number} | null; search?: {located: boolean} | null}, advice: string): OperationReading {
+  const range = s.site ? (s.search && !s.search.located ? 'POSITION UNCONFIRMED' : Math.round(distance(s, s.site)) + ' M') : '';
+  return {operation: !!s.operation, survey: s.mission === 'survey', completed: !!s.operation?.completed, underway: !!s.operation?.active,
+    range: range + (s.site && (!s.search || s.search.located) ? ' · Hull ' + Math.ceil(s.site.hull) + '%' : ''), advice: String(advice)};
+}
