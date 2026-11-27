@@ -248,6 +248,9 @@ $('patrol-seed').addEventListener('input',event=>{event.target.setCustomValidity
 const conditionChoices=catalog=>Object.entries(catalog).map(([id,{name}])=>({id,name}));
 const telegraph=globalThis.Elm.EngineTelegraph.init({node:$('telegraph-root')});
 const compass=globalThis.Elm.HelmCompass.init({node:$('helm-compass-root')});
+const propulsionPanel=globalThis.Elm.HelmPropulsion.init({node:$('propulsion-root')});
+const dieselModeOptions=Object.entries(dieselModes).map(([value,label])=>({value,label}));
+let engineHint='';
 attachCompassSteering($('helm-compass'),()=>helmFor(state,view).heading,heading=>{if(view==='orbit'||!canIssue(state,context())||!pilotEnabled())return;order('heading',heading);updateUI();});
 telegraph.ports.ringTelegraph.subscribe(({lever,quiet})=>{
  if(!pilotEnabled()||!canIssue(state,context()))return;
@@ -445,21 +448,34 @@ bindCommand('center-scope','click',()=>{alignScope(state,context(),'center');$('
 bindCommand('steer-scope','click',()=>{alignScope(state,context(),'helm-to-scope');$('scope-alignment').classList.remove('open');$('scope-align-toggle').setAttribute('aria-expanded','false');},()=>feedActive(state,'scope'));
 bindCommand('open-gun','click',()=>setView('gun'));
 bindCommand('aim-gun','click',()=>{const id=$('gun-target').value,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range){const e=estimateAt(c,state.time);aimGunAt(state,{x:e.x,y:e.y,vx:c.fix?.vx||0,vy:c.fix?.vy||0,altitude:2});}},()=>view==='gun'&&feedActive(state,'gun')&&!!$('gun-target').value);
-bindCommand('scope-toggle','click',scopeToggle,()=>operatingFraction(state.systems.periscope)>0);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0&&operatingFraction(state.systems.sonar)>0);bindCommand('silent','click',silent,()=>view!=='drone');
+bindCommand('scope-toggle','click',scopeToggle,()=>operatingFraction(state.systems.periscope)>0);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0&&operatingFraction(state.systems.sonar)>0);
 for(const axis of ['heading','depth','speed'])bindOrderRange(axis,()=>axis);
-for(const id of ['diesel-mode','mobile-diesel-mode']){
- const select=$(id);
- for(const [mode,label] of Object.entries(dieselModes))select.add(new Option(label,mode));
- bindCommand(select,'change',()=>{
-  if(!isDieselMode(select.value))return;
-  state.dieselMode=select.value;
-  log(state,'Diesel power set to '+dieselModes[state.dieselMode]+'.');
- },()=>state.engine==='diesel'&&(id==='mobile-diesel-mode'||view!=='drone'));
+function routeDieselPower(mode){
+ if(!isDieselMode(mode))return;
+ state.dieselMode=mode;
+ log(state,'Diesel power set to '+dieselModes[state.dieselMode]+'.');
+}
+{
+ const select=$('mobile-diesel-mode');
+ for(const {value,label} of dieselModeOptions)select.add(new Option(label,value));
+ bindCommand(select,'change',()=>routeDieselPower(select.value),()=>state.engine==='diesel');
 }
 bindCommand('port','click',()=>nudgeHelm(state,context(),-15),pilotEnabled);bindCommand('starboard','click',()=>nudgeHelm(state,context(),15),pilotEnabled);
 all('[data-depth]').forEach(b=>bindCommand(b,'click',()=>order('depth',+b.dataset.depth),pilotEnabled));
-bindCommand('electric','click',()=>{state.engine='electric';log(state,'Electric motors engaged.');},()=>view!=='drone');
-bindCommand('diesel','click',()=>{if(state.depth>14){toast('Diesel needs air. Rise to 14 meters or less first.');return;}if(state.fuel<=0){toast('Diesel fuel exhausted.');return;}state.engine='diesel';state.silent=false;log(state,generatorOutput(state)?'Diesel generator online.':'Diesel selected. Generator or fuel feed offline.','warning');},()=>view!=='drone');
+// The Elm propulsion view sends orders; each is checked against the moment it arrives.
+const propulsionOrders={
+ engine:{enabled:()=>view!=='drone',run:engine=>{
+  if(engine==='electric'){state.engine='electric';log(state,'Electric motors engaged.');}
+  else if(engine==='diesel'){if(state.depth>14){toast('Diesel needs air. Rise to 14 meters or less first.');return;}if(state.fuel<=0){toast('Diesel fuel exhausted.');return;}state.engine='diesel';state.silent=false;log(state,generatorOutput(state)?'Diesel generator online.':'Diesel selected. Generator or fuel feed offline.','warning');}
+ }},
+ silent:{enabled:()=>view!=='drone',run:()=>silent()},
+ dieselMode:{enabled:()=>state.engine==='diesel'&&view!=='drone',run:routeDieselPower},
+};
+propulsionPanel.ports.propulsionOrder.subscribe(({kind,value})=>{
+ const command=propulsionOrders[kind];
+ if(!command||view==='orbit'||!canIssue(state,context())||!command.enabled())return;
+ command.run(value);updateUI();
+});
 function assignDamageControl(){
  if(state.systems.crew<=0){toast('No repair crew available.');return;}
  if(!batteryOutput(state)&&!generatorOutput(state)){toast('Damage control needs electrical power.');return;}
@@ -736,9 +752,7 @@ function updateUI(){
  const plant=propulsion(s);
  const sourceStatus=s.engine==='diesel'?(s.depth>14?'INTAKE SUBMERGED':!s.fuel?'NO FUEL':!plant.generator?'GENERATOR / FUEL OFFLINE':s.depth<=1?'SURFACE DIESEL':'SNORKEL DIESEL'):batteryOutput(s)?'BATTERY POWER':'BATTERY UNAVAILABLE';
  const powerStatus=[sourceStatus,dieselRoutingStatus(s,plant)].filter(Boolean).join(' · ');
- for(const id of ['diesel-mode','mobile-diesel-mode']){
-  const select=$(id);select.value=s.dieselMode;select.parentElement.hidden=s.engine!=='diesel'||(id==='diesel-mode'&&view==='drone');
- }
+ {const select=$('mobile-diesel-mode');select.value=s.dieselMode;select.parentElement.hidden=s.engine!=='diesel';}
  $('engine-status').textContent=powerStatus;
 
  const drone=view==='drone',v=helmFor(s,view),actual={heading:v.heading,depth:v.depth,speed:v.speed},requested={heading:v.targetHeading,depth:v.targetDepth,speed:v.targetSpeed};
@@ -759,8 +773,10 @@ function updateUI(){
  }
  if(!drone)$('speed').setAttribute('aria-valuetext',Math.round(throttlePercent(v.targetSpeed))+'% throttle, actual '+v.speed.toFixed(1)+' knots');
  $('speed').setAttribute('aria-label',drone?'Requested ROV speed':'Submarine throttle');
- $('electric').classList.toggle('active',s.engine==='electric');$('diesel').classList.toggle('active',s.engine==='diesel');$('silent').classList.toggle('active',s.silent);
- $('engine-hint').textContent=drone?'Sub holds its own helm orders.':powerStatus+' · '+(s.silent?Math.min(3,plant.ahead):plant.ahead).toFixed(1)+' kn available'+(s.depth>14&&s.engine==='diesel'?' · Rise to 14 m or select electric.':'');
+ engineHint=drone?'Sub holds its own helm orders.':powerStatus+' · '+(s.silent?Math.min(3,plant.ahead):plant.ahead).toFixed(1)+' kn available'+(s.depth>14&&s.engine==='diesel'?' · Rise to 14 m or select electric.':'');
+ {const able=enabled=>canIssue(s,context())&&enabled();
+  propulsionPanel.ports.propulsionReading.send({engine:s.engine,silent:s.silent,dieselMode:s.dieselMode,modes:dieselModeOptions,routing:s.engine==='diesel'&&!drone,hint:engineHint,
+   electricEnabled:able(propulsionOrders.engine.enabled),dieselEnabled:able(propulsionOrders.engine.enabled),silentEnabled:able(propulsionOrders.silent.enabled),routingEnabled:able(propulsionOrders.dieselMode.enabled)});}
  const active=feedActive(s,view),tower=view==='tower',gun=view==='gun',absLook=drone?s.drone.heading:gun?wrapHeading(s.heading+s.gun.angle):tower?wrapHeading(s.heading+s.towerAngle):scopeBearing(s),optical=view==='scope'||drone||tower||gun;
  const labels={photos:['PHOTOGRAPHIC EVIDENCE',photoArchive(s).length+' ARCHIVED EXPOSURES'],gun:['DECK GUN',active?`DU EXPLOSIVE · ${s.gun.ammo} ROUNDS · ${s.gun.elevation.toFixed(1)}° ELEVATION`:'SURFACE TO MAN THE GUN'],tower:['CONNING TOWER',active?'OPEN BRIDGE · DRAG VERTICALLY TO LOOK DOWN':'SURFACE TO GO TOPSIDE'],scope:['OPTICAL OBSERVATION',active?`PERISCOPE · ${scopeWashed(s,env)?'LENS AWASH':deg(s.scopeAngle)+'° RELATIVE'} · ${(6*zoom).toFixed(0)}×`:'OPTICS OFFLINE'],sonar:['ACOUSTIC OBSERVATION',`BOW UP · DASHES: BEARING · DIAMONDS: RANGE`],chart:['NAVIGATION CHART',`NORTH UP · ${chart.zoom.toFixed(1)}× · ${chart.follow?'FOLLOWING SUB':'FREE PAN'}`],drone:['REMOTE INSPECTION',`ROV ${s.drone.mode.toUpperCase()} · BATTERY ${Math.round(s.drone.battery)}%`]};
  const scopeTab=document.querySelector('[data-view=scope]'),droneTab=document.querySelector('[data-view=drone]');scopeTab.classList.toggle('hidden',s.systems.periscope===0);droneTab.classList.toggle('damaged',s.drone.mode==='lost');droneTab.innerHTML='<span>04</span> '+(s.drone.mode==='lost'?'DRONE LOST':'DRONE');
@@ -1204,7 +1220,7 @@ function updateExtras(s,env,v){
  const ms=$('mobile-speed');ms.min=rov?-3:-4;ms.max=rov?10:17;ms.value=v.targetSpeed;ms.dataset.actual=v.speed;ms.dataset.requested=v.targetSpeed;ms.setAttribute('aria-valuetext',`Actual ${v.speed.toFixed(1)}; requested ${v.targetSpeed.toFixed(1)} knots`);$('mobile-speed-track').querySelector('.mobile-speed-rail').style.setProperty('--actual',clamp(((rov||v.speed<=0?v.speed:v.speed*17/SURFACE_KNOTS)-Number(ms.min))/(Number(ms.max)-Number(ms.min))*100,0,100)+'%');
  if(!rov)ms.setAttribute('aria-valuetext',Math.round(throttlePercent(v.targetSpeed))+'% throttle, actual '+v.speed.toFixed(1)+' knots');
  document.querySelector('[data-order=speed]').setAttribute('aria-label',rov?'Set ROV speed':'Set submarine throttle');
- $('mobile-speed-track').title=rov?'Requested ROV speed':$('engine-hint').textContent;
+ $('mobile-speed-track').title=rov?'Requested ROV speed':engineHint;
  ms.setAttribute('aria-label',rov?'Requested ROV speed':'Submarine throttle');
  ms.setAttribute('aria-orientation',rovTouch?'horizontal':'vertical');
  if(orderAxis){const cap=orderAxis[0].toUpperCase()+orderAxis.slice(1),throttle=orderAxis==='speed'&&!rov,requested=throttle?Math.round(throttlePercent(v.targetSpeed)):v['target'+cap];for(const id of ['order-number','order-slider'])if(document.activeElement!==$(id))$(id).value=requested;$('order-actual').textContent='ACTUAL '+v[orderAxis].toFixed(1)+(throttle?' kn · THROTTLE '+requested+'%':' · REQUESTED '+requested.toFixed(1));}

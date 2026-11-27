@@ -19,6 +19,8 @@ body:not(.orbiting):is([data-station=sonar],[data-station=chart],[data-station=t
 .helm-caption{height:30px}
 .helm>.speed-helm #speed-helm-presets .telegraph-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}
 .helm>.propulsion{order:1}
+/* The Elm propulsion view lays out as if its children sat directly in the group. */
+.propulsion-controls{display:contents}
 .helm>.depth-helm{order:2}
 .helm>.course-control{order:3}
 .helm>.speed-helm{order:4}
