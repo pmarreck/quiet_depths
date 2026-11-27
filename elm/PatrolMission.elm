@@ -103,6 +103,9 @@ convoyTracking =
 inclusive range, its speed is at most fastestKnots and its depth is strictly
 within depthTolerance of the rescue depth. The team assesses, transfers each
 survivor and returns over the given number of seconds while the sub holds.
+A seeded share of sites have nobody left alive; others start with
+fewestSurvivors plus a seeded count below survivorSpread. Survivors are lost
+one at a time after a seeded delay from the casualty clock.
 -}
 type alias RescueCriteria =
     { closestRange : Float
@@ -112,6 +115,14 @@ type alias RescueCriteria =
     , assessmentSeconds : Float
     , transferSeconds : Float
     , returnSeconds : Float
+    , emptySiteChance : Float
+    , fewestSurvivors : Int
+    , survivorSpread : Int
+    , casualtyClockStart : Float
+    , firstLossDelay : Float
+    , firstLossSpread : Float
+    , laterLossDelay : Float
+    , laterLossSpread : Float
     }
 
 
@@ -124,6 +135,14 @@ underseaRescue =
     , assessmentSeconds = 22
     , transferSeconds = 9
     , returnSeconds = 9
+    , emptySiteChance = 0.08
+    , fewestSurvivors = 8
+    , survivorSpread = 8
+    , casualtyClockStart = 240
+    , firstLossDelay = 145
+    , firstLossSpread = 90
+    , laterLossDelay = 105
+    , laterLossSpread = 110
     }
 
 

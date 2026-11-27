@@ -9,7 +9,7 @@ import {clamp,rad,bearing,delta,distance,separation,bottom,log} from './mechanic
 import {hash01,TIMES} from './environment.js';
 import {MISSIONS,allSunk,convoyTransportIds,evaluateObjective} from './mission-objective.js';
 import {addScan,scanRate,surveyComplete,surveyCriteria} from './wreck-survey.js';
-import {rescueCriteriaFor,stationKeeping} from './rescue-operation.js';
+import {initialSurvivors,nextLossDelay,rescueCriteriaFor,stationKeeping} from './rescue-operation.js';
 import {trackingCriteria,trackingGoal} from './convoy-tracking.js';
 import {photoCriteria,photoGoal} from './recon-photos.js';
 export {MISSIONS};
@@ -66,7 +66,8 @@ export function setupOperation(s,seed){
  if(!['undersea-rescue','surface-rescue','survey'].includes(s.mission))return;
  const surface=s.mission==='surface-rescue',survey=s.mission==='survey',x=1430+hash01(seed,801)*330,y=420+hash01(seed,802)*450;
  s.site={x,y,hull:100,depth:surface?2:bottom(x,y,s.environment.chartSeed)-5,heading:35+hash01(seed,803)*100,kind:surface?'surface':survey?'wreck':'sub',name:surface?['R/V Halcyon','M/V Solway','R/V Northstar'][Math.floor(hash01(seed,804)*3)]:survey?['SS Aster, 1912','SS Caledonia, 1906','SS Pelican, 1921'][Math.floor(hash01(seed,804)*3)]:['SS-118 Lantern','SS-142 Cormorant','SS-107 Narwhal'][Math.floor(hash01(seed,804)*3)],speed:0};
- s.operation={rescued:0,remaining:hash01(seed,811)<.08?0:8+Math.floor(hash01(seed,812)*8),dead:0,known:false,assessment:0,boarding:0,diverReturn:0,holding:false,active:false,scan:0,photoAngles:[],lastCasualty:240,completed:false,find:null};
+ const rules=rescueCriteriaFor(s.site.kind);
+ s.operation={rescued:0,remaining:initialSurvivors(hash01(seed,811),hash01(seed,812),rules),dead:0,known:false,assessment:0,boarding:0,diverReturn:0,holding:false,active:false,scan:0,photoAngles:[],lastCasualty:rules.casualtyClockStart,completed:false,find:null};
  const start={x:x-260-hash01(seed,805)*120,y:y-200-hash01(seed,806)*180},heading=bearing(start,s.site),depth=surface?0:35+Math.floor(hash01(seed,807)*20);
  Object.assign(s,{...start,depth,targetDepth:depth,heading,targetHeading:heading,speed:3,targetSpeed:3,scope:surface});
  s.home={x:start.x-250-hash01(seed,808)*150,y:start.y-350-hash01(seed,809)*180};
@@ -94,7 +95,7 @@ export function startRescue(s){
 }
 export function casualtyDeadline(s){
  const o=s.operation,seed=s.patrol.seed;
- return o.lastCasualty+(o.dead===0?145+hash01(seed,821)*90:105+hash01(seed,822+o.dead)*110);
+ return o.lastCasualty+nextLossDelay(o.dead,hash01(seed,o.dead===0?821:822+o.dead),rescueCriteria(s));
 }
 export function dronePhotograph(s){
  const d=s.drone,o=s.operation,site=s.site;

@@ -54,6 +54,14 @@ encodeObjective objective =
                 , ( "assessmentSeconds", E.float c.assessmentSeconds )
                 , ( "transferSeconds", E.float c.transferSeconds )
                 , ( "returnSeconds", E.float c.returnSeconds )
+                , ( "emptySiteChance", E.float c.emptySiteChance )
+                , ( "fewestSurvivors", E.int c.fewestSurvivors )
+                , ( "survivorSpread", E.int c.survivorSpread )
+                , ( "casualtyClockStart", E.float c.casualtyClockStart )
+                , ( "firstLossDelay", E.float c.firstLossDelay )
+                , ( "firstLossSpread", E.float c.firstLossSpread )
+                , ( "laterLossDelay", E.float c.laterLossDelay )
+                , ( "laterLossSpread", E.float c.laterLossSpread )
                 ]
 
         SurveyWreck c ->

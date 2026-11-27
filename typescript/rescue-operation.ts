@@ -10,6 +10,14 @@ export interface RescueCriteria {
   assessmentSeconds: number;
   transferSeconds: number;
   returnSeconds: number;
+  emptySiteChance: number;
+  fewestSurvivors: number;
+  survivorSpread: number;
+  casualtyClockStart: number;
+  firstLossDelay: number;
+  firstLossSpread: number;
+  laterLossDelay: number;
+  laterLossSpread: number;
 }
 
 export const underseaRescue: RescueCriteria = missions.find(m => m.id === 'undersea-rescue')!.objective;
@@ -17,6 +25,14 @@ export const surfaceRescue: RescueCriteria = missions.find(m => m.id === 'surfac
 
 // A surface casualty uses the surface rules; any other site uses the undersea rules.
 export const rescueCriteriaFor = (siteKind: string): RescueCriteria => siteKind === 'surface' ? surfaceRescue : underseaRescue;
+
+export function initialSurvivors(emptyRoll: number, countRoll: number, c: RescueCriteria): number {
+  return emptyRoll < c.emptySiteChance ? 0 : c.fewestSurvivors + Math.floor(countRoll * c.survivorSpread);
+}
+
+export function nextLossDelay(dead: number, roll: number, c: RescueCriteria): number {
+  return dead === 0 ? c.firstLossDelay + roll * c.firstLossSpread : c.laterLossDelay + roll * c.laterLossSpread;
+}
 
 export function stationKeeping(range: number, speed: number, depthError: number, c: RescueCriteria) {
   const onStation = range >= c.closestRange && range <= c.farthestRange && Math.abs(speed) <= c.fastestKnots;

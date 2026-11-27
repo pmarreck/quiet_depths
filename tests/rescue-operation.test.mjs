@@ -62,7 +62,8 @@ test('the Elm mission definitions supply the rescue criteria used by the briefin
  const {MISSIONS,objectiveState}=await import('../src/missions.js');
  const {readFile}=await import('node:fs/promises');
  const {rescueCriteriaFor,stationKeeping,surfaceRescue,underseaRescue}=await import('../src/rescue-operation.js');
- const team={assessmentSeconds:22,transferSeconds:9,returnSeconds:9,closestRange:30,fastestKnots:.6};
+ const team={assessmentSeconds:22,transferSeconds:9,returnSeconds:9,closestRange:30,fastestKnots:.6,
+  emptySiteChance:.08,fewestSurvivors:8,survivorSpread:8,casualtyClockStart:240,firstLossDelay:145,firstLossSpread:90,laterLossDelay:105,laterLossSpread:110};
  const undersea=MISSIONS.find(m=>m.id==='undersea-rescue'),surface=MISSIONS.find(m=>m.id==='surface-rescue');
  assert.deepEqual(undersea.objective,{kind:'rescue',...team,farthestRange:75,depthTolerance:5});
  assert.deepEqual(surface.objective,{kind:'rescue',...team,farthestRange:85,depthTolerance:1});
@@ -83,4 +84,32 @@ test('the Elm mission definitions supply the rescue criteria used by the briefin
  assert.deepEqual(stationKeeping(50,.5,2,{...u,farthestRange:40}),{onStation:false,holding:false});
  assert.deepEqual(stationKeeping(50,.5,2,{...u,depthTolerance:2}),{onStation:true,holding:false});
  assert.deepEqual(stationKeeping(50,.5,2,{...u,fastestKnots:.4}),{onStation:false,holding:false});
+});
+
+test('survivor counts and casualty deadlines follow the recorded seeded formulas',async()=>{
+ const {hash01}=await import('../src/environment.js');
+ const {casualtyDeadline}=await import('../src/missions.js');
+ const counts=new Set();
+ for(const mission of Object.keys(RESCUES))for(let seed=1;seed<=200;seed++){
+  const s=createGame(mission,seed),o=s.operation;
+  assert.equal(o.remaining,hash01(seed,811)<.08?0:8+Math.floor(hash01(seed,812)*8),mission+' '+seed);
+  counts.add(o.remaining);
+  assert.equal(o.lastCasualty,240);
+  for(let dead=0;dead<=3;dead++){
+   o.dead=dead;
+   assert.equal(casualtyDeadline(s),o.lastCasualty+(dead===0?145+hash01(seed,821)*90:105+hash01(seed,822+dead)*110),mission+' '+seed+' '+dead);
+  }
+ }
+ assert.ok(counts.has(0),'some sites have nobody left alive');
+ assert.deepEqual([...counts].filter(n=>n>0).sort((a,b)=>a-b),[8,9,10,11,12,13,14,15]);
+});
+
+test('survivor counts and loss timing follow whatever rescue criteria they are given',async()=>{
+ const {initialSurvivors,nextLossDelay,underseaRescue:c}=await import('../src/rescue-operation.js');
+ assert.equal(initialSurvivors(.07,.5,c),0);assert.equal(initialSurvivors(.08,0,c),8);assert.equal(initialSurvivors(.5,.999,c),15);
+ assert.equal(initialSurvivors(.15,.5,{...c,emptySiteChance:.2}),0);
+ assert.equal(initialSurvivors(.5,.5,{...c,fewestSurvivors:3,survivorSpread:4}),5);
+ assert.equal(nextLossDelay(0,0,c),145);assert.equal(nextLossDelay(0,1,c),235);
+ assert.equal(nextLossDelay(2,0,c),105);assert.equal(nextLossDelay(2,1,c),215);
+ assert.equal(nextLossDelay(0,.5,{...c,firstLossDelay:60,firstLossSpread:20}),70);
 });
