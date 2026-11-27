@@ -1,3 +1,5 @@
+import {transmitterProfiles} from './sonar-transmitters.ts';
+
 // The middle half of the recorder is a linear close-up. Beyond its two range
 // ticks the scale compresses smoothly until it reaches the full listening range.
 function strip(width:number,height:number,rows:number,near:number,range:number){
@@ -12,7 +14,7 @@ function strip(width:number,height:number,rows:number,near:number,range:number){
   return {width,height,rows,near,range,bands};
 }
 
-export const strips={survey:strip(384,112,1.75,80,1600),detail:strip(512,160,3,45,650)};
+export const strips={survey:strip(384,112,1.75,80,transmitterProfiles.survey.range),detail:strip(512,160,3,45,transmitterProfiles.detail.range)};
 
 interface Plate {x:number;z:number;width:number;height:number;cell:number;heightStep:number;data:Uint8Array}
 export type WreckPlates=Record<'wreck'|'sub'|'merchant'|'escort'|'fishing'|'carrier',Plate>;

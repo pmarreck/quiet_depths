@@ -82,3 +82,34 @@ test('Elm reads difficulty settings as leniently as the TypeScript, with the sam
   // Ports carry no undefined; null stands for it, and the TypeScript treats both as no settings.
   assert.deepEqual(await elm('difficulty.patrolDifficulty', inputs.map(v => [v ?? null])), inputs.map(v => patrolDifficulty(v)));
 });
+
+test('the Elm sonar transmitters validate, announce and aim exactly as the TypeScript does', async () => {
+  const sonar = await import('../src/sonar-transmitters.js'), random = seeded(16);
+  const states = [], profiles = [null, 'survey', 'detail'];
+  for (const scribbler of profiles) for (const painter of profiles) states.push({scribbler, painter});
+  const odd = [null, undefined, 0, 'survey', [], {}, {scribbler: null}, {painter: null}, {scribbler: 'deep', painter: null}, {scribbler: null, painter: 'Survey'},
+    {scribbler: null, painter: null, extra: 1}, {scribbler: 1, painter: null}];
+  const valid = [...states, ...odd].map(t => [t ?? null]);
+  assert.deepEqual(await elm('sonarTransmitters.validTransmitters', valid), valid.map(([t]) => sonar.validTransmitters(t)));
+  const notices = states.flatMap(t => [[t, true], [t, false]]);
+  assert.deepEqual(await elm('sonarTransmitters.transmissionNotice', notices), notices.map(([t, online]) => sonar.transmissionNotice(t, online)));
+  assert.deepEqual((await elm('sonarTransmitters.transmitterProfiles'))[0], sonar.transmitterProfiles);
+  // Heading 0 puts along on y and across on x, so each beam edge can be hit exactly.
+  const level = {x: 0, y: 0, depth: 0, heading: 0}, scans = [];
+  for (const [x, y, depth] of [[0, 1600, 0], [0, 1600.001, 0], [12, 10, 0], [11.99, 10, 0], [0, 20, 13], [0, 20, 12.99], [0, 0, 5], [0, -1, 0],
+    [200, 20, 0], [200, 19.99, 0], [5, 14, 0], [5, 13.99, 0], [5, 3, -0.01], [5, 3, 0], [5, 3, undefined]])
+    for (const mode of ['painter', 'scribbler']) scans.push([level, depth === undefined ? {x, y} : {x, y, depth}, mode, 1600]);
+  // A surface object has no depth and counts as depth 0, just above an eye half a meter down.
+  for (const mode of ['painter', 'scribbler']) scans.push([{...level, depth: 0.5}, {x: 5, y: 3}, mode, 1600], [{...level, depth: -0.5}, {x: 5, y: 3}, mode, 1600]);
+  // Directly abeam and astern, where the Painter's cone must not reach.
+  for (const [x, y] of [[0.001, 0], [-3, -0.001], [0, -5]]) scans.push([level, {x, y, depth: 0}, 'painter', 1600]);
+  for (let i = 0; i < 4000; i++) {
+    const eye = {x: (random() - .5) * 400, y: (random() - .5) * 400, depth: random() * 300, heading: random() * 360};
+    const object = {x: eye.x + (random() - .5) * 3000, y: eye.y + (random() - .5) * 3000};
+    if (random() < .9) object.depth = random() * 400;
+    scans.push([eye, object, random() < .5 ? 'painter' : 'scribbler', random() < .5 ? 1600 : 650]);
+  }
+  const expected = scans.map(([eye, object, mode, range]) => sonar.scanSector(eye, object, mode, range));
+  assert.ok(expected.filter(Boolean).length > 100 && expected.filter(x => !x).length > 100, 'the corpus lands both inside and outside the beams');
+  assert.deepEqual(await elm('sonarTransmitters.scanSector', scans), expected);
+});

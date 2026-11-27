@@ -10,6 +10,7 @@ import Sim.Equipment as Equipment
 import Sim.HullDesign as HullDesign
 import Sim.Math as SimMath
 import Sim.SeabedRest as SeabedRest
+import Sim.SonarTransmitters as Sonar
 import Sim.TorpedoTubes as TorpedoTubes
 import Sim.WatchWarnings as WatchWarnings
 import SimHarness.Codec exposing (arg, call1, call2, call3, call5, maybe, point)
@@ -162,6 +163,24 @@ sectionName s =
 function : String -> Maybe (D.Decoder E.Value)
 function name =
     case name of
+        "sonarTransmitters.validTransmitters" ->
+            Just (D.map (\v -> E.bool (D.decodeValue Sonar.decoder v |> Result.map (\_ -> True) |> Result.withDefault False)) (arg 0 D.value))
+
+        "sonarTransmitters.transmissionNotice" ->
+            Just (call2 Sonar.decoder D.bool E.string Sonar.notice)
+
+        "sonarTransmitters.transmitterProfiles" ->
+            Just (D.succeed (E.object (List.map (\( key, p ) -> ( key, E.object [ ( "range", E.float (Sonar.range p) ), ( "exposure", E.float (Sonar.exposure p) ) ] )) [ ( "survey", Sonar.Survey ), ( "detail", Sonar.Detail ) ])))
+
+        "sonarTransmitters.scanSector" ->
+            Just
+                (D.map4 (\eye object mode reach -> E.bool (Sonar.scanSector eye object mode reach))
+                    (arg 0 (D.map4 (\x y depth heading -> { x = x, y = y, depth = depth, heading = heading }) (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float) (D.field "heading" D.float)))
+                    (arg 1 (D.map3 (\x y depth -> { x = x, y = y, depth = depth }) (D.field "x" D.float) (D.field "y" D.float) (D.maybe (D.field "depth" D.float))))
+                    (arg 2 (D.string |> D.andThen (\m -> if m == "painter" then D.succeed Sonar.Painter else if m == "scribbler" then D.succeed Sonar.Scribbler else D.fail m)))
+                    (arg 3 D.float)
+                )
+
         "difficulty.patrolDifficulty" ->
             Just (D.map (Difficulty.decode >> Difficulty.encode) (arg 0 D.value))
 

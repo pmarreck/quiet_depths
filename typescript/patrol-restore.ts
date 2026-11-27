@@ -1,6 +1,6 @@
 import {captainName} from './captain.ts';
 import {earlyEndRule} from './early-end.ts';
-import {freshTransmitters, validTransmitters} from './sonar-imager.ts';
+import {freshTransmitters, validTransmitters} from './sonar-transmitters.ts';
 import {watchWarnings, validWarnings} from './watch-warnings.ts';
 import {sailingDay} from './patrol-calendar.ts';
 import {resumeTraffic, validTraffic} from './cold-watch.ts';

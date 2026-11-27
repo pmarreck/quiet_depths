@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync, readdirSync} from 'node:fs';
 import * as shared from '../src/sim-math.js';
 import {elm, seeded} from './sim-harness.mjs';
+import {simulationModules} from './sim-modules.mjs';
 
 // The Elm simulation's arithmetic must equal JavaScript's to the last bit,
 // signed zeros and NaN included, so its results can match the TypeScript.
@@ -45,17 +46,20 @@ test('Elm exp, expm1, tanh and cbrt equal the TypeScript simulation’s shared v
 // A simulation module that called the built-ins directly would drift from the
 // Elm port, so every module the simulation reaches must use the shared ones.
 test('the simulation reaches exp, expm1, tanh and cbrt only through the shared module', () => {
-  const source = name => readFileSync(new URL(`../typescript/${name}.ts`, import.meta.url), 'utf8');
-  const seen = new Set(), pending = ['sim'];
-  while (pending.length) {
-    const name = pending.pop();
-    if (seen.has(name)) continue;
-    seen.add(name);
-    for (const [, next] of source(name).matchAll(/^(?:import|export) (?!type)[^;]*from '\.\/([a-z0-9-]+)\.ts'/gm)) pending.push(next);
-  }
-  assert.ok(seen.has('coast') && seen.has('systems') && seen.size > 50, 'the walk reaches the whole simulation');
-  const direct = [...seen].filter(name => name !== 'sim-math' && /Math\.(exp|expm1|tanh|cbrt)\(/.test(source(name)));
+  const modules = simulationModules();
+  assert.ok(modules.has('coast') && modules.has('systems') && modules.size > 50, 'the walk reaches the whole simulation');
+  const direct = [...modules].filter(([name, code]) => name !== 'sim-math' && /Math\.(exp|expm1|tanh|cbrt)\(/.test(code)).map(([name]) => name);
   assert.deepEqual(direct, []);
+});
+
+// Whatever moves to Elm must be pure simulation. Display and browser code
+// stays in the page, so no module the simulation reaches may touch them.
+test('the simulation reaches no Three.js, DOM, canvas or browser storage code', () => {
+  const modules = simulationModules();
+  assert.ok(modules.has('sonar-transmitters') && !modules.has('sonar-imager'), 'the imager display stays outside the simulation');
+  const display = [...modules].flatMap(([name, code]) =>
+    [...code.matchAll(/vendor\/three|\bdocument\.|\bwindow\.|CanvasRenderingContext2D|getContext\(|requestAnimationFrame|localStorage|\bnavigator\./g)].map(m => name + ': ' + m[0]));
+  assert.deepEqual(display, []);
 });
 
 test('Elm max, min, abs, sign and clamp follow JavaScript for NaN and signed zeros', async () => {

@@ -1,4 +1,4 @@
-import {profiles,scanSector,type Instrument,type Profile} from './sonar-imager.ts';
+import {transmitterProfiles,scanSector,type Instrument,type Profile} from './sonar-transmitters.ts';
 import {hash01} from './surface-motion.ts';
 
 type Point={x:number;y:number};
@@ -21,7 +21,7 @@ export function leaveClue(s:Patrol,v:Watch,amount:number,observed:Point & {time:
   v.alert=Math.min(100,v.alert+amount);
 }
 export function imagerClue(s:Patrol,v:Watch,mode:Instrument,profile:Profile,beat:number){
-  const p=profiles[profile];
+  const p=transmitterProfiles[profile];
   if(Math.hypot(v.x-s.x,v.y-s.y)>p.range*1.5)return;
   const direct=scanSector(s,v,mode,p.range);
   const risk=p.exposure*(direct?1:.16)*s.difficulty.pingDetection*s.difficulty.detection;

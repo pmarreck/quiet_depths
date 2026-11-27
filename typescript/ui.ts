@@ -1,4 +1,4 @@
-import {transmissionNotice} from './sonar-imager.ts';
+import {transmissionNotice} from './sonar-transmitters.ts';
 import {operatingFraction} from './equipment.ts';
 import {bottomCall, batteryCall} from './watch-warnings.ts';
 import {suspicionLabel} from './suspicion.ts';

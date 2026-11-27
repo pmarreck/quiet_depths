@@ -22,7 +22,7 @@ import type {activeVolleys} from './fleet-action.ts';
 import type {photoArchive} from './photos.ts';
 import type {scopeWashed} from './environment.ts';
 import type {hearWreck} from './patrol-reports.ts';
-import type {Transmitters} from './sonar-imager.ts';
+import type {Transmitters} from './sonar-transmitters.ts';
 import type {WatchWarnings} from './watch-warnings.ts';
 import type {fleetTheater} from './fleet-action.ts';
 

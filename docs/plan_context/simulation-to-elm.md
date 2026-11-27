@@ -102,3 +102,26 @@ NFC, which Elm's String cannot do. The page normalizes a captain's name before
 the patrol sees it, and the Elm save decoder will accept the stored name as
 already normalized, which the TypeScript validation guarantees for every save
 written so far.
+
+## Simulation boundary (2026-11-27)
+
+The L0 list above came from an import walk that passed through the save
+validator and one mixed module, so it counted page code as simulation:
+
+- `sonar-imager` held both transmitter state, which the enemy's suspicion and
+  the save read, and the recorder paper display. The simulation half is now
+  `sonar-transmitters`, ported as `Sim.SonarTransmitters`; the paper display
+  and `sonar-strip` stay in TypeScript with the renderers.
+- `photos` is the archive of rendered images. The simulation never reads it
+  (objectives count `s.photos`, which holds ship IDs); the page records
+  captures and stores the archive under its own key. It stays in TypeScript,
+  and the page will hold the archive beside the Elm model, so megabytes of
+  image data never cross the ports each frame.
+- `captain` stays in TypeScript for the reason above.
+
+Both reach the simulation only through `patrol-restore`. When save decoding
+moves to Elm, the page will split the archive and captain name off a save,
+validate them with the TypeScript, and hand Elm the rest.
+
+A test fails the build if any module the simulation reaches uses Three.js,
+the DOM, a canvas, browser storage or `navigator`.

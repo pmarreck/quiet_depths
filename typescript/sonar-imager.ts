@@ -2,39 +2,21 @@ import {DAY_SECONDS} from './patrol-calendar.ts';
 import {chartDepth,shelfOutcrops} from './coast.ts';
 import {hash01} from './surface-motion.ts';
 import {strips,printWreck,type WreckPlates,type WreckEcho} from './sonar-strip.ts';
+import {instruments,transmitterProfiles,type Instrument,type Profile} from './sonar-transmitters.ts';
 
-export type Instrument = 'scribbler' | 'painter';
-export type Profile = 'survey' | 'detail';
-export const instruments:readonly Instrument[]=['scribbler','painter'];
-export type Transmitters=Record<Instrument,Profile|null>;
-export const freshTransmitters=():Transmitters=>({scribbler:null,painter:null});
-export function validTransmitters(t:Transmitters){
-  return !!t&&instruments.every(mode=>t[mode]===null||t[mode]==='survey'||t[mode]==='detail');
-}
-export function transmissionNotice(t:Transmitters,online:boolean){
-  const names=instruments.filter(mode=>t[mode]).map(mode=>mode==='scribbler'?'Scribbler':'Painter');
-  return names.length?names.join(' + ')+(online?' transmitting · Increased detection risk':' armed · Sonar offline'):'';
-}
+// The recorder paper and its display. Which instruments transmit, and what
+// they reach, is simulation state in sonar-transmitters.ts.
 const shipMinute=DAY_SECONDS/(24*60);
-// Fictional instrument presets. These control the recorder and encounter rolls.
+// Painter recorder presets; the Scribbler uses its strip layout.
 export const profiles = {
-  survey: {range:strips.survey.range, width:80, height:44, rows:5, exposure:.24},
-  detail: {range:strips.detail.range, width:132, height:64, rows:12, exposure:.56},
+  survey: {range:transmitterProfiles.survey.range, width:80, height:44, rows:5},
+  detail: {range:transmitterProfiles.detail.range, width:132, height:64, rows:12},
 } as const;
 type Pose = {x:number; y:number; depth:number; heading:number};
 type Echo = {x:number; y:number; depth?:number; sinkDepth?:number; heading:number; kind:string; hull:number;settled?:boolean};
 type World = Pose & {time:number; speed?:number; patrol:{seed:number}; environment:{chartSeed?:number}; ships:Echo[]; site?:Echo|null};
 const radians = Math.PI/180;
 const clamp = (n:number,lo:number,hi:number) => Math.min(hi,Math.max(lo,n));
-
-export function scanSector(eye:Pose, object:{x:number;y:number;depth?:number}, mode:Instrument, range:number) {
-  const dx=object.x-eye.x, dy=object.y-eye.y, a=eye.heading*radians;
-  const along=dx*Math.sin(a)+dy*Math.cos(a), across=dx*Math.cos(a)-dy*Math.sin(a);
-  const dz=(object.depth??0)-eye.depth;
-  if(Math.hypot(dx,dy,dz)>range)return false;
-  return mode==='painter' ? along>0 && Math.abs(across)<along*1.2 && Math.abs(dz)<along*.65 :
-    dz>=0 && Math.abs(along)<Math.max(14,Math.abs(across)*.10);
-}
 
 const rockCache=new WeakMap<Echo,{key:number;rocks:ReturnType<typeof acousticRocks>}>();
 function acousticRocks(site:Echo,seed:number,chartSeed?:number){

@@ -27,7 +27,7 @@ import {advanceApproach, approachProgress} from './patrol-search.ts';
 import {addDebrief} from './debrief.ts';
 import {updateWatchWarnings} from './patrol-create.ts';
 import {contact, dropDepthCharge, isVisible, recordLampContact} from './patrol-contacts.ts';
-import type {Instrument, Profile} from './sonar-imager.ts';
+import type {Instrument, Profile} from './sonar-transmitters.ts';
 import {slice} from './world-slice.ts';
 import type {Ship, World} from './patrol-world.ts';
 

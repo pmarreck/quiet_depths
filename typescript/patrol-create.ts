@@ -1,5 +1,5 @@
 import {watchWarnings, bottomCall, batteryCall} from './watch-warnings.ts';
-import {freshTransmitters} from './sonar-imager.ts';
+import {freshTransmitters} from './sonar-transmitters.ts';
 import {freshTraffic} from './cold-watch.ts';
 import {fullCondition, BOAT_PARTS, DRONE_PARTS} from './equipment.ts';
 import {makeEnvironment, hash01, soundings} from './environment.ts';
