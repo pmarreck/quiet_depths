@@ -239,3 +239,10 @@ even 20x compression runs about two ticks per 60 Hz frame. At the worst
 ratio measured, a tick would still fit the 2 ms budget several times over.
 The checkpoint should repeat this with busy battle ticks and a committed
 benchmark.
+
+The acoustics gap was mostly the port's own design. A literal translation
+made five passes, each allocating; one pass from the newest sound back took
+the update from 5.0 to 2.6 µs, and returning the list untouched when nothing
+is due or stale took it to 1.6 µs, 2.3 times the TypeScript (and that figure
+includes the benchmark's own list-length passes). Ported code should be
+written for Elm's data structures, not transliterated.

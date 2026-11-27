@@ -272,43 +272,64 @@ type alias Heard a =
 
 {-| Marks each sound that has reached the listener by `now`, then keeps the
 last two minutes of history, at most 96 sounds, so a resumed patrol does not
-replay old sounds.
+replay old sounds. Most ticks nothing is due and nothing is stale, and the
+list comes back untouched after one check. Otherwise one pass from the newest
+sound back keeps the newest 96 recent sounds and gathers the events in the
+order they occur.
 -}
 update : Float -> Listener -> List (Heard a) -> ( List (Heard a), List (Event a) )
 update now listener sounds =
     let
-        listen source ( kept, events ) =
-            if source.heard || now - source.time < propagationTime source listener then
-                ( source :: kept, events )
+        listen source ( kept, count, events ) =
+            let
+                ( sound, arrived ) =
+                    if source.heard || now - source.time < propagationTime source listener then
+                        ( source, events )
+
+                    else
+                        let
+                            perceived =
+                                perceivedSound source listener
+
+                            heard =
+                                { source | heard = True, heardAt = Just now, perceived = Just perceived }
+
+                            blast =
+                                if source.kind == Blast then
+                                    BlastAt heard perceived.distance :: events
+
+                                else
+                                    events
+                        in
+                        ( heard
+                        , if perceived.gain >= 0.002 then
+                            Received heard :: blast
+
+                          else
+                            blast
+                        )
+            in
+            if count < 96 && now - sound.time < 120 then
+                ( sound :: kept, count + 1, arrived )
 
             else
-                let
-                    perceived =
-                        perceivedSound source listener
+                ( kept, count, arrived )
 
-                    heard =
-                        { source | heard = True, heardAt = Just now, perceived = Just perceived }
+        settled count list =
+            case list of
+                [] ->
+                    count <= 96
 
-                    received =
-                        if perceived.gain >= 0.002 then
-                            [ Received heard ]
-
-                        else
-                            []
-
-                    blast =
-                        if source.kind == Blast then
-                            [ BlastAt heard perceived.distance ]
-
-                        else
-                            []
-                in
-                ( heard :: kept, List.reverse (received ++ blast) ++ events )
-
-        ( reversed, reversedEvents ) =
-            List.foldl listen ( [], [] ) sounds
-
-        recent =
-            List.filter (\sound -> now - sound.time < 120) (List.reverse reversed)
+                source :: rest ->
+                    source.heard && now - source.time < 120 && settled (count + 1) rest
     in
-    ( List.drop (List.length recent - 96) recent, List.reverse reversedEvents )
+    if settled 0 sounds then
+        ( sounds, [] )
+
+    else
+        let
+            ( recent, _, happened ) =
+                List.foldr listen ( [], 0, [] ) sounds
+        in
+        ( recent, happened )
+

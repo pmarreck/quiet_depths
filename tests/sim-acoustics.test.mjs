@@ -54,6 +54,10 @@ test('the Elm acoustics hear, record and forget sounds in the TypeScript order',
   // of exactly 0.002, one just under it, and sounds exactly 120 s old.
   const here = {x: 10, y: 20, depth: 30, heading: 0}, at = (id, time, power) => ({id, time, type: 'sweep', x: 10, y: 20, depth: 30, power, heard: false});
   cases.push([250, here, [at(1, 250, .002), at(2, 250, .0019999), at(3, 130, 1), at(4, 130.0000001, 1), {...at(5, 130, 1), heard: true, heardAt: 131}]]);
+  // Ticks where every sound is heard: settled at 96, one too many, and one sound
+  // exactly 120 s old, each against the full update's result.
+  const settled = count => Array.from({length: count}, (_, j) => ({...at(j + 1, 200 + j * .1, 1), heard: true, heardAt: 201}));
+  cases.push([250, here, settled(96)], [250, here, settled(97)], [250, here, [...settled(40), {...at(41, 130, 1), heard: true, heardAt: 131}]], [250, here, []]);
   const expected = cases.map(([now, l, sounds]) => {
     const s = {...l, time: now, soundSequence: 0, acoustics: structuredClone(sounds)}, events = [];
     ts.updateAcoustics(s, (source, distance) => events.push(['blast', source.id, distance]), source => events.push(['received', source.id]));
