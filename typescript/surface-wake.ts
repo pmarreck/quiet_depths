@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/SurfaceWake.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {scopeEyeHeight,scopeExtension} from './periscope.ts';
 import {boatPoint,surfaceHeight,surfaceMotion} from './surface-motion.ts';
 import {SUB_DESIGN as D} from './hull-design.ts';

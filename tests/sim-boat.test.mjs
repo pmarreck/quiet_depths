@@ -107,3 +107,51 @@ test('the Elm ROV nose, camera pitch and tether point match the TypeScript', asy
   for (let i = 0; i < 300; i++) changes.push([{nosePitch: random() < .3 ? null : (random() - .5) * 120, verticalSpeed: (random() - .5) * 3, targetDepth: random() * 100, depth: random() * 100}, (random() - .5) * 40, random() < .5]);
   assert.deepEqual(await elm('rovFlight.changeNosePitch', changes), changes.map(([d, degrees, inverted]) => {const c = {...d}; rov.changeNosePitch(c, degrees, inverted); return c;}));
 });
+
+test('the Elm wake finds the same surface crossings and keeps the same trail as the TypeScript', async () => {
+  const wake = await import('../src/surface-wake.js'), {createGame, step} = await import('../src/sim.js'), {environmentAt} = await import('../src/environment.js'), random = seeded(65);
+  assert.equal((await elm('surfaceWake.wakeLifetime'))[0], wake.wakeLifetime);
+  const sea = () => {
+    const s = {waveScale: random() * 2.5, waveSpeed: .4 + random() * 1.2};
+    if (random() < .5) s.wavePhase = random() * 900;
+    return s;
+  };
+  const boat = () => {
+    const b = {x: (random() - .5) * 6000, y: (random() - .5) * 6000, heading: random() * 360, depth: random() * 27 - 2, pitch: (random() - .5) * .4,
+      speed: (random() < .5 ? -1 : 1) * random() * 14, scope: random() < .4, systems: {periscope: [0, -0, NaN, 60, 100][Math.floor(random() * 5)]}, time: random() * 900};
+    if (random() < .3) b.scopeTravel = random();
+    return b;
+  };
+  const crossings = Array.from({length: 4000}, () => [boat(), sea()]);
+  // The depth and speed limits, ahead and astern.
+  for (const depth of [22.999, 23, 23.001]) for (const speed of [.0999, .1, -.1, 6]) crossings.push([{...boat(), depth, speed}, {waveScale: 0, waveSpeed: 1}]);
+  for (const depth of [0, 2, 5, 9, 12]) for (const pitch of [-.3, 0, .3]) crossings.push([{...boat(), depth, pitch, speed: 8, scope: true, systems: {periscope: 100}}, {waveScale: 0, waveSpeed: 1}]);
+  // Exact edges: a steeply pitched hull at exactly 23 m still breaks the
+  // surface; exactly 0.1 knot at the surface still leaves a wake; and at 15 m,
+  // where the sea's response is exactly zero, a flat sea puts the snorkel top
+  // at -0 clearance, which leads the crossing when backing down with the scope up.
+  const flat = {waveScale: 0, waveSpeed: 1}, still = {x: 0, y: 0, heading: 0, scope: false, systems: {periscope: 100}, time: 0};
+  for (const depth of [22.999, 23, 23.001]) crossings.push([{...still, depth, pitch: .78, speed: 6}, flat]);
+  for (const speed of [.0999, .1, -.1]) crossings.push([{...still, depth: 0, pitch: 0, speed}, flat]);
+  crossings.push([{...still, depth: 15, pitch: 0, speed: -5, scope: true}, flat], [{...still, depth: 15, pitch: 0, speed: 5, scope: true}, flat]);
+  const expected = crossings.map(([b, s]) => wake.surfaceCrossing(b, s) ?? null);
+  assert.ok(expected.filter(Boolean).length > 500 && expected.filter(e => !e).length > 500, 'the corpus finds and misses crossings');
+  assert.deepEqual(await elm('surfaceWake.surfaceCrossing', crossings), expected);
+  // A surfaced patrol recorded tick by tick, compared at every step.
+  const s = createGame('recon', 9);
+  Object.assign(s, {depth: 0, targetDepth: 0, speed: 9, targetSpeed: 17, engine: 'diesel', dieselMode: 'drive', ships: []});
+  const steps = [];
+  for (let i = 0; i < 400; i++) {
+    step(s, .25);
+    if (i % 7 === 0) s.targetHeading = (s.targetHeading + 40) % 360;
+    if (i === 200) {s.targetDepth = 30;}
+    const before = {...structuredClone({x: s.x, y: s.y, heading: s.heading, depth: s.depth, pitch: s.pitch, speed: s.speed, scope: s.scope, systems: {periscope: s.systems.periscope}, time: s.time + [0, .5, 1, 1.5, 27][i % 5], wake: s.wake}), ...(s.scopeTravel === undefined ? {} : {scopeTravel: s.scopeTravel})};
+    const {waveScale, waveSpeed, wavePhase, sampledAt} = environmentAt(s), sea = {waveScale, waveSpeed};
+    if (wavePhase !== undefined) sea.wavePhase = wavePhase;
+    if (sampledAt !== undefined) sea.sampledAt = sampledAt;
+    steps.push([before, sea]);
+  }
+  const trails = steps.map(([b, e]) => {const c = structuredClone(b); wake.recordWake(c, e); return c.wake;});
+  assert.ok(trails.some(t => t.length > 20) && trails.some((t, i) => i > 0 && t.length < trails[i - 1].length), 'the trail grows and ages');
+  assert.deepEqual(await elm('surfaceWake.recordWake', steps), trails);
+});

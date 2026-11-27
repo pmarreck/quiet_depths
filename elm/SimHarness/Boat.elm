@@ -7,6 +7,7 @@ import Json.Encode as E
 import Sim.PowerPlant as Plant
 import Sim.RovFlight as Rov
 import Sim.SurfaceMotion as Motion
+import Sim.SurfaceWake as Wake
 import SimHarness.Codec exposing (andMap, arg, call1, call2, call3)
 
 
@@ -141,6 +142,35 @@ point =
     D.map3 Motion.Point (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float)
 
 
+type alias WakeBoat =
+    { x : Float, y : Float, heading : Float, depth : Float, pitch : Float, speed : Float, scope : Bool, scopeTravel : Maybe Float, systems : { periscope : Float }, time : Float }
+
+
+wakeBoat : D.Decoder WakeBoat
+wakeBoat =
+    D.succeed WakeBoat
+        |> andMap (D.field "x" D.float)
+        |> andMap (D.field "y" D.float)
+        |> andMap (D.field "heading" D.float)
+        |> andMap (D.field "depth" D.float)
+        |> andMap (D.field "pitch" D.float)
+        |> andMap (D.field "speed" D.float)
+        |> andMap (D.field "scope" D.bool)
+        |> andMap (D.maybe (D.field "scopeTravel" D.float))
+        |> andMap (D.field "systems" (D.map (\p -> { periscope = p }) (D.field "periscope" D.float)))
+        |> andMap (D.field "time" D.float)
+
+
+wakeSample : D.Decoder Wake.WakeSample
+wakeSample =
+    D.map6 Wake.WakeSample (D.field "x" D.float) (D.field "y" D.float) (D.field "heading" D.float) (D.field "time" D.float) (D.field "width" D.float) (D.field "strength" D.float)
+
+
+encodeWakeSample : Wake.WakeSample -> E.Value
+encodeWakeSample w =
+    E.object [ ( "x", E.float w.x ), ( "y", E.float w.y ), ( "time", E.float w.time ), ( "heading", E.float w.heading ), ( "width", E.float w.width ), ( "strength", E.float w.strength ) ]
+
+
 {-| The functions this module answers for, by the TypeScript name each replaces. -}
 function : String -> Maybe (D.Decoder E.Value)
 function name =
@@ -205,6 +235,15 @@ function name =
 
         "rovFlight.constants" ->
             Just (D.succeed (E.object [ ( "maxNosePitch", E.float Rov.maxNosePitch ), ( "cableGland", E.object [ ( "side", E.float Rov.cableGland.side ), ( "down", E.float Rov.cableGland.down ), ( "forward", E.float Rov.cableGland.forward ) ] ) ]))
+
+        "surfaceWake.wakeLifetime" ->
+            Just (D.succeed (E.float Wake.wakeLifetime))
+
+        "surfaceWake.surfaceCrossing" ->
+            Just (call2 wakeBoat sea (\w -> Maybe.map encodeWakeSample w |> Maybe.withDefault E.null) Wake.surfaceCrossing)
+
+        "surfaceWake.recordWake" ->
+            Just (D.map3 (\b s wake -> E.list encodeWakeSample (Wake.recordWake b s wake)) (arg 0 wakeBoat) (arg 1 sea) (arg 0 (D.field "wake" (D.list wakeSample))))
 
         "powerPlant.constants" ->
             Just (D.succeed (E.object [ ( "SURFACE_KNOTS", E.float Plant.surfaceKnots ), ( "ELECTRIC_KNOTS", E.float Plant.electricKnots ) ]))
