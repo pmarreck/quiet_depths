@@ -4,12 +4,12 @@ Completed work and QA evidence are in the [plan log](docs/PLAN_LOG.md).
 
 ## Playtest fixes (owner feedback 2026-11-27)
 
-- [x] Restore the boat panel’s status dot, lost since the hull-collision update, now drawn in the status color (green, gold or red), confirmed at 4 × 4 px in Chromium for nominal, flooding, outer-hull and fuel-fire patrols (done 2026-11-27 09:08 EST).
+- [x] Restore the boat panel’s status dot, lost since the hull-collision update, now drawn in the status color (green, gold or red), confirmed at 4 × 4 px in Chromium for nominal, flooding, outer-hull and fuel-fire patrols (done 2026-11-27 09:08 EST; commit 7b2dccf).
+- [x] Color the boat status line and dot by severity, owner rule “red for bad news”: red for fuel fire, fuel leak, flooding and pressure hull damage; gold for outer hull and subsystem damage; damage control takes the color of the worst fault it is working on; confirmed for 11 fault patrols in Chromium (done 2026-11-27 09:20 EST).
 - [ ] Ask “End mission?” on entering extraction surfaced before the objective is complete, scoring per-mission partial credit after owner review of the draft rules (context: docs/plan_context/owner-feedback-2026-11-27.md).
 
 ## Elm migration
 
-- [x] Build the Elm panels' per-frame readings in a typed TypeScript module with behavioral Node tests (mutation-checked), shrinking app.js, with all five panel comparisons unchanged in Chromium (done 2026-11-27 05:12 EST; commit 960aa9f).
 - [x] Stage: render the drone bay panel from Elm, which owns the lost, stowed and outside advice, matching the previous build on nine resumed drone states and the briefing placeholder in Chromium (done 2026-11-27 05:16 EST; commit 7b0c272).
 - [x] Stage: render the station strip and helm caption from Elm, which owns the station status and helm owner, matching the previous build on eleven resumed patrols (all five statuses, all four helm captions) and the briefing placeholder in Chromium (done 2026-11-27 05:20 EST; commit ff91df9).
 - [x] Stage: render the captain's log from Elm as a keyed list, matching the previous build's entries, count and scrolling (at the top and scrolled) in Chromium; the control-lookup test now also accepts Elm-rendered ids and rejects ids defined in both (done 2026-11-27 05:25 EST; commit 9ba27f1).

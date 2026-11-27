@@ -118,19 +118,70 @@ statusText r s =
             "ALL SYSTEMS NOMINAL"
 
 
-{-| The color follows the water and the outer hull, not the named fault: a fuel
-fire with a sound hull reads green, as it always has.
+type Severity
+    = Alarm
+    | Caution
+    | Clear
+
+
+{-| Bad news reads red: fire, leaking fuel, water coming in or a damaged
+pressure hull. Damage that does not threaten the boat reads gold. While damage
+control works, the line takes the color of the worst fault it is working on,
+and gold once only the work itself remains.
 -}
+severity : Reading -> Status -> Severity
+severity r s =
+    case s of
+        FuelFire ->
+            Alarm
+
+        FuelLeak ->
+            Alarm
+
+        Flooding ->
+            Alarm
+
+        PressureHullDamaged ->
+            Alarm
+
+        OuterHullDamaged ->
+            Caution
+
+        SubsystemDamage ->
+            Caution
+
+        Nominal ->
+            Clear
+
+        Repairing ->
+            let
+                underlying =
+                    { r | repair = 0 }
+            in
+            case severity underlying (status underlying) of
+                Clear ->
+                    Caution
+
+                worst ->
+                    worst
+
+
+severityColor : Severity -> String
+severityColor s =
+    case s of
+        Alarm ->
+            "var(--red)"
+
+        Caution ->
+            "var(--gold)"
+
+        Clear ->
+            "var(--green)"
+
+
 statusColor : Reading -> String
 statusColor r =
-    if r.flood > 0 then
-        "var(--red)"
-
-    else if r.outerHull < 99.9 then
-        "var(--gold)"
-
-    else
-        "var(--green)"
+    severityColor (severity r (status r))
 
 
 buoyancy : Reading -> String
