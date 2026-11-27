@@ -13,6 +13,7 @@ import Platform
 import Sim.Debrief as Debrief
 import Sim.Equipment as Equipment
 import Sim.HullDesign as HullDesign
+import Sim.Math as SimMath
 import Sim.SeabedRest as SeabedRest
 import Sim.TorpedoTubes as TorpedoTubes
 import Sim.WatchWarnings as WatchWarnings
@@ -236,6 +237,15 @@ function name =
 
         "equipment.hitSystem" ->
             Just (call2 (D.nullable section) D.float (Equipment.systemKey >> E.string) Equipment.hitSystem)
+
+        "math.hypot2" ->
+            Just (call2 D.float D.float E.float SimMath.hypot2)
+
+        "math.hypot3" ->
+            Just (call3 D.float D.float D.float E.float SimMath.hypot3)
+
+        "math.remainder" ->
+            Just (call2 D.float D.float E.float SimMath.remainder)
 
         "watchWarnings.warnings" ->
             Just (call3 D.float D.float (D.nullable warnings) encodeWarnings WatchWarnings.warnings)
