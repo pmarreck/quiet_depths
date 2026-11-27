@@ -5,7 +5,7 @@ import {elm, seeded} from './sim-harness.mjs';
 
 // Every input is compared with the TypeScript it replaces. The edge values
 // sit on each rule's boundaries; the random ones cover the space between.
-const edges = [-5, 0, 0.001, 19.999, 20, 20.001, 50, 99.999, 100, 120];
+const edges = [-5, -0, 0, 0.001, 19.999, 20, 20.001, 50, 99.999, 100, 120, NaN];
 
 test('the Elm equipment list, names and compartments are the TypeScript ones, in order', async () => {
   const [systems] = await elm('equipment.systems');

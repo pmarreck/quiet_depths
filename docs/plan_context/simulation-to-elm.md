@@ -18,13 +18,7 @@ dt, input)`, then the scene, audio and interface read the same object. After
 the switch, Elm will own the patrol, take the frame's inputs through a port
 and send back a snapshot for the renderer, audio and storage.
 
-**Floating point will not always match to the last bit.** Elm compiles to
-JavaScript and uses the same `Math.sin`, `Math.atan2` and arithmetic, but it
-has no `Math.hypot`, which the simulation calls often. `sqrt (x*x + y*y)` can
-differ from `Math.hypot` in the last bit. Browsers already implement `hypot`
-differently, so seeds are not bit-for-bit reproducible across engines today.
-Single-step comparisons use a tight relative tolerance; discrete outcomes
-(detections, hits, mission results) must match on the test corpus.
+**Floating point matches to the bit.** Elm compiles to JavaScript and uses the same `Math.sin`, `Math.atan2` and arithmetic. Where Elm lacks a built-in, `Sim.Math` reproduces it exactly or both simulations share one formula; see Exact arithmetic below. Differential tests therefore compare with exact equality.
 
 ## Strategy
 
@@ -90,3 +84,15 @@ Elm. That moved its results by a few units in the last place at most, and
 every existing test still passes. A test fails the build if any module the
 simulation reaches calls the four built-ins directly. The audio and renderer
 keep the built-ins.
+
+Two more differences surfaced while porting acoustics, and `Sim.Math` covers
+both:
+
+- Elm's `max`, `min`, `abs` and `clamp` are not JavaScript's for NaN and
+  signed zeros (`max 0 (-0)` is -0, `max (0/0) 1` is 1, `abs (-0)` is -0).
+- The optimizing compiler emits `x == 0` as `!x` and `x /= 0` as `!!x`, which
+  treat NaN as zero; comparisons with other literals stay `===`.
+
+Simulation modules use `M.max`, `M.min`, `M.abs`, `M.sign`, `M.clamp` and
+`M.isZero`, and a test fails the build on a bare Basics version or a bare
+comparison with 0 in `elm/Sim/` (outside `Sim.Math`).

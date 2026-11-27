@@ -1,4 +1,4 @@
-module Sim.Math exposing (cbrt, clamp, exp, expm1, hypot2, hypot3, remainder, tanh)
+module Sim.Math exposing (abs, cbrt, clamp, exp, expm1, hypot2, hypot3, isZero, max, min, remainder, sign, tanh)
 
 {-| Arithmetic the simulation needs exactly as JavaScript computes it, so the
 Elm simulation reproduces the TypeScript one bit for bit in V8.
@@ -8,12 +8,97 @@ bit for many inputs. These follow V8's algorithm: scale by the largest
 magnitude, then sum the squares with Kahan compensation. Elm also has no
 floating-point remainder; `remainder` matches JavaScript's `%` exactly.
 
+Elm's own `max`, `min`, `abs` and `clamp` differ from JavaScript's for NaN
+and signed zeros: `max 0 (-0)` is -0 where `Math.max(0, -0)` is 0, and
+`max (0/0) 1` is 1 where `Math.max(NaN, 1)` is NaN. The simulation uses the
+versions here, qualified, so it always gets JavaScript's answer.
+
+The optimizing compiler turns `x == 0` into JavaScript's `!x`, which is also
+true for NaN, and `x /= 0` into `!!x`. The simulation asks `isZero` instead,
+which means `x === 0`.
+
 Elm has no `exp`, `expm1`, `tanh` or `cbrt` either, and `e ^ x` differs from
 `Math.exp` in the last bits for most inputs. The TypeScript simulation computes
 these through `typescript/sim-math.ts` with the same formulas, so both agree.
 -}
 
 
+{-| JavaScript's `x === 0`: true for 0 and -0, false for NaN. -}
+isZero : Float -> Bool
+isZero x =
+    not (isNaN x) && x == 0
+
+
+isNegativeZero : Float -> Bool
+isNegativeZero x =
+    isZero x && 1 / x < 0
+
+
+{-| Math.max of two values: NaN if either is, and 0 above -0. -}
+max : Float -> Float -> Float
+max a b =
+    if isNaN a || isNaN b then
+        0 / 0
+
+    else if a > b then
+        a
+
+    else if b > a then
+        b
+
+    else if isNegativeZero a then
+        b
+
+    else
+        a
+
+
+{-| Math.min of two values: NaN if either is, and -0 below 0. -}
+min : Float -> Float -> Float
+min a b =
+    if isNaN a || isNaN b then
+        0 / 0
+
+    else if a < b then
+        a
+
+    else if b < a then
+        b
+
+    else if isNegativeZero a then
+        a
+
+    else
+        b
+
+
+{-| Math.abs: the magnitude, with -0 becoming 0. -}
+abs : Float -> Float
+abs x =
+    if x < 0 then
+        negate x
+
+    else if isZero x then
+        0
+
+    else
+        x
+
+
+{-| Math.sign: -1, 1, or the zero or NaN it was given. -}
+sign : Float -> Float
+sign x =
+    if x > 0 then
+        1
+
+    else if x < 0 then
+        -1
+
+    else
+        x
+
+
+{-| `Math.max(low, Math.min(high, value))`, as the TypeScript writes it. -}
 clamp : Float -> Float -> Float -> Float
 clamp low high value =
     max low (min high value)
@@ -40,7 +125,7 @@ hypot2 x y =
             largest =
                 max a b
         in
-        if largest == 0 then
+        if isZero largest then
             0
 
         else
@@ -78,7 +163,7 @@ hypot3 x y z =
             largest =
                 max a (max b c)
         in
-        if largest == 0 then
+        if isZero largest then
             0
 
         else
@@ -152,10 +237,10 @@ running remainder; by Sterbenz's lemma every subtraction is exact.
 -}
 remainder : Float -> Float -> Float
 remainder x y =
-    if isNaN x || isNaN y || isInfinite x || y == 0 then
+    if isNaN x || isNaN y || isInfinite x || isZero y then
         0 / 0
 
-    else if isInfinite y then
+    else if isInfinite y || isZero x then
         x
 
     else
@@ -163,7 +248,6 @@ remainder x y =
             target =
                 abs y
 
-            -- Elm's abs keeps a negative zero, so -0 % y comes out as -0, as in JavaScript.
             reduce r =
                 if r < target then
                     r

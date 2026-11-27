@@ -5,6 +5,8 @@ and which fires next. A torpedo leaving the tube clears the bow before it
 bends toward its ordered course.
 -}
 
+import Sim.Math as M
+
 
 type Tube
     = Port
@@ -53,7 +55,7 @@ tubes s =
 
         remaining tube =
             if s.torps > 1 || (s.torps == 1 && tube == first) then
-                Just (max 0 (readyAt tube - s.time))
+                Just (M.max 0 (readyAt tube - s.time))
 
             else
                 Nothing
@@ -86,7 +88,7 @@ exitPitch current requested age elapsed duration =
             remaining time =
                 let
                     t =
-                        min 1 (2 * (duration - time) / duration)
+                        M.min 1 (2 * (duration - time) / duration)
                 in
                 t * t * (3 - 2 * t)
         in

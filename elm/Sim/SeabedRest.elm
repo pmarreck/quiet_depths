@@ -5,6 +5,8 @@ damage. A stopped sub on the bottom blends into it; trying to move scrapes the
 outer hull.
 -}
 
+import Sim.Math as M
+
 
 restingKnots : Float
 restingKnots =
@@ -29,12 +31,12 @@ wearPerKnotSecond =
 {-| Driving into a bank counts as an impact as well as sinking onto it. -}
 touchdownImpact : Float -> Float -> Float
 touchdownImpact descent speedKnots =
-    max descent (0.2 * abs speedKnots)
+    M.max descent (0.2 * M.abs speedKnots)
 
 
 touchdownChance : Float -> Float
 touchdownChance impact =
-    min 1 (max 0 ((impact - safeImpact) / (heavyImpact - safeImpact)))
+    M.min 1 (M.max 0 ((impact - safeImpact) / (heavyImpact - safeImpact)))
 
 
 touchdownDamage : Float -> Float
@@ -43,7 +45,7 @@ touchdownDamage impact =
         0
 
     else
-        4 + 12 * min 1.5 ((impact - safeImpact) / (heavyImpact - safeImpact))
+        4 + 12 * M.min 1.5 ((impact - safeImpact) / (heavyImpact - safeImpact))
 
 
 {-| Outer hull points lost while the sub works against the seabed. -}
@@ -51,7 +53,7 @@ seabedWear : Float -> Float -> Float
 seabedWear effortKnots dt =
     let
         effort =
-            abs effortKnots
+            M.abs effortKnots
     in
     if effort > restingKnots then
         wearPerKnotSecond * effort * dt
@@ -62,7 +64,7 @@ seabedWear effortKnots dt =
 
 restingStealth : Bool -> Float -> Float
 restingStealth bottomed effortKnots =
-    if bottomed && abs effortKnots <= restingKnots then
+    if bottomed && M.abs effortKnots <= restingKnots then
         0.25
 
     else
@@ -71,7 +73,7 @@ restingStealth bottomed effortKnots =
 
 sweepClutter : Bool -> Float -> Float
 sweepClutter bottomed effortKnots =
-    if bottomed && abs effortKnots <= restingKnots then
+    if bottomed && M.abs effortKnots <= restingKnots then
         0.5
 
     else

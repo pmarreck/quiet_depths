@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync, readdirSync} from 'node:fs';
 import * as shared from '../src/sim-math.js';
 import {elm, seeded} from './sim-harness.mjs';
 
@@ -56,4 +56,27 @@ test('the simulation reaches exp, expm1, tanh and cbrt only through the shared m
   assert.ok(seen.has('coast') && seen.has('systems') && seen.size > 50, 'the walk reaches the whole simulation');
   const direct = [...seen].filter(name => name !== 'sim-math' && /Math\.(exp|expm1|tanh|cbrt)\(/.test(source(name)));
   assert.deepEqual(direct, []);
+});
+
+test('Elm max, min, abs, sign and clamp follow JavaScript for NaN and signed zeros', async () => {
+  const pairs = corpus(26, 2, 20000), singles = pairs.map(([x]) => [x]);
+  same(await elm('math.max', pairs), pairs.map(([a, b]) => Math.max(a, b)), 'max');
+  same(await elm('math.min', pairs), pairs.map(([a, b]) => Math.min(a, b)), 'min');
+  same(await elm('math.abs', singles), singles.map(([x]) => Math.abs(x)), 'abs');
+  same(await elm('math.sign', singles), singles.map(([x]) => Math.sign(x)), 'sign');
+  const triples = corpus(27, 3, 20000);
+  same(await elm('math.clamp', triples), triples.map(([low, high, x]) => Math.max(low, Math.min(high, x))), 'clamp');
+});
+
+// Elm's own max, min, abs, clamp and truncate disagree with JavaScript's,
+// e ^ x is not Math.exp, and the optimizer compiles x == 0 to !x, which is true
+// for NaN. A simulation module must take the Sim.Math versions, qualified, say
+// Basics. when it means Elm's on integers, and test zero with M.isZero.
+test('Elm simulation modules never use the Basics arithmetic that differs from JavaScript', () => {
+  const dir = new URL('../elm/Sim/', import.meta.url), offenders = [];
+  for (const file of readdirSync(dir).filter(f => f.endsWith('.elm') && f !== 'Math.elm')) {
+    const code = readFileSync(new URL(file, dir), 'utf8').replace(/\{-[\s\S]*?-\}/g, '').replace(/--.*$/gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""');
+    for (const m of code.matchAll(/(?<![.\w])(max|min|abs|clamp|truncate)\b|(?<![.\w])e \^|(?:==|\/=)\s*0(?![.\d])/g)) offenders.push(file + ': ' + m[0]);
+  }
+  assert.deepEqual(offenders, []);
 });

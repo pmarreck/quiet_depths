@@ -20,6 +20,8 @@ are independent: a light hit may leave more working equipment intact than the
 crew could rebuild after a later hit.
 -}
 
+import Sim.Math as M
+
 
 type System
     = Diesel
@@ -220,11 +222,11 @@ damage amount part =
     else
         let
             condition =
-                max 0 (part.condition - amount)
+                M.max 0 (part.condition - amount)
         in
         { condition = condition
         , limit =
-            if condition == 0 then
+            if M.isZero condition then
                 0
 
             else
@@ -241,12 +243,12 @@ repair amount part =
         part
 
     else
-        { part | condition = min part.limit (part.condition + amount) }
+        { part | condition = M.min part.limit (part.condition + amount) }
 
 
 conditionLabel : Bool -> Part -> String
 conditionLabel offlineBelow20 part =
-    if part.condition == 0 then
+    if M.isZero part.condition then
         "DESTROYED"
 
     else
@@ -282,7 +284,7 @@ hitSection boat hit =
             hit.y - boat.y
 
         longitudinal =
-            (dx * sin angle + dy * cos angle) / max 30 (sqrt (dx * dx + dy * dy))
+            (dx * sin angle + dy * cos angle) / M.max 30 (M.hypot2 dx dy)
     in
     if longitudinal > 0.34 then
         Bow
@@ -317,7 +319,7 @@ hitSystem section roll =
             List.length pool
     in
     pool
-        |> List.drop (min (count - 1) (floor (pick * toFloat count)))
+        |> List.drop (Basics.min (count - 1) (floor (pick * toFloat count)))
         |> List.head
         -- Every section holds at least one system, so the pool is never empty.
         |> Maybe.withDefault Crew
