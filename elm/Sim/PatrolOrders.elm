@@ -3,8 +3,9 @@ module Sim.PatrolOrders exposing (Orders, apply, decoder, fields)
 {-| The patrol fields the page writes itself between commands: the helm and
 the drone's, silent running, the engine and its diesel routing, the route,
 the scope, the tower, the gun's aim, the torpedo run setting, the imagers,
-damage control, the photo cooldown and the count of archived reconnaissance
-packets. The page keeps writing them on its mirror of the world, as it did
+damage control, the photo cooldown, the count of archived reconnaissance
+packets, the day the crew last wished the boat a happy new year, and the
+patrol's id, which the page assigns when a patrol starts. The page keeps writing them on its mirror of the world, as it did
 on the TypeScript world; each command brings them, and the world takes them
 before acting. Everything else in the world only the simulation changes.
 -}
@@ -36,6 +37,8 @@ type alias Orders =
     , repair : Float
     , photoCooldown : Float
     , reconArchivedSequence : Float
+    , newYearWatch : Maybe Float
+    , patrolId : Maybe String
     , drone : { targetSpeed : Float, targetDepth : Float, targetHeading : Float, nosePitch : Maybe Float }
     }
 
@@ -46,7 +49,7 @@ the page's adapter sends them.
 fields : { boat : List String, gun : List String, drone : List String }
 fields =
     { boat =
-        [ "targetSpeed", "targetDepth", "targetHeading", "silent", "engine", "dieselMode", "route", "scopeAngle", "scopeSteerBearing", "towerAngle", "towerPitch", "runSetting", "imagers", "repair", "photoCooldown", "reconArchivedSequence" ]
+        [ "targetSpeed", "targetDepth", "targetHeading", "silent", "engine", "dieselMode", "route", "scopeAngle", "scopeSteerBearing", "towerAngle", "towerPitch", "runSetting", "imagers", "repair", "photoCooldown", "reconArchivedSequence", "newYearWatch", "patrolId" ]
     , gun = [ "angle", "elevation" ]
     , drone = [ "targetSpeed", "targetDepth", "targetHeading", "nosePitch" ]
     }
@@ -97,6 +100,8 @@ decoder =
         |> andMap (D.field "repair" D.float)
         |> andMap (D.field "photoCooldown" D.float)
         |> andMap (D.field "reconArchivedSequence" D.float)
+        |> andMap (optional "newYearWatch" D.float)
+        |> andMap (optional "patrolId" D.string)
         |> andMap
             (D.field "drone"
                 (D.map4 (\speed depth heading pitch -> { targetSpeed = speed, targetDepth = depth, targetHeading = heading, nosePitch = pitch })
@@ -139,5 +144,7 @@ apply o s =
         , repair = o.repair
         , photoCooldown = o.photoCooldown
         , reconArchivedSequence = o.reconArchivedSequence
+        , newYearWatch = o.newYearWatch
+        , patrolId = o.patrolId
         , drone = { drone | targetSpeed = o.drone.targetSpeed, targetDepth = o.drone.targetDepth, targetHeading = o.drone.targetHeading, nosePitch = o.drone.nosePitch }
     }

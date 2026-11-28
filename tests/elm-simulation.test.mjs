@@ -108,7 +108,8 @@ test('the page played through the Elm worker matches the TypeScript game', async
       // Now and then, every other field the page writes, on both patrols.
       if (random() < .15) for (const s of [t, m]) {
         Object.assign(s, {engine: k % 2 ? 'diesel' : 'electric', dieselMode: pick(seeded(k), ['charge', 'drive', 'assist']), scopeAngle: 20, towerAngle: 15, towerPitch: -3,
-          repair: 120, photoCooldown: 2, reconArchivedSequence: s.recon.sequence});
+          repair: 120, photoCooldown: 2, reconArchivedSequence: s.recon.sequence, newYearWatch: 2});
+        s.patrolId ??= 'abcdef0123456789abcdef0123456789';
         Object.assign(s.gun, {angle: 30, elevation: 8});
         Object.assign(s.drone, {targetSpeed: 2, targetDepth: 40, targetHeading: 90, nosePitch: k % 3 ? 12 : null});
         s.imagers.scribbler = 'survey';
@@ -231,7 +232,7 @@ test('the worker takes as orders exactly the fields the page writes', () => {
   app.ports.commands.send({kind: 'orderFields'});
   assert.deepEqual(reply, {
     boat: ['targetSpeed', 'targetDepth', 'targetHeading', 'silent', 'engine', 'dieselMode', 'route', 'scopeAngle', 'scopeSteerBearing', 'towerAngle', 'towerPitch', 'runSetting', 'imagers', 'repair',
-      'photoCooldown', 'reconArchivedSequence'],
+      'photoCooldown', 'reconArchivedSequence', 'newYearWatch', 'patrolId'],
     gun: ['angle', 'elevation'],
     drone: ['targetSpeed', 'targetDepth', 'targetHeading', 'nosePitch'],
   });
