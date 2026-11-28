@@ -21,6 +21,7 @@ import {requestSupport, updateAircraft, raiseCarrierAlarm} from './air-support.t
 import {ARMING_TIME, MAX_RUN, SURFACE_RUN_DEPTH, TORPEDO_SPEED, putTorpedoInWater, torpedoOrders, updateTorpedoes} from './torpedo-run.ts';
 import {shipHit, sphereHit, wrap} from './combat-geometry.ts';
 import {slice} from './world-slice.ts';
+import {reportInvalidNumber} from './invalid-numbers.ts';
 import type {Aircraft, Aloft, Blast, CombatWorld, Point3, Round, Ship, Torpedo} from './combat-types.ts';
 export {MAX_RUN, TORPEDO_SPEED, ENEMY_DECOY_SUPPLY} from './torpedo-run.ts';
 
@@ -108,8 +109,13 @@ export function restoreTorpedo(s: CombatWorld, input: unknown): boolean {
 }
 
 export function fireDeckGun(s: CombatWorld, aim: {bearing: number; elevation: number}): boolean {
-  if (s.status !== 'patrol' || !isSurfaced(s) || s.gun.ammo <= 0 || s.gun.cooldown > 0 || !operatingFraction(s.systems.deckgun) ||
-    !Number.isFinite(aim.bearing) || !Number.isFinite(aim.elevation)) return false;
+  // An aim that is not a finite number is a bug upstream: refuse it, and say so.
+  if (!Number.isFinite(aim.bearing) || !Number.isFinite(aim.elevation)) {
+    if (!Number.isFinite(aim.bearing)) reportInvalidNumber('fireDeckGun bearing', aim.bearing);
+    if (!Number.isFinite(aim.elevation)) reportInvalidNumber('fireDeckGun elevation', aim.elevation);
+    return false;
+  }
+  if (s.status !== 'patrol' || !isSurfaced(s) || s.gun.ammo <= 0 || s.gun.cooldown > 0 || !operatingFraction(s.systems.deckgun)) return false;
   s.gun.ammo--; s.gun.shots++; s.gun.cooldown = .25 / operatingFraction(s.systems.deckgun);
   const a = rad(s.heading), b = rad(aim.bearing), e = rad(clamp(aim.elevation, -15, 85)), speed = 600;
   s.gunRounds.push({id: s.weaponSequence++, owner: 'player', x: s.x + Math.sin(a) * 16, y: s.y + Math.cos(a) * 16, altitude: 6 - s.depth,
