@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Missions: layout, objective, fleet battle (114 lines, one Elm module) | about 25 min | matched on the first run; 51 of 51 mutants killed |
 | Rescues and surveys (119 lines, two Elm modules) | about 40 min after the audit and site record | setup matched at once; two test fixes; four restore gaps fixed first; 65 of 65 mutants killed |
 | Convoy and allied lamp watch (188 lines, three Elm modules) | about 30 min | matched once the test dropped a bookkeeping flag; 58 of 58 mutants killed |
 | Contact reports, ping and photographs (114 lines, two Elm modules) | about 25 min | matched once the test passed both languages the same look; a restore gap fixed first; 52 of 52 mutants killed |
@@ -800,3 +801,50 @@ separation from one recorded. A constructed-edges test now covers each,
 comparing the operation decoder's verdict with restore's; the exact mark
 needs a site where the chart reads exactly 20 m, found by bisection. All 65
 mutants fail the tests.
+
+## A new patrol's layout, the objective and the fleet battle ported (2026-11-28)
+
+What remained of `missions.ts` (114 code lines) became `Sim.Missions` at
+`8dc0920`: a new patrol's seeded layout for every mission, the objective with
+any rescue or survey worked as it is judged, and the fleet action as the
+patrol hears, marks and replays it. `Sim.Carrier` gained `carrierGroup`,
+which its port had left in TypeScript though the module was marked as
+mirrored. All three tests matched on the first run, about 25 minutes after
+the mission target checks moved to restore.
+
+Mutation testing killed 49 of 51 mutants at first: no layout seed drew a
+second hunted submarine's odds between 0.30 and 0.36, and no missed shot
+arrived between 2 and 3 m deep (a missed volley keeps the aim point it was
+fired at, so a miss on a submarine lands deep). Seeds found by search and
+constructed misses now kill all 51.
+
+## The world record (plan, 2026-11-28)
+
+What remains is the integration layer: creation, restore and save, the tick
+and `sim.ts`. All of it works on one record, so the next step is an Elm
+world record holding every field the TypeScript world holds. At `8dc0920`
+the TypeScript world carries 108 top-level keys across every mission, fresh
+and after five minutes of play; the harness's patrol record already holds
+all but 18:
+
+- the photo archive and photo sequence, which stay with the page as the
+  boundary note says;
+- the scope and tower aim (`scopeAngle`, `scopeSteerBearing`, `towerAngle`,
+  `towerPitch`), lightning (`lightning`, `nextLightningAt`) and the sea's
+  `wavePhase`;
+- `imagers`, `recon` and `reconArchivedSequence`, `soundBearings`, `wake`,
+  `watchWarnings` and `shells`;
+- `version` and `plantVersion`;
+
+plus the optional `imagingTime`, `newYearWatch` and `patrolId` (the captain's
+name also stays with the page). Elm types exist for all of them
+(`Transmitters`, `Recon`, `Shell`, `WakeSample`, `Warnings`, `Strike`).
+
+The record moves from the harness into `Sim.World`. Its decoders mostly live
+in harness modules that import the patrol harness themselves (the hostile
+tracks harness decodes shells, for one), so they move down into the
+simulation modules beside their types, where restore will need them anyway.
+The harness's patrol becomes an alias of the world, so every existing
+differential test keeps decoding through it. A round trip then checks the
+save half: a TypeScript save decoded and re-encoded by Elm, compared with
+the save itself minus the page's fields.

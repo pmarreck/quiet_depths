@@ -4,6 +4,7 @@ import {createGame, save, restore} from '../src/sim.js';
 import {MISSIONS, randomizePatrol, objectiveComplete, updateFleetBattle} from '../src/missions.js';
 import {listenForReplayEvents} from '../src/replay-events.js';
 import {collectInvalidNumbers} from '../src/invalid-numbers.js';
+import {hash01} from '../src/environment.js';
 import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 
 // The boat's fields the shared harness encodes, as tests/sim-combat.test.mjs picks them.
@@ -50,6 +51,13 @@ test('every mission\'s seeded layout matches, short and long patrols alike', asy
     const w = unlaid(id, 1 + n, n % 3 === 2), seed = Math.floor(random() * 2 ** 32);
     calls.push({input: w, seed, expected: run(w, s => randomizePatrol(s, seed)).output});
   }
+  // Seeds either side of the odds of a second hunted submarine.
+  for (const [lo, hi] of [[.3, .36], [.36, .42]]) {
+    let seed = 1;
+    while (!(lo <= hash01(seed, 89) && hash01(seed, 89) < hi)) seed++;
+    const w = unlaid('seek-and-destroy-sub', 2, false);
+    calls.push({input: w, seed, expected: run(w, s => randomizePatrol(s, seed)).output});
+  }
   assert.ok(calls.some(c => c.expected.ships.some(v => v.id === 'echo-two')) && calls.some(c => c.expected.departure) && calls.some(c => c.expected.battle) && calls.some(c => c.expected.convoy),
     'a second submarine, a transit, a fleet action and a convoy');
   sameResults(await elm('missions.randomizePatrol', calls.map(c => [c.input, c.seed])), calls.map(c => c.expected));
@@ -88,6 +96,14 @@ test('the fleet action as the patrol hears and records it matches, round after r
       w.acoustics = w.acoustics.slice(-10);
       w.impacts = w.impacts.slice(-10);
     }
+  }
+  // A missed shot arriving at the surface, just below it, and deeper.
+  const fleet = exact(restore(save(createGame('tiebreaker', 9))));
+  const [a, b] = [fleet.ships.find(v => v.side === 'friendly'), fleet.ships.find(v => v.side === 'hostile')];
+  for (const altitude of [2, -2, -2.5, -3.5]) {
+    const w = structuredClone(fleet);
+    w.battle.volleys = [{id: 900, underwater: altitude < 0, from: {x: a.x, y: a.y, altitude: -3}, to: {x: b.x + 30, y: b.y, altitude}, source: a.id, target: b.id, launched: w.time - 5, arrives: w.time, damage: 0}];
+    calls.push({input: w, expected: run(w, s => updateFleetBattle(s)).output});
   }
   const kinds = new Set(calls.flatMap(c => c.expected.impacts.map(i => i.kind)));
   for (const kind of ['torpedo', 'splash', 'hit']) assert.ok(kinds.has(kind), 'an arrival marked ' + kind);
