@@ -1,4 +1,4 @@
-T="tests/elm-simulation.test.mjs tests/persistence.test.mjs"; WM=typescript/world-mirror.ts; ES=typescript/elm-simulation.ts; SM=typescript/simulation.ts; PT=typescript/patrol-transfer.ts; WS=scripts/sim-worker-script.mjs
+T="tests/elm-simulation.test.mjs tests/elm-simulation-orders.test.mjs tests/persistence.test.mjs"; WM=typescript/world-mirror.ts; ES=typescript/elm-simulation.ts; SM=typescript/simulation.ts; PT=typescript/patrol-transfer.ts; WS=scripts/sim-worker-script.mjs
 m $ES 's/    const run = tail.then\(\(\) => job\(exchange\)\);/    const run = Promise.resolve().then(() => job(exchange));/' es-queue-wait "$T"
 m $ES 's/waiting = reply => \{ if \(reply.error\) reject/waiting = reply => { if (false) reject/' es-refusal "$T"
 m $ES 's/    if \(!deliver\) throw new Error\(.The Elm simulation replied to no command.\);\n//' es-unasked "$T"

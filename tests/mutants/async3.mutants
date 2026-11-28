@@ -1,4 +1,4 @@
-T="tests/elm-simulation.test.mjs"; ES=typescript/elm-simulation.ts; WS=scripts/sim-worker-script.mjs
+T="tests/elm-simulation.test.mjs tests/elm-simulation-orders.test.mjs"; ES=typescript/elm-simulation.ts; WS=scripts/sim-worker-script.mjs
 m $ES 's/    return whole \|\| unset.includes\(top\) \? undefined : base\[i\];/    return base[i];/' es-reported-unset "$T"
 m $ES 's/: isRecord\(v\) \? Object.fromEntries/: false ? Object.fromEntries/' es-plain-record "$T"
 m $WS 's/if \(whole \|\| orders.has\(k\) \|\| sent\[k\] !== fields\[k\]\) set\[k\] = v;/if (whole || orders.has(k)) set[k] = v;/' ws-changed "$T"

@@ -15,3 +15,7 @@ that had changed. The results and the commits each list was written against
 are in `docs/plan_context/simulation-to-elm.md`. Later changes to the code
 make some patterns stop applying; the dry run names them, and a list is
 brought up to date by writing a new one, as `async3` follows `async2`.
+
+The adapter's tests were split in two on 2026-11-28; the lists that named
+`tests/elm-simulation.test.mjs` now name `elm-simulation-orders.test.mjs`
+too, so a rerun has the coverage each list was first run with.
