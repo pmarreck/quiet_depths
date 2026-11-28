@@ -176,3 +176,34 @@ test('Elm simulation modules compare two values only with < and <=, which NaN ca
   }
   assert.deepEqual(offenders, []);
 });
+
+// Sim.Finite's literal and unitLiteral skip the range check, so they may take
+// only a numeric literal that is in range: below MAX in magnitude, zero or at
+// least MIN, and within [-1, 1] for a unit. Passing anything else, or the
+// functions themselves as values, would let an unchecked number in.
+function finiteLiteralOffenders(file, source) {
+  const code = source.replace(/\{-[\s\S]*?-\}/g, '').replace(/--.*$/gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""'), offenders = [];
+  const imported = code.match(/^import Sim\.Finite\b(?: as (\w+))?(?: exposing \(([^)]*)\))?/m);
+  if (!imported) return offenders;
+  if (imported[2] && /(?:^|,)\s*(?:\.\.|literal|unitLiteral)\s*(?:,|$)/.test(imported[2])) offenders.push(`${file}: exposes the unchecked literals`);
+  const alias = imported[1] ?? 'Sim.Finite', number = /^-?\d+(?:\.\d+)?(?:e[-+]?\d+)?(?![\w.])/;
+  for (const m of code.matchAll(new RegExp(`(?<![\\w.])${alias.replace('.', '\\.')}\\.(literal|unitLiteral)\\b`, 'g'))) {
+    const rest = code.slice(m.index + m[0].length), arg = rest.match(/^ +(\S+)/)?.[1] ?? '', literal = arg.match(number)?.[0];
+    const v = Number(literal), size = Math.abs(v);
+    if (literal === undefined || !(size < Number.MAX_VALUE) || (size !== 0 && size < 2.2250738585072014e-308) || (m[1] === 'unitLiteral' && size > 1)) offenders.push(`${file}: ${m[0]} ${arg.slice(0, 20)}`);
+  }
+  return offenders;
+}
+
+test('Sim.Finite\'s unchecked literals take only numeric literals in range', () => {
+  const dir = new URL('../elm/Sim/', import.meta.url), offenders = [];
+  for (const file of readdirSync(dir).filter(f => f.endsWith('.elm') && f !== 'Finite.elm')) offenders.push(...finiteLiteralOffenders(file, readFileSync(new URL(file, dir), 'utf8')));
+  assert.deepEqual(offenders, []);
+  // The check itself rejects what it must and accepts what it may.
+  const sample = body => finiteLiteralOffenders('Sample.elm', `module Sample exposing (x)\n\nimport Sim.Finite as F\n\n\nx =\n    ${body}\n`);
+  for (const ok of ['F.literal 14', 'F.literal -7', 'F.literal 1.0e-10', 'F.literal 0', 'F.unitLiteral 0.38', 'F.unitLiteral -1', 'F.literal 2.2250738585072014e-308']) assert.deepEqual(sample(ok), [], ok);
+  for (const bad of ['F.literal x', 'F.literal (a + b)', 'List.map F.literal xs', 'F.literal 1.7976931348623157e308', 'F.literal 1e309', 'F.literal 5e-324', 'F.unitLiteral 1.5', 'F.unitLiteral size', 'F.literal 3.x'])
+    assert.equal(sample(bad).length, 1, bad);
+  assert.equal(finiteLiteralOffenders('Sample.elm', 'import Sim.Finite exposing (literal)\n').length, 1, 'exposing literal');
+  assert.equal(finiteLiteralOffenders('Sample.elm', 'import Sim.Finite as F exposing (..)\n').length, 1, 'exposing everything');
+});
