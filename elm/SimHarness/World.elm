@@ -1,4 +1,4 @@
-module SimHarness.World exposing (Boat, boat, function)
+module SimHarness.World exposing (Boat, boat, config, function)
 
 {-| Harness entries for the calendar, the chart and the weather.
 -}

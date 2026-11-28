@@ -1,4 +1,4 @@
-module SimHarness.Patrol exposing (Patrol, decoder, encode, encodeFields, limits, systems)
+module SimHarness.Patrol exposing (Patrol, decoder, difficulty, encode, encodeFields, limits, systems)
 
 {-| The flat patrol record the systems modules work on, decoded from a saved
 patrol and encoded back with every field systems can change.
@@ -16,10 +16,12 @@ import Sim.Contact as Contact exposing (Contact)
 import Sim.ConvoyWatch exposing (AlliedLamp, Convoy)
 import Sim.Debrief as Debrief
 import Sim.Drone as Drone exposing (Drone)
+import Sim.Environment as Env
 import Sim.FleetTheater exposing (Battle)
 import Sim.HostileTracks exposing (Noisemaker)
 import Sim.InvalidNumber exposing (InvalidNumber)
 import Sim.Mechanics as Mechanics exposing (LogEntry)
+import Sim.Operation as Operation exposing (Operation)
 import Sim.Ordnance exposing (Blast, Round)
 import Sim.PatrolReports exposing (Report)
 import Sim.PatrolSearch exposing (SearchArea)
@@ -41,6 +43,7 @@ import SimHarness.Lamp as Lamp
 import SimHarness.Objectives as Objectives
 import SimHarness.Ordnance exposing (airSupport, aircraft, blast, gunRound, torpedo)
 import SimHarness.Watch as Watch
+import SimHarness.World as World
 
 
 type alias Patrol =
@@ -134,6 +137,10 @@ type alias Patrol =
     , decoys : Int
     , alert : Float
     , alliedLamp : Maybe AlliedLamp
+    , operation : Maybe Operation
+    , route : Maybe { x : Float, y : Float, radius : Maybe Float }
+    , home : { x : Float, y : Float }
+    , environment : Env.Config
     }
 
 
@@ -246,7 +253,7 @@ decoder =
                                 |> andMap (D.field "status" (named Status.statusName Status.statuses))
                                 |> andMap (D.succeed now)
                                 |> andMap (D.field "rng" D.int)
-                                |> andMap (optional "difficulty" (D.map8 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool) (optional "satellite" D.bool) (optional "pingDetection" D.float)))
+                                |> andMap (optional "difficulty" difficulty)
                                 |> andMap (D.field "x" D.float)
                                 |> andMap (D.field "y" D.float)
                                 |> andMap (D.field "depth" D.float)
@@ -333,6 +340,10 @@ decoder =
                                 |> andMap (D.field "decoys" D.int)
                                 |> andMap (D.field "alert" D.float)
                                 |> andMap (optional "alliedLamp" (D.map3 AlliedLamp (D.field "message" (D.nullable (Lamp.transmission Lamp.lampFix))) (D.field "sequence" D.float) (D.field "lastIssue" D.float)))
+                                |> andMap (optional "operation" (D.nullable Operation.decoder) |> D.map (Maybe.andThen identity))
+                                |> andMap (optional "route" (D.nullable route) |> D.map (Maybe.andThen identity))
+                                |> andMap (D.field "home" point)
+                                |> andMap (D.field "environment" World.config)
                         )
             )
 
@@ -482,3 +493,32 @@ convoy =
         (D.field "round" D.int)
         (D.field "next" D.float)
         (D.field "shot" (D.nullable Fleet.volley))
+
+
+{-| The difficulty switches and sliders the simulation reads; any absent is
+the default.
+-}
+difficulty : D.Decoder Difficulty
+difficulty =
+    D.succeed Difficulty
+        |> andMap (optional "drone" D.bool)
+        |> andMap (optional "damage" D.float)
+        |> andMap (optional "pursuit" D.float)
+        |> andMap (optional "depthStealth" D.float)
+        |> andMap (optional "detection" D.float)
+        |> andMap (optional "airSupport" D.bool)
+        |> andMap (optional "satellite" D.bool)
+        |> andMap (optional "pingDetection" D.float)
+        |> andMap (optional "longPatrol" D.bool)
+
+
+{-| A chart route: a point, and the radius within which it counts as reached.
+-}
+route : D.Decoder { x : Float, y : Float, radius : Maybe Float }
+route =
+    D.map3 (\x y radius -> { x = x, y = y, radius = radius }) (D.field "x" D.float) (D.field "y" D.float) (optional "radius" D.float)
+
+
+point : D.Decoder { x : Float, y : Float }
+point =
+    D.map2 (\x y -> { x = x, y = y }) (D.field "x" D.float) (D.field "y" D.float)

@@ -21,7 +21,7 @@ import Sim.Systems exposing (Difficulty)
 import SimHarness.Codec exposing (andMap, arg)
 import SimHarness.Fleet exposing (optional)
 import SimHarness.Hulls exposing (logKind)
-import SimHarness.Patrol exposing (systems)
+import SimHarness.Patrol as Patrol exposing (systems)
 
 
 type alias Hunt =
@@ -75,7 +75,7 @@ encodeTrack t =
 
 difficulty : D.Decoder Difficulty
 difficulty =
-    D.map8 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool) (optional "satellite" D.bool) (optional "pingDetection" D.float)
+    Patrol.difficulty
 
 
 shell : D.Decoder Shell
@@ -153,7 +153,7 @@ encodeHunt s =
         ]
 
 
-attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float, airSupport : Maybe Bool, satellite : Maybe Bool, pingDetection : Maybe Float }
+attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float, airSupport : Maybe Bool, satellite : Maybe Bool, pingDetection : Maybe Float, longPatrol : Maybe Bool }
 attacks =
     { dropCharge = \c s -> { s | charges = s.charges ++ [ c ] }
     , launchTorpedo =
