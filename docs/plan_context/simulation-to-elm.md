@@ -910,3 +910,24 @@ Testing compares restore's verdict and result on current saves from every
 mission, on each field damaged in turn, and on saves made older by removing
 fields each migration fills, so every migration and every refusal is
 exercised. Mutation testing follows, as for every port.
+
+## The patrol tick before restore (plan, 2026-11-28 02:15 EST)
+
+The tick goes before restore: it composes the ported modules into a whole
+step, so a differential test can run identical patrols in both languages
+under scripted inputs (scope, tower, drone, imaging, time compression) and
+compare the whole save after every tick, the strongest end-to-end check
+available; restore's migrations are independent plumbing. `step` splits a
+frame into quarter-second ticks; `tick` updates the sea, lightning, route,
+boat and wake, then each ship in turn (contacts, hostile tracks, clues,
+sweeps, attacks, movement), then traffic, the fleet action, the convoy and
+allied watch, the search, hull contacts, contacts' aging, reconnaissance,
+combat, blasts, shells, acoustics with the patrol's receipts, the drone,
+the watch's warnings, sightings and wrecks, tracking, and the objective and
+the patrol's end. In Elm each stage is a world transform; the ship loop
+folds over indices, writing each ship back before the next, since the
+TypeScript mutates ships in place while later calls read the list.
+
+Audit first, per the owner's rule: no TypeScript bug found on a first read
+of the tick and its three helpers (the patrol sweep, the receipt of heard
+sounds, the traffic signal).
