@@ -1,10 +1,11 @@
 // Plays every mission in a real browser: begins each patrol, plays it at 1x
 // and then at 20x, and reports the patrol's saved time and status (or its
 // patrol report, if it ended) and every console warning, error and uncaught
-// exception. Under ?sim=elm it then times a step through the Web Worker on
+// exception. Under the Elm simulation (the default; ?sim=ts runs the
+// TypeScript) it then times a step through the Web Worker on
 // each patrol's save. Exits nonzero if the console was not quiet.
 //   node scripts/browser-check.mjs CDP_URL SITE_URL [QUERY] [SECONDS_1X] [SECONDS_20X] [MISSIONS]
-// for example: node scripts/browser-check.mjs http://127.0.0.1:9222 http://127.0.0.1:4173/ '?sim=elm'
+// for example: node scripts/browser-check.mjs http://127.0.0.1:9222 http://127.0.0.1:4173/ '?sim=ts'
 // See scripts/cdp.mjs for starting the browser and serving the site.
 import {openPage, beginPatrol, pause, heardSince} from './cdp.mjs';
 

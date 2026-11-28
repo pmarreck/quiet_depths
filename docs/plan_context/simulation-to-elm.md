@@ -1536,3 +1536,14 @@ since many recorded times may not exceed it), then the TypeScript, then
 `Sim.RestoreChecks`. The bounds test now compares each edge and impossible
 value between the two restores; with the Elm check removed it fails, 14 of
 83 differing.
+
+## The Elm simulation is the default (2026-11-28)
+
+As the owner decided, the page now runs the Elm simulation in its Web
+Worker unless the address carries `?sim=ts`, which runs the TypeScript
+until the owner has playtested the Elm and the TypeScript is deleted. A
+recording (`?record`) still runs the TypeScript, whose oracle it keeps. If
+the worker cannot start, the TypeScript runs the patrol. All twelve
+missions played with a quiet console under the new default in headless
+Chromium, and three under `?sim=ts`. The service worker caches every file
+of the site, the worker included, so the default works offline.

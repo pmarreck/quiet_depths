@@ -62,10 +62,11 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 // quietDepthsRecording.save() downloads the recording.
 const playRecording=new URLSearchParams(location.search).has('record')?playRecorder(navigator.userAgent.match(/(Firefox|Chrome|Safari)\/\d+/)?.[0]??'a browser'):null;
 if(playRecording){recordPlay(playRecording);window.quietDepthsRecording=playRecording;console.info('Recording play for the replay tests: quietDepthsRecording.save() downloads it.');}
-// `?sim=elm` runs the patrol in the Elm simulation, in a Web Worker, instead
-// of the TypeScript simulation, until it has been played enough to be the
-// default. If the worker cannot start, the TypeScript runs the patrol.
-if(!playRecording&&new URLSearchParams(location.search).get('sim')==='elm'){
+// The Elm simulation runs the patrol, in a Web Worker. `?sim=ts` runs the
+// TypeScript simulation instead, until the owner has playtested the Elm and
+// the TypeScript is deleted; so does a recording. If the worker cannot
+// start, the TypeScript runs the patrol.
+if(!playRecording&&new URLSearchParams(location.search).get('sim')!=='ts'){
  const worker=new Worker('sim-worker.js');
  const failed=new Promise((_,reject)=>worker.addEventListener('error',e=>reject(new Error(e.message||'the worker did not load')),{once:true}));
  // A field the page writes outside the orders would be lost; say which.
