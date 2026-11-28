@@ -1,4 +1,5 @@
 import {environmentAt, hash01, WEATHER, type EnvironmentConfig} from './environment.ts';
+import {isSurfaceShip} from './foundering.ts';
 // Experimental 1972 imagery relay is a deliberate historical exception. Real
 // VLF is low-throughput, one-way and shallow-antenna reception. Depth limits and
 // all timings below are fictional play tuning, not calibrated radio performance.
@@ -157,15 +158,20 @@ export function reconStatus(s: Patrol) {
 }
 
 // Save validation: values arrive as untrusted JSON, so each check stays at run time.
+const validSide = (side: unknown) => side === undefined || side === 'friendly' || side === 'hostile';
+// A photographed ship's identity, as a frame holds it and an identified track copies it.
+const validIdentity = (v: {name?: unknown; kind?: unknown; military?: unknown; side?: unknown}) =>
+  (v.military === undefined || typeof v.military === 'boolean') && validSide(v.side);
 function validWeather(input: unknown) {
   const value = input as FrameWeather | null | undefined;
-  return value && Object.hasOwn(WEATHER, value.id) && (['waveScale', 'waveSpeed', 'wavePhase'] as const).every(k => value[k] === undefined || finite(value[k]) && value[k] >= 0) &&
+  return value && Object.hasOwn(WEATHER, value.id) && typeof value.name === 'string' && (['waveScale', 'waveSpeed', 'wavePhase'] as const).every(k => value[k] === undefined || finite(value[k]) && value[k] >= 0) &&
     (['cloud', 'rain', 'storm', 'daylight', 'hour'] as const).every(k => finite(value[k])) && (['cloud', 'rain', 'storm', 'daylight'] as const).every(k => value[k] >= 0 && value[k] <= 1);
 }
 function validFrame(input: unknown) {
   const value = input as Frame | null | undefined;
   return value && finite(value.time) && value.time >= 0 && typeof value.night === 'boolean' && validWeather(value.weather) && Array.isArray(value.ships) &&
-    value.ships.length <= RECON_LIMITS.maxTracks && value.ships.every(v => v && typeof v.id === 'string' && (['x', 'y', 'heading', 'speed', 'hull'] as const).every(k => finite(v[k])));
+    value.ships.length <= RECON_LIMITS.maxTracks && value.ships.every(v => v && typeof v.id === 'string' && typeof v.name === 'string' && isSurfaceShip(v.kind) && validIdentity(v) &&
+      (['x', 'y', 'heading', 'speed', 'hull'] as const).every(k => finite(v[k])));
 }
 export function validateReconState(input: unknown): boolean {
   const value = input as Recon | null | undefined;
@@ -175,6 +181,9 @@ export function validateReconState(input: unknown): boolean {
     const at = value[key];
     if (at !== null && (!finite(at) || (at as number) < 0)) return false;
   }
+  // The update times these phases from when they started, and tasking until it is ready.
+  if (['tasking', 'imaging', 'processing'].includes(value.phase) && value.startedAt === null) return false;
+  if (value.phase === 'tasking' && (value.readyAt === null || value.readyAt <= (value.startedAt as number))) return false;
   if (value.area !== null && !validArea(value.area)) return false;
   if (!['idle', 'failed'].includes(value.phase) && !validArea(value.area)) return false;
   if (value.firstFrame !== null && !validFrame(value.firstFrame) || value.phase === 'imaging' && !validFrame(value.firstFrame)) return false;
@@ -189,12 +198,14 @@ export function validateReconState(input: unknown): boolean {
   for (const track of p.tracks) {
     if (!track || typeof track.id !== 'string' || ids.has(track.id) ||
       !(['x', 'y', 'vx', 'vy', 'time', 'positionSigma', 'velocitySigma', 'maneuverSigma'] as const).every(k => finite(track[k])) || track.time > p.capturedAt || track.time < 0 ||
-      (['positionSigma', 'velocitySigma', 'maneuverSigma'] as const).some(k => track[k] < 0) || typeof track.identified !== 'boolean') return false;
+      (['positionSigma', 'velocitySigma', 'maneuverSigma'] as const).some(k => track[k] < 0) || typeof track.identified !== 'boolean' ||
+      track.name !== undefined && typeof track.name !== 'string' || track.kind !== undefined && !isSurfaceShip(track.kind) || !validIdentity(track)) return false;
     ids.add(track.id);
   }
   const rendered = new Set<string>();
   for (const ship of p.sceneShips) {
-    if (!ship || !ids.has(ship.id) || rendered.has(ship.id) || !(['x', 'y', 'heading', 'speed', 'hull'] as const).every(k => finite(ship[k])) || p.night && ship.kind !== 'light') return false;
+    if (!ship || !ids.has(ship.id) || rendered.has(ship.id) || !(['x', 'y', 'heading', 'speed', 'hull'] as const).every(k => finite(ship[k])) ||
+      (p.night ? ship.kind !== 'light' : !isSurfaceShip(ship.kind))) return false;
     rendered.add(ship.id);
   }
   const image = p.image;
