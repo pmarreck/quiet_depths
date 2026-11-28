@@ -338,3 +338,20 @@ operations that could produce it:
 "MAX × 0.5" therefore cannot be written: no MAX value exists to multiply, and
 the operation that would have produced one already made its caller handle the
 overflow. The pilot measures how often that handling appears in real code.
+
+### Fading values end by threshold, not by reaching zero (owner, 2026-11-27)
+
+A side agent noted that under the MIN rule a value shrinking by repeated
+multiplication (speed × 0.98, a glow × 0.9) never reaches zero: it saturates
+at ±MIN and stays there, so a check such as "is shock above 0?" would stay
+true for the rest of a patrol. Fading by 0.9 per tick reaches the subnormal
+range after about 6,700 ticks, about half an hour of quarter-second ticks.
+
+The owner's ruling: relying on a fade reaching exactly zero relies on the
+representation's inaccuracy, which code must not do. A fading value ends when
+it reaches MIN or a threshold that means "gone" in its context, tested
+explicitly. Zero itself stays representable and exact (0 × anything is 0);
+only a non-zero value that shrinks stops at ±MIN. When the number types are
+built across modules, every multiplicative fade and every test of such a
+value against zero is checked, and a test that depends on underflow reaching
+zero becomes a threshold test, TypeScript first.
