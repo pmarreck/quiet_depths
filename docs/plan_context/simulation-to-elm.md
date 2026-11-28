@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Combat (209 lines, four Elm modules) | not measured (written across a context break) | matched once the test stated the one deliberate difference (a player torpedo's launcher and aim); two TypeScript save checks fixed first; 61 of 62 mutants killed, the last equivalent |
 | Torpedo runs (130 lines, four Elm modules) | about 60 min | matched on the first comparison; 54 of 55 mutants killed, the last equivalent |
 | Air support (115 lines, two Elm modules) | about 40 min | matched on the first run; found and fixed a TypeScript bug first (a surfaced boat's bomb depth); 55 of 55 mutants killed after four input gaps closed |
 | Early end (90 lines) | about 15 min | matched on the first run; 18 of 19 mutants killed, the last equivalent under the real mission catalog |
@@ -655,3 +656,31 @@ Porting `combat.ts` turned up two TypeScript fixes, made first: the deck gun
 silently refused an aim that was not a finite number (`f5d0c77`), and a
 saved torpedo's id passed validation as any finite number, though ids come
 from the integer weapon sequence.
+
+## Combat ported (2026-11-27)
+
+`combat.ts` (209 code lines) became `Sim.Combat` (the boat's torpedoes and
+deck gun, an enemy's torpedo, and each moment of combat), `Sim.GunRounds`
+(shells in flight), `Sim.ShipDamage` (flooding, sinking, collapse and
+settling) and `Sim.TorpedoSaves` (checking and completing saved torpedoes),
+at `1e833e0`. It was written across a context break, so its time was not
+measured. The shared patrol harness now decodes contacts, tubes, the deck
+gun and the crew's quiet watch.
+
+Porting found two more TypeScript gaps, fixed first: a saved torpedo's id
+passed as any finite number though ids are whole (`9d6b0f1`), and its
+intended target and lock were never checked as ship ids (`4eeeb53`). One
+deliberate difference remains: a player's torpedo has no launcher or aim in
+Elm, so a damaged save giving one those fields loses them, where the
+TypeScript keeps them unread.
+
+Mutation testing killed 45 of 62 mutants at first. The played patrols never
+put a boat between 90 and 100 m at a launch, a warship just past the run
+setting, an opponent 5 to 6 km from the deck gun, a submarine 8 to 10 m down
+under a plunging shell, a boat 2 to 3 m down under strafing, a splash 120 to
+150 m from a ship, a shell striking between 4 and 5 m above the waterline,
+the carrier struck before her aircraft were up, a doomed carrier or a listing
+ship flooding, or a wreck crossing the depths at which it collapses. Wider
+inputs and 1,200 constructed single ticks now kill 61. The last removes the
+charge's "has an air time" test, which `elapsed < air` already implies
+because `elapsed` is never negative: an equivalent mutant.
