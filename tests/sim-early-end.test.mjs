@@ -37,7 +37,7 @@ function extractions() {
       for (const id of targets) {
         const v = s.ships.find(x => x.id === id);
         if (!v) continue;
-        v.hull = pick(random, [0, 0, 40, 100]);
+        v.hull = pick(random, [0, 0, .5, 40, 100]);
         const hits = pick(random, [undefined, 0, 1, 2, 3]);
         if (hits === undefined) delete v.directHits; else v.directHits = hits;
       }

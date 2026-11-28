@@ -319,6 +319,9 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Air support (115 lines, two Elm modules) | about 40 min | matched on the first run; found and fixed a TypeScript bug first (a surfaced boat's bomb depth); 55 of 55 mutants killed after four input gaps closed |
+| Early end (90 lines) | about 15 min | matched on the first run; 18 of 19 mutants killed, the last equivalent under the real mission catalog |
+| Cold watch (176 lines, five Elm modules) | about 45 min | matched on the first run; 108 of 108 mutants killed after the tests met rarer encounters and coastal passages |
 | Hostile hunters (107 lines, two Elm modules) | about 30 min | one representation difference (null against Nothing), normalized; 41 of 41 mutants killed after two input gaps closed |
 | Mission objectives (49 lines) | about 15 min | matched on the first run; 13 of 13 mutants killed after two test gaps closed |
 | Mess watch (48 lines) | about 20 min | matched on the first run; 34 of 34 mutants killed |
@@ -579,3 +582,42 @@ killed once the inputs gained hunters just either side of each weapon's
 reach and a zero-length tick (an alert lands on exactly 42 only by chance
 after an update). The systems helpers for the debrief, the random stream and
 sound now take only the fields they use, and sounds can carry an altitude.
+
+## Cold watch, early end and air support ported (2026-11-27)
+
+`cold-watch.ts` (176 code lines) became five Elm modules: `Sim.ColdWatch` (the
+tick, landings and the player's signals), `Sim.Stands` (shared types and
+helpers), `Sim.StandDecisions` (each ship's turn), `Sim.TrafficEncounters`
+(the schedule and arrivals) and `Sim.TrafficSaves` (save validation), about
+45 minutes, matched on the first run (`f817ece`). The patrol's callback is a
+typed signal called in the TypeScript's order, because the patrol draws impact
+ids from the same sequence as volleys. Mutation testing killed 80 of 108
+mutants at first: the long replays rarely met damaged, flooded or disabled
+ships, carriers, recent attacks on the player, narrow temperament bands or
+coastal passages. 5,000 random single turns, 900 arrivals placed mostly near
+the coast (some in shallows or ashore, so that groups find no passage), and
+four more save breakers closed the gaps; all 108 now fail the tests
+(`66dbbd3`). The tests had also hardcoded half a day as 43,200 seconds; a
+game day is 2,880, so they read it from the calendar now.
+
+`early-end.ts` (90 code lines) became `Sim.EarlyEnd`, with `Sim.PatrolPhase`
+typing the patrol's objective and extraction phases, about 15 minutes, matched
+on the first run (`73b83de`). Of 19 mutants, 18 fail the tests once a briefed
+target's hull can sit between 0 and 1. The last turns the foundering carrier's
+"any briefed target doomed" into "every briefed target doomed", which cannot
+differ while the only mission with that rule briefs a single carrier: an
+equivalent mutant under the real catalog.
+
+`air-support.ts` (115 code lines) became `Sim.AirSupport` (the sortie, its
+report and requests) and `Sim.AircraftFlight` (flying it), with
+`Sim.Ordnance` typing blasts and gun rounds for combat to share, about 40
+minutes, matched on the first run (`0818c0b`). Porting it turned up a
+TypeScript bug, fixed first (`48db130`): a depth bomb's fuse read
+`report.depth || 40`, meant for legacy reports saved without a depth, so a
+report of a boat on the surface (depth 0) set the bomb for 40 m instead of
+the 15 m minimum. It now reads `?? 40`, with a regression test for a surfaced,
+a deep and a legacy report. All 55 mutants fail the tests once the inputs
+reached each threshold: an island base over open water (restore checks only
+that the base is finite), a falling plane ending a tick between -10 and -5 m,
+a plane flying home on a tick short enough that the 10 m arrival floor binds,
+and a strafing cooldown ending a tick between 0 and 0.1 s.

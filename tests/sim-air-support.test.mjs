@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame} from '../src/sim.js';
-import {raiseCarrierAlarm, requestSupport, updateAircraft} from '../typescript/air-support.ts';
+import {raiseCarrierAlarm, requestSupport, updateAircraft} from '../src/air-support.js';
 import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 
 const FIELDS = ['x', 'y', 'depth', 'heading', 'speed', 'time', 'mission', 'rng', 'patrol', 'environment', 'wavePhase', 'lightning', 'difficulty', 'systems', 'scope', 'scopeTravel',
@@ -96,15 +96,15 @@ test('single aircraft updates match across phases, ranges, reports and condition
     const at = report ?? s;
     s.aircraft = Array.from({length: 1 + Math.floor(random() * 3)}, (_, i) => {
       const phase = pick(random, PHASES), range = pick(random, [100, 170, 190, 400, 460, 850, 950, 1250, 1350, 1700, 1900, 3000]), a = random() * Math.PI * 2;
-      const home = phase === 'return' ? pick(random, [5, 30, 200, 3000]) : null;
+      const home = phase === 'return' ? pick(random, [5, 8, 30, 200, 3000]) : null;
       const p = {id: 'air-' + i, name: 'Plane ' + i, x: home === null ? at.x + Math.sin(a) * range : s.airSupport.base.x + home, y: home === null ? at.y + Math.cos(a) * range : s.airSupport.base.y,
-        altitude: pick(random, [-5, 10, 65, 120, 180, 200]), heading: random() * 360, speed: pick(random, [70, 90]), hull: pick(random, [100, 100, 100, 0]), phase,
-        takeoffUntil: s.time + pick(random, [-1, 0, 2]), attack: pick(random, [0, 0, .1, .45, 999]), bank: pick(random, [0, .3]), bombDropped: random() < .4};
+        altitude: pick(random, [-5, 4, 10, 65, 120, 180, 200]), heading: random() * 360, speed: pick(random, [70, 90]), hull: pick(random, [100, 100, 100, 0]), phase,
+        takeoffUntil: s.time + pick(random, [-1, 0, 2]), attack: pick(random, [0, 0, .1, .3, .45, 999]), bank: pick(random, [0, .3]), bombDropped: random() < .4};
       if (random() < .5) p.egress = pick(random, [.1, 5, 10]);
       if (random() < .3) p.previous = {x: p.x, y: p.y, altitude: p.altitude};
       return p;
     });
-    call(calls, 'updateAircraft', updateAircraft, s, pick(random, [.25, 1, 2]));
+    call(calls, 'updateAircraft', updateAircraft, s, pick(random, [.05, .25, 1, 2]));
   }
   const outs = calls.map(c => c.output);
   assert.ok(outs.some(o => o.aircraft.some(p => p.phase === 'down')) && calls.some((c, i) => c.args[0].aircraft.length > outs[i].aircraft.length), 'planes falling and leaving');
@@ -123,6 +123,8 @@ test('support requests and carrier alarms match across sortie states and hunters
     s.difficulty = {...s.difficulty, airSupport: pick(random, [true, true, false, undefined])};
     s.airSupport = {...s.airSupport, status: pick(random, ['idle', 'idle', 'arming', 'airborne', 'spent']), launchAt: pick(random, [null, s.time - 1, s.time, s.time + 1]),
       requestedAt: null, lastKnown: pick(random, [null, reportAt(s, 5), reportAt(s, .5), {x: 0, y: 0, time: s.time - 2}])};
+    // Restore checks only that the base is finite, so some sit over open water.
+    if (random() < .25) s.airSupport.base = {x: s.x + 600, y: s.y - 300};
     const carrier = carrierOf(s);
     if (carrier) { carrier.hull = pick(random, [100, 100, 0]); carrier.fighterCount = pick(random, [1, 2, 3]); }
     for (const v of s.ships) if (v.military && v.kind !== 'carrier') {
