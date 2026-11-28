@@ -1,4 +1,4 @@
-module SimHarness.Acoustics exposing (function)
+module SimHarness.Acoustics exposing (function, kind)
 
 {-| Harness entries for the acoustics.
 -}

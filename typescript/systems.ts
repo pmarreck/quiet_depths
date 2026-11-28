@@ -1,5 +1,6 @@
 // Mirrored in elm/Sim/Systems.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Its drone orders are mirrored in elm/Sim/DroneOrders.elm, the boat's tick in BoatMotion.elm, DamageControl.elm and SeabedContact.elm, and the drone's flight in DroneFlight.elm, DroneReturn.elm and DroneCollisions.elm.
+import {reportInvalidNumber} from './invalid-numbers.ts';
 import {exp, expm1, tanh} from './sim-math.ts';
 import {orderScope, advanceScope} from './periscope.ts';
 import {energyDraw, propulsion, throttlePercent, batteryOutput} from './power-plant.ts';
@@ -101,6 +102,7 @@ export function loseDrone(s: Boat, reason: string): void {
 }
 
 export function damageSystem(s: Boat, key: SystemKey, amount: number): void {
+  if (!Number.isFinite(amount)) { reportInvalidNumber('damageSystem', amount); return; }
   const old = s.systems[key];
   damagePart(s.systems, s.repairLimits, key, amount);
   const health = s.systems[key];
@@ -135,7 +137,8 @@ function scrapeSeabed(s: Boat, dt: number) {
 }
 
 export function hurt(s: Boat, amount: number, text: string, subsystem: SystemKey | null = null, point: Point | null = null): void {
-  if (!Number.isFinite(amount) || amount <= 0 || s.status !== 'patrol') return;
+  if (!Number.isFinite(amount)) { reportInvalidNumber('hurt', amount); return; }
+  if (amount <= 0 || s.status !== 'patrol') return;
   amount *= 2 ** -(s.difficulty?.damage ?? 0);
   s.outerHull = clamp(s.outerHull - amount * .85, 0, 100);
   damagePart(s, s.repairLimits, 'hull', amount); s.flood = clamp(s.flood + amount * .11, 0, 25); s.shock = 2; log(s, text, 'damage');
@@ -184,7 +187,8 @@ function fuelEmergency(s: Boat, dt: number, crew: number) {
 
 export function damageDrone(s: Boat, amount: number, reason: string): void {
   const d = s.drone;
-  if (!['remote', 'return'].includes(d.mode) || !Number.isFinite(amount) || amount <= 0) return;
+  if (!Number.isFinite(amount)) { reportInvalidNumber('damageDrone', amount); return; }
+  if (!['remote', 'return'].includes(d.mode) || amount <= 0) return;
   amount *= 2 ** -(s.difficulty?.damage ?? 0);
   for (const part of DRONE_PARTS) damagePart(d, d.repairLimits, part, amount * DRONE_HIT_FACTORS[part]);
   log(s, 'Drone impact: ' + reason + ' Integrity ' + Math.ceil(d.hull) + '%.', 'damage');

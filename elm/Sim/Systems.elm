@@ -1,4 +1,4 @@
-module Sim.Systems exposing (Difficulty, Impact, World, addDebrief, bottom, damageScale, damageSystem, draw, hullOf, hurt, onboardExplosion)
+module Sim.Systems exposing (Difficulty, Impact, World, addDebrief, bottom, damageScale, damageSystem, draw, emitSound, hullOf, hurt, onboardExplosion)
 
 {-| Damage to the boat: its systems, its hulls, and onboard explosions. The
 drone's orders and damage are in `Sim.DroneOrders`, the boat's per-tick motion
@@ -13,6 +13,7 @@ import Sim.Coast as Coast exposing (Coastline)
 import Sim.Debrief as Debrief
 import Sim.Drone exposing (Drone)
 import Sim.Equipment as Equipment exposing (Section(..), System(..))
+import Sim.InvalidNumber as InvalidNumber exposing (InvalidNumber)
 import Sim.Math as M
 import Sim.Mechanics as Mechanics exposing (LogEntry, LogKind(..))
 import Sim.Periscope as Periscope
@@ -68,6 +69,7 @@ type alias World w =
         , acoustics : List Sound
         , soundSequence : Int
         , replay : List Replay.Marked
+        , invalid : List InvalidNumber
     }
 
 
@@ -98,6 +100,15 @@ addDebrief text s =
 
 damageSystem : System -> Float -> World w -> World w
 damageSystem key amount s =
+    if isNaN amount || isInfinite amount then
+        InvalidNumber.report "damageSystem" amount s
+
+    else
+        damageFinite key amount s
+
+
+damageFinite : System -> Float -> World w -> World w
+damageFinite key amount s =
     let
         old : Float
         old =
@@ -201,7 +212,10 @@ in the struck section, and, rarely, a torpedo-room cook-off.
 -}
 hurt : Float -> String -> Maybe System -> Maybe Point -> World w -> World w
 hurt given text subsystem point start =
-    if isNaN given || isInfinite given || given <= 0 || start.status /= Status.Patrol then
+    if isNaN given || isInfinite given then
+        InvalidNumber.report "hurt" given start
+
+    else if given <= 0 || start.status /= Status.Patrol then
         start
 
     else
@@ -333,8 +347,16 @@ onboardExplosion kind at s =
 {-| A sound at a point, appended to the patrol's acoustic history.
 -}
 emitSound : Acoustics.Kind -> Point -> Float -> World w -> World w
-emitSound kind at power s =
+emitSound kind at power start =
     let
+        s : World w
+        s =
+            if isNaN power || isInfinite power || power < 0 then
+                InvalidNumber.report "emitSound power" power start
+
+            else
+                start
+
         sound : Sound
         sound =
             { id = s.soundSequence

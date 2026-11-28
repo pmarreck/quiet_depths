@@ -1,3 +1,7 @@
+import {setInvalidNumberReporter,warnOnInvalidNumber} from './invalid-numbers.js';
+// In play, a number the simulation refuses is logged rather than thrown. Imports
+// are hoisted, so this runs before any other statement here.
+setInvalidNumberReporter(warnOnInvalidNumber);
 import {orderScope} from './periscope.js';
 import {stationLamp} from './convoy-watch.js';
 import {bindTwoFinger} from './view-gestures.js';

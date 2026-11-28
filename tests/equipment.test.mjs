@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createGame,step,ping,restore,save,isVisible} from '../src/sim.js';
 import {environmentAt} from '../src/environment.js';
 import {damageSystem,damageDrone,hurt,deployDrone} from '../src/systems.js';
+import {collectInvalidNumbers} from '../src/invalid-numbers.js';
 import {feedActive} from '../src/controls.js';
 import {propulsion} from '../src/power-plant.js';
 import {fireDeckGun} from '../src/combat.js';
@@ -194,22 +195,28 @@ test('pre-compartment saves retain propulsion health and repair ceilings, and da
 
 // A hit with no real size, NaN or infinite, once left the outer hull and the
 // flooding NaN (every later comparison then false, and null after a save) or
-// flooded the boat while sparing its pressure hull. Such a hit changes nothing.
-test('a hit whose size is not a finite number changes nothing', () => {
+// flooded the boat while sparing its pressure hull. Such a hit changes nothing,
+// and is reported, since its size means a bug upstream.
+test('a hit whose size is not a finite number changes nothing and is reported', () => {
  for (const amount of [NaN, Infinity, -Infinity]) for (const subsystem of [null, 'sonar']) {
   const s = boat(), before = structuredClone(s), point = {x: s.x, y: s.y + 20, depth: s.depth};
-  hurt(s, amount, 'Phantom impact.', subsystem, point);
+  const {reports} = collectInvalidNumbers(() => hurt(s, amount, 'Phantom impact.', subsystem, point));
   assert.deepStrictEqual(s, before, `a hit of ${amount}${subsystem ? ' to the ' + subsystem : ''}`);
+  assert.deepStrictEqual(reports, [{where: 'hurt', value: amount}]);
+  const direct = boat(), untouched = structuredClone(direct);
+  assert.deepStrictEqual(collectInvalidNumbers(() => damageSystem(direct, 'batteryBank', amount)).reports, [{where: 'damageSystem', value: amount}]);
+  assert.deepStrictEqual(direct, untouched, `system damage of ${amount}`);
  }
 });
 
 // The drone's damage guard had the same gap as hurt's: a NaN or infinite hit
 // passed it, damaged nothing, and still logged an impact.
-test('a drone hit whose size is not a finite number changes nothing', () => {
+test('a drone hit whose size is not a finite number changes nothing and is reported', () => {
  for (const amount of [NaN, Infinity, -Infinity]) for (const mode of ['remote', 'return']) {
   const s = boat(); s.drone.mode = mode;
   const before = structuredClone(s);
-  damageDrone(s, amount, 'phantom contact.');
+  const {reports} = collectInvalidNumbers(() => damageDrone(s, amount, 'phantom contact.'));
   assert.deepStrictEqual(s, before, `a drone hit of ${amount} while ${mode}`);
+  assert.deepStrictEqual(reports, [{where: 'damageDrone', value: amount}]);
  }
 });

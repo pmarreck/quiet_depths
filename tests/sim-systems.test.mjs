@@ -4,11 +4,13 @@ import {createGame, step, save, restore} from '../src/sim.js';
 import {missions} from '../typescript/mission-catalog.ts';
 import {droneDeployReason, deployDrone, recallDrone, loseDrone, damageSystem, hurt, damageDrone} from '../src/systems.js';
 import {listenForReplayEvents} from '../src/replay-events.js';
+import {emitSound} from '../src/acoustics.js';
 import {updateBoat, updateDrone} from '../src/systems.js';
 import {rand, bottom} from '../src/mechanics.js';
 import {recoveryDock} from '../src/vehicle-status.js';
 import {keelLimit} from '../src/hull-contacts.js';
 import {elm, sameResults, exact} from './sim-harness.mjs';
+import {collectInvalidNumbers} from '../src/invalid-numbers.js';
 
 const SYSTEMS = ['diesel', 'fuelTank', 'batteryBank', 'tubes', 'engine', 'propeller', 'oxygen', 'ballast', 'planes', 'rudder', 'sonar', 'periscope', 'deckgun', 'crew'];
 const FIELDS = ['time', 'x', 'y', 'depth', 'heading', 'pitch', 'speed', 'targetSpeed', 'targetHeading', 'targetDepth', 'verticalSpeed', 'hull', 'outerHull', 'flood', 'shock', 'fuel',
@@ -43,10 +45,10 @@ function runTypeScript(state, call) {
   assert.ok(w, 'the patrol restores');
   const input = exact(w);
   listenForReplayEvents(w, {mark: (time, event) => replay.push({time, event})});
-  const result = call(w);
+  const {result, reports: invalid} = collectInvalidNumbers(() => call(w));
   const picked = Object.fromEntries(FIELDS.filter(k => w[k] !== undefined).map(k => [k, w[k]]));
   if (picked.debrief === undefined) picked.debrief = [];
-  return {input, output: exact({...picked, replay}), result};
+  return {input, output: exact({...picked, replay, invalid}), result};
 }
 
 const restorable = () => systemPatrols().filter(s => restore(JSON.stringify(s)) !== null);
@@ -121,6 +123,7 @@ test('hurting the boat matches: hull, flooding, section hits, cook-offs and loss
   // A hit with no finite size once left NaN hulls and flooding; it now changes nothing.
   const phantom = runs.filter(r => !Number.isFinite(r.args[0]));
   assert.ok(phantom.length > 100 && phantom.every(r => Object.is(r.output.outerHull, r.input.outerHull) && Object.is(r.output.flood, r.input.flood) && r.output.events.length === r.input.events.length), 'hits of no finite size change nothing');
+  assert.ok(phantom.every(r => r.output.invalid.length === 1 && r.output.invalid[0].where === 'hurt') && runs.every(r => Number.isFinite(r.args[0]) === !r.output.invalid.length), 'and each is reported, the rest not');
   sameResults(await elm('systems.hurt', runs.map(r => [r.input, ...r.args])), runs.map(r => r.output));
 });
 
@@ -226,4 +229,16 @@ test("the drone's tick matches: link, battery, the return lane, collisions, the 
     ['the low battery alarm sounds', (b, a) => !b.drone.lowAlarm && a.drone.lowAlarm], ['the return lane advances', (b, a) => a.drone.returnStage > b.drone.returnStage]])
     assert.ok(pairs.some(([b, a]) => ok(b, a)), what);
   sameResults(await elm('systems.updateDrone', runs.map(r => [r.input, ...r.args])), runs.map(r => r.output));
+});
+
+// Sounds are made with literal powers, so an invalid one means a bug in new
+// code; both languages report it as the sound is made, and still make it.
+test('making a sound matches, reporting a non-finite or negative power', async () => {
+  const runs = [];
+  for (const [i, s] of restorable().filter((_, i) => i % 6 === 0).entries()) for (const power of [0, .8, 2, NaN, Infinity, -Infinity, -1]) {
+    const data = {type: ['detonation', 'blast', 'creak'][i % 3], x: s.x + 40, y: s.y - 25, depth: 30, power};
+    runs.push({data, ...runTypeScript(s, w => emitSound(w, data))});
+  }
+  assert.ok(runs.some(r => r.output.invalid.length) && runs.some(r => !r.output.invalid.length), 'valid and invalid powers');
+  sameResults(await elm('acoustics.emitSound', runs.map(r => [r.input, r.data])), runs.map(r => r.output));
 });

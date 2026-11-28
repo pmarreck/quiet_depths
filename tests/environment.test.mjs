@@ -4,6 +4,7 @@ import {createGame,step,isVisible,dropDepthCharge,save,restore,getSoundings} fro
 import {environmentAt,DAY_SECONDS,WEATHER,TIMES,surfaceHeight,scopeWashed,soundings} from '../src/environment.js';
 import {waterColumnLight} from '../src/sea-shading.js';
 import {AIR_SOUND_SPEED,WATER_SOUND_SPEED,airWaterPath,propagationTime,perceivedSound,engineSound,emitSound,updateAcoustics} from '../src/acoustics.js';
+import {collectInvalidNumbers} from '../src/invalid-numbers.js';
 import * as sea from '../src/environment.js';
 import {SUB_DESIGN as design} from '../src/hull-design.js';
 import {SternSpray} from '../src/stern-spray.js';
@@ -183,4 +184,14 @@ test('a sound of zero or negative power is silent, and a missing or non-finite p
   for (const power of [undefined, NaN, Infinity, -Infinity]) assert.equal(gain(power), gain(1), `${type} at power ${power}`);
   assert.ok(gain(.5) > 0 && gain(.5) < gain(1), type + ' scales with power');
  }
+});
+
+// Every sound the game emits has a literal power, so an invalid one means a
+// bug in new code: it is reported when the sound is made.
+test('emitting a sound with a non-finite or negative power reports it; zero and missing powers are fine', () => {
+ const s = {time: 5, soundSequence: 0, acoustics: []};
+ for (const power of [NaN, Infinity, -Infinity, -1])
+  assert.deepStrictEqual(collectInvalidNumbers(() => emitSound(s, {type: 'creak', x: 0, y: 0, power})).reports, [{where: 'emitSound power', value: power}]);
+ for (const power of [0, .5, undefined])
+  assert.deepStrictEqual(collectInvalidNumbers(() => emitSound(s, {type: 'creak', x: 0, y: 0, ...(power === undefined ? {} : {power})})).reports, []);
 });

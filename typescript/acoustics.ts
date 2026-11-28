@@ -1,4 +1,5 @@
 // Mirrored in elm/Sim/Acoustics.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+import {reportInvalidNumber} from './invalid-numbers.ts';
 import {exp} from './sim-math.ts';
 // Constant-speed, flat-interface approximation. Typical speeds: NOAA,
 // https://oceanservice.noaa.gov/facts/sound.html . Not a full ocean acoustic model.
@@ -71,6 +72,7 @@ export function aircraftSound(plane: {x: number; y: number; altitude?: number; s
 }
 
 export function emitSound(s: Patrol, data: Source & Record<string, unknown>): Sound {
+  if (data.power !== undefined && !(Number.isFinite(data.power) && (data.power as number) >= 0)) reportInvalidNumber('emitSound power', data.power as number);
   const source: Sound = {id: s.soundSequence++, time: s.time, power: 1, heard: false, ...data};
   s.acoustics.push(source);
   return source;

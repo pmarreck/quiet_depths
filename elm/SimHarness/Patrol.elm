@@ -12,6 +12,7 @@ import Sim.Coast as Coast exposing (Coastline)
 import Sim.Debrief as Debrief
 import Sim.Drone as Drone exposing (Drone)
 import Sim.HullGeometry exposing (Body)
+import Sim.InvalidNumber exposing (InvalidNumber)
 import Sim.Mechanics as Mechanics exposing (LogEntry)
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
 import Sim.ReplayEvents as Replay
@@ -86,6 +87,7 @@ type alias Patrol =
     , ships : List Ship
     , site : Maybe Body
     , replay : List Replay.Marked
+    , invalid : List InvalidNumber
     }
 
 
@@ -183,7 +185,8 @@ impact =
     D.map6 Impact (D.field "id" D.int) (D.field "x" D.float) (D.field "y" D.float) (D.field "altitude" D.float) (D.field "time" D.float) (D.field "kind" D.string)
 
 
-{-| A saved patrol, as restore leaves it; the replay outbox starts empty.
+{-| A saved patrol, as restore leaves it; the replay and invalid-number
+outboxes start empty.
 -}
 decoder : D.Decoder Patrol
 decoder =
@@ -255,6 +258,7 @@ decoder =
                                 |> andMap (D.field "soundSequence" D.int)
                                 |> andMap (D.succeed ships)
                                 |> andMap (optional "site" (D.nullable body) |> D.map (Maybe.andThen identity))
+                                |> andMap (D.succeed [])
                                 |> andMap (D.succeed [])
                         )
             )
@@ -375,6 +379,7 @@ encode s =
                , ( "acoustics", E.list Sound.encode s.acoustics )
                , ( "soundSequence", E.int s.soundSequence )
                , ( "replay", E.list encodeReplay s.replay )
+               , ( "invalid", E.list (\n -> E.object [ ( "where", E.string n.place ), ( "value", E.float n.value ) ]) s.invalid )
                ]
             ++ List.filterMap identity
                 [ field "roll" E.float s.roll

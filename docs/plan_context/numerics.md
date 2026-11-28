@@ -185,3 +185,40 @@ changes `"elm-version"` in elm.json and review/elm.json, the package cache
 directory and the elm2nix sources, and may change behavior the development
 branch altered, so every differential test and the numbers bench rerun
 across it, and the bench compares the two compilers' output speed.
+
+## What produced the NaN hits, and making them impossible (2026-11-27 19:55)
+
+Only the tests. The 542 NaN hulls came from the systems differential test,
+which passes NaN hit sizes on purpose to probe the guard. All 13 places the
+game makes a hit size (hull collisions, torpedoes, strafing, lightning,
+shells, depth charges, landings, fires, system hits, and the drone's
+collisions, seabed strikes and pressure waves) are finite given finite state:
+literals, clamps of `hypot`, falloffs over constant denominators, and one
+normal division that `capsuleContact` guards (`length > 1e-8`). State is
+finite because restore rejects non-finite saves and JSON cannot carry NaN.
+With the invalid-number reports throwing, the full suite (570 tests, whole
+simulated patrols included) met none but the deliberate ones.
+
+The root cause is the type. A double holds NaN and the infinities as ordinary
+values, and a handful of operations make them from finite inputs: 0/0, x/0,
+`sqrt` of a negative, `log` of zero or less, `acos`/`asin` out of range,
+overflow, Infinity - Infinity, 0 * Infinity. Every author must remember every
+guard; this code's authors did, but that is an audit, not a guarantee.
+
+Impossible by construction, by stage:
+- **TypeScript:** not possible; `number` includes NaN, and a branded
+  `Finite` type still needs a runtime check where it is made.
+- **Elm, now:** make the partial operations unavailable in `Sim.*` except as
+  total versions with refined arguments (`M.divide : Float -> NonZero ->
+  Float`, a `NonNegative` for `sqrt`, a range type for `acos`), enforced by
+  a custom elm-review rule that rejects raw `/` with a non-literal
+  denominator, `sqrt`, `logBase`, `acos`, `asin` and `^`. Where the
+  TypeScript already guards an operation, the total version gives the same
+  bits, so the differential tests still hold and this need not wait for the
+  switch. Finite inputs then give finite outputs, overflow aside, which
+  bounded game magnitudes rule out in practice but not by type.
+- **The fork's `Num`:** no representation for NaN or infinity at all; the
+  requirement is with the elm-compiler agent.
+
+The invalid-number reports stay as tripwires until then: tests throw, play
+warns in the console.

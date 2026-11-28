@@ -10,6 +10,7 @@ import Sim.DroneFlight as DroneFlight
 import Sim.DroneOrders as Orders
 import Sim.Equipment as Equipment exposing (System)
 import Sim.Systems as Systems
+import SimHarness.Acoustics exposing (kind)
 import SimHarness.Codec exposing (arg)
 import SimHarness.Patrol as Patrol exposing (Patrol)
 
@@ -52,6 +53,14 @@ function name =
 
         "systems.damageSystem" ->
             Just (D.map3 (\s key amount -> Patrol.encode (Systems.damageSystem key amount s)) patrol (arg 1 system) (arg 2 D.float))
+
+        "acoustics.emitSound" ->
+            Just
+                (D.map3 (\s ( k, at ) power -> Patrol.encode (Systems.emitSound k at power s))
+                    patrol
+                    (arg 1 (D.map2 Tuple.pair (D.field "type" kind) (D.map3 (\x y depth -> { x = x, y = y, depth = depth }) (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float))))
+                    (arg 1 (D.field "power" D.float))
+                )
 
         "systems.hurt" ->
             Just

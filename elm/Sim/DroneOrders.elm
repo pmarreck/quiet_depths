@@ -6,6 +6,7 @@ module Sim.DroneOrders exposing (Flying, damageDrone, deployDrone, droneDeployRe
 import Sim.Drone exposing (Drone, Mode(..))
 import Sim.Equipment as Equipment
 import Sim.HullGeometry exposing (Body)
+import Sim.InvalidNumber as InvalidNumber
 import Sim.Math as M
 import Sim.Mechanics as Mechanics exposing (LogKind(..))
 import Sim.PowerPlant exposing (EngineMode)
@@ -160,55 +161,59 @@ loseDrone reason s =
 
 damageDrone : Float -> String -> World w -> World w
 damageDrone given reason s =
-    let
-        d : Drone
-        d =
-            s.drone
-    in
-    if not (d.mode == Remote || d.mode == Returning) || isNaN given || isInfinite given || given <= 0 then
-        s
+    if isNaN given || isInfinite given then
+        InvalidNumber.report "damageDrone" given s
 
     else
         let
-            amount : Float
-            amount =
-                given * damageScale s
-
-            hull : Equipment.Part
-            hull =
-                Equipment.damage amount { condition = d.hull, limit = d.repairLimits.hull }
-
-            mobility : Equipment.Part
-            mobility =
-                Equipment.damage (amount * 0.8) { condition = d.mobility, limit = d.repairLimits.mobility }
-
-            buoyancy : Equipment.Part
-            buoyancy =
-                Equipment.damage (amount * 0.7) { condition = d.buoyancy, limit = d.repairLimits.buoyancy }
-
-            camera : Equipment.Part
-            camera =
-                Equipment.damage (amount * 0.95) { condition = d.camera, limit = d.repairLimits.camera }
-
-            hit : Drone
-            hit =
-                { d
-                    | hull = hull.condition
-                    , mobility = mobility.condition
-                    , buoyancy = buoyancy.condition
-                    , camera = camera.condition
-                    , repairLimits = { hull = hull.limit, mobility = mobility.limit, buoyancy = buoyancy.limit, camera = camera.limit }
-                }
-
-            logged : World w
-            logged =
-                Mechanics.log ("Drone impact: " ++ reason ++ " Integrity " ++ String.fromInt (ceiling hit.hull) ++ "%.") Damage { s | drone = hit }
+            d : Drone
+            d =
+                s.drone
         in
-        if hit.hull <= 0 then
-            loseDrone "Drone destroyed." logged
+        if not (d.mode == Remote || d.mode == Returning) || given <= 0 then
+            s
 
         else
-            logged
+            let
+                amount : Float
+                amount =
+                    given * damageScale s
+
+                hull : Equipment.Part
+                hull =
+                    Equipment.damage amount { condition = d.hull, limit = d.repairLimits.hull }
+
+                mobility : Equipment.Part
+                mobility =
+                    Equipment.damage (amount * 0.8) { condition = d.mobility, limit = d.repairLimits.mobility }
+
+                buoyancy : Equipment.Part
+                buoyancy =
+                    Equipment.damage (amount * 0.7) { condition = d.buoyancy, limit = d.repairLimits.buoyancy }
+
+                camera : Equipment.Part
+                camera =
+                    Equipment.damage (amount * 0.95) { condition = d.camera, limit = d.repairLimits.camera }
+
+                hit : Drone
+                hit =
+                    { d
+                        | hull = hull.condition
+                        , mobility = mobility.condition
+                        , buoyancy = buoyancy.condition
+                        , camera = camera.condition
+                        , repairLimits = { hull = hull.limit, mobility = mobility.limit, buoyancy = buoyancy.limit, camera = camera.limit }
+                    }
+
+                logged : World w
+                logged =
+                    Mechanics.log ("Drone impact: " ++ reason ++ " Integrity " ++ String.fromInt (ceiling hit.hull) ++ "%.") Damage { s | drone = hit }
+            in
+            if hit.hull <= 0 then
+                loseDrone "Drone destroyed." logged
+
+            else
+                logged
 
 
 {-| The patrol fields the drone's tick reads and writes, beyond those damage
