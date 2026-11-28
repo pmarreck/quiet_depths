@@ -2,7 +2,8 @@
 // The whole patrol, derived from the slice each typed module declares for the
 // functions the simulation hands it. A slice that drifts out of agreement with
 // another stops compiling here instead of failing during play.
-import type {randomizePatrol, objectiveComplete, validMissionTargets, updateFleetBattle} from './missions.ts';
+import type {randomizePatrol, objectiveComplete, updateFleetBattle} from './missions.ts';
+import type {validMissionTargets} from './patrol-restore.ts';
 import type {longPatrol, validSearch} from './patrol-search.ts';
 import type {updateBoat, updateDrone, hurt} from './systems.ts';
 import type {recordWake} from './surface-wake.ts';

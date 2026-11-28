@@ -6,11 +6,15 @@ import {sailingDay} from './patrol-calendar.ts';
 import {resumeTraffic, validTraffic} from './cold-watch.ts';
 import {launchWatchSeconds} from './mess-watch.ts';
 import {validTubeTimes} from './torpedo-tubes.ts';
-import {validAlliedWatch} from './convoy-watch.ts';
+import {validAlliedWatch, validConvoy} from './convoy-watch.ts';
 import {validEcho, validTracks} from './torpedo-watch.ts';
 import {BOAT_PARTS, DRONE_PARTS, readLimits} from './equipment.ts';
 import {makeEnvironment, isWeather} from './environment.ts';
-import {MISSIONS, validMissionTargets} from './missions.ts';
+import {MISSIONS, type Patrol as MissionPatrol} from './missions.ts';
+import {carrierId, validCarrier} from './carrier.ts';
+import {validTheater} from './fleet-action.ts';
+import {allSunk, convoyTransportIds} from './mission-objective.ts';
+import {slice} from './world-slice.ts';
 import {isDieselMode} from './power-plant.ts';
 import {maxNosePitch} from './rov-flight.ts';
 import {freshSystems, freshMotion, freshDrone} from './systems.ts';
@@ -216,4 +220,25 @@ export function restore(raw: string): World | null {
     }
     return s;
   } catch { return null; }
+}
+
+// Each mission's targets are present and as the mission made them.
+export function validMissionTargets(s: MissionPatrol) {
+  if (s.mission === 'wolf-in-the-henhouse') return validConvoy(slice(s));
+  if (s.mission === 'tiebreaker') return validTheater(slice(s));
+  if (s.mission === 'big-kahuna') {
+    const carriers = s.ships.filter(v => v.kind === 'carrier' || v.id === carrierId);
+    return carriers.length === 1 && carriers[0].kind === 'carrier' && carriers[0].id === carrierId && carriers[0].military === true &&
+      validCarrier(slice(carriers[0])) && (s.phase === 'objective' || carriers[0].hull === 0);
+  }
+  if (s.mission === 'sneaky-seamen') return s.departure && Number.isFinite(s.departure.x) && Number.isFinite(s.departure.y) &&
+    s.ships.some(v => v.kind === 'sub' && v.military) && s.ships.some(v => v.kind === 'merchant');
+  if (s.mission === 'intercept') return s.ships.some(ship => ship.id === 'cobalt');
+  if (s.mission === 'seek-and-destroy-sub') return s.ships.some(ship => ship.id === 'echo' && ship.kind === 'sub' && ship.military === true);
+  if (s.mission !== 'seek-and-destroy') return true;
+  const valid = convoyTransportIds.every(id => {
+    const matches = s.ships.filter(ship => ship.id === id);
+    return matches.length === 1 && matches[0].kind === 'merchant' && matches[0].military === true;
+  });
+  return valid && (s.phase === 'objective' || allSunk(s.ships, convoyTransportIds));
 }

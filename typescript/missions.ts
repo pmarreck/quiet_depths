@@ -1,12 +1,12 @@
 import {recordLocalLaunch} from './mess-watch.ts';
-import {carrierId, carrierGroup, validCarrier} from './carrier.ts';
-import {setupHenhouse, validConvoy} from './convoy-watch.ts';
-import {advanceFleetAction, fleetTheater, validTheater} from './fleet-action.ts';
+import {carrierGroup} from './carrier.ts';
+import {setupHenhouse} from './convoy-watch.ts';
+import {advanceFleetAction, fleetTheater} from './fleet-action.ts';
 import {emitSound, launchNoise, type Sound} from './acoustics.ts';
 import {replayEvent} from './replay-events.ts';
 import {rad, bearing, log, type LogEntry} from './mechanics.ts';
 import {hash01, type EnvironmentConfig} from './environment.ts';
-import {MISSIONS, allSunk, convoyTransportIds, evaluateObjective} from './mission-objective.ts';
+import {MISSIONS, convoyTransportIds, evaluateObjective} from './mission-objective.ts';
 import {setupOperation, updateRescue, updateSurvey, type Site, type Operation} from './operation.ts';
 import {trackingCriteria, trackingGoal} from './convoy-tracking.ts';
 import {photoCriteria, photoGoal} from './recon-photos.ts';
@@ -50,25 +50,6 @@ export function updateFleetBattle(s: Patrol): void {
 }
 
 
-export function validMissionTargets(s: Patrol) {
-  if (s.mission === 'wolf-in-the-henhouse') return validConvoy(slice(s));
-  if (s.mission === 'tiebreaker') return validTheater(slice(s));
-  if (s.mission === 'big-kahuna') {
-    const carriers = s.ships.filter(v => v.kind === 'carrier' || v.id === carrierId);
-    return carriers.length === 1 && carriers[0].kind === 'carrier' && carriers[0].id === carrierId && carriers[0].military === true &&
-      validCarrier(slice(carriers[0])) && (s.phase === 'objective' || carriers[0].hull === 0);
-  }
-  if (s.mission === 'sneaky-seamen') return s.departure && Number.isFinite(s.departure.x) && Number.isFinite(s.departure.y) &&
-    s.ships.some(v => v.kind === 'sub' && v.military) && s.ships.some(v => v.kind === 'merchant');
-  if (s.mission === 'intercept') return s.ships.some(ship => ship.id === 'cobalt');
-  if (s.mission === 'seek-and-destroy-sub') return s.ships.some(ship => ship.id === 'echo' && ship.kind === 'sub' && ship.military === true);
-  if (s.mission !== 'seek-and-destroy') return true;
-  const valid = convoyTransportIds.every(id => {
-    const matches = s.ships.filter(ship => ship.id === id);
-    return matches.length === 1 && matches[0].kind === 'merchant' && matches[0].military === true;
-  });
-  return valid && (s.phase === 'objective' || allSunk(s.ships, convoyTransportIds));
-}
 
 
 export const objectiveComplete = (s: Patrol, dt: number) => evaluateObjective(s, dt, {rescue: updateRescue, survey: updateSurvey});
