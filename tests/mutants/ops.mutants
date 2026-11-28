@@ -1,0 +1,66 @@
+T=tests/sim-operations.test.mjs; OP=elm/Sim/Operation.elm; OW=elm/Sim/OperationWork.elm
+m $OP 's/if 0 <= toNumber v then/if -1 <= toNumber v then/' decode-negative $T
+m $OP 's/if Maybe.map .located s.search == Just False then/if False then/' approach-unlocated $T
+m $OP 's/x = site.x - 55/x = site.x - 50/' approach-offset $T
+m $OP 's/M.max 0 \(site.depth - 11\)/M.max 0 (site.depth - 10)/' approach-depth $T
+m $OP 's/M.max 0 \(site.depth - 11\)/site.depth - 11/' approach-floor $T
+m $OP 's/, radius = 8/, radius = 9/' approach-radius $T
+m $OP 's/\n                        site.depth - 11\n/\n                        site.depth - 12\n/' station-depth $T
+m $OP 's/\n                821\n/\n                820\n/' first-loss-draw $T
+m $OP 's/822 \+ toFloat o.dead/823 + toFloat o.dead/' later-loss-draw $T
+m $OP 's/c.onStation && s.status == Status.Patrol && /c.onStation \&\& /' start-status $T
+m $OP 's/ && s.mission \/= Survey && not o.completed then/ \&\& not o.completed then/' start-survey $T
+m $OP 's/ && s.mission \/= Survey && not o.completed then/ \&\& s.mission \/= Survey then/' start-completed $T
+m $OP 's/route = Nothing, targetSpeed = 0, targetDepth = c.depth/route = s.route, targetSpeed = 0, targetDepth = c.depth/' start-route $T
+m $OP 's/route = Nothing, targetSpeed = 0, targetDepth = c.depth/route = Nothing, targetSpeed = 1, targetDepth = c.depth/' start-speed $T
+m $OP 's/1430 \+ h 801 \* 330/1430 + h 801 * 300/' setup-x $T
+m $OP 's/420 \+ h 802 \* 450/420 + h 802 * 400/' setup-y $T
+m $OP 's/case floor \(h 804 \* 3\) of/case floor (h 804 * 2) of/' setup-name $T
+m $OP 's/Coast.chartDepth s.chart x y - 5/Coast.chartDepth s.chart x y - 4/' setup-site-depth $T
+m $OP 's/heading = 35 \+ h 803 \* 100/heading = 35 + h 803 * 90/' setup-site-heading $T
+m $OP 's/x = x - 260 - h 805 \* 120/x = x - 250 - h 805 * 120/' setup-start-x $T
+m $OP 's/y = y - 200 - h 806 \* 180/y = y - 200 - h 806 * 170/' setup-start-y $T
+m $OP 's/35 \+ toFloat \(floor \(h 807 \* 20\)\)/35 + toFloat (floor (h 807 * 15))/' setup-boat-depth $T
+m $OP 's/0.4 < h 813/0.5 < h 813/' setup-hostile $T
+m $OP 's/\| x = x \+ 1200/| x = x + 1100/' setup-escort-x $T
+m $OP 's/\n                                        35\n/\n                                        30\n/' setup-escort-alert $T
+m $OP 's/x = start.x - 250 - h 808 \* 150/x = start.x - 250 - h 808 * 140/' setup-home-x $T
+m $OP 's/y = start.y - 350 - h 809 \* 180/y = start.y - 350 - h 809 * 170/' setup-home-y $T
+m $OP 's/if not hostile \|\| kind == SurveyWreck then/if not hostile then/' setup-survey-quiet $T
+m $OP 's/\n                    , speed = 3\n/\n                    , speed = 4\n/' setup-speed $T
+m $OP 's/, scope = kind == SurfaceCasualty/, scope = False/' setup-scope $T
+m $OP 's/\|> Maybe.withDefault False then/|> Maybe.withDefault True then/' setup-long-patrol $T
+m $OW 's/vertical = M.abs \(s.depth - site.depth\)/vertical = s.depth - site.depth/' survey-vertical $T
+m $OW 's/\n                        0 < rate\n/\n                        0 <= rate\n/' survey-active $T
+m $OW 's/\| holding = c.holding/| holding = False/' survey-holding $T
+m $OW 's/environment.seed 819/environment.seed 818/' survey-find $T
+m $OW 's/holding = False, active = False, boarding = 0, diverReturn = 0/holding = False, active = False, diverReturn = 0/' leave-boarding $T
+m $OW 's/holding = False, active = False, boarding = 0, diverReturn = 0/holding = False, active = False, boarding = 0/' leave-return $T
+m $OW 's/casualtyDeadline s1 held < s1.time && 0 < held.remaining/casualtyDeadline s1 held <= s1.time \&\& 0 < held.remaining/' loss-edge $T
+m $OW 's/casualtyDeadline s1 held < s1.time && 0 < held.remaining/casualtyDeadline s1 held < s1.time \&\& 0 <= held.remaining/' loss-none-left $T
+m $OW 's/lastCasualty = s1.time,/lastCasualty = held.lastCasualty + 100,/' loss-clock $T
+m $OW 's/, if lost.known then/, if True then/' loss-report-known $T
+m $OW 's/Maybe.withDefault 0\)/Maybe.withDefault 1)/' sink-protected $T
+m $OW 's/patrol.seed 820/patrol.seed 821/' sink-roll $T
+m $OW 's/Coast.chartDepth s2.chart site.x site.y - 5/Coast.chartDepth s2.chart site.x site.y - 4/' sink-rest $T
+m $OW 's/sink.lostBelow < settled.depth && 0 < counted.remaining/sink.lostBelow <= settled.depth \&\& 0 < counted.remaining/' sink-lost-edge $T
+m $OW 's/dead = counted.dead \+ counted.remaining, remaining = 0/dead = counted.dead, remaining = 0/' sink-dead $T
+m $OW 's/M.notLess assessing.assessment rules.assessmentSeconds && not assessing.known/rules.assessmentSeconds < assessing.assessment \&\& not assessing.known/' assess-edge $T
+m $OW 's/M.notLess assessing.assessment rules.assessmentSeconds && not assessing.known/M.notLess assessing.assessment rules.assessmentSeconds/' assess-once $T
+m $OW 's/if 0 < assessed.remaining then/if 0 <= assessed.remaining then/' transfer-none-left $T
+m $OW 's/M.notLess boarding.boarding rules.transferSeconds/rules.transferSeconds < boarding.boarding/' transfer-edge $T
+m $OW 's/boarding = boarding.boarding - rules.transferSeconds,/boarding = 0,/' transfer-carry $T
+m $OW 's/transferred.known && M.isZero \(toFloat transferred.remaining\)/M.isZero (toFloat transferred.remaining)/' return-known $T
+m $OW 's/M.notLess returning.diverReturn rules.returnSeconds/rules.returnSeconds < returning.diverReturn/' return-edge $T
+m $OW 's/completed = True, active = False \}/completed = True, active = True }/' return-inactive $T
+m $OW 's/if M.isZero \(toFloat returning.rescued\) then/if False then/' return-empty $T
+m $OW 's/if s.mission == Survey then/if False then/' operation-kind $T
+m $OW 's/ \|\| d.mode == Drone.Returning\)/)/' photo-returning $T
+m $OW 's/ \|\| 0 < s.photoCooldown then/ || 2 < s.photoCooldown then/' photo-cooldown $T
+m $OW 's/85 \* Equipment.operatingFraction/80 * Equipment.operatingFraction/' photo-reach $T
+m $OW 's/if reach < gap \|\| gap < 8 \|\| 32 </if reach <= gap || gap < 8 || 32 </' photo-reach-edge $T
+m $OW 's/ \|\| gap < 8 \|\| 32 </ || gap < 7 || 32 </' photo-closest $T
+m $OW 's/ \|\| gap < 8 \|\| 32 </ || gap < 8 || 30 </' photo-spread $T
+m $OW 's/\n                                Mechanics.bearing site d\n/\n                                Mechanics.bearing d site\n/' photo-side $T
+m $OW 's/\) < c.photoSeparation\)/) <= c.photoSeparation)/' photo-separation $T
+m $OW 's/photoAngles = angles \}, photoCooldown = 4/photoAngles = angles }, photoCooldown = 3/' photo-cooldown-set $T

@@ -1,0 +1,25 @@
+T=tests/sim-convoy-watch.test.mjs; CW=elm/Sim/ConvoyWatch.elm; AW=elm/Sim/AlliedWatch.elm; CS=elm/Sim/ConvoySaves.elm
+m $CW 's/s.scope && 0 < Equipment.operatingFraction/s.scope \&\& 0 <= Equipment.operatingFraction/' scope-damaged $T
+m $CW 's/                                if s0.depth <= 1 then/                                if s0.depth <= 2 then/' hail-depth $T
+m $CW 's/M.max 3400 \(range \* 1.35\)/M.max 3000 (range * 1.35)/' hail-reach-floor $T
+m $CW 's/M.max 3400 \(range \* 1.35\)/M.max 3400 (range * 1.25)/' hail-reach-range $T
+m $CW 's/                                        s2.depth <= 15 && scopeClear s2 env/                                        s2.depth <= 16 \&\& scopeClear s2 env/' lamp-scope-depth $T
+m $CW 's/                                        s2.depth <= 1\n/                                        s2.depth <= 2\n/' lamp-tower-depth $T
+m $CW 's/optical && input.lampInView == Just sender.id && Mechanics.distance s2 sender <= range/optical \&\& input.lampInView == Just sender.id/' lamp-range $T
+m $CW 's/                        0 < shot.damage && 0 < target.hull\n/                        0 < shot.damage\n/' hit-afloat $T
+m $CW 's/if M.notLess s.time shot.arrives then/if s.time > shot.arrives then/' arrival-edge $T
+m $CW 's/v.kind == Surface Escort && v.disabled \/= Just True/v.kind == Surface Escort/' escort-disabled $T
+m $CW 's/Mechanics.distance wolf charge < 650/Mechanics.distance wolf charge < 600/' charge-reach $T
+m $CW 's/14600\) < 0.32 then/14600) < 0.3 then/' charge-odds $T
+m $AW 's/Mechanics.distance s ship0 < 4200/Mechanics.distance s ship0 < 4000/' sweep-range $T
+m $AW 's/s.time - fix.time < 45/s.time - fix.time < 40/' fix-freshness $T
+m $AW 's/180 < s2.time - current.estimate.time/170 < s2.time - current.estimate.time/' uncopied-stands $T
+m $AW 's/initial.elapsed < 20/initial.elapsed < 15/' convoy-first $T
+m $AW 's/if s2.depth <= 1 && not copyingInitial then/if s2.depth <= 1 then/' wait-for-convoy $T
+m $AW 's/lastIssue = -1 \}/lastIssue = 0 }/' watch-fresh-issue $T
+m $CS 's/safeCount c.number && //' save-number $T
+m $CS 's/ && 0 <= c.next && / \&\& /' save-next $T
+m $CS 's/M.isZero wreck.hull && //' save-wreck-hull $T
+m $CS 's/                                < s.weaponSequence\n/                                <= s.weaponSequence\n/' save-shot-id $T
+m $CS 's/valid f && f.sender == v.id/valid f/' save-fix-sender $T
+m $CS 's/List.length \(List.filter \(\\v -> v.incidental \/= Just True\) s.ships\)/List.length s.ships/' save-incidental $T

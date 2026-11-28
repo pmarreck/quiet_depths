@@ -593,6 +593,27 @@ for (const [how, via] of SOURCES) test('an order a reply removes stays removed f
   sameResults([pageless(m)], [pageless(t)]);
 });
 
+// An order the page removes stays removed for a call queued behind the one
+// that carries the removal, the queued call made before either reply: once
+// with the patrol held in the worker throughout, and once removed while the
+// worker held another patrol, so that loading it back is the first the
+// worker hears of it.
+for (const [how, via] of SOURCES) test('an order the page removes stays removed for a queued call, ' + how, async () => {
+  for (const away of [false, true]) {
+    const sim = await elmSimulation(transport(via), strict), m = await sim.create('recon', 29), t = createGame('recon', 29);
+    const other = await sim.create('survey', 30);
+    for (const s of [m, t]) s.newYearWatch = 3;
+    await sim.step(m, 1, {timeRate: 1});
+    step(t, 1, {timeRate: 1});
+    if (away) await sim.step(other, 1, {timeRate: 1});
+    for (const s of [m, t]) delete s.newYearWatch;
+    await Promise.all([sim.step(m, 1, {timeRate: 1}), sim.step(m, 1, {timeRate: 1})]);
+    for (let i = 0; i < 2; i++) step(t, 1, {timeRate: 1});
+    assert.equal('newYearWatch' in m, false, away ? 'removed while away' : 'removed while held');
+    sameResults([pageless(m)], [pageless(t)]);
+  }
+});
+
 // A patrol loaded back into the worker goes without the fields the page
 // left undefined, as JSON would carry it; the TypeScript reads an undefined
 // route as it reads none.

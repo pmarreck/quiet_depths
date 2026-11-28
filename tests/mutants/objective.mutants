@@ -1,0 +1,14 @@
+T=tests/sim-mission-objective.test.mjs; O=elm/Sim/MissionObjective.elm
+m $O 's/\|> Maybe.map \(.hull >> M.isZero\)/|> Maybe.map (.hull >> (\\h -> h < 1))/' sunk-threshold $T
+m $O 's/                \|> Maybe.withDefault False\n/                |> Maybe.withDefault True\n/' missing-counts-sunk $T
+m $O 's/\( M.notLess \(toFloat \(List.length state.photos\)\) state.patrol.photoGoal, state \)/( state.patrol.photoGoal < toFloat (List.length state.photos), state )/' photo-goal-edge $T
+m $O 's/\( allSunk state.ships \(first :: rest\), state \)/( allSunk state.ships rest, state )/' first-target-ignored $T
+m $O 's/\( allSunk state.ships \[ carrier \], state \)/( allSunk state.ships [], state )/' carrier-ignored $T
+m $O 's/\( True, state \)/( False, state )/' survive-fails $T
+m $O 's/\( margin <= Theater.friendlyLead state.ships, state \)/( margin < Theater.friendlyLead state.ships, state )/' lead-edge $T
+m $O 's/\( allSunk state.ships \[ hunter \], state \)/( allSunk state.ships [], state )/' hunter-ignored $T
+m $O 's/\(state.y - state.home.y\) <= radius, state \)/(state.y - state.home.y) < radius, state )/' gate-edge $T
+m $O 's/\( M.notLess state.trackTime state.patrol.trackGoal, state \)/( state.patrol.trackGoal < state.trackTime, state )/' track-edge $T
+m $O 's/            work.rescue dt criteria state/            ( False, state )/' rescue-skipped $T
+m $O 's/            work.survey dt criteria state/            work.survey (dt * 2) criteria state/' survey-tick $T
+m $O 's/            first :: rest\n\n        _ ->/            [ first ]\n\n        _ ->/' transports-truncated $T

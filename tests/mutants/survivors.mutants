@@ -1,0 +1,15 @@
+T=tests/sim-systems.test.mjs; S=elm/Sim
+m $S/Systems.elm 's/M.clamp 0 25 \(start.flood/M.clamp 0 26 (start.flood/' flood-cap $T
+m $S/DroneOrders.elm 's/s.depth \+ 8 < M.min 279/s.depth + 9 < M.min 279/' recall-clearance $T
+m $S/BoatMotion.elm 's/warned.time - since >= 120 then/warned.time - since >= 121 then/' power-watch $T
+m $S/DamageControl.elm 's/if flooded.water > 4 && rate > 0/if flooded.water > 5 \&\& rate > 0/' flood-alarm $T
+m $S/DamageControl.elm 's/s.flood - dt \* 0.045 \* crew/s.flood - dt * 0.05 * crew/' pump-repair $T
+m $S/DamageControl.elm 's/negate dt \* drawn.fuelLeak \* 0.012/negate dt * drawn.fuelLeak * 0.024/' ignition-odds $T
+m $S/DamageControl.elm 's/negate dt \* 0.0015/negate dt * 0.003/' vapor-odds $T
+m $S/SeabedContact.elm 's/if 20 < worn.time/if 30 < worn.time/' scrape-log $T
+m $S/DroneFlight.elm 's/if link >= 70 && not/if link >= 71 \&\& not/' range-alarm $T
+m $S/DroneFlight.elm 's/, if r < 140 then/, if r < 130 then/' wave-reach $T
+m $S/DroneReturn.elm 's/M.abs \(local.down - 2.5\) < 0.7/M.abs (local.down - 2.5) < 0.5/' hatch-stage $T
+m $S/DroneCollisions.elm 's/Carrier.carrierSize.halfLength - Carrier.carrierSize.halfBeam/Carrier.carrierSize.halfLength/' carrier-capsule $T
+m $S/DroneCollisions.elm 's/if closing > 0.3 && pushed.collisionCooldown/if closing > 0.6 \&\& pushed.collisionCooldown/' closing-threshold $T
+m $S/DroneCollisions.elm 's/                                19\n/                                20\n/' fishing-capsule $T

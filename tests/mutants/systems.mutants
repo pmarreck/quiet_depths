@@ -1,0 +1,43 @@
+T=tests/sim-systems.test.mjs; S=elm/Sim
+# outer-hull-share: killed in the first run
+m $S/Systems.elm 's/M.clamp 0 25 \(start.flood/M.clamp 0 26 (start.flood/' flood-cap $T
+m $S/Systems.elm 's/if amount >= 2 \|\| subsystem/if amount > 2 || subsystem/' system-hit-threshold $T
+m $S/Systems.elm 's/\(amount \* \(1.2 \+ r\)\)/(amount * (1.2 - r))/' system-hit-draw $T
+m $S/Systems.elm 's/if r < 0.025 then/if r < 0.05 then/' cookoff-odds $T
+m $S/Systems.elm 's/if amount > 24 && systemHit.torps > 0/if amount > 40 \&\& systemHit.torps > 0/' cookoff-threshold $T
+m $S/Systems.elm 's/"MIDSHIPS"/"MIDSHIP"/' section-name $T
+m $S/Systems.elm 's/        , weaponSequence = s.weaponSequence \+ 1\n//' weapon-sequence $T
+m $S/Systems.elm 's/, heard = False/, heard = True/' sound-heard $T
+m $S/DroneOrders.elm 's/else if M.abs s.speed > 3 then/else if M.abs s.speed >= 3 then/' deploy-speed $T
+m $S/DroneOrders.elm 's/s.depth \+ 8 < M.min 279/s.depth + 9 < M.min 279/' recall-clearance $T
+m $S/DroneOrders.elm 's/if p.side >= 9 && M.abs p.forward < 24/if p.side > 9 \&\& M.abs p.forward < 24/' recall-stage $T
+m $S/DroneOrders.elm 's/\(amount \* 0.8\)/(amount * 0.85)/' drone-mobility-factor $T
+m $S/BoatMotion.elm 's/\(negate dt \* 1.8\) \(dt \* 1.8\)/(negate dt * 1.9) (dt * 1.9)/' rudder-rate $T
+m $S/BoatMotion.elm 's/M.abs turn < M.abs yaw then/M.abs turn <= M.abs yaw then/' yaw-overshoot $T
+m $S/BoatMotion.elm 's/M.min -4 error/M.min -3 error/' surface-demand $T
+m $S/BoatMotion.elm 's/ballast \* 0.72/ballast * 0.7/' ballast-lift $T
+m $S/BoatMotion.elm 's/warned.time - since >= 120 then/warned.time - since >= 121 then/' power-watch $T
+m $S/BoatMotion.elm 's/if s.depth < 2 then/if s.depth < 1 then/' surface-air $T
+m $S/DamageControl.elm 's/if flooded.water > 4 && rate > 0/if flooded.water > 5 \&\& rate > 0/' flood-alarm $T
+m $S/DamageControl.elm 's/repaired.water - 12\) \* 0.012/repaired.water - 12) * 0.013/' soaking $T
+m $S/DamageControl.elm 's/s.flood - dt \* 0.045 \* crew/s.flood - dt * 0.05 * crew/' pump-repair $T
+m $S/DamageControl.elm 's/working \* 0.018 \* dt/working * 0.02 * dt/' leak-sealing $T
+m $S/DamageControl.elm 's/negate dt \* drawn.fuelLeak \* 0.012/negate dt * drawn.fuelLeak * 0.024/' ignition-odds $T
+m $S/DamageControl.elm 's/negate dt \* 0.0015/negate dt * 0.003/' vapor-odds $T
+m $S/DamageControl.elm 's/dt \* \(0.5 \+ working \* 3\)/dt * (0.5 + working * 2)/' firefighting $T
+m $S/SeabedContact.elm 's/\(\\r -> r < chance\)/(\\r -> r <= chance * 0.9)/' landing-odds $T
+m $S/SeabedContact.elm 's/if 20 < worn.time/if 30 < worn.time/' scrape-log $T
+m $S/DroneFlight.elm 's/M.max 0 \(s.battery - charge \* 0.08\)/M.max 0 (s.battery - charge * 0.09)/' charge-cost $T
+m $S/DroneFlight.elm 's/if link >= 70 && not/if link >= 71 \&\& not/' range-alarm $T
+m $S/DroneFlight.elm 's/d.speed \* d.speed \* 0.0013/d.speed * d.speed * 0.0014/' drone-drain $T
+m $S/DroneFlight.elm 's/if before > 10 && drained/if before > 11 \&\& drained/' low-alarm $T
+m $S/DroneFlight.elm 's/, if r < 140 then/, if r < 130 then/' wave-reach $T
+m $S/DroneFlight.elm 's/\(dronePosition d\) dock < 1.2/(dronePosition d) dock < 0.6/' recovery-reach $T
+m $S/DroneReturn.elm 's/M.abs \(local.down - 2.5\) < 0.7/M.abs (local.down - 2.5) < 0.5/' hatch-stage $T
+m $S/DroneReturn.elm 's/\(goal.x - d.x\) \* 0.35/(goal.x - d.x) * 0.4/' lane-gain $T
+m $S/DroneReturn.elm 's/if magnitude > 0.02 then/if magnitude > 0.2 then/' heading-deadband $T
+m $S/DroneCollisions.elm 's/Carrier.carrierSize.halfLength - Carrier.carrierSize.halfBeam/Carrier.carrierSize.halfLength/' carrier-capsule $T
+m $S/DroneCollisions.elm 's/if closing > 0.3 && pushed.collisionCooldown/if closing > 0.6 \&\& pushed.collisionCooldown/' closing-threshold $T
+m $S/DroneCollisions.elm 's/Systems.hurt \(damage \* 0.07\)/Systems.hurt (damage * 0.08)/' plating-damage $T
+m $S/DroneCollisions.elm 's/speed = x.speed \* 0.15/speed = x.speed * 0.2/' collision-slowing $T
+m $S/DroneCollisions.elm 's/                                19\n/                                20\n/' fishing-capsule $T

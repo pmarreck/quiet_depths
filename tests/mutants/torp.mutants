@@ -1,0 +1,56 @@
+T=tests/sim-torpedo-run.test.mjs; TA=elm/Sim/Torpedo.elm; TC=elm/Sim/TorpedoCourse.elm; TS=elm/Sim/TorpedoStrike.elm; TR=elm/Sim/TorpedoRun.elm
+m $TA 's/maxRun =\n    4320/maxRun =\n    4300/' max-run $T
+m $TA 's/torpedoSpeed =\n    24/torpedoSpeed =\n    23/' speed $T
+m $TA 's/torpedoLife =\n    180/torpedoLife =\n    170/' life $T
+m $TA 's/armingTime =\n    4\n/armingTime =\n    3\n/' arming $T
+m $TA 's/maxPitch =\n    pi \/ 4/maxPitch =\n    pi \/ 5/' max-pitch $T
+m $TA 's/surfaceRunDepth =\n    3\n/surfaceRunDepth =\n    4\n/' surface-run-depth $T
+m $TA 's/enemyDecoySupply =\n    2\n/enemyDecoySupply =\n    1\n/' decoy-supply $T
+m $TA 's/\(id \+ 673\)\) < 0.5 then/(id + 673)) < 0.4 then/' search-direction $T
+m $TA 's/, pingAge = 99/, pingAge = 0/' first-ping $T
+m $TC 's/Maybe.withDefault 65 ship.depth/Maybe.withDefault 60 ship.depth/' sub-default-depth $T
+m $TC 's/1800 < d \|\|/1700 < d ||/' seeker-range $T
+m $TC 's/\|\| 40 < M.abs/|| 35 < M.abs/' seeker-cone $T
+m $TC 's/                                        75\n/                                        70\n/' merchant-noise $T
+m $TC 's/                                        65\n/                                        60\n/' escort-noise $T
+m $TC 's/                                        28\n/                                        30\n/' sub-noise $T
+m $TC 's/                                        40\n/                                        45\n/' other-noise $T
+m $TC 's/                                    \* 3\n/                                    * 2\n/' speed-noise $T
+m $TC 's/                            2.5\n/                            2\n/' intended-preference $T
+m $TC 's/ && not p.diverted then/ then/' diverted-preference $T
+m $TC 's/\(d \+ 80\)/(d + 60)/' range-weight $T
+m $TC 's/\|\| 220 < M.hypot2/|| 200 < M.hypot2/' decoy-range $T
+m $TC 's/if M.notLess r 0.25 then/if M.notLess r 0.3 then/' decoy-odds $T
+m $TC 's/ship.x - sin a \* 60/ship.x - sin a * 50/' decoy-short $T
+m $TC 's/cos a \* 24 \* side/cos a * 20 * side/' decoy-side $T
+m $TC 's/expiresAt = rolled.time \+ 18/expiresAt = rolled.time + 15/' decoy-life $T
+m $TC 's/8 \/ \(1 \+ searchAge \/ 24\)/8 \/ (1 + searchAge \/ 20)/' search-turn $T
+m $TC 's/p0.age <= Torpedo.armingTime \/ 2/p0.age < Torpedo.armingTime \/ 2/' tube-run-edge $T
+m $TC 's/M.notLess p0.pingAge 2.4/M.notLess p0.pingAge 2.5/' ping-interval $T
+m $TC 's/power = 0.24 \}/power = 0.25 }/' ping-power $T
+m $TC 's/Mechanics.distance p0 decoy < 650/Mechanics.distance p0 decoy < 600/' noisemaker-range $T
+m $TC 's/floor decoy.time \* 19\)\) < 0.25 then/floor decoy.time * 19)) < 0.3 then/' noisemaker-odds $T
+m $TC 's/p0.decoyCheckedAt \/= Just decoy.time && //' noisemaker-once $T
+m $TC 's/Mechanics.distance p v < 750/Mechanics.distance p v < 700/' diverted-lock-range $T
+m $TC 's/ && Just v.id \/= knows.launcher//' diverted-not-launcher $T
+m $TC 's/if 0 < \(point.x - p.x\) \* sin a/if -50 < (point.x - p.x) * sin a/' aim-passed $T
+m $TC 's/if M.notLess s0.time decoy.expiresAt then/if s0.time > decoy.expiresAt then/' decoy-expiry-edge $T
+m $TC 's/if p.traveled < p.runOut then/if p.traveled <= p.runOut then/' run-out-edge $T
+m $TS 's/sinkDepth = 0, depth = Just s.depth/sinkDepth = 2, depth = Just s.depth/' boat-hit-depth $T
+m $TS 's/sinkDepth = orZero ship.sinkDepth/sinkDepth = 0/' ship-sink-depth $T
+m $TS 's/Systems.hurt 36/Systems.hurt 30/' boat-hit-damage $T
+m $TS 's/hull = M.max 0 \(ship.hull - 100\)/hull = M.max 0 (ship.hull - 90)/' enemy-hit-damage $T
+m $TS 's/100 \* 2 \^ \(Maybe/90 * 2 ^ (Maybe/' player-hit-damage $T
+m $TS 's/if p.diverted && p.intended \/= Just sunk.id then/if p.diverted then/' neutral-decoy-text $T
+m $TS 's/ownHit = Just \(stopped.owner == PlayerTorpedo\)/ownHit = Just True/' own-hit $T
+m $TS 's/Just \(stopped.owner \/= PlayerTorpedo\)/Just True/' replay-enemy $T
+m $TR 's/negate flight \* 10\) \(flight \* 10\)/negate flight * 8) (flight * 8)/' turn-rate $T
+m $TR 's/\(atan2 \(negate drop\) 32\)/(atan2 (negate drop) 30)/' pitch-response $T
+m $TR 's/if M.truthy p.tubeSide then/if False then/' tube-exit-pitch $T
+m $TR 's/0 < depthStep \* drop && M.abs drop < M.abs depthStep/M.abs drop < M.abs depthStep/' overshoot-sign $T
+m $TR 's/\} 12 of/} 10 of/' decoy-radius $T
+m $TR 's/if 0 < flight && M.notLess decoyed.age Torpedo.armingTime then/if M.notLess decoyed.age Torpedo.armingTime then/' strike-needs-flight $T
+m $TR 's/M.notLess \(time - last.time\) 0.24/M.notLess (time - last.time) 0.3/' wake-interval $T
+m $TR 's/time - v.time < 40\)/time - v.time < 30)/' wake-age $T
+m $TR 's/List.length recent - 80\)/List.length recent - 60)/' wake-length $T
+m $TR 's/if not hit && \(M.notLess struck.traveled struck.runLimit/if not hit \&\& (struck.runLimit < struck.traveled/' run-limit-edge $T

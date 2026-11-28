@@ -1,0 +1,52 @@
+T=tests/sim-fleet.test.mjs; A=elm/Sim/FleetAction.elm; H=elm/Sim/FleetTheater.elm; V=elm/Sim/FleetVolleys.elm; S=elm/Sim/FleetActionSaves.elm
+m $A 's/if target.hull <= 0 then\n(\s+)0\n/if target.hull < 0 then\n${1}0\n/' sunk-target-damage $T
+m $A 's/M.max 0 \(target.hull - aimed.damage\)/(target.hull - aimed.damage)/' hull-floor $T
+m $A 's/\(3000 \+ round \* 64 \+ n\)/(3000 + round * 63 + n)/' round-stride $T
+m $A 's/next = s.time \+ 9 \+ roll 0 \* 9/next = s.time + 9 + roll 0 * 8/' round-interval $T
+m $A 's/v.side \/= Just side && v.hull > 0\)/v.side \/= Just side \&\& v.hull > 0 \&\& v.disabled \/= Just True)/' others-include-disabled $T
+m $A 's/index \* 16/index * 15/' side-roll-offset $T
+m $A 's/0.45 \+ 0.55 \* toFloat teamSize/0.5 + 0.55 * toFloat teamSize/' hold-fire-odds $T
+m $A 's/chosen.hull < 40 && teamSize > 1/chosen.hull < 30 \&\& teamSize > 1/' yield-threshold $T
+m $A 's/roll \(n \+ 2\) < 0.7 then/roll (n + 2) < 0.6 then/' yield-odds $T
+m $A 's/if best.hull < v.hull then/if best.hull <= v.hull then/' healthiest-tie $T
+m $A 's/                    0.78\n/                    0.8\n/' sub-hit-odds $T
+m $A 's/                    0.58\n/                    0.6\n/' escort-hit-odds $T
+m $A 's/                            28\n/                            27\n/' sub-damage $T
+m $A 's/                            \* 16\n/                            * 15\n/' damage-spread $T
+m $A 's/                            \+ 90\n/                            + 80\n/' miss-offset $T
+m $A 's/aimed.y \+ 120 \*/aimed.y + 110 */' miss-spread $T
+m $A 's/M.min 48 \(M.max 5/M.min 40 (M.max 5/' torpedo-cap $T
+m $A 's/\/ 30\)\)/\/ 31))/' torpedo-speed $T
+m $A 's/2.5 \+ roll \(n \+ 8\) \* 2/2.5 + roll (n + 8) * 3/' gunfire-time $T
+m $A 's/                        3\n/                        4\n/' gun-altitude $T
+m $A 's/if 1800 < M.hypot2/if 1700 < M.hypot2/' recall-radius $T
+m $A 's/- 0.5\) \* 32 \+ 360/- 0.5) * 30 + 360/' turn-spread $T
+m $H 's/if h 0 < 0.5 then/if h 0 < 0.4 then/' layout-odds $T
+m $H 's/center.x - east \* 540/center.x - east * 530/' surface-area-offset $T
+m $H 's/center.y - 500, radius = 440/center.y - 500, radius = 430/' sub-area-radius $T
+m $H 's/h \(1 \+ offset\) \* 0.28/h (1 + offset) * 0.27/' angle-spread $T
+m $H 's/38 \+ toFloat \(floor \(36 \*/38 + toFloat (floor (35 */' sub-depth $T
+m $H 's/4 \+ toFloat i \* 0.5/4 + toFloat i * 0.4/' escort-speed $T
+m $H 's/area.radius \* 1.8/area.radius * 1.7/' plan-reach $T
+m $H 's/                0.62\n/                0.6\n/' far-friendly-odds $T
+m $H 's/roll < 0.28 then/roll < 0.3 then/' hostile-odds $T
+m $H 's/"PROBABLE HOSTILE"/"PROBABLE HOSTIL"/' probable-hostile $T
+m $H 's/if v.incidental \/= Just True && v.hull > 0 then/if v.hull > 0 then/' incidental-counted $T
+m $V 's/mission \+\+ traffic/traffic ++ mission/' traffic-order $T
+m $V 's/M.max 0 \(time - v.launched\)/(time - v.launched)/' age-floor $T
+m $V 's/M.min 1 \(age \/ seconds\)/(age \/ seconds)/' pose-cap $T
+m $S 's/M.abs v <= 9007199254740991/M.abs v <= 9007199254740992/' safe-integer-bound $T
+m $S 's/\|\| s.round\n(\s+)< 0/|| s.round\n${1}< -1/' round-sign $T
+m $S 's/\|\| s.next\n(\s+)< 0/|| s.next\n${1}< -1/' next-sign $T
+m $S 's/\|\| v.id\n(\s+)< 1/|| v.id\n${1}< 0/' id-floor $T
+m $S 's/\|\| M.notLess v.id s.weaponSequence/|| s.weaponSequence < v.id/' id-ceiling $T
+m $S 's/\|\| v.launched\n(\s+)< 0/|| v.launched\n${1}< -1/' launch-sign $T
+m $S 's/\|\| s.time\n(\s+)< v.launched/|| s.time + 1\n${1}< v.launched/' launch-future $T
+m $S 's/\|\| v.arrives\n(\s+)<= s.time/|| v.arrives\n${1}< s.time/' arrival-past $T
+m $S 's/\|\| v.arrives\n(\s+)<= v.launched/|| v.arrives\n${1}< v.launched/' flight-length $T
+m $S 's/&& 0 < a.radius/\&\& 0 <= a.radius/' radius-sign $T
+m $S 's/        <= 12\n/        <= 13\n/' volley-cap $T
+m $S 's/            \/= 2\n/            \/= 3\n/' area-count $T
+m $S 's/        == 8\n/        == 9\n/' unit-count $T
+m $S 's/                    source.side \/= target.side/                    True/' opposite-sides $T
+m $S 's/                        == \(if i == 3 then/                        == (if i == 2 then/' sub-slot $T

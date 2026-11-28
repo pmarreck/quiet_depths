@@ -1,0 +1,4 @@
+T=tests/sim-hostile-tracks.test.mjs; H=elm/Sim/HostileTracks.elm; R=elm/Sim/HunterReports.elm
+T=tests/sim-hostile-tracks.test.mjs; H=elm/Sim/HostileTracks.elm; R=elm/Sim/HunterReports.elm
+m $H 's/reported.alert <= 42 then/reported.alert < 42 then/' track-alert-edge $T
+m $H 's/                2300\n/                2200\n/' torpedo-reach $T

@@ -1,0 +1,52 @@
+T=tests/sim-missions.test.mjs; MI=elm/Sim/Missions.elm; CA=elm/Sim/Carrier.elm
+m $MI 's/if fired && v.underwater then/if fired then/' battle-launch-underwater $T
+m $MI 's/Systems.launchNoise p \(Just \(negate p.altitude\)\) False/Systems.launchNoise p (Just p.altitude) False/' battle-launch-depth $T
+m $MI 's/depth = Just \(M.max 0 \(negate p.altitude\)\)/depth = Just (negate p.altitude)/' battle-sound-depth $T
+m $MI 's/\n                        0.55\n/\n                        0.5\n/' battle-shot-power $T
+m $MI 's/\n                        0.9\n/\n                        0.85\n/' battle-arrival-power $T
+m $MI 's/if M.truthy v.damage && v.underwater then/if M.truthy v.damage then/' battle-torpedo-kind $T
+m $MI 's/-2 <= p.altitude then/-3 <= p.altitude then/' battle-splash-height $T
+m $MI 's/weaponSequence = heard.weaponSequence \+ 1/weaponSequence = heard.weaponSequence/' battle-sequence $T
+m $MI 's/if v.underwater && M.truthy v.damage then/if v.underwater then/' battle-replay-hit $T
+m $MI 's/depth = negate p.altitude \}, heading = Nothing/depth = p.altitude }, heading = Nothing/' battle-replay-depth $T
+m $MI 's/220 \+ h 21 \* 65/220 + h 21 * 60/' layout-convoy-heading $T
+m $MI 's/\{ x = \(h 22 - 0.5\) \* 500/{ x = (h 22 - 0.5) * 400/' layout-start $T
+m $MI 's/3.5 \+ h 32 \* 3/3.5 + h 32 * 2/' layout-convoy-speed $T
+m $MI 's/Mechanics.rad \(-15 \+ h 84 \* 85\)/Mechanics.rad (-10 + h 84 * 85)/' layout-hunted-course $T
+m $MI 's/2700 \+ h 85 \* 1200/2700 + h 85 * 1100/' layout-hunted-range $T
+m $MI 's/start.x \+ 1050 \+ h 30 \* 650/start.x + 1000 + h 30 * 650/' layout-convoy-x $T
+m $MI 's/case floor \(h 80 \* 5\) of/case floor (h 80 * 4) of/' layout-military-name $T
+m $MI 's/\( -2200, -900 \)/( -2200, -800 )/' layout-fourth-ship $T
+m $MI 's/\(h \(40 \+ n\) - 0.5\) \* 800/(h (40 + n) - 0.5) * 700/' layout-ship-x $T
+m $MI 's/\(h \(60 \+ n\) - 0.5\) \* 12/(h (60 + n) - 0.5) * 10/' layout-ship-heading $T
+m $MI 's/2 \+ h \(70 \+ n\) \* 2/2 + h (70 + n) * 3/' layout-fishing-speed $T
+m $MI 's/\n                        speed \+ 2\n/\n                        speed + 1\n/' layout-escort-speed $T
+m $MI 's/case floor \(h 81 \* 3\) of/case floor (h 81 * 2) of/' layout-alder-name $T
+m $MI 's/convoy.x \+ 400 \+ h 82 \* 500/convoy.x + 400 + h 82 * 400/' layout-alder-x $T
+m $MI 's/photoGoal \(h 24\)/photoGoal (h 25)/' layout-photo-goal $T
+m $MI 's/trackingGoal \(h 25\)/trackingGoal (h 24)/' layout-track-goal $T
+m $MI 's/1 \+ floor \(h 26 \* 999\)/floor (h 26 * 999)/' layout-variant $T
+m $MI 's/, heading = 20 \+ h 27 \* 35/, heading = 25 + h 27 * 35/' layout-boat-heading $T
+m $MI 's/start.x - 1100 - h 28 \* 650/start.x - 1000 - h 28 * 650/' layout-home $T
+m $MI 's/not \(String.startsWith "Helm steady." e.text\)/True/' layout-opening-line $T
+m $MI 's/home = \{ x = start.x - 450, y = start.y - 550 \}/home = { x = start.x - 400, y = start.y - 550 }/' fleet-home $T
+m $MI 's/\(if longPatrol then\n(\s+)arrayed/(if False then\n$1arrayed/' fleet-long-patrol $T
+m $MI 's/\(h 981 < 0.5\)/(h 981 < 0.4)/' carrier-extra-escort $T
+m $MI 's/depth = Just \(55 \+ h 86 \* 40\)/depth = Just (55 + h 86 * 30)/' hunt-depth $T
+m $MI 's/h 89 < 0.36/h 89 < 0.3/' hunt-second-odds $T
+m $MI 's/depth = Just \(45 \+ h 92 \* 45\)/depth = Just (45 + h 92 * 40)/' hunt-second-depth $T
+m $MI 's/phase = Extract \}/phase = s.phase }/' hunt-extract $T
+m $MI 's/Mechanics.rad \(30 \+ h 920 \* 35\)/Mechanics.rad (30 + h 920 * 30)/' transit-course $T
+m $MI 's/2700 \+ h 921 \* 550/2700 + h 921 * 500/' transit-length $T
+m $MI 's/length \* \(0.37 \+ h \(930 \+ n\) \* 0.36\)/length * (0.37 + h (930 + n) * 0.3)/' transit-along $T
+m $MI 's/Just \(15 \+ h \(960 \+ n\) \* 35\)/Just (15 + h (960 + n) * 30)/' transit-sweep $T
+m $MI 's/if v.kind == Surface Escort \|\| v.kind == Submarine then/if v.kind == Surface Escort then/' transit-sweep-subs $T
+m $MI 's/if 0.4 <= h 87 then/if 0.5 <= h 87 then/' convoy-echo-odds $T
+m $MI 's/if List.member v.id MissionObjective.convoyTransportIds then/if False then/' convoy-armed $T
+m $MI 's/\/ 45\) \* 45\)/\/ 40) * 40)/' convoy-bearing $T
+m $MI 's/String.padLeft 3/String.padLeft 2/' convoy-bearing-digits $T
+m $MI 's/\n            if longPatrol then\n                hunted\n/\n            if False then\n                hunted\n/' convoy-long-quiet $T
+m $CA 's/y = y \+ dy, heading/y = y - dy, heading/' group-offsets $T
+m $CA 's/military = Just True, flood = Just 0/military = Just False, flood = Just 0/' group-military $T
+m $CA 's/1 \+ floor \(fighterRoll \* 3\)/1 + floor (fighterRoll * 2)/' group-fighters $T
+m $CA 's/ship "petrel" "Petrel" \(Surface Escort\) 510 380/ship "petrel" "Petrel" (Surface Escort) 500 380/' group-petrel $T

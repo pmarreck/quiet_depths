@@ -1,0 +1,63 @@
+T=tests/sim-combat.test.mjs; CB=elm/Sim/Combat.elm; GR=elm/Sim/GunRounds.elm; SD=elm/Sim/ShipDamage.elm; TV=elm/Sim/TorpedoSaves.elm
+m $CB 's/if M.truthy air && elapsed < air then/if elapsed < air then/' charge-no-air $T
+m $CB 's/M.max 0.001 \(charge.totalDelay - air\)/M.max 0.01 (charge.totalDelay - air)/' charge-sink-floor $T
+m $CB 's/\(1 - \(elapsed \/ air\) \^ 2\)/(1 - elapsed \/ air)/' charge-fall-curve $T
+m $CB 's/ \|\| \(c.identified == Just True && c.military \/= Just True\)//' launch-neutral $T
+m $CB 's/ \|\| 100 < s.depth/ || 90 < s.depth/' launch-depth-limit $T
+m $CB 's/if c.side == Just Sim.Vessel.Friendly \|\| /if /' launch-friendly $T
+m $CB 's/\{ port_ = s0.time \+ reloadSeconds \/ condition, starboard/{ port_ = s0.time + reloadSeconds, starboard/' reload-condition $T
+m $CB 's/reloadSeconds =\n    20/reloadSeconds =\n    18/' reload-time $T
+m $CB 's/M.min s.runSetting \(s.runSetting \/ 2\)/M.min s.runSetting (s.runSetting \/ 3)/' bearing-only-run-out $T
+m $CB 's/Mechanics.distance launched v < 3500 then/Mechanics.distance launched v < 3000 then/' launch-warn-range $T
+m $CB 's/launched.runSetting \+ 50\)/launched.runSetting + 0)/' launch-serious-margin $T
+m $CB 's/12 \+ range \* 0.04 \+ track.age/12 + range * 0.03 + track.age/' hostile-scatter $T
+m $CB 's/\(4 \+ track.age \* 0.25\)/(4 + track.age * 0.2)/' hostile-depth-spread $T
+m $CB 's/if ship.lastTubeSide == Just 1 then/if ship.lastTubeSide == Just -1 then/' hostile-tube-alternation $T
+m $CB 's/Maybe.withDefault 0 ship.depth, pitch = orZero ship.pitch/Maybe.withDefault 0 ship.depth, pitch = 0/' hostile-pitch $T
+m $CB 's/M.clamp -15 85 aim.elevation/M.clamp -10 85 aim.elevation/' gun-elevation-limit $T
+m $CB 's/, x = s0.x \+ sin a \* 16/, x = s0.x + sin a * 15/' gun-mount $T
+m $CB 's/, altitude = 6 - s0.depth/, altitude = 5 - s0.depth/' gun-height $T
+m $CB 's/, vz = sin e \* 600/, vz = sin e * 550/' gun-muzzle-speed $T
+m $CB 's/M.remainder shots 5/M.remainder shots 4/' gun-tracer $T
+m $CB 's/cooldown = 0.25 \/ Equipment/cooldown = 0.2 \/ Equipment/' gun-cooldown $T
+m $CB 's/Just \(fired.time \+ 3\)/Just (fired.time + 2)/' gun-loud $T
+m $CB 's/Mechanics.distance fired v < 6000 then/Mechanics.distance fired v < 5000 then/' gun-alert-range $T
+m $CB 's/M.max v.alert 65/M.max v.alert 60/' gun-alert $T
+m $CB 's/ \|\| 0 < s0.gun.cooldown//' gun-cooldown-check $T
+m $CB 's/            d \/ 600\n/            d \/ 500\n/' aim-lead $T
+m $CB 's/Maybe.withDefault 2 point.altitude - 6/Maybe.withDefault 0 point.altitude - 6/' aim-default-altitude $T
+m $CB 's/cooldown = M.max 0 \(gun.cooldown - dt\)/cooldown = M.max 0 (gun.cooldown - dt * 2)/' tick-cooldown $T
+m $GR 's/8 < orZero v.depth/10 < orZero v.depth/' round-sub-depth $T
+m $GR 's/altitude = p.altitude \} 10\)/altitude = p.altitude } 12)/' round-aircraft-radius $T
+m $GR 's/if s.depth <= 2 then\n                Geometry.sphereHit/if s.depth <= 3 then\n                Geometry.sphereHit/' strafe-depth $T
+m $GR 's/altitude = 2 \} 8 \|>/altitude = 2 } 6 |>/' strafe-radius $T
+m $GR 's/Mechanics.distance v point < 150 then/Mechanics.distance v point < 120 then/' splash-notice $T
+m $GR 's/plane.hull - 38 \* scale/plane.hull - 30 * scale/' round-aircraft-damage $T
+m $GR 's/\(12 \* scale\)/(10 * scale)/' round-ship-damage $T
+m $GR 's/orZero signaled.sinkDepth < 5 then/orZero signaled.sinkDepth < 4 then/' round-waterline $T
+m $GR 's/2.4 \* scale/2 * scale/' round-flooding $T
+m $GR 's/if 2 < neutralNoted.time - Maybe.withDefault -99/if 3 < neutralNoted.time - Maybe.withDefault -99/' hit-log-interval $T
+m $GR 's/ended.time - p.time < 3\)/ended.time - p.time < 2)/' impact-age $T
+m $GR 's/r.age < 6\)/r.age < 5)/' round-life $T
+m $GR 's/List.length recent - 64\)/List.length recent - 4)/' impact-count $T
+m $GR 's/if signaled.kind == Surface Carrier then/if False then/' round-carrier-alarm $T
+m $SD 's/flood \* 0.05 \* dt/flood * 0.04 * dt/' flood-rate $T
+m $SD 's/hull < 48 \|\| 8 < flood/hull < 40 || 8 < flood/' disable-hull $T
+m $SD 's/hull < 48 \|\| 8 < flood/hull < 48 || 9 < flood/' disable-flood $T
+m $SD 's/\(1 - hull \/ 40\) \* 7/(1 - hull \/ 40) * 6/' doomed-settle $T
+m $SD 's/M.min 4 \(sinkDepth/M.min 3 (sinkDepth/' list-limit $T
+m $SD 's/dt \* flood \* 0.002/dt * flood * 0.003/' list-rate $T
+m $SD 's/                1.3\n/                1.2\n/' sub-descent $T
+m $SD 's/                3\n\n            else\n                8\n/                3\n\n            else\n                6\n/' bed-clearance $T
+m $SD 's/Maybe.withDefault 4 v1.nextCreak/Maybe.withDefault 3 v1.nextCreak/' first-creak $T
+m $SD 's/age \+ 9 \+ hash01/age + 8 + hash01/' creak-interval $T
+m $SD 's/                && 45\n/                \&\& 40\n/' collapse-depth $T
+m $SD 's/                && 18\n/                \&\& 15\n/' collapse-sink $T
+m $SD 's/0.45 < hash01 s3.patrol.seed sunkAt/0.5 < hash01 s3.patrol.seed sunkAt/' collapse-odds $T
+m $SD 's/if M.notLess sinkDepth bed then/if bed < sinkDepth then/' settle-edge $T
+m $TV 's/M.min s.depth 6/M.min s.depth 5/' save-default-depth $T
+m $TV 's/orDefault value "pingAge" finiteFloat 99/orDefault value "pingAge" finiteFloat 98/' save-default-ping $T
+m $TV 's/100 <= v && v <= Torpedo.maxRun/90 <= v \&\& v <= Torpedo.maxRun/' save-run-limit $T
+m $TV 's/age \* Torpedo.torpedoSpeed/age * 20/' save-default-traveled $T
+m $TV 's/0 <= t && t <= time/0 <= t/' save-checked-at-future $T
+m $TV 's/0 <= v && v <= limit/0 <= v/' save-traveled-limit $T

@@ -1,0 +1,17 @@
+T=tests/sim-combat.test.mjs; CB=elm/Sim/Combat.elm; GR=elm/Sim/GunRounds.elm; SD=elm/Sim/ShipDamage.elm; TV=elm/Sim/TorpedoSaves.elm
+m $CB 's/M.max 0.001 \(charge.totalDelay - air\)/M.max 0.01 (charge.totalDelay - air)/' charge-sink-floor $T
+m $CB 's/ \|\| 100 < s.depth/ || 90 < s.depth/' launch-depth-limit $T
+m $CB 's/launched.runSetting \+ 50\)/launched.runSetting + 0)/' launch-serious-margin $T
+m $CB 's/Mechanics.distance fired v < 6000 then/Mechanics.distance fired v < 5000 then/' gun-alert-range $T
+m $GR 's/8 < orZero v.depth/10 < orZero v.depth/' round-sub-depth $T
+m $GR 's/if s.depth <= 2 then\n                Geometry.sphereHit/if s.depth <= 3 then\n                Geometry.sphereHit/' strafe-depth $T
+m $GR 's/Mechanics.distance v point < 150 then/Mechanics.distance v point < 120 then/' splash-notice $T
+m $GR 's/orZero signaled.sinkDepth < 5 then/orZero signaled.sinkDepth < 4 then/' round-waterline $T
+m $GR 's/if signaled.kind == Surface Carrier then/if False then/' round-carrier-alarm $T
+m $SD 's/\(1 - hull \/ 40\) \* 7/(1 - hull \/ 40) * 6/' doomed-settle $T
+m $SD 's/M.min 4 \(sinkDepth/M.min 3 (sinkDepth/' list-limit $T
+m $SD 's/                && 45\n/                \&\& 40\n/' collapse-depth $T
+m $SD 's/                && 18\n/                \&\& 15\n/' collapse-sink $T
+m $SD 's/0.45 < hash01 s3.patrol.seed sunkAt/0.5 < hash01 s3.patrol.seed sunkAt/' collapse-odds $T
+m $TV 's/100 <= v && v <= Torpedo.maxRun/90 <= v \&\& v <= Torpedo.maxRun/' save-run-limit $T
+m $TV 's/age \* Torpedo.torpedoSpeed/age * 20/' save-default-traveled $T

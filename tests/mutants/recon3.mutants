@@ -1,0 +1,2 @@
+T=tests/sim-recon.test.mjs; RC=elm/Sim/Recon.elm; RP=elm/Sim/ReconPasses.elm; RS=elm/Sim/ReconSaves.elm
+m $RC 's/ \|\| not \(settled recon.phase\)//' request-busy $T

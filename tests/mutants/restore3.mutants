@@ -1,0 +1,11 @@
+T="--test-name-pattern=current|any.field|older|bounds tests/sim-patrol-restore.test.mjs"; SF=elm/Sim/SaveFields.elm; RF=elm/Sim/RestoreFields.elm; RS=elm/Sim/RestoreStores.elm; RC=elm/Sim/RestoreChecks.elm; PR=elm/Sim/PatrolRestore.elm
+m $SF 's/integer v && M.abs v <= 9007199254740991/integer v/' sf-safe-range "$T"
+m $SF 's/        Ok _ ->\n            Nothing\n/        Ok _ ->\n            Just Dict.empty\n/' sf-object-array "$T"
+m $RF 's/text "phase" f == Just "objective" && //' rf-partial-phase "$T"
+m $RS 's/\(\\n -> integer n && 0 <= n\)/(\\n -> 0 <= n)/' rs-torps-integer "$T"
+m $RC 's/Just Number ->\n(\s+)number key f \/= Nothing/Just Number ->\n${1}True/' rc-template-number "$T"
+m $RC 's/0 <= v && v <= t\) >> Result.withDefault False/0 <= v) >> Result.withDefault False/' rc-collision-hits "$T"
+m $RC 's/&& \(Dict.get "drone" f \|> Maybe.map truthy \|> Maybe.withDefault False\)/\&\& True/' rc-drone-truthy "$T"
+m $RC 's/if 0 <= n && n <= 100 then/if 0 <= n then/' rc-limit-range "$T"
+m $RC 's/kind \/= "sub" \|\| depth/True/' rc-sub-depth "$T"
+m $PR 's/SaveFields.integer fighters && SaveFields.integer hits && /SaveFields.integer hits \&\& /' pr-carrier-fighters "$T"

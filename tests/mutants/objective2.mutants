@@ -1,0 +1,4 @@
+T=tests/sim-mission-objective.test.mjs; O=elm/Sim/MissionObjective.elm
+T=tests/sim-mission-objective.test.mjs; O=elm/Sim/MissionObjective.elm
+m $O 's/\(state.y - state.home.y\) <= radius, state \)/(state.y - state.home.y) < radius, state )/' gate-edge $T
+m $O 's/            work.survey dt criteria state/            work.survey (dt * 2) criteria state/' survey-tick $T

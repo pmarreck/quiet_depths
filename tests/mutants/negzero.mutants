@@ -1,0 +1,1 @@
+m elm/Sim/Systems.elm 's/\| outerHull = M.clamp 0 100 \(start.outerHull - amount \* 0.85\)/| outerHull = (\\v -> if v < 0.5 && v > -0.5 then negate v else v) (M.clamp 0 100 (start.outerHull - amount * 0.85))/' "zero-becomes-negative-zero ($LABEL)" tests/sim-systems.test.mjs

@@ -1,0 +1,26 @@
+T=tests/sim-patrol-tick.test.mjs; PT=elm/Sim/PatrolTick.elm; PS=elm/Sim/PatrolShips.elm; PH=elm/Sim/PatrolHearing.elm; PZ=elm/Sim/PatrolHazards.elm; PE=elm/Sim/PatrolEnd.elm
+m $PT 's/if first.text == second.text then/if False then/' events-dedupe $T
+m $PT 's/f.source == Just "satellite" && s.time - f.time < 900/f.source == Just "satellite" \&\& s.time - f.time < 800/' contacts-satellite $T
+m $PT 's/receivedAt = Maybe.withDefault \(0 \/ 0\) p.receivedAt/receivedAt = p.capturedAt/' recon-received $T
+m $PT 's/PatrolHearing.advanceTraffic \(env.holiday \/= Nothing\) s3/PatrolHearing.advanceTraffic False s3/' traffic-holiday $T
+m $PT 's/\{ observed \| lampInView = Nothing \}/observed/' lamp-busy $T
+m $PT 's/if M.truthy r then\n(\s+)r\n/if True then\n${1}r\n/' rate-zero $T
+m $PT 's/photoCooldown = M.max 0 \(s1.photoCooldown - dt\)/photoCooldown = s1.photoCooldown/' photo-cooldown $T
+m $PS 's/\(s0.silent \|\| s0.speed < 9\)/s0.speed < 9/' hear-silent $T
+m $PS 's/0.16\n(\s+)< watch.env.fog/0.3\n${1}< watch.env.fog/' lights-fog $T
+m $PS 's/&& within 19\n/\&\& within 25\n/' lights-arc $T
+m $PS 's/Maybe.withDefault -1\) < r.time then/Maybe.withDefault -1) <= r.time then/' clue-fresh $T
+m $PS 's/if hunted.disabled == Just True then/if False then/' disabled-stop $T
+m $PS 's/delay = c.delay, kind = Charge \}/delay = c.delay, kind = Bomb }/' charge-kind $T
+m $PH 's/                0.97\n/                0.9\n/' hear-launch-odds $T
+m $PH 's/                            2200\n/                            2000\n/' hear-splash-range $T
+m $PH 's/heardDistance < 6000 \* sonar s1/heardDistance < 5000 * sonar s1/' seeker-range $T
+m $PH 's/if reported.time - last < 120 then/if reported.time - last < 100 then/' sweep-area-window $T
+m $PH 's/< 5600 \* Equipment.operatingFraction s.systems.sonar then/< 5000 * Equipment.operatingFraction s.systems.sonar then/' traffic-ping $T
+m $PH 's/    if d < 210 then/    if d < 200 then/' blast-near $T
+m $PZ 's/if s0.time < 30 then/if s0.time < 20 then/' strike-early $T
+m $PZ 's/Mechanics.distance s v < 6000/Mechanics.distance s v < 5000/' strike-exposed-range $T
+m $PZ 's/if s1.convoy \/= Nothing && fired.convoyCharge == Just True then/if False then/' convoy-charge $T
+m $PE 's/s0.convoy \/= Nothing \|\| s0.mission == Tiebreaker \|\| v.incidental == Just True/s0.convoy \/= Nothing || v.incidental == Just True/' drone-sighting-fleet $T
+m $PE 's/M.min 1200 eyes.env.opticalRange/M.min 1000 eyes.env.opticalRange/' wreck-range $T
+m $PT 's/List.foldl \(\\c w -> Replay.mark \{[^\n]*\} w\)/List.foldl (\\_ w -> w)/' hull-replay $T

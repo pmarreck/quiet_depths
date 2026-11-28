@@ -1,0 +1,42 @@
+T=tests/sim-hostile-tracks.test.mjs; H=elm/Sim/HostileTracks.elm; R=elm/Sim/HunterReports.elm
+m $R 's/M.max 0 \(time - report.time\)/(time - report.time)/' age-floor $T
+m $R 's/\(age \+ lead\) \* report.speed \* 0.514444/(age + lead) * report.speed * 0.5/' knots $T
+m $R 's/\|\| r.time < 0 \|\|/||/' report-past $T
+m $R 's/\|\| time < r.time\)/)/' report-future $T
+m $R 's/Maybe.map finite >> Maybe.withDefault legacy/Maybe.map finite >> Maybe.withDefault True/' legacy-ignored $T
+m $R 's/radius \* sqrt r2/radius * r2/' scatter-uniform $T
+m $H 's/\(\\d -> 15 < d\)/(\\d -> 16 < d)/' deep-sub $T
+m $H 's/if s.depth <= 15 && 0 < s.systems.periscope then/if s.depth <= 15 then/' periscope-damage $T
+m $H 's/                        if s.depth < 3 then\n                            90 \+ 5 \* mast/                        if s.depth <= 3 then\n                            90 + 5 * mast/' surfaced-edge $T
+m $H 's/23 \* mast/20 * mast/' mast-exposure $T
+m $H 's/0.45 \* setting .depthStealth s/0.45 * 1/' depth-stealth-ignored $T
+m $H 's/M.clamp 0 1 \(1 - range \/ 5500\)/M.clamp 0 1 (1 - range \/ 5000)/' hearing-range $T
+m $H 's/senses.storm \* 0.38/senses.storm * 0.3/' storm-masking $T
+m $H 's/M.notLess \(visual \* sensitivity\) 9/M.notLess (visual * sensitivity) 10/' sight-threshold $T
+m $H 's/M.notLess \(acoustic \* sensitivity\) 8/M.notLess (acoustic * sensitivity) 9/' hearing-threshold $T
+m $H 's/decoyRange < 1050/decoyRange < 1000/' decoy-range $T
+m $H 's/s.time - n.time <= 32/s.time - n.time < 32/' decoy-age $T
+m $H 's/decoyRange < range \* 0.65/decoyRange < range * 0.5/' decoy-closer $T
+m $H 's/ship.alert \+ dt \* 1.35/ship.alert + dt * 1.3/' decoy-alert $T
+m $H 's/M.notLess \(s.time - r.time\) 2 \|\| r.reason/M.notLess (s.time - r.time) 3 || r.reason/' report-refresh $T
+m $H 's/sensitivity \* 0.06/sensitivity * 0.05/' alert-gain $T
+m $H 's/0.65 \/ setting .pursuit s/0.6 \/ setting .pursuit s/' alert-decay $T
+m $H 's/reported.alert <= 42 then/reported.alert < 42 then/' track-alert-edge $T
+m $H 's/s.engine == Diesel && s.depth <= 14/s.engine == Diesel/' diesel-depth $T
+m $H 's/else if 4 < t.age then/else if 5 < t.age then/' searching-age $T
+m $H 's/" reacquired"/" re-acquired"/' reacquired-text $T
+m $H 's/\{ ship \| speed = patrol, patrolSpeed = Nothing \}/{ ship | patrolSpeed = Nothing }/' patrol-speed-kept $T
+m $H 's/M.clamp \(negate dt \* 2.5\) \(dt \* 2.5\)/M.clamp (negate dt * 3) (dt * 3)/' turn-rate $T
+m $H 's/                        15\n/                        14\n/' escort-chase-speed $T
+m $H 's/closing.kind == Surface Escort && track.depth <= 2/closing.kind == Surface Escort \&\& track.depth < 2/' guns-depth-edge $T
+m $H 's/                2600\n/                2500\n/' gun-reach $T
+m $H 's/                2300\n/                2200\n/' torpedo-reach $T
+m $H 's/if closing.alert <= 55 \|\|/if closing.alert < 55 ||/' attack-alert-edge $T
+m $H 's/if 0 < timed.attack then/if 0 <= timed.attack then/' attack-timer-edge $T
+m $H 's/1.5 \+ range \/ 550/1.5 + range \/ 500/' shell-flight $T
+m $H 's/25 \+ range \* 0.065 \+ track.age \* 0.6/25 + range * 0.065/' shell-scatter-age $T
+m $H 's/\( \{ ship \| attack = 12 \}/( { ship | attack = 10 }/' gun-reload $T
+m $H 's/attacks.launchTorpedo \{ ship \| attack = 35 \}/attacks.launchTorpedo { ship | attack = 30 }/' torpedo-reload $T
+m $H 's/\(12 \+ track.age \* 0.35\)/(12 + track.age * 0.3)/' charge-depth-spread $T
+m $H 's/M.max 4 \(depth \/ 4.5\)/M.max 4 (depth \/ 4)/' charge-sink-time $T
+m $H 's/70 \+ range \* 0.48 \+ track.age \* 1.4/70 + range * 0.48/' charge-scatter-age $T

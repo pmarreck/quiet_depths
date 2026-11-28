@@ -1,0 +1,76 @@
+T=tests/sim-early-end.test.mjs; X=elm/Sim/EarlyEnd.elm
+m $X 's/\n    400\n/\n    401\n/' pickup-radius $T
+m $X 's/Mechanics.distance s s.home < pickupRadius/Mechanics.distance s s.home <= pickupRadius/' pickup-edge $T
+m $X 's/insidePickup s && s.depth <= 1/insidePickup s \&\& s.depth < 1/' surfaced-edge $T
+m $X 's/s.status == Patrol && s.phase == Objective/s.phase == Objective/' offered-status $T
+m $X 's/s.status == Patrol && s.phase == Objective/s.status == Patrol/' offered-phase $T
+m $X 's/\.hull >> M.isZero/.hull >> (\\h -> h < 1)/' sunk-hull $T
+m $X 's/atLeast <= List.length s.photos/atLeast < List.length s.photos/' photo-edge $T
+m $X 's/atLeast <= sunkTargets s/atLeast < sunkTargets s/' sunk-edge $T
+m $X 's/List.any \(\\id -> Carrier.carrierDoomed/List.all (\\id -> Carrier.carrierDoomed/' carrier-any $T
+m $X 's/Maybe.withDefault 0 \|> floor \}/Maybe.withDefault 2 |> floor }/' carrier-default-hits $T
+m $X 's/\(toFloat atLeast\)/(toFloat atLeast + 1)/' survivors-edge $T
+m $X 's/M.notLess operation.scan \(share \* seconds\)/M.notLess operation.scan (share * seconds + 0.0005)/' scan-edge $T
+m $X 's/<= List.length operation.photoAngles/< List.length operation.photoAngles/' survey-photo-edge $T
+m $X 's/M.notLess s.trackTime \(share \* s.patrol.trackGoal\)/M.notLess s.trackTime (share * s.patrol.trackGoal + 0.25)/' tracking-edge $T
+m $X 's/\{ ask = False, armed = True \}/{ ask = False, armed = False }/' prompt-rearm $T
+m $X 's/else if armed && earlyEndOffered s then/else if earlyEndOffered s then/' prompt-once $T
+m $X 's/\{ s \| status = Partial \}/{ s | status = Withdrawn }/' partial-status $T
+m $X 's/ended at extraction with part of the objective complete." Success/ended at extraction with part of the objective complete." Info/' partial-log-kind $T
+m $X 's/String.fromInt \(floor s.trackTime\)/String.fromInt (round s.trackTime)/' tracking-summary $T
+T=tests/sim-air-support.test.mjs; A=elm/Sim/AirSupport.elm; G=elm/Sim/AircraftFlight.elm
+m $A 's/s.difficulty == Just True then/s.difficulty \/= Just False then/' alarm-needs-support $T
+m $A 's/alert = M.max 60 escort.alert/alert = M.max 55 escort.alert/' alarm-escort-alert $T
+m $A 's/\( 2, "Intercepted flight-deck alarm/( 3, "Intercepted flight-deck alarm/' deck-arming $T
+m $A 's/\( 45 \+ toFloat \(floor \(hash01 s.patrol.seed 591 \* 15\)\)/( 45 + toFloat (floor (hash01 s.patrol.seed 591 * 10))/' island-arming $T
+m $A 's/if Maybe.andThen .airSupport s.difficulty == Just False then/if False then/' support-disabled $T
+m $A 's/\{ x = -3200, y = 3400 \}/{ x = -3200, y = 3300 }/' island-base $T
+m $A 's/v.alert <= 55/v.alert < 55/' hunter-alert-edge $T
+m $A 's/ \|\| not \(ColdWatch.canAttackPlayer s v\)//' hunter-permission $T
+m $A 's/ \|\| report.reason == Just "noisemaker"//' hunter-noisemaker $T
+m $A 's/4 < s.time - report.time/4.5 < s.time - report.time/' report-age $T
+m $A 's/ \|\| report.time < newest//' newer-report $T
+m $A 's/s.time < Maybe.withDefault 0 support.launchAt/s.time <= Maybe.withDefault 0 support.launchAt/' launch-edge $T
+m $A 's/25 - toFloat i \* 18/25 - toFloat i * 15/' deck-spacing $T
+m $A 's/deckHeight \+ 2\n/deckHeight + 3\n/' deck-altitude $T
+m $A 's/base.x - toFloat i \* 20/base.x - toFloat i * 25/' island-spacing $T
+m $A 's/\+ 8 \+ toFloat i \* 12\)/+ 8 + toFloat i * 10)/' island-altitude $T
+m $A 's/M.max 8 \(negate/M.max 0 (negate/' island-min-altitude $T
+m $A 's/, speed = 70\n/, speed = 75\n/' aircraft-speed $T
+m $A 's/                6\n/                5\n/' island-takeoff $T
+m $A 's/Maybe.withDefault 45\n/Maybe.withDefault 40\n/' island-heading $T
+m $G 's/Reports.searchDuration s < s.time - lastReport/Reports.searchDuration s + 5 < s.time - lastReport/' search-call-off $T
+m $G 's/p.altitude - dt \* 45/p.altitude - dt * 40/' falling-speed $T
+m $G 's/if altitude < -10 then/if altitude < -5 then/' gone-depth $T
+m $G 's/Mechanics.orZero p.bank \+ dt \* 1.3/Mechanics.orZero p.bank + dt * 1.2/' falling-bank $T
+m $G 's/remaining <= M.max 10 travel/remaining <= M.max 5 travel/' home-radius $T
+m $G 's/M.min 2600 visibility.subVisualRange/M.min 2400 visibility.subVisualRange/' sight-cap $T
+m $G 's/\(s0.depth <= 2 && d </(s0.depth < 2 \&\& d </' surfaced-sight-edge $T
+m $G 's/s0.depth <= 15 && 0 < s0.systems.periscope/s0.depth <= 15/' periscope-damage $T
+m $G 's/400 \* sensitivity/350 * sensitivity/' periscope-sight $T
+m $G 's/r < 1300/r < 1200/' search-range $T
+m $G 's/r < 1800/r < 1700/' attack-range $T
+m $G 's/ && \(s.mission \/= BigKahuna \|\| ph \/= Takeoff\)//' carrier-takeoff $T
+m $G 's/s.time \* 0.06/s.time * 0.05/' search-circle-rate $T
+m $G 's/sin a \* 650/sin a * 600/' search-circle-radius $T
+m $G 's/dt \* 22\)/dt * 20)/' turn-rate $T
+m $G 's/\n                65\n/\n                70\n/' attack-height $T
+m $G 's/\(negate dt \* 10\) \(dt \* 5\)/(negate dt * 10) (dt * 6)/' climb-rate $T
+m $G 's/\* 0.02\)/* 0.03)/' bank-factor $T
+m $G 's/r < 900 && p0.attack <= 0/r < 800 \&\& p0.attack <= 0/' strafe-range $T
+m $G 's/p0.attack <= 0 then/p0.attack < 0.1 then/' strafe-cooldown $T
+m $G 's/\|> bombIf \(r < 450\)/|> bombIf (r < 400)/' attack-bomb-range $T
+m $G 's/&& r < 180 then/\&\& r < 170 then/' egress-range $T
+m $G 's/egress = Just 10/egress = Just 9/' egress-time $T
+m $G 's/bombIf \(not visible && r < 450\)/bombIf (not visible \&\& r < 400)/' blind-bomb-range $T
+m $G 's/8 \+ r \* 0.045/8 + r * 0.04/' strafe-scatter $T
+m $G 's/r \/ 500\)/r \/ 450)/' strafe-lead $T
+m $G 's/\/ n \* 500\n/\/ n * 450\n/' round-speed $T
+m $G 's/attack = 0.45/attack = 0.5/' strafe-reload $T
+m $G 's/M.clamp 15 90/M.clamp 10 90/' bomb-shallowest $T
+m $G 's/2 \+ plane.altitude \/ 70/2 + plane.altitude \/ 60/' bomb-fall $T
+m $G 's/airTime \+ depth \/ 6/airTime + depth \/ 5/' bomb-sink $T
+m $G 's/45 \+ aim.age \* 0.9/45 + aim.age * 0.8/' bomb-scatter $T
+m $G 's/if left <= 0 then/if left < 0 then/' egress-end-edge $T
+m $G 's/M.max 0 \(Mechanics.orZero start.attack - dt\)/M.max 0 (Mechanics.orZero start.attack - dt * 0.5)/' attack-cooldown $T
+m $G 's/if report.reason == Just "an explosion near the carrier" then/if False then/' alarm-no-bomb $T

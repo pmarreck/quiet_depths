@@ -1,0 +1,115 @@
+T=tests/sim-patrol-tick.test.mjs; PT=elm/Sim/PatrolTick.elm; PS=elm/Sim/PatrolShips.elm; PH=elm/Sim/PatrolHearing.elm; PZ=elm/Sim/PatrolHazards.elm; PE=elm/Sim/PatrolEnd.elm
+m $PT 's/ \|\| input.paused \|\| / || /' step-paused $T
+m $PT 's/ \|\| input.modal then/ then/' step-modal $T
+m $PT 's/ticks input \(M.min dt 60\) s/ticks input (M.min dt 30) s/' step-cap $T
+m $PT 's/M.min 0.25 left/M.min 0.5 left/' tick-size $T
+m $PT 's/(Nothing ->\n\s+)100\n/${1}50\n/' route-default-radius $T
+m $PT 's/if Mechanics.distance steered r < radius then/if Mechanics.distance steered r < radius \/ 2 then/' route-radius $T
+m $PT 's/if M.abs \(Mechanics.delta b s.heading\) < 0.1 then/if M.abs (Mechanics.delta b s.heading) < 0.01 then/' scope-settle $T
+m $PT 's/M.remainder \(b - s.heading \+ 360\) 360/M.remainder (b - s.heading) 360/' scope-angle $T
+m $PT 's/if first.text == second.text then/if False then/' events-dedupe $T
+m $PT 's/if s.hull <= 0 then \{ s \| status = Lost \}/if False then { s | status = Lost }/' hull-lost $T
+m $PT 's/if sweep.mode == mode then/if True then/' imaging-mode $T
+m $PT 's/if floor \(previous \/ 5\) < floor \(now \/ 5\) then/if floor (previous \/ 4) < floor (now \/ 4) then/' imaging-beat $T
+m $PT 's/toFloat \(floor \(now \/ 5\)\)/toFloat (floor (now \/ 5)) + 1/' imaging-beat-number $T
+m $PT 's/List.foldl \(\\c w -> Replay.mark [^\n]*\) w\)/List.foldl (\\_ w -> w)/' hull-replay $T
+m $PT 's/, ships = after.ships\n/, ships = s.ships\n/' hull-ships $T
+m $PT 's/, hull = after.hull\n/, hull = s.hull\n/' hull-damage $T
+m $PT 's/, collisionHits = after.collisionHits\n/, collisionHits = s.collisionHits\n/' hull-hits $T
+m $PT 's/            c.age\n                < 240/            c.age\n                < 200/' contacts-age $T
+m $PT 's/f.source == Just "satellite" && s.time - f.time < 900/f.source == Just "satellite" \&\& s.time - f.time < 800/' contacts-satellite $T
+m $PT 's/c.confidence - dt \* 0.0006/c.confidence - dt * 0.0005/' contacts-confidence $T
+m $PT 's/Mechanics.log \("Orbital reconnaissance received. "[^\n]*Success applied/applied/' recon-log $T
+m $PT 's/kind = Maybe.map Surface t.kind/kind = Nothing/' recon-kind $T
+m $PT 's/receivedAt = Maybe.withDefault \(0 \/ 0\) p.receivedAt/receivedAt = p.capturedAt/' recon-received $T
+m $PT 's/recon = Maybe.withDefault s.recon passed.recon, ships = passed.ships/recon = Maybe.withDefault s.recon passed.recon, ships = s.ships/' recon-ships $T
+m $PT 's/PatrolHearing.advanceTraffic \(env.holiday \/= Nothing\) s3/PatrolHearing.advanceTraffic False s3/' traffic-holiday $T
+m $PT 's/s.mission == Tiebreaker && not approaching then/s.mission == Tiebreaker then/' fleet-approach $T
+m $PT 's/\{ observed \| lampInView = Nothing \}/observed/' lamp-busy $T
+m $PT 's/M.clamp 0 100 danger/M.clamp 0 90 danger/' alert-clamp $T
+m $PT 's/s.time - t.time < 35/s.time - t.time < 30/' tracks-age $T
+m $PT 's/if 32 < s2.time - n.time then/if 30 < s2.time - n.time then/' noisemaker-age $T
+m $PT 's/Just \(s0.time \* \(Env.environmentAt \(sky s0\)\).waveSpeed\)/Just 0/' wave-init $T
+m $PT 's/env0.waveSpeed \* dt \/ M.max 1 rate/env0.waveSpeed * dt/' wave-compression $T
+m $PT 's/if M.truthy r then\n(\s+)r\n/if True then\n${1}r\n/' rate-zero $T
+m $PT 's/800 \* \(PatrolSearch.approachProgress advanced/700 * (PatrolSearch.approachProgress advanced/' formation-travel $T
+m $PT 's/o.lastCasualty \+ dt/o.lastCasualty/' casualty-clock $T
+m $PT 's/pingAge = s1.pingAge \+ dt/pingAge = s1.pingAge/' ping-age $T
+m $PT 's/photoCooldown = M.max 0 \(s1.photoCooldown - dt\)/photoCooldown = s1.photoCooldown/' photo-cooldown $T
+m $PS 's/2300\n/2000\n/' hear-fishing $T
+m $PS 's/M.exp \(negate s0.depth \/ 80\)/M.exp (negate s0.depth \/ 60)/' hear-storm $T
+m $PS 's/\(s0.silent \|\| s0.speed < 9\)/s0.speed < 9/' hear-silent $T
+m $PS 's/ && d < reach && watch.newTriad then/ \&\& d < reach then/' hear-triad $T
+m $PS 's/\(watch.observation == Just "tower" \|\| watch.observation == Just "gun"\)/watch.observation == Just "tower"/' topside-gun $T
+m $PS 's/Maybe.withDefault \(M.remainder \(s1.heading \+ s1.scopeAngle\) 360\) watch.look/Maybe.withDefault s1.heading watch.look/' look-default $T
+m $PS 's/d < watch.env.opticalRange && within 25/d < watch.env.opticalRange \&\& within 30/' topside-arc $T
+m $PS 's/0.16\n(\s+)< watch.env.fog/0.3\n${1}< watch.env.fog/' lights-fog $T
+m $PS 's/&& within 19\n/\&\& within 25\n/' lights-arc $T
+m $PS 's/watch.dt \* 0.36/watch.dt * 0.3/' approach-turn $T
+m $PS 's/if s1.mission == Transit then/if False then/' transit-sweep $T
+m $PS 's/if 12 <= tracked.alert/if 20 <= tracked.alert/' clue-alert $T
+m $PS 's/Maybe.withDefault -1\) < r.time then/Maybe.withDefault -1) <= r.time then/' clue-fresh $T
+m $PS 's/track \/= Nothing \|\| clue \/= Nothing \|\| fresh held then/track \/= Nothing || clue \/= Nothing then/' danger-report $T
+m $PS 's/80 <= searched.alert/90 <= searched.alert/' signal-alert $T
+m $PS 's/if ColdWatch.canAttackPlayer s ship then/if True then/' attack-allowed $T
+m $PS 's/if hunted.disabled == Just True then/if False then/' disabled-stop $T
+m $PS 's/stopped.speed \* 0.514444 \* watch.dt/stopped.speed * 0.5 * watch.dt/' travel-knots $T
+m $PS 's/delay = c.delay, kind = Charge \}/delay = c.delay, kind = Bomb }/' charge-kind $T
+m $PS 's/\( Painter, watch.painter \)/( Painter, watch.scribbler )/' imaging-painter $T
+m $PS 's/            if due then\n/            if False then\n/' inquiry-sweep $T
+m $PH 's/nextSweep = Just \(s.time \+ 28 \+ roll \* 45\)/nextSweep = Just (s.time + 30 + roll * 45)/' sweep-schedule $T
+m $PH 's/Mechanics.distance scheduled s \/ 4500/Mechanics.distance scheduled s \/ 4000/' sweep-range $T
+m $PH 's/touchRoll < 0.25 \* nearby/touchRoll < 0.3 * nearby/' sweep-touch $T
+m $PH 's/depth = Just \(Maybe.withDefault 0 scheduled.depth\)/depth = Just (Maybe.withDefault 1 scheduled.depth)/' sweep-depth $T
+m $PH 's/alert = M.max 55 scheduled.alert/alert = M.max 50 scheduled.alert/' sweep-alert $T
+m $PH 's/                0.97\n/                0.9\n/' hear-launch-odds $T
+m $PH 's/                            2200\n/                            2000\n/' hear-splash-range $T
+m $PH 's/\(43000 \+ toFloat source.id\) - 0.5\) \* 9\)/(43000 + toFloat source.id) - 0.5) * 8)/' hear-bearing-spread $T
+m $PH 's/List.drop \(List.length kept - 16\) kept/List.drop (List.length kept - 15) kept/' bearings-keep $T
+m $PH 's/            markMissed source s0\n/            s0\n/' hear-missed $T
+m $PH 's/heardDistance < 6000 \* sonar s1/heardDistance < 5000 * sonar s1/' seeker-range $T
+m $PH 's/if reported.time - last < 120 then/if reported.time - last < 100 then/' sweep-area-window $T
+m $PH 's/            if source.warning == Just True then/            if False then/' sweep-challenge $T
+m $PH 's/\{ s5 \| ships = PatrolReports.hearWreck s5 [^\n]*\}/s5/' wreck-heard $T
+m $PH 's/if volley.warning == Just True && volley.underwater then/if volley.warning == Just True then/' answer-warning $T
+m $PH 's/                        "hit"\n/                        "splash"\n/' answer-kind $T
+m $PH 's/< 5600 \* Equipment.operatingFraction s.systems.sonar then/< 5000 * Equipment.operatingFraction s.systems.sonar then/' traffic-ping $T
+m $PH 's/MessWatch.recordLocalLaunch v s \|> //' traffic-launch-watch $T
+m $PH 's/altitude = Just 4, power = 0.55/altitude = Just 3, power = 0.55/' traffic-gun $T
+m $PH 's/    if d < 210 then/    if d < 200 then/' blast-near $T
+m $PH 's/36 \* \(1 - d \/ 210\)/30 * (1 - d \/ 210)/' blast-damage $T
+m $PH 's/    else if d < 2500 then/    else if d < 2000 then/' blast-miss $T
+m $PH 's/, crewQuietUntil = after.crewQuietUntil\n/, crewQuietUntil = s.crewQuietUntil\n/' traffic-crew $T
+m $PH 's/ entered the area\./ arrived./' traffic-arrival $T
+m $PZ 's/if 0.35 < env.storm then/if 0.5 < env.storm then/' storm-threshold $T
+m $PZ 's/if s0.time < 30 then/if s0.time < 20 then/' strike-early $T
+m $PZ 's/\(a - 0.5\) \* 26/(a - 0.5) * 20/' strike-aim $T
+m $PZ 's/1800 \+ r \* 4000/2000 + r * 4000/' strike-range $T
+m $PZ 's/if hash01 seed 910 < 0.09 then/if hash01 seed 910 < 0.2 then/' strike-hit-odds $T
+m $PZ 's/Mechanics.distance s v < 6000/Mechanics.distance s v < 5000/' strike-exposed-range $T
+m $PZ 's/altitude = Just 18/altitude = Just 20/' strike-ship-altitude $T
+m $PZ 's/5 \+ toFloat \(floor \(12 \* hash01 bolt.seed 912\)\)/4 + toFloat (floor (12 * hash01 bolt.seed 912))/' strike-damage $T
+m $PZ 's/struck.time \+ 18 \+ roll \* 36/struck.time + 20 + roll * 36/' lightning-next $T
+m $PZ 's/s1.time - e.time < 20/s1.time - e.time < 15/' lightning-fade $T
+m $PZ 's/power = 0.8 \+ p \* 0.4/power = 0.8 + p * 0.3/' thunder-power $T
+m $PZ 's/b1.kind == Bomb && b1.splashed \/= Just True && /b1.kind == Bomb \&\& /' bomb-splash-once $T
+m $PZ 's/altitude = Nothing, power = 1.2/altitude = Nothing, power = 1.0/' blast-power $T
+m $PZ 's/if s1.convoy \/= Nothing && fired.convoyCharge == Just True then/if False then/' convoy-charge $T
+m $PZ 's/\\b -> b.age < 5/\\b -> b.age < 4/' blast-age $T
+m $PZ 's/24 \* \(1 - range \/ 65\)/24 * (1 - range \/ 60)/' shell-damage $T
+m $PZ 's/\\p -> -3 < p.delay/\\p -> -2 < p.delay/' shell-linger $T
+m $PE 's/List.member observation \[ Just "scope", Just "tower", Just "gun" \]/List.member observation [ Just "scope", Just "gun" ]/' casualty-tower $T
+m $PE 's/Mechanics.separation s site < 120/Mechanics.separation s site < 50/' site-close $T
+m $PE 's/\(c.identified == Just True \|\| /(/' recognized-identified $T
+m $PE 's/s0.convoy \/= Nothing \|\| s0.mission == Tiebreaker \|\| v.incidental == Just True/s0.convoy \/= Nothing || v.incidental == Just True/' drone-sighting-fleet $T
+m $PE 's/M.min 1200 eyes.env.opticalRange/M.min 1000 eyes.env.opticalRange/' wreck-range $T
+m $PE 's/\{ s0 \| trackTime = s0.trackTime \+ dt \}/{ s0 | trackTime = s0.trackTime + dt \/ 2 }/' tracking $T
+m $PE 's/ProtectConvoy _ limit ->\n(\s+)toFloat limit/ProtectConvoy _ limit ->\n${1}toFloat limit + 1/' convoy-loss-limit $T
+m $PE 's/                else if done then\n/                else if False then\n/' convoy-won $T
+m $PE 's/if s3.mission == Transit && done && s3.status == Patrol then/if False then/' transit-gate $T
+m $PE 's/\[ Intercept, Convoy, BigKahuna \]/[ Convoy, BigKahuna ]/' silent-extraction $T
+m $PE 's/Mechanics.distance s5 s5.home < 400/Mechanics.distance s5 s5.home < 30/' pickup-range $T
+m $PE 's/\(FleetTheater.sidesAfloat s6.ships\).friendly < 2/(FleetTheater.sidesAfloat s6.ships).friendly < 1/' fleet-broken $T
+m $PE 's/toFloat PatrolMission.patrolTiming.standardWindow\n/toFloat PatrolMission.patrolTiming.standardWindow + 1\n/' window-standard $T
+m $PE 's/toFloat PatrolMission.patrolTiming.longerWindow \+ area.protectedTime/toFloat PatrolMission.patrolTiming.longerWindow/' window-long $T
+m $PE 's/ && not \(s7.mission == Tiebreaker && s7.phase == Extract\) then/ then/' window-fleet-extract $T

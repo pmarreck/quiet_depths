@@ -1,0 +1,35 @@
+T=tests/sim-mess-watch.test.mjs; W=elm/Sim/MessWatch.elm
+m $W 's/\(a.y - b.y\) <= 2000/(a.y - b.y) < 2000/' nearby-edge $T
+m $W 's/\(a.y - b.y\) <= 2000/(a.y - b.y) <= 1990/' nearby-range $T
+m $W 's/    90\n/    89\n/' watch-seconds $T
+m $W 's/\(actionStations && \(PatrolMission.briefing s.mission\).crewWatch == ActionStations\)/(PatrolMission.briefing s.mission).crewWatch == ActionStations/' stations-ignored $T
+m $W 's/\.crewWatch == ActionStations\)/.crewWatch \/= ActionStations)/' stations-inverted $T
+m $W 's/        \|\| s.silent\n//' silent-ignored $T
+m $W 's/\(30 < s.alert\)/(31 < s.alert)/' alert-threshold $T
+m $W 's/\(0 < s.shock\)/(0.2 < s.shock)/' shock-threshold $T
+m $W 's/\(0 < s.flood\)/(0.2 < s.flood)/' flood-threshold $T
+m $W 's/        \|\| M.truthy \(toFloat s.pressureAlarm\)\n//' pressure-ignored $T
+m $W 's/                    s.time < until/                    s.time <= until/' gun-edge $T
+m $W 's/\(s.time < s.crewQuietUntil\)/(s.time <= s.crewQuietUntil)/' quiet-edge $T
+m $W 's/\(0 < s.fuelLeak\)/(0.02 < s.fuelLeak)/' leak-threshold $T
+m $W 's/\(0 < s.fuelFire\)/(0.02 < s.fuelFire)/' fire-threshold $T
+m $W 's/\(4 < s.water\)/(4.5 < s.water)/' water-threshold $T
+m $W 's/\(s.hull < s.repairLimits.hull\)/(s.hull <= s.repairLimits.hull)/' hull-edge $T
+m $W 's/s.repairLimits\) Equipment.systems/s.repairLimits) (List.drop 1 Equipment.systems)/' first-system-unchecked $T
+m $W 's/        \|\| List.any \(nearby s\) s.projectiles\n//' projectiles-ignored $T
+m $W 's/\\shot -> shot.underwater && nearby s/\\shot -> nearby s/' surface-volleys-count $T
+m $W 's/\\v -> 0 < v.hull && Theater.isOpponent v/\\v -> 0 <= v.hull \&\& Theater.isOpponent v/' sunk-ships-count $T
+m $W 's/0 < v.hull && Theater.isOpponent v && /0 < v.hull \&\& /' all-ships-hostile $T
+m $W 's/ \|\| v.tracking == Just Searching\)/)/' searching-ignored $T
+m $W 's/0 < plane.hull && plane.phase \/= Gone && plane.phase \/= Down/0 < plane.hull \&\& plane.phase \/= Gone/' downed-planes-count $T
+m $W 's/0 < plane.hull && plane.phase \/= Gone/plane.phase \/= Gone/' wrecked-planes-count $T
+m $W 's/12 <= hour && hour < 12.55/12 <= hour \&\& hour < 12.5/' lunch-length $T
+m $W 's/23 <= hour && hour < 23.25/23 <= hour \&\& hour < 23.5/' lights-out-length $T
+m $W 's/0 <= hour && hour < 6/0 <= hour \&\& hour <= 6/' sleep-edge $T
+m $W 's/19 <= hour && hour < 23/19 < hour \&\& hour < 23/' music-edge $T
+m $W 's/    if 0 <= position then/    if 0 < position then/' line-zero-choice $T
+m $W 's/List.filter \(\\line -> Just line \/= last\)/List.filter (\\_ -> True)/' repeat-last-line $T
+m $W 's/\[ "coffee", "mess-a" \]/[ "mess-a", "coffee" ]/' coffee-order $T
+m $W 's/            if List.member clip kept then\n                kept\n\n            else\n                kept \+\+ \[ clip \]/            kept ++ [ clip ]/' clips-repeat $T
+m elm/Sim/FleetVolleys.elm 's/Maybe.andThen .shot s.convoy \|> Maybe.map List.singleton \|> Maybe.withDefault \[\]/[]/' convoy-shot-ignored $T
+m elm/Sim/AircraftPhase.elm 's/"egress"/"egres"/' phase-name $T

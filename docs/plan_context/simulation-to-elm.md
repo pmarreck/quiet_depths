@@ -1387,3 +1387,41 @@ deleted, the tests should also replay inputs recorded from real play.
 - The oracle after the TypeScript: each recording keeps a digest of the
   TypeScript's world after every call, so once the TypeScript is gone the
   replay still checks the Elm against what it did.
+
+## The tools these checks use (2026-11-28)
+
+The browser checks, the mutation runner and every mutant list now live in
+the project, so each result here can be rerun:
+
+- `scripts/browser-check.mjs`: plays every mission in a browser, under
+  either simulation, and reports the console; under `?sim=elm` it also
+  times a step through the worker.
+- `scripts/browser-panels-check.mjs`: works each panel moved to Elm and
+  asserts what the player sees, the phone layout included.
+- `scripts/browser-frame-bench.mjs`: the page's share of a tick and a
+  step's round trip, with the CPU throttled.
+- `scripts/cdp.mjs`: their DevTools protocol client. Each needs Chromium
+  started with `--remote-debugging-port` and a built site served by
+  `scripts/serve.mjs`.
+- `scripts/mutate.sh` and `tests/mutants/`: each mutation check's list, run
+  against HEAD in a disposable worktree (see `tests/mutants/README.md`).
+- `scripts/verify-release.sh`: follows a pushed commit through CI to the
+  live site.
+
+### The relay's orders, mutation-checked (2026-11-28)
+
+`tests/mutants/async3.mutants`, against fc43281: 6 of 8 killed at first.
+Both survivors were missing tests, not faults in the code. Each concerns an
+order that a reply reports gone, which the adapter must then forget:
+
+- `es-reported-unset` kept the old value in the adapter's base when a reply
+  left an order out. A call queued behind the one that removed it would
+  send it back.
+- `ws-orders-unset` had the relay report as gone only the fields it had
+  sent before. A load's reply bypasses the adapter, so after the page
+  removed an order from a patrol the worker was not holding, nothing told
+  the adapter the order was gone, and again a queued call sent it back.
+
+The route test could not catch either: a cleared route crosses as `null`,
+a value, not as a removal. The new test, "an order the page removes stays
+removed for a queued call", kills both, with and without a patrol switch.

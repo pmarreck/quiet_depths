@@ -1,0 +1,12 @@
+T=tests/sim-patrol-contacts.test.mjs; CR=elm/Sim/ContactReports.elm; PC=elm/Sim/PatrolContacts.elm
+m $CR 's/if c3.identified \/= Just True && c3.probableSide == Nothing then/if c3.identified \/= Just True then/' guess-once $T
+m $CR 's/M.max 25 \(d \* 0.045\)/M.max 20 (d * 0.045)/' visual-sigma-floor $T
+m $CR 's/M.clamp 0 320 \(/M.clamp 0 300 (/' depth-ceiling $T
+m $PC 's/ \|\| 15 < s.depth \|\| / || 16 < s.depth || /' visible-depth $T
+m $PC 's/separation s0 site < 1500 \* reach/separation s0 site < 1400 * reach/' site-range $T
+m $PC 's/\(s.depth - p.depth\) < 6000 \* reach/(s.depth - p.depth) < 5000 * reach/' torpedo-range $T
+m $PC 's/if volley.underwater && Mechanics.separation s p < 6000/if Mechanics.separation s p < 6000/' volley-underwater $T
+m $PC 's/Mechanics.separation s p < 6000 \* reach/Mechanics.separation s p < 5000 * reach/' volley-range $T
+m $PC 's/ \|\| v.disabled == Just True then/ then/' heard-disabled $T
+m $PC 's/List.filter \(\\v -> v.incidental \/= Just True && /List.filter (\\v -> /' photo-incidental $T
+m $CR 's/maneuverSigma = Just 0.03, source/maneuverSigma = Just 0.02, source/' fix-maneuver-sigma $T

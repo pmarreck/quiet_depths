@@ -1,0 +1,10 @@
+T=tests/sim-operations.test.mjs; OP=elm/Sim/Operation.elm; OW=elm/Sim/OperationWork.elm
+m $OP 's/if 0 <= toNumber v then/if -1 <= toNumber v then/' decode-negative $T
+m $OP 's/if Maybe.map .located s.search == Just False then/if False then/' approach-unlocated $T
+m $OP 's/M.max 0 \(site.depth - 11\)/site.depth - 11/' approach-floor $T
+m $OP 's/route = Nothing, targetSpeed = 0, targetDepth = c.depth/route = s.route, targetSpeed = 0, targetDepth = c.depth/' start-route $T
+m $OW 's/vertical = M.abs \(s.depth - site.depth\)/vertical = s.depth - site.depth/' survey-vertical $T
+m $OW 's/casualtyDeadline s1 held < s1.time && 0 < held.remaining/casualtyDeadline s1 held <= s1.time \&\& 0 < held.remaining/' loss-edge $T
+m $OW 's/sink.lostBelow < settled.depth && 0 < counted.remaining/sink.lostBelow <= settled.depth \&\& 0 < counted.remaining/' sink-lost-edge $T
+m $OW 's/if reach < gap \|\| gap < 8 \|\| 32 </if reach <= gap || gap < 8 || 32 </' photo-reach-edge $T
+m $OW 's/\) < c.photoSeparation\)/) <= c.photoSeparation)/' photo-separation $T

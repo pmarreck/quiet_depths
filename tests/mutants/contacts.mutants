@@ -1,0 +1,53 @@
+T=tests/sim-patrol-contacts.test.mjs; CR=elm/Sim/ContactReports.elm; PC=elm/Sim/PatrolContacts.elm
+m $CR 's/nextId = s.nextId \+ 1/nextId = s.nextId + 2/' next-id $T
+m $CR 's/                3 \* Readings.observationBias s2.patrol.seed/                2 * Readings.observationBias s2.patrol.seed/' passive-bias $T
+m $CR 's/if s2.convoy \/= Nothing && method == Passive then/if method == Passive then/' convoy-passive $T
+m $CR 's/                                    c2.side\n/                                    Nothing\n/' visual-keeps-side $T
+m $CR 's/if c3.identified \/= Just True && c3.probableSide == Nothing then/if c3.identified \/= Just True then/' guess-once $T
+m $CR 's/if c3.identified \/= Just True && c3.probableSide == Nothing then/if c3.probableSide == Nothing then/' guess-unidentified $T
+m $CR 's/M.max 0.24 c1.confidence/M.max 0.25 c1.confidence/' passive-confidence $T
+m $CR 's/M.max 25 \(d \* 0.045\)/M.max 20 (d * 0.045)/' visual-sigma-floor $T
+m $CR 's/M.max 25 \(d \* 0.045\)/M.max 25 (d * 0.04)/' visual-sigma-range $T
+m $CR 's/M.max 15 \(d \* 0.03\)/M.max 12 (d * 0.03)/' active-sigma-floor $T
+m $CR 's/M.max 15 \(d \* 0.03\)/M.max 15 (d * 0.025)/' active-sigma-range $T
+m $CR 's/\(s.time - fix.time\) 5/(s.time - fix.time) 4/' refix-age $T
+m $CR 's/&& \(\(method == Visual && fix.source == Just "visual"\)\n *\|\| /\&\& ((False)\n || /' continued-sight $T
+m $CR 's/sigma \* 2.448 < e.major/sigma * 2.5 < e.major/' refix-uncertainty $T
+m $CR 's/1 \+ 0.06 \* Readings.observationBias/1 + 0.05 * Readings.observationBias/' visual-range-bias $T
+m $CR 's/0.97 \+ observationRoll \* 0.06/0.96 + observationRoll * 0.06/' active-range-base $T
+m $CR 's/0.97 \+ observationRoll \* 0.06/0.97 + observationRoll * 0.05/' active-range-spread $T
+m $CR 's/                            0.9\n/                            0.85\n/' visual-confidence $T
+m $CR 's/                            0.75\n/                            0.7\n/' active-confidence $T
+m $CR 's/velocitySigma = Just 1.5/velocitySigma = Just 1.4/' fix-velocity-sigma $T
+m $CR 's/maneuverSigma = Just 0.03 /maneuverSigma = Just 0.02 /' fix-maneuver-sigma $T
+m $CR 's/\(12 \+ d \* 0.012\)/(10 + d * 0.012)/' depth-spread-base $T
+m $CR 's/\(12 \+ d \* 0.012\)/(12 + d * 0.01)/' depth-spread-range $T
+m $CR 's/M.clamp 0 320 \(/M.clamp 0 300 (/' depth-ceiling $T
+m $CR 's/\/ 10\)\) \* 10\)/\/ 5)) * 5)/' depth-rounding $T
+m $CR 's/M.max 1 \(M.hypot2 dx dy \/ 9\)/M.max 1 (M.hypot2 dx dy \/ 8)/' course-speed-cap $T
+m $CR 's/fix.speed \* 0.514444/fix.speed * 0.5/' lamp-knots $T
+m $CR 's/positionSigma = Just 10, velocitySigma = Just 0.4/positionSigma = Just 9, velocitySigma = Just 0.4/' lamp-position-sigma $T
+m $CR 's/velocitySigma = Just 0.4, maneuverSigma = Just 0.015/velocitySigma = Just 0.5, maneuverSigma = Just 0.015/' lamp-velocity-sigma $T
+m $CR 's/maneuverSigma = Just 0.015/maneuverSigma = Just 0.02/' lamp-maneuver-sigma $T
+m $CR 's/, confidence = 0.92/, confidence = 0.9/' lamp-confidence $T
+m $CR 's/, depthEstimate = Just fix.depth/, depthEstimate = fixed.depthEstimate/' lamp-depth $T
+m $PC 's/ \|\| ship.kind == Submarine \|\| 15 < s.depth/ || 15 < s.depth/' visible-sub $T
+m $PC 's/ \|\| 15 < s.depth \|\| / || 16 < s.depth || /' visible-depth $T
+m $PC 's/\(Mechanics.bearing s ship\) l\) < 19/(Mechanics.bearing s ship) l) < 18/' visible-arc $T
+m $PC 's/separation s0 site < 1500 \* reach/separation s0 site < 1400 * reach/' site-range $T
+m $PC 's/pingAge = 0, pingCooldown = 15 \}\n\n                    _ ->/pingAge = 0, pingCooldown = 14 }\n\n                    _ ->/' ping-cooldown $T
+m $PC 's/\(s.depth - p.depth\) < 6000 \* reach/(s.depth - p.depth) < 5000 * reach/' torpedo-range $T
+m $PC 's/if volley.underwater && Mechanics.separation s p < 6000/if Mechanics.separation s p < 6000/' volley-underwater $T
+m $PC 's/Mechanics.separation s p < 6000 \* reach/Mechanics.separation s p < 5000 * reach/' volley-range $T
+m $PC 's/Mechanics.distance s v < 6000 \* reach/Mechanics.distance s v < 5000 * reach/' contact-range $T
+m $PC 's/ \|\| v.disabled == Just True then/ then/' heard-disabled $T
+m $PC 's/Mechanics.distance s v \/ 7500\)/Mechanics.distance s v \/ 7000)/' heard-range $T
+m $PC 's/Suspicion.leaveClue 65 /Suspicion.leaveClue 60 /' heard-alert $T
+m $PC 's/photoCooldown = 4 \}/photoCooldown = 3 }/' photo-cooldown $T
+m $PC 's/List.filter \(\\v -> v.incidental \/= Just True && /List.filter (\\v -> /' photo-incidental $T
+m $PC 's/ && v.kind == Surface Merchant\)/)/' photo-merchant $T
+m $PC 's/ \|> List.sortBy \(\\v -> M.abs \(off v\)\)\n/\n/' photo-nearest $T
+m $PC 's/ReconPhotos.framed \(off v\) PatrolCriteria.merchantPhotos && //' photo-framed $T
+m $PC 's/M.max 0 \(s.alert - 35\)/M.max 0 (s.alert - 30)/' decoy-alert $T
+m $PC 's/M.max 0 \(v.alert - 50\)/M.max 0 (v.alert - 40)/' decoy-ships $T
+m $PC 's/depth = Just 0, altitude = Nothing, power = 0.65/depth = Just 0, altitude = Nothing, power = 0.6/' charge-splash $T

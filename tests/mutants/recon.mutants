@@ -1,0 +1,75 @@
+T=tests/sim-recon.test.mjs; RC=elm/Sim/Recon.elm; RP=elm/Sim/ReconPasses.elm; RS=elm/Sim/ReconSaves.elm
+m $RC 's/uplinkDepth =\n    15/uplinkDepth =\n    14/' uplink-depth $T
+m $RC 's/receiveDepth =\n    30/receiveDepth =\n    29/' receive-depth $T
+m $RC 's/cooldown =\n    480/cooldown =\n    470/' cooldown $T
+m $RC 's/surfaceTransferSeconds =\n    18/surfaceTransferSeconds =\n    17/' surface-transfer $T
+m $RC 's/phase == Idle \|\| phase == Complete \|\| phase == Failed/phase == Idle || phase == Complete/' settled-failed $T
+m $RC 's/    if settled recon.phase then/    if False then/' display-settled $T
+m $RC 's/                        M.max 0 d\n/                        d\n/' link-negative-depth $T
+m $RC 's/        else if depth <= 1 then\n            1 \/ surfaceTransferSeconds/        else if depth <= 2 then\n            1 \/ surfaceTransferSeconds/' surface-rate-depth $T
+m $RC 's/1 \/ \(80 \+ depth \* 8\)/1 \/ (80 + depth * 7)/' vlf-rate $T
+m $RC 's/        else if depth <= 1 then\n            "Surface radio relay"/        else if depth <= 2 then\n            "Surface radio relay"/' surface-label-depth $T
+m $RC 's/M.abs area.x <= 20000/M.abs area.x <= 19000/' request-area-x $T
+m $RC 's/ && area.size == footprint//' request-area-size $T
+m $RC 's/\(s.difficulty \|> Maybe.andThen .satellite\) == Just False \|\| //' request-satellite $T
+m $RC 's/ \|\| s.status \/= Status.Patrol//' request-status $T
+m $RC 's/ \|\| s.time < 0//' request-negative-time $T
+m $RC 's/ \|\| s.time < recon.cooldownUntil//' request-cooldown $T
+m $RC 's/ \|\| not \(settled recon.phase\)//' request-busy $T
+m $RC 's/ \|\| 0.5 < storm then/ || 0.6 < storm then/' request-storm $T
+m $RC 's/            0.5 < storm\n/            0.6 < storm\n/' panel-storm $T
+m $RC 's/cooldownRemaining <= 0 && not blocked/cooldownRemaining < 0 \&\& not blocked/' panel-cooldown $T
+m $RC 's/String.fromInt \(round \(s.time - /String.fromInt (floor (s.time - /' panel-age-round $T
+m $RC 's/            \(if M.truthy r.progress then/            (if True then/' panel-progress-nan $T
+m $RP 's/uplinkSeconds =\n    8/uplinkSeconds =\n    7/' uplink-seconds $T
+m $RP 's/exposureSeconds =\n    10/exposureSeconds =\n    9/' exposure-seconds $T
+m $RP 's/processingSeconds =\n    12/processingSeconds =\n    11/' processing-seconds $T
+m $RP 's/e.daylight < 0.25/e.daylight < 0.3/' night-threshold $T
+m $RP 's/orZero \(Maybe.withDefault 0 v.depth\) <= 3/orZero (Maybe.withDefault 0 v.depth) <= 2/' snapshot-depth $T
+m $RP 's/if 0 < v.hull && /if /' snapshot-hull $T
+m $RP 's/v.lights \/= Just False && //' snapshot-lights $T
+m $RP 's/ && v.blackout \/= Just True//' snapshot-blackout $T
+m $RP 's/M.abs \(v.x - area.x\) <= half/M.abs (v.x - area.x) <= half + 500/' snapshot-square $T
+m $RP 's/Maybe.withDefault \(s.time \* e.waveSpeed\) s.wavePhase/Maybe.withDefault (s.time * e.waveScale) s.wavePhase/' snapshot-wave-phase $T
+m $RP 's/cloud = M.max e.cloud e.fog/cloud = e.cloud/' snapshot-fog $T
+m $RP 's/cloud < 0.35 && rain < 0.1/cloud < 0.4 \&\& rain < 0.1/' clear-cloud $T
+m $RP 's/cloud < 0.35 && rain < 0.1/cloud < 0.35 \&\& rain < 0.2/' clear-rain $T
+m $RP 's/M.clamp 0.12 0.9 \(1 - cloud \* 0.8 - rain \* 0.15\)/M.clamp 0.12 0.9 (1 - cloud * 0.7 - rain * 0.15)/' coverage-cloud $T
+m $RP 's/M.clamp 0.12 0.9 \(1 - cloud \* 0.8 - rain \* 0.15\)/M.clamp 0.12 0.9 (1 - cloud * 0.8 - rain * 0.25)/' coverage-rain $T
+m $RP 's/M.clamp 0.12 0.9 \(/M.clamp 0.15 0.9 (/' coverage-floor $T
+m $RP 's/M.clamp 0.1 0.85 \(1 - cloud \* 0.7 - rain \* 0.2\)/M.clamp 0.1 0.85 (1 - cloud * 0.6 - rain * 0.2)/' quality-cloud $T
+m $RP 's/M.clamp 0.1 0.85 \(/M.clamp 0.15 0.85 (/' quality-floor $T
+m $RP 's/M.clamp 0.1 0.85 \(1 - cloud \* 0.7 - rain \* 0.2\)/M.clamp 0.1 0.85 (1 - cloud * 0.7 - rain * 0.3)/' quality-rain $T
+m $RP 's/\(floor \(ship.x \/ 1300\)\) \* 19/(floor (ship.x \/ 1300)) * 17/' patch-x $T
+m $RP 's/\(floor \(ship.y \/ 1300\)\) \* 43/(floor (ship.y \/ 1300)) * 41/' patch-y $T
+m $RP 's/ship.x \/ 1300/ship.x \/ 1200/' patch-size $T
+m $RP 's/40 \+ cloud \* 150 \+ rain \* 100/30 + cloud * 150 + rain * 100/' sigma-base $T
+m $RP 's/40 \+ cloud \* 150 \+ rain \* 100/40 + cloud * 140 + rain * 100/' sigma-cloud $T
+m $RP 's/40 \+ cloud \* 150 \+ rain \* 100/40 + cloud * 150 + rain * 90/' sigma-rain $T
+m $RP 's/code \+ 1201/code + 1203/' scatter-x $T
+m $RP 's/                                            0.25\n/                                            0.2\n/' velocity-sigma $T
+m $RP 's/maneuverSigma = 0.008/maneuverSigma = 0.009/' maneuver-sigma $T
+m $RP 's/not second.night && clear/clear/' identify-night $T
+m $RP 's/s.time \+ 90 \+ toFloat/s.time + 80 + toFloat/' overpass-base $T
+m $RP 's/\* 61\)\)\)/* 60)))/' overpass-spread $T
+m $RP 's/toFloat \(700 \+ r.sequence\)/toFloat (701 + r.sequence)/' overpass-seed $T
+m $RP 's/if s.time < ready then/if s.time <= ready then/' overpass-edge $T
+m $RP 's/if r0.phase == Queued && link.canUplink then/if r0.phase == Queued then/' queued-needs-link $T
+m $RP 's/cooldownUntil = M.max r.cooldownUntil \(s.time \+ Recon.cooldown\)/cooldownUntil = s.time + Recon.cooldown/' delivery-cooldown $T
+m $RP 's/M.max 0.001 \(second.time - first.time\)/M.max 1 (second.time - first.time)/' frame-interval $T
+m $RS 's/\(D.field "x" \(finiteWhere "on the chart" \(\\v -> M.abs v <= 20000\)\)\)/(D.field "x" (finiteWhere "on the chart" (\\v -> M.abs v <= 30000)))/' save-area-x $T
+m $RS 's/        \(D.field "size" \(finiteWhere "the footprint" \(\\v -> v == Recon.footprint\)\)\)/        (D.field "size" finite)/' save-area-size $T
+m $RS 's/finiteWhere "in \[0, 1\]" \(\\v -> 0 <= v && v <= 1\)/finiteWhere "in [0, 1]" (\\v -> 0 <= v \&\& v <= 2)/' save-unit-range $T
+m $RS 's/\(absentOr "waveScale" \(finiteWhere "non-negative" \(\\v -> 0 <= v\)\)\)/(absentOr "waveScale" finite)/' save-wave-scale $T
+m $RS 's/\(\\v -> 0 <= v && v <= capturedAt\)/(\\v -> 0 <= v)/' save-track-time $T
+m $RS 's/unique ids && unique shown && /unique shown \&\& /' save-unique-tracks $T
+m $RS 's/ && List.all \(\\id -> List.member id ids\) shown//' save-scene-matches $T
+m $RS 's/Maybe.map \(\\at -> at < capturedAt\) receivedAt/Maybe.map (\\at -> at < 0) receivedAt/' save-received-order $T
+m $RS 's/\(\\v -> v < capturedAt\)/(\\v -> v <= capturedAt)/' save-frame-order $T
+m $RS 's/\(D.field "width" \(finiteWhere "640" \(\\v -> v == 640\)\)\)/(D.field "width" finite)/' save-image-width $T
+m $RS 's/        needs \[ Tasking, Imaging, Processing \] \(r.startedAt \/= Nothing\)\n            && /        /' save-phase-start $T
+m $RS 's/            && needs \[ Tasking \] \(Maybe.map2 \(<\) r.startedAt r.readyAt == Just True\)\n//' save-tasking-ready $T
+m $RS 's/            && needs \[ Imaging \] \(r.firstFrame \/= Nothing\)\n//' save-imaging-frame $T
+m $RS 's/            && needs \[ Complete \] \(Maybe.andThen .receivedAt r.packet \/= Nothing\)\n//' save-complete-received $T
+m $RS 's/if M.isZero n \|\| isNaN n then/if isNaN n then/' save-falsy-zero $T
+m $RS 's/ && toFloat \(floor v\) == v\) \|> D.map floor/) |> D.map floor/' save-sequence-whole $T

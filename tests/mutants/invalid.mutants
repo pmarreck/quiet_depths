@@ -1,0 +1,11 @@
+T=tests/sim-systems.test.mjs
+m elm/Sim/Systems.elm 's/InvalidNumber.report "hurt" given start/start/' elm-hurt-silent $T
+m elm/Sim/Systems.elm 's/InvalidNumber.report "damageSystem" amount s/s/' elm-system-silent $T
+m elm/Sim/DroneOrders.elm 's/InvalidNumber.report "damageDrone" given s/s/' elm-drone-silent $T
+m elm/Sim/Systems.elm 's/InvalidNumber.report "emitSound power" power start/start/' elm-sound-silent $T
+m elm/Sim/Systems.elm 's/isInfinite power \|\| power < 0 then/isInfinite power || power < -1 then/' elm-sound-negative $T
+m typescript/systems.ts "s/\{ reportInvalidNumber\('hurt', amount\); return; \}/return;/" ts-hurt-silent tests/equipment.test.mjs
+m typescript/systems.ts "s/\{ reportInvalidNumber\('damageDrone', amount\); return; \}/return;/" ts-drone-silent tests/equipment.test.mjs
+m typescript/acoustics.ts "s/\(data.power as number\) >= 0\)\)/(data.power as number) > 0))/" ts-zero-power-reported tests/environment.test.mjs
+m typescript/invalid-numbers.ts 's/let reporter: InvalidNumberReporter = throwOnInvalidNumber;/let reporter: InvalidNumberReporter = warnOnInvalidNumber;/' ts-default-warns tests/invalid-numbers.test.mjs
+m src/app.js 's/^setInvalidNumberReporter\(warnOnInvalidNumber\);\n//m' game-never-warns tests/invalid-numbers.test.mjs

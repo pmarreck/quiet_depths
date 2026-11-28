@@ -425,3 +425,12 @@ normally. Since the fork now tracks that development release, pinning it
 here must wait until it compiles quiet_depths in ordinary memory; a memory
 cap on such benchmarks (a `systemd-run --user -p MemoryMax=` scope) would
 turn a host-wide out-of-memory event into one failed run.
+
+## PDEA's progress (owner, 2026-11-28 14:55 EST)
+
+PDEA, the owner's exact rational arithmetic core in Rust for native use and
+WebAssembly (a separate repository), has found significant speedups and is
+adding transcendental functions and matrix operations. Those would serve
+the simulation's 2D and 3D geometry that is not handed to three.js. Nothing
+here depends on it yet. It bears on the `Num` question and the numerics
+experiment above once either is taken up after the switch.

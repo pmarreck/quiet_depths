@@ -1,0 +1,116 @@
+T=tests/sim-cold-watch.test.mjs; D=elm/Sim/StandDecisions.elm; S=elm/Sim/Stands.elm; W=elm/Sim/ColdWatch.elm; E=elm/Sim/TrafficEncounters.elm; V=elm/Sim/TrafficSaves.elm
+# Volleys
+m $D 's/negate \(M.max 2 \(Maybe.withDefault 0 target.depth\)\)/negate (M.max 1 (Maybe.withDefault 0 target.depth))/' torpedo-min-depth $T
+m $D 's/negate \(Maybe.withDefault 20 v.depth\)/negate (Maybe.withDefault 0 v.depth)/' sub-default-depth $T
+m $D 's/\(aimed.x - v.x\) \* 0.45/(aimed.x - v.x) * 0.5/' warning-run-short $T
+m $D 's/aimed.x \+ 100, y = aimed.y - 100/aimed.x + 100, y = aimed.y + 100/' warning-shell-offset $T
+m $D 's/                        9\n/                        8\n/' torpedo-flight $T
+m $D 's/                        3\n                      \)/                        4\n                      )/' shell-flight $T
+m $D 's/roll < 0.34 then/roll < 0.3 then/' miss-chance $T
+m $D 's/toFloat \(18 \+ round \(18 \* roll\)\)/toFloat (18 + floor (18 * roll))/' hit-damage-rounding $T
+# Whom to face
+m $D 's/                            0.45\n/                            0.5\n/' assist-weight $T
+m $D 's/strength c \* 1.5 < strength v/strength c * 1.4 < strength v/' strength-ratio $T
+m $D 's/                            0.8\n/                            0.9\n/' weak-weight $T
+m $D 's/if d < 2600 && d \* weight < nearest/if d < 2500 \&\& d * weight < nearest/' notice-range $T
+m $D 's/if s.time - r.time <= 30 then/if s.time - r.time < 30 then/' observed-age-edge $T
+m $D 's/s.time - o.time < 75\)/s.time - o.time < 70)/' deliberate-age $T
+m $D 's/0 < p.level && s.time - o.time/0 <= p.level \&\& s.time - o.time/' deliberate-level $T
+# Each turn
+m $D 's/turn \* 9/turn * 8/' turn-key $T
+m $D 's/\* 0.035/* 0.03/' flood-damage $T
+m $D 's/                        0.48\n/                        0.4\n/' disabled-damage $T
+m $D 's/p0.range \+ 75 < d/p0.range + 70 < d/' leaving-margin $T
+m $D 's/s.time \+ 12 \+ roll 1 \* 12/s.time + 12 + roll 1 * 10/' turn-delay $T
+m $D 's/0.28 < damage/0.3 < damage/' hurt-threshold $T
+m $D 's/damage \* \(1.25 - 0.75 \* aggression\)/damage * (1.25 - 0.7 * aggression)/' hurt-retreat-odds $T
+m $D 's/\(1 - aggression\) \* 0.44/(1 - aggression) * 0.4/' timid-retreat-odds $T
+m $D 's/M.max 4 p.cruise \* \(1 - 0.5 \* damage\)/M.max 3 p.cruise * (1 - 0.5 * damage)/' retreat-min-speed $T
+m $D 's/next = p.next \+ 65/next = p.next + 60/' retreat-delay $T
+m $D 's/0.3 \+ 0.65 \* aggression/0.3 + 0.6 * aggression/' help-odds $T
+m $D 's/0.91 < aggression/0.9 < aggression/' spoiling-threshold $T
+m $D 's/roll 4 < initiative \* 0.65\)/roll 4 < initiative * 0.6)/' spoiling-odds $T
+m $D 's/initiative \* \(0.12 \+ 0.74 \* aggression\)/initiative * (0.12 + 0.7 * aggression)/' initiative-odds $T
+m $D 's/floor \(choice \* 3\)/floor (choice * 2)/' warning-choice $T
+m $D 's/p.cruise \+ 2\n/p.cruise + 1\n/' approach-speed $T
+m $D 's/\{ reply \| level = M.min 4 \(reply.level \+ 1\) \}/{ reply | level = reply.level }/' reply-stiffens $T
+m $D 's/if p.order \/= Retreat then\n/if True then\n/' withdraw-once $T
+m $D 's/if target.id \/= "player" && not \(disabled v\) && v.kind \/= Surface Merchant then/if target.id \/= "player" \&\& v.kind \/= Surface Merchant then/' disabled-holds-fire $T
+# Stands
+m $S 's/Surface Merchant ->\n            1\n/Surface Merchant ->\n            2\n/' merchant-strength $T
+m $S 's/Surface Carrier ->\n            4\n/Surface Carrier ->\n            3\n/' carrier-strength $T
+m $S 's/        _ ->\n            3\n/        _ ->\n            2\n/' warship-strength $T
+m $S 's/            0.5\n/            0.6\n/' disabled-strength $T
+m $S 's/time - t < 45/time - t < 40/' recent-attack $T
+m $S 's/\* 180 \/ pi \+ 360\) 360/* 180 \/ pi) 360/' bearing-wrap $T
+m $S 's/fresh \(Just p.cruise\)/fresh Nothing/' cruise-kept $T
+# The watch
+m $W 's/round \(h.x \/ 250\)\) \* 250/round (h.x \/ 200)) * 200/' origin-grid $T
+m $W 's/if serious then\n                                    4\n/if serious then\n                                    3\n/' serious-level $T
+m $W 's/if not \(military v\) \|\| v.hull <= 0 \|\| sideOf v == Friendly then/if not (military v) || v.hull <= 0 then/' friendly-ignores-player $T
+m $W 's/M.notLess v.alert 80\)/80 < v.alert)/' alert-edge $T
+m $W 's/\(v.incidental \/= Just True && M.notLess/(M.notLess/' incidental-alert $T
+m $W 's/next = landed.time \+ 4,/next = landed.time + 5,/' turn-interval $T
+m $W 's/\{ p \| level = 4, order = Fight \} \} s/{ p | level = 3, order = Fight } } s/' struck-level $T
+m $W 's/if 0 < target.hull && M.truthy shot.damage then/if M.truthy shot.damage then/' sunk-not-struck $T
+m $W 's/if 0 < target.hull && M.truthy shot.damage then/if 0 < target.hull then/' miss-not-struck $T
+m $W 's/hull = Carrier.incidentalHull \{ kind = target.kind, hull = target.hull, directHits = floor \(Maybe.withDefault 0 target.directHits\) \} shot.damage/hull = M.max 0 (target.hull - shot.damage)/' carrier-floor $T
+# Encounters
+m $E 's/\+ 90 \+ hash01/+ 80 + hash01/' arrival-offset $T
+m $E 's/\(0.91 \* halfDay\)/(0.9 * halfDay)/' arrival-spread $T
+m $E 's/friendlySub = roll 1 </friendlySub = roll 2 </' group-roll $T
+m $E 's/\( 17, False \)/( 19, False )/' hash-seed $T
+m $E 's/M.imul n 31 \+ unit/M.imul n 37 + unit/' hash-multiplier $T
+m $E 's/if afterHigh && 0xDC00 <= unit/if False \&\& 0xDC00 <= unit/' hash-surrogates $T
+m $E 's/1150 \+ roll 1 \* 1750/1100 + roll 1 * 1750/' passage-near $T
+m $E 's/1150 \+ roll 1 \* 1750/1150 + roll 1 * 1700/' passage-far $T
+m $E 's/roll 2 < 0.52 then/roll 2 < 0.5 then/' convoy-odds $T
+m $E 's/2 \+ floor \(roll 3 \* 3\)/2 + floor (roll 3 * 2)/' convoy-size $T
+m $E 's/List.range 0 15\n/List.range 0 7\n/' bearing-trials $T
+m $E 's/toFloat trial \* pi \/ 8/toFloat trial * pi \/ 4/' bearing-step $T
+m $E 's/toFloat i \* 140/toFloat i * 150/' column-east $T
+m $E 's/toFloat i \* 170/toFloat i * 160/' column-south $T
+m $E 's/                30\n\n             else\n                10\n/                25\n\n             else\n                10\n/' sub-water-depth $T
+m $E 's/                30\n\n             else\n                10\n/                30\n\n             else\n                15\n/' surface-water-depth $T
+m $E 's/Char.fromCode \(65 \+ i\)/Char.fromCode (64 + i)/' name-letter $T
+m $E 's/\(count > 1 \|\| roll 4 < 0.65\)/(count > 1 || roll 4 < 0.6)/' escort-odds $T
+m $E 's/angle \* 180 \/ pi \+ 145 \+ roll 12 \* 70/angle * 180 \/ pi + 140 + roll 12 * 70/' passage-heading $T
+m $E 's/roll 12 \* 70\)/roll 12 * 60)/' heading-spread $T
+m $E 's/35 \+ roll 5 \* 35/35 + roll 5 * 30/' sub-depth-spread $T
+m $E 's/position.y - 8\)/position.y - 10)/' sub-keel-margin $T
+m $E 's/, speed =\n                    if sub then\n                        4\n/, speed =\n                    if sub then\n                        5\n/' sub-speed $T
+m $E 's/if M.notLess time \(encounterTime seed window\) then/if encounterTime seed window < time then/' resume-edge $T
+m $E 's/floor \(time \/ halfDay\) - 1, next/floor (time \/ halfDay), next/' fresh-window $T
+m $E 's/if modBy 2 index == 1 then/if modBy 2 index == 0 then/' group-sides $T
+# Saves
+m $V 's/\(not \(isInteger s.window\)\n            \|\| /(/' save-window-integer $T
+m $V 's/s.window\n            < -1/s.window\n            < -2/' save-window-min $T
+m $V 's/toFloat \(floor \(s.time \/ Encounters.halfDay\)\)\n/toFloat (floor (s.time \/ Encounters.halfDay)) + 1\n/' save-window-max $T
+m $V 's/not \(isSafeInteger s.turn\)/not (isInteger s.turn)/' save-turn-safe $T
+m $V 's/s.turn\n            < 0/s.turn\n            < -1/' save-turn-min $T
+m $V 's/not \(finite s.next\)/False/' save-next-finite $T
+m $V 's/s.next\n            < 0/s.next\n            < -1/' save-next-min $T
+m $V 's/\|\| Set.size ids\n            \/= List.length s.ships\n/\n/' save-unique-ids $T
+m $V 's/slot group && slot index/slot group/' save-passage-index $T
+m $V 's/String.all digit window/True/' save-passage-digits $T
+m $V 's/flag && passageId v.id && v.side \/= Nothing/flag \&\& passageId v.id/' save-incidental-side $T
+m $V 's/flag && passageId v.id/passageId v.id/' save-incidental-flag $T
+m $V 's/\|\| t < 0 \|\| time < t\)/|| t < 0)/' save-attack-future $T
+m $V 's/\|\| t < 0 \|\| time < t\)/|| time < t)/' save-attack-negative $T
+m $V 's/not \(isInteger p.level\)/False/' save-level-integer $T
+m $V 's/4\n                            < p.level/5\n                            < p.level/' save-level-max $T
+m $V 's/not \(finite p.next && finite p.cruise/not (finite p.cruise/' save-parley-finite $T
+m $V 's/p.range\n                            < 0/p.range\n                            < -1/' save-range-min $T
+m $V 's/\(p.against \/= "player" && not \(Set.member p.against ids\)\)/False/' save-against $T
+m $V 's/ \|\| time < o.time\n/\n/' save-origin-future $T
+m $V 's/v.id\n            < 1/v.id\n            < 0/' save-volley-id-min $T
+m $V 's/M.notLess v.id s.weaponSequence/s.weaponSequence < v.id/' save-volley-sequence $T
+m $V 's/        && List.length s.volleys\n        == Set.size \(Set.fromList \(List.map .id s.volleys\)\)\n/\n/' save-volley-duplicates $T
+m $V 's/not \(point v.from && point v.to\)/not (point v.to)/' save-volley-from $T
+m $V 's/\[ v.from.altitude, v.to.altitude, /[ v.from.altitude, /' save-volley-altitude $T
+m $V 's/s.time\n            < v.launched/s.time + 1\n            < v.launched/' save-volley-launched $T
+m $V 's/v.arrives\n            <= s.time/v.arrives\n            < s.time/' save-volley-arrives $T
+m $V 's/v.damage\n            < 0/v.damage\n            < -1/' save-volley-damage $T
+m $V 's/\(v.warning && not \(M.isZero v.damage\)\)/False/' save-warning-damage $T
+m $V 's/        && Set.member v.source ids\n/\n/' save-volley-source $T
+m $V 's/\(v.target == "player" && v.warning\)/v.target == "player"/' save-player-warning $T

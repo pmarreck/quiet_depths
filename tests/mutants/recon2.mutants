@@ -1,0 +1,18 @@
+T=tests/sim-recon.test.mjs; RC=elm/Sim/Recon.elm; RP=elm/Sim/ReconPasses.elm; RS=elm/Sim/ReconSaves.elm
+m $RC 's/M.abs area.x <= 20000/M.abs area.x <= 19000/' request-area-x $T
+m $RC 's/ \|\| s.status \/= Status.Patrol//' request-status $T
+m $RC 's/ \|\| s.time < 0//' request-negative-time $T
+m $RC 's/ \|\| not \(settled recon.phase\)//' request-busy $T
+m $RC 's/ \|\| 0.5 < storm then/ || 0.6 < storm then/' request-storm $T
+m $RC 's/            0.5 < storm\n/            0.6 < storm\n/' panel-storm $T
+m $RP 's/e.daylight < 0.25/e.daylight < 0.3/' night-threshold $T
+m $RP 's/if 0 < v.hull && /if /' snapshot-hull $T
+m $RP 's/cloud < 0.35 && rain < 0.1/cloud < 0.4 \&\& rain < 0.1/' clear-cloud $T
+m $RP 's/cloud < 0.35 && rain < 0.1/cloud < 0.35 \&\& rain < 0.2/' clear-rain $T
+m $RP 's/M.clamp 0.12 0.9 \(/M.clamp 0.15 0.9 (/' coverage-floor $T
+m $RP 's/M.clamp 0.1 0.85 \(/M.clamp 0.15 0.85 (/' quality-floor $T
+m $RP 's/40 \+ cloud \* 150 \+ rain \* 100/40 + cloud * 150 + rain * 90/' sigma-rain $T
+m $RP 's/cooldownUntil = M.max r.cooldownUntil \(s.time \+ Recon.cooldown\)/cooldownUntil = s.time + Recon.cooldown/' delivery-cooldown $T
+m $RP 's/M.max 0.001 \(second.time - first.time\)/M.max 1 (second.time - first.time)/' frame-interval $T
+m $RS 's/\(absentOr "waveScale" \(finiteWhere "non-negative" \(\\v -> 0 <= v\)\)\)/(absentOr "waveScale" finite)/' save-wave-scale $T
+m $RS 's/            && needs \[ Complete \] \(Maybe.andThen .receivedAt r.packet \/= Nothing\)\n//' save-complete-received $T

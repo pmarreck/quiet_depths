@@ -1,0 +1,10 @@
+T="tests/sim-patrol.test.mjs tests/elm-simulation.test.mjs"; PT=elm/Sim/Patrol.elm; PC=elm/Sim/PatrolCommand.elm; PO=elm/Sim/PatrolOrders.elm; SW=elm/SimWorker.elm; WM=typescript/world-mirror.ts; ES=typescript/elm-simulation.ts; SM=typescript/simulation.ts
+m $PT 's/ \|\| input.paused \|\| / || /' pt-paused "$T"
+m $PT 's/ticks input \(M.min dt 60\)/ticks input (M.min dt 30)/' pt-cap "$T"
+m $PT 's/PatrolContacts.photograph \(environment s\) look s/PatrolContacts.photograph (environment s) (look + 1) s/' pt-photo-look "$T"
+m $PT 's/rescued = toFloat o.rescued/rescued = 0/' pt-early-rescued "$T"
+m $PC 's/\|> andMap \(switch "paused"\)/|> andMap (switch "modal")/' pc-paused "$T"
+m $PC 's/\( "scribbler", Sonar.Scribbler \), \( "painter", Sonar.Painter \)/( "scribbler", Sonar.Painter ), ( "painter", Sonar.Scribbler )/' pc-imaging "$T"
+m $PC 's/\|> andMap \(optional "lampInView" \(D.nullable D.string\) \|> D.map \(Maybe.andThen identity\)\)/|> andMap (D.succeed Nothing)/' pc-lamp "$T"
+m $PO 's/        , dieselMode = o.dieselMode\n/        , dieselMode = s.dieselMode\n/' po-diesel "$T"
+m $WM 's/Object.is\(x, -0\) \|\| !Number.isFinite\(x\)\) \?/!Number.isFinite(x)) ?/' wm-key-zero "$T"

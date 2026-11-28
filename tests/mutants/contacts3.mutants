@@ -1,0 +1,2 @@
+T=tests/sim-patrol-contacts.test.mjs; CR=elm/Sim/ContactReports.elm; PC=elm/Sim/PatrolContacts.elm
+m $PC 's/List.filter \(\\v -> v.incidental \/= Just True && /List.filter (\\v -> /' photo-incidental $T

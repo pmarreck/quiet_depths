@@ -1,0 +1,3 @@
+T=tests/sim-patrol-tick.test.mjs; PT=elm/Sim/PatrolTick.elm; PS=elm/Sim/PatrolShips.elm; PH=elm/Sim/PatrolHearing.elm; PZ=elm/Sim/PatrolHazards.elm; PE=elm/Sim/PatrolEnd.elm
+m $PT 's/PatrolHearing.advanceTraffic \(env.holiday \/= Nothing\) s3/PatrolHearing.advanceTraffic False s3/' traffic-holiday $T
+m $PH 's/< 5600 \* Equipment.operatingFraction s.systems.sonar then/< 5000 * Equipment.operatingFraction s.systems.sonar then/' traffic-ping $T

@@ -1,0 +1,2 @@
+T=tests/sim-operations.test.mjs; OP=elm/Sim/Operation.elm; OW=elm/Sim/OperationWork.elm
+m $OW 's/vertical = M.abs \(s.depth - site.depth\)/vertical = s.depth - site.depth/' survey-vertical $T

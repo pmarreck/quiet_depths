@@ -1,0 +1,9 @@
+T="tests/elm-simulation.test.mjs"; ES=typescript/elm-simulation.ts; WS=scripts/sim-worker-script.mjs
+m $ES 's/    return whole \|\| unset.includes\(top\) \? undefined : base\[i\];/    return base[i];/' es-reported-unset "$T"
+m $ES 's/: isRecord\(v\) \? Object.fromEntries/: false ? Object.fromEntries/' es-plain-record "$T"
+m $WS 's/if \(whole \|\| orders.has\(k\) \|\| sent\[k\] !== fields\[k\]\) set\[k\] = v;/if (whole || orders.has(k)) set[k] = v;/' ws-changed "$T"
+m $WS 's/if \(whole \|\| orders.has\(k\) \|\| sent\[k\] !== fields\[k\]\) set\[k\] = v;/set[k] = v;/' ws-all "$T"
+m $WS 's/if \(whole \|\| orders.has\(k\) \|\| sent\[k\] !== fields\[k\]\) set\[k\] = v;/if (whole || sent[k] !== fields[k]) set[k] = v;/' ws-orders "$T"
+m $WS 's/    const unset = whole \? \[\] : \[...new Set\(\[...Object.keys\(sent\), ...orders\]\)\].filter\(k => !\(k in fields\)\);/    const unset = [];/' ws-unset "$T"
+m $WS 's/    const unset = whole \? \[\] : \[...new Set\(\[...Object.keys\(sent\), ...orders\]\)\].filter\(k => !\(k in fields\)\);/    const unset = whole ? [] : Object.keys(sent).filter(k => !(k in fields));/' ws-orders-unset "$T"
+m $WS "s/    if \(reply.boat\) orders = new Set\(\[...reply.boat, 'gun', 'drone'\]\);\n//" ws-learn "$T"

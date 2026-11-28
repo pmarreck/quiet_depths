@@ -1,0 +1,3 @@
+T=tests/sim-missions.test.mjs; MI=elm/Sim/Missions.elm; CA=elm/Sim/Carrier.elm
+m $MI 's/-2 <= p.altitude then/-3 <= p.altitude then/' battle-splash-height $T
+m $MI 's/h 89 < 0.36/h 89 < 0.3/' hunt-second-odds $T

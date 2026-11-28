@@ -1,0 +1,3 @@
+T=tests/sim-fleet.test.mjs; A=elm/Sim/FleetAction.elm; H=elm/Sim/FleetTheater.elm; V=elm/Sim/FleetVolleys.elm; S=elm/Sim/FleetActionSaves.elm
+m $A 's/if 1800 < M.hypot2/if 1700 < M.hypot2/' recall-radius $T
+m $S 's/\|\| v.arrives\n(\s+)<= v.launched/|| v.arrives\n${1}< v.launched/' flight-length $T

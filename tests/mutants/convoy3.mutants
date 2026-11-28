@@ -1,0 +1,4 @@
+T=tests/sim-convoy-watch.test.mjs; CW=elm/Sim/ConvoyWatch.elm; AW=elm/Sim/AlliedWatch.elm; CS=elm/Sim/ConvoySaves.elm
+m $AW 's/s.time - fix.time < 45/s.time - fix.time < 40/' fix-freshness $T
+m $AW 's/initial.elapsed < 20/initial.elapsed < 15/' convoy-first $T
+m $AW 's/if s2.depth <= 1 && not copyingInitial then/if s2.depth <= 1 then/' wait-for-convoy $T

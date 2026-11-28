@@ -1,0 +1,6 @@
+T=tests/sim-torpedo-run.test.mjs; TA=elm/Sim/Torpedo.elm; TC=elm/Sim/TorpedoCourse.elm; TS=elm/Sim/TorpedoStrike.elm; TR=elm/Sim/TorpedoRun.elm
+m $TC 's/if M.notLess r 0.25 then/if M.notLess r 0.3 then/' decoy-odds $T
+m $TC 's/if p.traveled < p.runOut then/if p.traveled <= p.runOut then/' run-out-edge $T
+m $TS 's/sinkDepth = 0, depth = Just s.depth/sinkDepth = 2, depth = Just s.depth/' boat-hit-depth $T
+m $TS 's/sinkDepth = orZero ship.sinkDepth/sinkDepth = 0/' ship-sink-depth $T
+m $TS 's/if p.diverted && p.intended \/= Just sunk.id then/if p.diverted then/' neutral-decoy-text $T

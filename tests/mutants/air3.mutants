@@ -1,0 +1,4 @@
+T=tests/sim-air-support.test.mjs; A=elm/Sim/AirSupport.elm; G=elm/Sim/AircraftFlight.elm
+m $G 's/if altitude < -10 then/if altitude < -5 then/' gone-depth $T
+m $G 's/remaining <= M.max 10 travel/remaining <= M.max 5 travel/' home-radius $T
+m $G 's/p0.attack <= 0 then/p0.attack < 0.1 then/' strafe-cooldown $T

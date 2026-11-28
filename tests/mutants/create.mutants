@@ -1,0 +1,41 @@
+T=tests/sim-patrol-create.test.mjs; PC=elm/Sim/PatrolCreate.elm
+m $PC 's/depth = s.drone.depth \}, 0.7 \)/depth = s.drone.depth }, 0.5 )/' sound-drone-keel $T
+m $PC 's/5 \+ 27.5 \* M.abs \(sin s.pitch\)/5 + 27.5 * sin s.pitch/' sound-pitch-abs $T
+m $PC 's/5 \+ 27.5 \* M.abs/5 + 25 * M.abs/' sound-pitch-reach $T
+m $PC 's/belowKeel = waterDepth - at.depth - keelOffset/belowKeel = waterDepth - at.depth/' sound-keel $T
+m $PC 's/if wasBottom && not current.bottom then/if not current.bottom then/' warn-keel-cleared $T
+m $PC 's/if previous \/= Nothing && level current.battery < before then/if level current.battery < before then/' warn-battery-previous $T
+m $PC 's/if current.battery == Low then/if current.battery == Charged then/' warn-battery-cleared-text $T
+m $PC 's/if current.bottom && not wasBottom then/if current.bottom then/' warn-keel-rising $T
+m $PC 's/if before < level current.battery then/if before <= level current.battery then/' warn-battery-rising $T
+m $PC 's/\( 1450, 2700 \)/( 1450, 2600 )/' cast-cobalt $T
+m $PC 's/depth = Just 75 \}/depth = Just 70 }/' cast-echo-depth $T
+m $PC 's/, damage = Just d.damage/, damage = Just d.detection/' difficulty-damage $T
+m $PC 's/, longPatrol = Just d.longPatrol/, longPatrol = Just False/' difficulty-long $T
+m $PC 's/\n    , depth = 25\n/\n    , depth = 20\n/' drone-depth $T
+m $PC 's/returnClearance = 8/returnClearance = 7/' drone-clearance $T
+m $PC 's/changing = options.changing \/= Just False/changing = options.changing == Just True/' env-changing $T
+m $PC 's/if M.truthy seed then/if True then/' rng-zero $T
+m $PC 's/            , depth = 12\n/            , depth = 11\n/' boat-depth $T
+m $PC 's/            , heading = 32\n/            , heading = 30\n/' boat-heading $T
+m $PC 's/            , speed = 4\n/            , speed = 3\n/' boat-speed $T
+m $PC 's/            , fuel = 86\n/            , fuel = 80\n/' boat-fuel $T
+m $PC 's/            , battery = 92\n/            , battery = 90\n/' boat-battery $T
+m $PC 's/propRpm = Just 52/propRpm = Just 50/' boat-rpm $T
+m $PC 's/            , noise = 12\n/            , noise = 10\n/' boat-noise $T
+m $PC 's/gunLoudUntil = Just 0/gunLoudUntil = Nothing/' boat-gun-loud $T
+m $PC 's/runSetting = 4320/runSetting = 4000/' combat-run $T
+m $PC 's/base = \{ x = -3200, y = 3400 \}/base = { x = -3200, y = 3000 }/' combat-air-base $T
+m $PC 's/ammo = 240/ammo = 200/' combat-ammo $T
+m $PC 's/pingAge = 999/pingAge = 0/' sim-ping-age $T
+m $PC 's/            , decoys = 3\n/            , decoys = 2\n/' sim-decoys $T
+m $PC 's/home = \{ x = -1500, y = -1700 \}/home = { x = -1500, y = -1600 }/' sim-home $T
+m $PC 's/plantVersion = Just 1/plantVersion = Nothing/' sim-plant-version $T
+m $PC 's/8 \+ hash01 seed 0 \* 8/8 + hash01 seed 1 * 8/' sim-lightning $T
+m $PC 's/            , weaponSequence = 1\n/            , weaponSequence = 0\n/' sim-weapon-sequence $T
+m $PC 's/            , nextId = 1\n/            , nextId = 0\n/' sim-next-id $T
+m $PC 's/sign \(second.x - first.x\)/sign (first.x - second.x)/' long-east $T
+m $PC 's/if v.side == Just Friendly then/if v.side \/= Just Friendly then/' long-sides $T
+m $PC 's/v.x - direction \* 800/v.x - direction * 700/' long-apart $T
+m $PC 's/if 0 < direction then/if 0 <= direction then/' long-heading $T
+m $PC 's/departure = Maybe.map \(\\_ -> \{ x = apart.x, y = apart.y \}\) apart.departure/departure = apart.departure/' long-departure $T

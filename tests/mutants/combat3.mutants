@@ -1,0 +1,2 @@
+T=tests/sim-combat.test.mjs; CB=elm/Sim/Combat.elm; GR=elm/Sim/GunRounds.elm; SD=elm/Sim/ShipDamage.elm; TV=elm/Sim/TorpedoSaves.elm
+m $CB 's/launched.runSetting \+ 50\)/launched.runSetting + 0)/' launch-serious-margin $T
