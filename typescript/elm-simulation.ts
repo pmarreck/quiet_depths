@@ -22,7 +22,7 @@
 // object; anything else the page writes there would be lost at the next
 // reply. `onStray`, when given, hears the names of such fields before each
 // command.
-import {refreshMirror} from './world-mirror.ts';
+import {refreshMirror, refreshChanged} from './world-mirror.ts';
 import {markReplay, type ReplayEvent} from './replay-events.ts';
 import {reportInvalidNumber, type InvalidNumber} from './invalid-numbers.ts';
 import {PAGE_FIELDS, restorePageFields} from './page-fields.ts';
@@ -31,8 +31,13 @@ import type {World} from './patrol-world.ts';
 
 type Fields = Record<string, unknown>;
 type Announced = {replay: {time: number; event: ReplayEvent}[]; invalid: InvalidNumber[]};
-export type Reply = Partial<Announced> & {error?: string; world?: Fields | null; ticks?: (Announced & {world: Fields})[]; result?: unknown;
-  boat?: string[]; gun?: string[]; drone?: string[]};
+// A world as the Web Worker sends it: only the fields that changed since its
+// last, or whole (see scripts/sim-worker-script.mjs).
+export interface Changes {set: Fields; unset: string[]; whole: boolean}
+type Sent = {world?: Fields | null; changes?: Changes};
+export type Reply = Partial<Announced> & Sent & {error?: string; ticks?: (Announced & Sent)[]; result?: unknown; boat?: string[]; gun?: string[]; drone?: string[]};
+const changesOf = (r: Sent): Changes | null => r.changes ?? (r.world ? {set: r.world, unset: [], whole: true} : null);
+const worldOf = (r: Sent): Fields | null => r.world ?? r.changes?.set ?? null;
 
 // How commands reach the worker and replies come back.
 export interface Transport {send(command: unknown): void; listen(listener: (reply: Reply) => void): void}
@@ -127,6 +132,12 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
     for (const c of changes) if (c.has(i)) value = c.get(i);
     return value;
   });
+  // The orders a world reports, the rest as the worker last reported them.
+  const reported = (base: unknown[], {set, unset, whole}: Changes) => places.map(([part, f], i) => {
+    const top = part ?? f;
+    if (top in set) return structuredClone(part ? (set[part] as Fields | undefined)?.[f] : set[f]);
+    return whole || unset.includes(top) ? undefined : base[i];
+  });
   // The orders on the page's object that differ from what the adapter has logged.
   const changed = (s: World, t: Track) => {
     const out = new Map<number, unknown>();
@@ -160,24 +171,25 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
   // over the last the page's orders the worker has not yet applied: those of
   // later calls, and those written since the page's last call. `own` is the
   // call's changes, which the reply has applied.
-  const landed = (s: World, t: Track, worlds: Fields[], own: Map<number, unknown> | null, before = () => {}, each: (index: number) => void = () => {}) => {
+  const landed = (s: World, t: Track, worlds: Changes[], own: Map<number, unknown> | null, before = () => {}, each: (index: number) => void = () => {}) => {
     if (own && t.unreplied[0] === own) t.unreplied.shift();
     const since = changed(s, t);
     before();
-    for (const [i, world] of worlds.entries()) { refreshMirror(s, world, PAGE_FIELDS); t.replied = simulated(s); each(i); }
-    const last = worlds[worlds.length - 1];
-    t.base = last ? places.map(p => structuredClone(at(s, p))) : merged(t.base, own ? [own] : []);
-    const later = merged(t.base, t.unreplied);
-    t.logged = later.map(key);
+    for (const [i, world] of worlds.entries()) {
+      if (world.whole) refreshMirror(s, world.set, PAGE_FIELDS); else refreshChanged(s, world.set, world.unset);
+      t.base = reported(t.base, world);
+      t.replied = simulated(s);
+      each(i);
+    }
+    if (!worlds.length) t.base = merged(t.base, own ? [own] : []);
+    t.logged = merged(t.base, t.unreplied).map(key);
     const over = new Map([...t.unreplied.flatMap(c => [...c]), ...since]);
-    if (!over.size || !last) return;
+    if (!over.size || !worlds.length) return;
     checked(s, t);
-    const world: Fields = {...last, gun: {...last.gun as Fields}, drone: {...last.drone as Fields}};
     for (const [i, value] of over) {
-      const [part, f] = places[i], into = part ? world[part] as Fields : world;
+      const [part, f] = places[i], w = s as unknown as Fields, into = part ? w[part] as Fields : w;
       if (value === undefined) delete into[f]; else into[f] = structuredClone(value);
     }
-    refreshMirror(s, world, PAGE_FIELDS);
     t.replied = simulated(s);
   };
   let held: object | null = null;
@@ -191,7 +203,7 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
     });
     for (const k of PAGE_FIELDS) delete world[k];
     const reply = await exchange({kind: 'load', world: JSON.parse(JSON.stringify(world))});
-    landed(s, t, [reply.world as Fields], null);
+    landed(s, t, [changesOf(reply)!], null);
     held = s;
   };
   // Logs the page's order changes as this call's, then runs `job` in its turn.
@@ -223,7 +235,7 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
   };
   return {
     create: (mission, seed, options = {}) => jobs(async exchange => {
-      const world = (await exchange({kind: 'create', mission, seed, options})).world as Fields;
+      const world = worldOf(await exchange({kind: 'create', mission, seed, options}))!;
       return adopt(Object.assign(world, {photoArchive: [], photoSequence: 1}) as unknown as World);
     }),
     restore: raw => jobs(async exchange => {
@@ -232,19 +244,19 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
       if (!isRecord(saved) || !restorePageFields(saved)) return null;
       const page = pick(saved, PAGE_FIELDS.filter(k => saved[k] !== undefined)), rest = {...saved};
       for (const k of PAGE_FIELDS) delete rest[k];
-      const world = (await exchange({kind: 'restore', save: rest})).world;
+      const world = worldOf(await exchange({kind: 'restore', save: rest}));
       return world ? adopt(Object.assign(world, page) as unknown as World) : null;
     }),
     step: (s, dt, input = {}) => call(s, async (exchange, t, own) => {
       const {afterTick, beforeTicks, ...frame} = input;
       await holding(s, t, exchange);
       const ticks = (await exchange({kind: 'step', orders: orders(t, own), dt, input: defined(frame)})).ticks ?? [];
-      landed(s, t, ticks.map(tick => tick.world), own, () => beforeTicks?.(s), i => { announce(s, ticks[i]); afterTick?.(s); });
+      landed(s, t, ticks.map(tick => changesOf(tick)!), own, () => beforeTicks?.(s), i => { announce(s, ticks[i]); afterTick?.(s); });
     }),
     act: (s, action) => call(s, async (exchange, t, own) => {
       await holding(s, t, exchange);
       const done = await exchange({kind: 'act', orders: orders(t, own), action: defined(action)});
-      landed(s, t, [done.world as Fields], own);
+      landed(s, t, [changesOf(done)!], own);
       announce(s, done);
       return done.result;
     }),

@@ -15,19 +15,34 @@ import {compiledElm, elmSource, sameResults, seeded, exact} from './sim-harness.
 
 // The worker's program, stock: each reply arrives once the event loop turns.
 const program = compiledElm('elm/SimWorker.elm').SimWorker;
-// The worker as the adapter reaches it. With `hold`, each reply waits until
-// the test releases it, so the test can act while a command is in flight;
+// The worker file the site ships, compiled once.
+const shippedScript = workerScript(elmSource('elm/SimWorker.elm'));
+// The shipped worker file, run in a stand-in for a Web Worker's global
+// scope; what crosses between the page and the worker is cloned as
+// postMessage clones it, so a function or other value a worker could not
+// receive fails here.
+function shippedWorker() {
+  const listeners = [], scope = {postMessage: reply => { const data = structuredClone(reply); for (const l of listeners) l({data}); }};
+  new Function('self', shippedScript).call(scope, scope);
+  return {postMessage: command => scope.onmessage({data: structuredClone(command)}), addEventListener: (type, l) => { if (type === 'message') listeners.push(l); }};
+}
+// The worker as the adapter reaches it: its program on the same thread,
+// sending whole worlds, or with `shipped` the shipped worker file, sending
+// only the fields that changed. With `hold`, each reply waits until the
+// test releases it, so the test can act while a command is in flight;
 // `sent` lists the commands in the order they went.
-function transport({hold = false} = {}) {
-  const app = program.init(), held = [], sent = [];
+function transport({hold = false, shipped = false} = {}) {
+  const source = shipped ? (w => ({send: c => w.postMessage(c), subscribe: l => w.addEventListener('message', e => l(e.data))}))(shippedWorker())
+    : (app => ({send: c => app.ports.commands.send(c), subscribe: l => app.ports.replies.subscribe(l)}))(program.init());
+  const held = [], sent = [];
   let listener = null, arrived = null;
-  app.ports.replies.subscribe(reply => {
+  source.subscribe(reply => {
     if (!hold) { listener(reply); return; }
     held.push(reply);
     arrived?.();
   });
   return {
-    send: command => { sent.push(command); app.ports.commands.send(command); },
+    send: command => { sent.push(command); source.send(command); },
     listen: l => { listener = l; },
     sent,
     // Delivers the next reply once the worker has sent it.
@@ -39,6 +54,8 @@ function transport({hold = false} = {}) {
   };
 }
 const worker = () => transport();
+// The tests that run both ways.
+const SOURCES = [['on the page', {}], ['through the shipped worker', {shipped: true}]];
 // Fails a test that writes, on the page's patrol object, a field only the
 // simulation changes; the worker would never see it.
 const strict = {onStray: fields => { throw new Error('written outside the orders: ' + fields.join(', ')); }};
@@ -63,16 +80,6 @@ async function announced(world, marks, work) {
   const invalid = [], previous = setInvalidNumberReporter(problem => invalid.push(problem));
   const before = marks.length;
   try { return {result: await work(), replay: marks.slice(before), invalid}; } finally { setInvalidNumberReporter(previous); }
-}
-
-// The worker file the site ships, run in a stand-in for a Web Worker's
-// global scope; what crosses between the page and the worker is cloned as
-// postMessage clones it, so a function or other value a worker could not
-// receive fails here.
-function shippedWorker() {
-  const listeners = [], scope = {postMessage: reply => { const data = structuredClone(reply); for (const l of listeners) l({data}); }};
-  new Function('self', workerScript(elmSource('elm/SimWorker.elm'))).call(scope, scope);
-  return {postMessage: command => scope.onmessage({data: structuredClone(command)}), addEventListener: (type, l) => { if (type === 'message') listeners.push(l); }};
 }
 
 // A stock outgoing port answers once the event loop turns, never within the
@@ -143,8 +150,8 @@ test('a refreshed mirror keeps the sign of a zero', () => {
 // same orders are written on both, the same actions taken, the same frames
 // played; after each, the two must match, with every tick the per-tick hook
 // sees, every replay mark and every invalid number.
-test('the page played through the Elm worker matches the TypeScript game', async () => {
-  const sim = await elmSimulation(worker(), strict), random = seeded(911), kinds = Object.keys(TYPESCRIPT), written = new Set();
+for (const [how, via] of SOURCES) test('the page played through the Elm worker matches the TypeScript game, ' + how, async () => {
+  const sim = await elmSimulation(transport(via), strict), random = seeded(911), kinds = Object.keys(TYPESCRIPT), written = new Set();
   let turn = 0, frames = 0, ticks = 0;
   for (const [n, {id}] of MISSIONS.entries()) for (const longPatrol of [false, true]) {
     const seed = 900 + 2 * n + Number(longPatrol), options = exact({difficulty: {longPatrol}, weather: pick(random, [undefined, 'storm', 'fog'])});
@@ -207,8 +214,8 @@ test('the page played through the Elm worker matches the TypeScript game', async
 // The worker holds one patrol. The page can restore another (a save slot
 // checked, an import validated) and then go back to the first; the adapter
 // loads it into the worker again before stepping it.
-test('the page can go back to a patrol the worker no longer holds', async () => {
-  const sim = await elmSimulation(worker(), strict);
+for (const [how, via] of SOURCES) test('the page can go back to a patrol the worker no longer holds, ' + how, async () => {
+  const sim = await elmSimulation(transport(via), strict);
   const a = createGame('recon', 3), b = createGame('intercept', 4);
   for (const s of [a, b]) step(s, 30, {timeRate: 4});
   const ma = await sim.restore(save(a)), mb = await sim.restore(save(b));
@@ -328,8 +335,8 @@ test('the adapter names fields written outside the orders', async () => {
 // while it was in flight. The patrol under the worker, replies held and
 // released by the test, ends as the TypeScript's does with the same writes
 // and calls made synchronously in the same order.
-test('writes around a command in flight keep their place in the page\'s order', async () => {
-  const tr = transport({hold: true}), starting = elmSimulation(tr, strict);
+for (const [how, via] of SOURCES) test('writes around a command in flight keep their place in the page\'s order, ' + how, async () => {
+  const tr = transport({...via, hold: true}), starting = elmSimulation(tr, strict);
   await tr.release();
   const sim = await starting, made = sim.create('recon', 5);
   await tr.release();
@@ -372,8 +379,8 @@ test('writes around a command in flight keep their place in the page\'s order', 
 
 // A refused command applies nothing, and the orders it carried reach the
 // worker with the next call, so the page's order still holds.
-test('a refused command leaves the page\'s orders for the next call', async () => {
-  const sim = await elmSimulation(worker(), strict), m = await sim.create('intercept', 6), t = createGame('intercept', 6);
+for (const [how, via] of SOURCES) test('a refused command leaves the page\'s orders for the next call, ' + how, async () => {
+  const sim = await elmSimulation(transport(via), strict), m = await sim.create('intercept', 6), t = createGame('intercept', 6);
   for (const s of [m, t]) s.targetSpeed = 5;
   await assert.rejects(sim.act(m, {kind: 'fire'}), /refused a command/);
   m.targetHeading = 45;
@@ -386,8 +393,8 @@ test('a refused command leaves the page\'s orders for the next call', async () =
 // A patrol the worker no longer holds is loaded as the worker last knew it,
 // so a write the page made after the call still reaches the worker after
 // that call, not with the load ahead of it.
-test('a patrol loaded back keeps the page\'s later writes for later', async () => {
-  const sim = await elmSimulation(worker(), strict), a = createGame('recon', 13);
+for (const [how, via] of SOURCES) test('a patrol loaded back keeps the page\'s later writes for later, ' + how, async () => {
+  const sim = await elmSimulation(transport(via), strict), a = createGame('recon', 13);
   const ma = await sim.restore(save(a));
   await sim.restore(save(createGame('intercept', 14)));
   for (const s of [ma, a]) s.targetSpeed = 9;
@@ -405,8 +412,8 @@ test('a patrol loaded back keeps the page\'s later writes for later', async () =
 
 // The hook before a step's ticks sees the patrol as it was, once, before
 // any tick lands; then each tick's hook sees that tick.
-test('the hook before a step sees the patrol before its ticks', async () => {
-  const sim = await elmSimulation(worker(), strict), m = await sim.create('survey', 15), seen = [];
+for (const [how, via] of SOURCES) test('the hook before a step sees the patrol before its ticks, ' + how, async () => {
+  const sim = await elmSimulation(transport(via), strict), m = await sim.create('survey', 15), seen = [];
   const before = m.time;
   await sim.step(m, 5, {timeRate: 4, beforeTicks: s => seen.push(['before', s.time]), afterTick: s => seen.push(['tick', s.time])});
   assert.deepEqual(seen[0], ['before', before]);
@@ -455,4 +462,31 @@ test('the page-side simulation answers with promises in both modes', async () =>
   await assert.rejects(typed);
   page.useElmSimulation(await elmSimulation(worker(), strict));
   try { await exercise(); } finally { page.useElmSimulation(null); }
+});
+
+// Two calls queued behind a step, then a write: the write comes after both,
+// so neither carries it, though the replies before them leave the written
+// order unchanged and the worker's file then omits it. The adapter keeps
+// the worker's own orders from its replies, not from the page's object.
+for (const [how, via] of SOURCES) test('a write after queued calls reaches the worker after them, ' + how, async () => {
+  const tr = transport({...via, hold: true}), starting = elmSimulation(tr, strict);
+  await tr.release();
+  const sim = await starting, made = sim.create('recon', 19);
+  await tr.release();
+  const m = await made, t = createGame('recon', 19);
+  const calls = [sim.step(m, 5, {timeRate: 4}), sim.act(m, {kind: 'ping'}), sim.act(m, {kind: 'log', text: 'Steady.'})];
+  m.targetHeading = 123;
+  for (let i = 0; i < 3; i++) { await tr.release(); await calls[i]; }
+  assert.equal(m.targetHeading, 123);
+  assert.ok(tr.sent.slice(2, 5).every(c => c.orders.targetHeading !== 123), 'none of the three carries the later write');
+  const last = sim.step(m, 5, {timeRate: 4});
+  await tr.release();
+  await last;
+  assert.equal(tr.sent[5].orders.targetHeading, 123);
+  step(t, 5, {timeRate: 4});
+  ping(t);
+  log(t, 'Steady.');
+  t.targetHeading = 123;
+  step(t, 5, {timeRate: 4});
+  sameResults([pageless(m)], [pageless(t)]);
 });

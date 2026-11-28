@@ -53,3 +53,11 @@ function mergeList(old: unknown[], next: unknown[]): unknown[] {
 export function refreshMirror(mirror: object, next: object, keep: readonly string[] = []): void {
   mergeRecord(mirror as Fields, next as Fields, keep);
 }
+
+// Refreshes only the fields a reply says changed: each in `set` merged as
+// refreshMirror merges it, each in `unset` removed; the rest stay as they are.
+export function refreshChanged(mirror: object, set: object, unset: readonly string[]): void {
+  const m = mirror as Fields;
+  for (const [k, v] of Object.entries(set)) m[k] = merge(m[k], v);
+  for (const k of unset) delete m[k];
+}

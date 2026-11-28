@@ -1323,3 +1323,41 @@ encoding, posting back, the refresh), takes 1.0 to 2.5 ms at 1x and 1.9 to
 0.2 to 0.5 ms a tick receiving the world and refreshing its patrol object;
 the rest now runs off it. Before the move, the page's thread carried the
 whole 0.7 to 1.5 ms (1x) and 1.4 to 3.1 ms (20x).
+
+## Only what changed crosses (2026-11-28)
+
+With the simulation off the page's thread, the cost that mattered was the
+page's own: receiving each tick's world and refreshing its patrol object.
+Under Chromium's CPU throttling, which stands in for slower phones, that
+share grew to 1.5 to 5.8 ms a tick at 6x, and a 20x frame carries two
+ticks. Most of a world does not change from one tick to the next: in busy
+patrols ten minutes in, the acoustics (up to 21 KB) change on about a third
+of ticks, the wake on half, the log rarely, while ships, contacts and the
+boat's own numbers change every tick. So the worker's relay now compares
+each world's top-level fields with the last it sent and posts only those
+that changed, with the ones removed, and the whole world after a create,
+restore or load. The adapter refreshes only those fields, keeps the
+worker's own orders from the replies rather than from the page's object,
+and lays the page's pending orders back by direct assignment.
+
+Keeping the worker's orders from the page's object would have been wrong
+here, and only here: an order a reply omits would read back as the page's
+pending write, and a call queued before that write would have carried it.
+A test queues two calls behind a step, writes after them, and checks that
+neither carries the write; it fails against that version through the
+shipped worker and passes on the page, as expected. The key adapter tests
+now run both ways: against the program on the page, sending whole worlds,
+and through the shipped worker file, sending changes.
+
+Measured in Chromium (median of 100; ms):
+
+| Patrol | Sent per tick | Page's share, whole worlds (1x, 4x, 6x) | Page's share, changes (1x, 4x, 6x) | Step round trip, 1x and 20x |
+|---|---|---|---|---|
+| Reconnaissance | 4.4 of 11.5 KB | 0.4, 1.0, 1.5 | 0.1, 0.1, 0.1 | 1.4, 2.6 |
+| Fleet action | 9.2 of 41.7 KB | 0.8, 3.2, 4.7 | 0.2, 0.6, 1.0 | 2.0, 3.8 |
+| Convoy defense | 5.8 of 23.5 KB | 0.5, 2.0, 3.0 | 0.1, 0.3, 0.4 | 1.6, 3.0 |
+
+The throttling applies to the page's thread; the protocol would not reach
+the worker's, so the worker's own time is unthrottled in these figures.
+The worker still encodes each whole world; that cost is off the page's
+thread, and a step's round trip stays well inside a frame.
