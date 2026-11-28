@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/FleetAction.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its stage is mirrored in elm/Sim/FleetTheater.elm, its volleys in FleetVolleys.elm, and validTheater in FleetActionSaves.elm.
 import {hash01} from './surface-motion.ts';
 
 type Side = 'friendly' | 'hostile';
