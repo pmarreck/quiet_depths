@@ -1,4 +1,4 @@
-module SimHarness.Hulls exposing (function, logKind)
+module SimHarness.Hulls exposing (function)
 
 {-| Harness entries for hull contacts.
 -}
@@ -11,6 +11,7 @@ import Sim.Debrief as Debrief
 import Sim.HullContacts as Contacts
 import Sim.HullGeometry as Geometry exposing (Body)
 import Sim.Mechanics as Mechanics
+import Sim.SaveParts exposing (logKind)
 import Sim.Ship as Ship
 import Sim.Site as Site
 import SimHarness.Codec exposing (andMap, arg, call2)
@@ -44,20 +45,6 @@ body =
 encodePoint : { a | x : Float, y : Float, depth : Float } -> E.Value
 encodePoint p =
     E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ), ( "depth", E.float p.depth ) ]
-
-
-logKind : D.Decoder Mechanics.LogKind
-logKind =
-    D.string
-        |> D.andThen
-            (\name ->
-                case List.filter (\k -> Mechanics.logKindName k == name) [ Mechanics.Info, Mechanics.Warning, Mechanics.Damage, Mechanics.Success, Mechanics.Contact ] of
-                    k :: _ ->
-                        D.succeed k
-
-                    [] ->
-                        D.fail name
-            )
 
 
 type alias Recorded =

@@ -6,12 +6,12 @@ water, and every torpedo's run, with the strikes it makes.
 
 import Json.Decode as D
 import Json.Encode as E
+import Sim.OrdnanceSaves exposing (encodeAirSupport, encodeAircraft, encodeTorpedo)
 import Sim.Ship as Ship
 import Sim.Torpedo as Torpedo exposing (Owner(..), Torpedo)
 import Sim.TorpedoRun as Run
 import SimHarness.Codec exposing (arg, point)
 import SimHarness.Fleet exposing (optional)
-import SimHarness.Ordnance exposing (encodeAirSupport, encodeAircraft, encodeTorpedo)
 import SimHarness.Patrol as Patrol exposing (Patrol)
 
 

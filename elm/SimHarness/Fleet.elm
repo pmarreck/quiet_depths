@@ -1,4 +1,4 @@
-module SimHarness.Fleet exposing (battle, encodeBattle, encodeVolley, function, optional, shots, volley)
+module SimHarness.Fleet exposing (function, optional, shots)
 
 {-| Harness entries for the fleet action: its stage, its battle, its volleys
 and its save validation.
@@ -7,9 +7,10 @@ and its save validation.
 import Json.Decode as D
 import Json.Encode as E
 import Sim.FleetAction as FleetAction
-import Sim.FleetActionSaves as Saves exposing (SavedTheater, SavedVolley)
-import Sim.FleetTheater as Theater exposing (Area, Battle)
-import Sim.FleetVolleys as Volleys exposing (Position, Volley)
+import Sim.FleetActionSaves as Saves exposing (savedTheater)
+import Sim.FleetTheater as Theater exposing (Battle)
+import Sim.FleetVolleys as Volleys exposing (Volley)
+import Sim.SaveParts exposing (battle, encodeBattle, encodeVolley, volley)
 import Sim.Ship as Ship exposing (Ship)
 import Sim.Vessel as Vessel exposing (Kind, Side)
 import SimHarness.Codec exposing (arg)
@@ -26,67 +27,6 @@ optional key valueDecoder =
                 else
                     D.succeed Nothing
             )
-
-
-position : D.Decoder Position
-position =
-    D.map3 Position (D.field "x" D.float) (D.field "y" D.float) (D.field "altitude" D.float)
-
-
-encodePosition : Position -> E.Value
-encodePosition p =
-    E.object [ ( "x", E.float p.x ), ( "y", E.float p.y ), ( "altitude", E.float p.altitude ) ]
-
-
-volley : D.Decoder Volley
-volley =
-    D.map8 (\id underwater from to source target launched arrives -> { id = id, underwater = underwater, from = from, to = to, source = source, target = target, launched = launched, arrives = arrives, damage = 0, warning = Nothing })
-        (D.field "id" D.int)
-        (D.field "underwater" D.bool)
-        (D.field "from" position)
-        (D.field "to" position)
-        (D.field "source" D.string)
-        (D.field "target" D.string)
-        (D.field "launched" D.float)
-        (D.field "arrives" D.float)
-        |> D.andThen (\v -> D.map2 (\damage warning -> { v | damage = damage, warning = warning }) (D.field "damage" D.float) (optional "warning" D.bool))
-
-
-encodeVolley : Volley -> E.Value
-encodeVolley v =
-    E.object
-        ([ ( "id", E.int v.id )
-         , ( "underwater", E.bool v.underwater )
-         , ( "from", encodePosition v.from )
-         , ( "to", encodePosition v.to )
-         , ( "source", E.string v.source )
-         , ( "target", E.string v.target )
-         , ( "launched", E.float v.launched )
-         , ( "arrives", E.float v.arrives )
-         , ( "damage", E.float v.damage )
-         ]
-            ++ (Maybe.map (\w -> [ ( "warning", E.bool w ) ]) v.warning |> Maybe.withDefault [])
-        )
-
-
-area : D.Decoder Area
-area =
-    D.map4 Area (D.field "x" D.float) (D.field "y" D.float) (D.field "label" D.string) (D.field "radius" D.float)
-
-
-battle : D.Decoder Battle
-battle =
-    D.map4 Battle (D.field "areas" (D.list area)) (D.field "volleys" (D.list volley)) (D.field "round" D.int) (D.field "next" D.float)
-
-
-encodeBattle : Battle -> E.Value
-encodeBattle b =
-    E.object
-        [ ( "areas", E.list (\a -> E.object [ ( "x", E.float a.x ), ( "y", E.float a.y ), ( "radius", E.float a.radius ), ( "label", E.string a.label ) ]) b.areas )
-        , ( "volleys", E.list encodeVolley b.volleys )
-        , ( "round", E.int b.round )
-        , ( "next", E.float b.next )
-        ]
 
 
 side : D.Decoder Side
@@ -166,36 +106,6 @@ encodeState s =
         , ( "battle", encodeBattle s.battle )
         , ( "log", E.list identity s.log )
         ]
-
-
-savedVolley : D.Decoder SavedVolley
-savedVolley =
-    D.map8 SavedVolley
-        (D.field "id" D.float)
-        (D.field "underwater" D.bool)
-        (D.field "from" position)
-        (D.field "to" position)
-        (D.field "source" D.string)
-        (D.field "target" D.string)
-        (D.field "launched" D.float)
-        (D.field "arrives" D.float)
-        |> D.andThen (\make -> D.map make (D.field "damage" D.float))
-
-
-savedTheater : D.Decoder SavedTheater
-savedTheater =
-    D.field "time" D.float
-        |> D.andThen
-            (\now ->
-                D.map7 SavedTheater
-                    (D.succeed now)
-                    (D.field "weaponSequence" D.float)
-                    (D.field "ships" (D.list (Ship.decoder now)))
-                    (D.at [ "battle", "round" ] D.float)
-                    (D.at [ "battle", "next" ] D.float)
-                    (D.at [ "battle", "areas" ] (D.list area))
-                    (D.at [ "battle", "volleys" ] (D.list savedVolley))
-            )
 
 
 {-| What `activeVolleys` reads: the battle's volleys, the convoy's shot and

@@ -1,99 +1,19 @@
-module SimHarness.Lamp exposing (encodeEstimate, encodeLampFix, encodeTransmission, estimate, function, lampFix, transmission)
+module SimHarness.Lamp exposing (function)
 
 {-| Harness entries for signal lamps.
 -}
 
 import Json.Decode as D
 import Json.Encode as E
+import Sim.SaveParts exposing (encodeEstimate, encodeLampFix, encodeTransmission, estimate, lampFix, transmission)
 import Sim.SignalLamp as Lamp
 import Sim.SignalLampSaves as Saves
 import SimHarness.Codec exposing (andMap, arg, call1, call2, point)
 
 
-estimate : D.Decoder Lamp.Estimate
-estimate =
-    D.map7 Lamp.Estimate
-        (D.field "text" D.string)
-        (D.field "x" D.float)
-        (D.field "y" D.float)
-        (D.field "time" D.float)
-        (D.field "radius" D.float)
-        (D.field "sender" D.string)
-        (D.field "number" D.float)
-
-
-encodeEstimate : Lamp.Estimate -> E.Value
-encodeEstimate p =
-    E.object
-        [ ( "text", E.string p.text )
-        , ( "x", E.float p.x )
-        , ( "y", E.float p.y )
-        , ( "radius", E.float p.radius )
-        , ( "time", E.float p.time )
-        , ( "sender", E.string p.sender )
-        , ( "number", E.float p.number )
-        ]
-
-
-lampFix : D.Decoder Lamp.LampFix
-lampFix =
-    D.succeed Lamp.LampFix
-        |> andMap (D.field "text" D.string)
-        |> andMap (D.field "x" D.float)
-        |> andMap (D.field "y" D.float)
-        |> andMap (D.field "time" D.float)
-        |> andMap (D.field "radius" D.float)
-        |> andMap (D.field "sender" D.string)
-        |> andMap (D.field "number" D.float)
-        |> andMap (D.field "target" D.string)
-        |> andMap (D.field "depth" D.float)
-        |> andMap (D.field "course" D.float)
-        |> andMap (D.field "speed" D.float)
-
-
-encodeLampFix : Lamp.LampFix -> E.Value
-encodeLampFix p =
-    E.object
-        [ ( "sender", E.string p.sender )
-        , ( "target", E.string p.target )
-        , ( "x", E.float p.x )
-        , ( "y", E.float p.y )
-        , ( "radius", E.float p.radius )
-        , ( "time", E.float p.time )
-        , ( "number", E.float p.number )
-        , ( "text", E.string p.text )
-        , ( "depth", E.float p.depth )
-        , ( "course", E.float p.course )
-        , ( "speed", E.float p.speed )
-        ]
-
-
-transmission : D.Decoder e -> D.Decoder (Lamp.Transmission e)
-transmission decodeEstimate =
-    D.map6 Lamp.Transmission
-        (D.field "estimate" decodeEstimate)
-        (D.field "elapsed" D.float)
-        (D.field "since" (D.nullable D.float))
-        (D.field "copied" D.int)
-        (D.field "delivered" D.bool)
-        (D.field "completedAt" (D.nullable D.float))
-
-
 nullable : (a -> E.Value) -> Maybe a -> E.Value
 nullable encode =
     Maybe.map encode >> Maybe.withDefault E.null
-
-
-encodeTransmission : (e -> E.Value) -> Lamp.Transmission e -> E.Value
-encodeTransmission encode m =
-    E.object
-        [ ( "estimate", encode m.estimate )
-        , ( "elapsed", E.float m.elapsed )
-        , ( "since", nullable E.float m.since )
-        , ( "copied", E.int m.copied )
-        , ( "delivered", E.bool m.delivered )
-        , ( "completedAt", nullable E.float m.completedAt )
-        ]
 
 
 {-| The copying state only; the estimate rides along unchanged.

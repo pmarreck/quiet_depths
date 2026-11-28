@@ -1,4 +1,4 @@
-module Sim.TrafficSaves exposing (SavedTraffic, SavedVolley, validTraffic)
+module Sim.TrafficSaves exposing (SavedTraffic, SavedVolley, savedTraffic, validTraffic)
 
 {-| Whether a saved patrol's traffic can be resumed: the watch counters in
 range, ship ids unique, passing traffic named and sided as the watch makes
@@ -8,10 +8,12 @@ may be aimed at the player). Whether each field has the right JSON type is
 the decoder's question; a save that does not decode is invalid.
 -}
 
+import Json.Decode as D
 import Set
 import Sim.FleetVolleys exposing (Position)
 import Sim.Math as M
-import Sim.Ship exposing (Ship)
+import Sim.SaveParts exposing (position)
+import Sim.Ship as Ship exposing (Ship)
 import Sim.TrafficEncounters as Encounters
 
 
@@ -184,3 +186,36 @@ validVolley s ids v =
         )
         && Set.member v.source ids
         && (Set.member v.target ids || (v.target == "player" && v.warning))
+
+
+savedVolley : D.Decoder SavedVolley
+savedVolley =
+    D.map8 (\id source target underwater warning from to launched -> { id = id, source = source, target = target, underwater = underwater, warning = warning, from = from, to = to, launched = launched, arrives = 0, damage = 0 })
+        (D.field "id" D.float)
+        (D.field "source" D.string)
+        (D.field "target" D.string)
+        (D.field "underwater" D.bool)
+        (D.field "warning" D.bool)
+        (D.field "from" position)
+        (D.field "to" position)
+        (D.field "launched" D.float)
+        |> D.andThen (\v -> D.map2 (\arrives damage -> { v | arrives = arrives, damage = damage }) (D.field "arrives" D.float) (D.field "damage" D.float))
+
+
+{-| The coastal traffic as a save holds it, with the clock, weapon sequence
+and ships its checks read.
+-}
+savedTraffic : D.Decoder SavedTraffic
+savedTraffic =
+    D.field "time" D.float
+        |> D.andThen
+            (\now ->
+                D.map7 SavedTraffic
+                    (D.succeed now)
+                    (D.field "weaponSequence" D.float)
+                    (D.field "ships" (D.list (Ship.decoder now)))
+                    (D.at [ "traffic", "window" ] D.float)
+                    (D.at [ "traffic", "turn" ] D.float)
+                    (D.at [ "traffic", "next" ] D.float)
+                    (D.at [ "traffic", "volleys" ] (D.list savedVolley))
+            )

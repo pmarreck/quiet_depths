@@ -1,4 +1,4 @@
-module SimHarness.ConvoyWatch exposing (encodeConvoy, function)
+module SimHarness.ConvoyWatch exposing (function)
 
 {-| Harness entries for the wolf in the henhouse and the allied lamp watch:
 the convoy's setup, its lamp, the hunter's raid, the escort's charges, and
@@ -13,13 +13,13 @@ import Sim.AlliedWatch as AlliedWatch
 import Sim.Contact as Contact
 import Sim.ContactReports as ContactReports
 import Sim.ConvoySaves as ConvoySaves exposing (StationMessage(..))
-import Sim.ConvoyWatch as ConvoyWatch exposing (Convoy, Observation)
+import Sim.ConvoyWatch as ConvoyWatch exposing (Observation)
 import Sim.Environment as Env
+import Sim.OrdnanceSaves exposing (encodeBlast)
+import Sim.SaveParts as SaveParts exposing (encodeConvoy)
 import Sim.Ship as Ship
 import SimHarness.Codec exposing (arg)
-import SimHarness.Fleet exposing (encodeVolley, optional)
-import SimHarness.Lamp as Lamp
-import SimHarness.Ordnance exposing (encodeBlast)
+import SimHarness.Fleet exposing (optional)
 import SimHarness.Patrol as Patrol exposing (Patrol)
 import SimHarness.World as World
 
@@ -65,26 +65,12 @@ encodeWorld s =
                )
             ++ (case s.alliedLamp of
                     Just w ->
-                        [ ( "alliedLamp", E.object [ ( "message", nullable (Lamp.encodeTransmission Lamp.encodeLampFix) w.message ), ( "sequence", E.float w.sequence ), ( "lastIssue", E.float w.lastIssue ) ] ) ]
+                        [ ( "alliedLamp", E.object [ ( "message", nullable (SaveParts.encodeTransmission SaveParts.encodeLampFix) w.message ), ( "sequence", E.float w.sequence ), ( "lastIssue", E.float w.lastIssue ) ] ) ]
 
                     Nothing ->
                         []
                )
         )
-
-
-{-| The convoy as a save writes it.
--}
-encodeConvoy : Convoy -> E.Value
-encodeConvoy c =
-    E.object
-        [ ( "message", nullable (Lamp.encodeTransmission Lamp.encodeEstimate) c.message )
-        , ( "pin", nullable Lamp.encodeEstimate c.pin )
-        , ( "number", E.float c.number )
-        , ( "round", E.int c.round )
-        , ( "next", E.float c.next )
-        , ( "shot", nullable encodeVolley c.shot )
-        ]
 
 
 {-| The functions this module answers for, by the TypeScript name each replaces.
@@ -125,10 +111,10 @@ function name =
                     (\s ->
                         case ConvoySaves.stationLamp s of
                             Just (AlliedSignal m) ->
-                                Lamp.encodeTransmission Lamp.encodeLampFix m
+                                SaveParts.encodeTransmission SaveParts.encodeLampFix m
 
                             Just (ConvoySignal m) ->
-                                Lamp.encodeTransmission Lamp.encodeEstimate m
+                                SaveParts.encodeTransmission SaveParts.encodeEstimate m
 
                             Nothing ->
                                 E.null

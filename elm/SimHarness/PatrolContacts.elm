@@ -12,16 +12,15 @@ import Sim.Contact as Contact exposing (Sighting(..))
 import Sim.ContactReports as ContactReports exposing (Sighted)
 import Sim.Environment as Env
 import Sim.Ordnance as Ordnance exposing (BlastKind)
+import Sim.OrdnanceSaves exposing (encodeBlast)
 import Sim.PatrolContacts as PatrolContacts
+import Sim.SaveParts as SaveParts
 import Sim.Ship as Ship
 import Sim.SignalLamp exposing (LampFix)
 import Sim.Vessel as Vessel
 import SimHarness.Codec exposing (andMap, arg)
 import SimHarness.Fleet exposing (optional)
-import SimHarness.Objectives as Objectives
-import SimHarness.Ordnance exposing (encodeBlast)
 import SimHarness.Patrol as Patrol exposing (Patrol)
-import SimHarness.Watch as Watch
 import SimHarness.World as World
 
 
@@ -117,7 +116,7 @@ encodeWorld s =
                , ( "nextId", E.float s.nextId )
                , ( "pingAge", E.float s.pingAge )
                , ( "pingCooldown", E.float s.pingCooldown )
-               , ( "torpedoTracks", E.list Watch.encodeTrack s.torpedoTracks )
+               , ( "torpedoTracks", E.list SaveParts.encodeTrack s.torpedoTracks )
                , ( "ships", E.list Ship.encode s.ships )
                , ( "photos", E.list E.string s.photos )
                , ( "photoCooldown", E.float s.photoCooldown )
@@ -125,7 +124,7 @@ encodeWorld s =
                , ( "alert", E.float s.alert )
                , ( "blasts", E.list encodeBlast s.blasts )
                ]
-            ++ (Maybe.map (\search -> [ ( "search", Objectives.encodeSearch search ) ]) s.search |> Maybe.withDefault [])
+            ++ (Maybe.map (\search -> [ ( "search", SaveParts.encodeSearch search ) ]) s.search |> Maybe.withDefault [])
             ++ (Maybe.map (\n -> [ ( "noisemaker", E.object [ ( "x", E.float n.x ), ( "y", E.float n.y ), ( "depth", E.float n.depth ), ( "heading", E.float n.heading ), ( "speed", E.float n.speed ), ( "time", E.float n.time ) ] ) ]) s.noisemaker |> Maybe.withDefault [])
         )
 

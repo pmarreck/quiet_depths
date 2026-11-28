@@ -1,4 +1,4 @@
-module SimHarness.Watch exposing (encodeTrack, function, track)
+module SimHarness.Watch exposing (function)
 
 {-| Harness entries for sinking ships and the torpedo watch.
 -}
@@ -8,9 +8,10 @@ import Json.Encode as E
 import Sim.Carrier as Carrier
 import Sim.ContactReadings as Readings
 import Sim.Foundering as Foundering
+import Sim.SaveParts exposing (encodeTrack, track)
 import Sim.TorpedoWatch as TorpedoWatch
 import Sim.Vessel as Vessel
-import SimHarness.Codec exposing (andMap, arg, call1, call2, call3, flag, maybe, point, position3, safeInt, surfaceShip, vesselKind, wholeNumber)
+import SimHarness.Codec exposing (andMap, arg, call1, call2, call3, flag, point, position3, safeInt, surfaceShip, vesselKind, wholeNumber)
 
 
 vessel : D.Decoder (Foundering.Vessel {})
@@ -149,43 +150,6 @@ echo =
 encodeEcho : TorpedoWatch.Echo -> E.Value
 encodeEcho e =
     E.object [ ( "id", E.int e.id ), ( "time", E.float e.time ), ( "x", E.float e.x ), ( "y", E.float e.y ), ( "depth", E.float e.depth ), ( "speed", E.float e.speed ), ( "inboundRun", E.bool e.inboundRun ) ]
-
-
-track : D.Decoder TorpedoWatch.Track
-track =
-    D.succeed TorpedoWatch.Track
-        |> andMap (D.field "id" D.int)
-        |> andMap (D.field "time" D.float)
-        |> andMap (D.field "x" D.float)
-        |> andMap (D.field "y" D.float)
-        |> andMap (D.field "depth" D.float)
-        |> andMap (D.field "speed" D.float)
-        |> andMap (D.field "inboundRun" D.bool)
-        |> andMap (D.field "arrival" (D.nullable D.float))
-        |> andMap (D.field "fixes" D.int)
-        |> andMap (D.field "activeAt" D.float)
-        |> andMap (D.field "activeX" D.float)
-        |> andMap (D.field "activeY" D.float)
-        |> andMap (D.field "course" (D.nullable D.int))
-
-
-encodeTrack : TorpedoWatch.Track -> E.Value
-encodeTrack t =
-    E.object
-        [ ( "id", E.int t.id )
-        , ( "time", E.float t.time )
-        , ( "x", E.float t.x )
-        , ( "y", E.float t.y )
-        , ( "depth", E.float t.depth )
-        , ( "speed", E.float t.speed )
-        , ( "inboundRun", E.bool t.inboundRun )
-        , ( "fixes", E.int t.fixes )
-        , ( "activeAt", E.float t.activeAt )
-        , ( "activeX", E.float t.activeX )
-        , ( "activeY", E.float t.activeY )
-        , ( "course", maybe E.int t.course )
-        , ( "arrival", maybe E.float t.arrival )
-        ]
 
 
 {-| The functions this module answers for, by the TypeScript name each replaces.

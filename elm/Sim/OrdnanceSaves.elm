@@ -1,4 +1,4 @@
-module SimHarness.Ordnance exposing (airSupport, aircraft, blast, encodeAirSupport, encodeAircraft, encodeBlast, encodeRound, encodeTorpedo, gunRound, torpedo)
+module Sim.OrdnanceSaves exposing (airSupport, aircraft, blast, encodeAirSupport, encodeAircraft, encodeBlast, encodeRound, encodeTorpedo, gunRound, torpedo)
 
 {-| Codecs for what flies and falls: aircraft and their sortie, blasts, gun
 rounds and torpedoes, shared by the harness modules that read them.
@@ -9,9 +9,8 @@ import Json.Encode as E
 import Sim.AirSupport as Air exposing (AirReport, AirSupport, Aircraft)
 import Sim.AircraftPhase as AircraftPhase
 import Sim.Ordnance as Ordnance exposing (Aloft, Blast, Round)
+import Sim.SaveCodec exposing (andMap, optional, point)
 import Sim.Torpedo exposing (DecoyTarget, Owner(..), Torpedo, Trace)
-import SimHarness.Codec exposing (andMap, point)
-import SimHarness.Fleet exposing (optional)
 
 
 named : String -> (a -> String) -> List a -> D.Decoder a

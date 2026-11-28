@@ -1,4 +1,4 @@
-module SimHarness.World exposing (Boat, boat, config, encodeConfig, function)
+module SimHarness.World exposing (Boat, boat, function)
 
 {-| Harness entries for the calendar, the chart and the weather.
 -}
@@ -9,6 +9,7 @@ import Sim.BoatSensors as Sensors
 import Sim.Coast as Coast
 import Sim.Environment as Env
 import Sim.PatrolCalendar as Calendar
+import Sim.SaveParts exposing (config, encodeConfig)
 import SimHarness.Codec exposing (andMap, arg, call1, call2, call3, point)
 
 
@@ -46,33 +47,6 @@ lenient key =
 optional : String -> D.Decoder a -> D.Decoder (Maybe a)
 optional key decoder =
     D.maybe (D.field key decoder)
-
-
-weatherId : D.Decoder Env.WeatherId
-weatherId =
-    D.string
-        |> D.andThen
-            (\name ->
-                case List.filter (\id -> Env.weatherIdName id == name) Env.weatherIds of
-                    id :: _ ->
-                        D.succeed id
-
-                    [] ->
-                        D.fail ("unknown weather " ++ name)
-            )
-
-
-{-| Saved conditions; a missing or null start day is an older save's.
--}
-config : D.Decoder Env.Config
-config =
-    D.map6 Env.Config
-        (optional "startDay" (D.nullable D.float) |> D.map (Maybe.andThen identity))
-        (D.field "chartSeed" D.float)
-        (D.field "startHour" D.float)
-        (D.field "startWeather" weatherId)
-        (D.field "changing" D.bool)
-        (D.field "seed" D.float)
 
 
 type alias Boat =
@@ -149,18 +123,6 @@ encodeEnvironment e =
          ]
             ++ List.filterMap identity [ Maybe.map (\t -> ( "sampledAt", E.float t )) e.sampledAt, Maybe.map (\w -> ( "wavePhase", E.float w )) e.wavePhase ]
         )
-
-
-encodeConfig : Env.Config -> E.Value
-encodeConfig c =
-    E.object
-        [ ( "startDay", Maybe.map E.float c.startDay |> Maybe.withDefault E.null )
-        , ( "chartSeed", E.float c.chartSeed )
-        , ( "startHour", E.float c.startHour )
-        , ( "startWeather", E.string (Env.weatherIdName c.startWeather) )
-        , ( "changing", E.bool c.changing )
-        , ( "seed", E.float c.seed )
-        ]
 
 
 pose : D.Decoder { x : Float, y : Float, heading : Float, depth : Float, pitch : Float, roll : Float }

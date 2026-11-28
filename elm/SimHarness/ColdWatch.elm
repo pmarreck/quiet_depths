@@ -1,4 +1,4 @@
-module SimHarness.ColdWatch exposing (encodeTraffic, function, traffic)
+module SimHarness.ColdWatch exposing (function)
 
 {-| Harness entries for the cold watch and its traffic. The signal stand-in
 logs each action with a snapshot of the ship and its volley, and takes an
@@ -11,13 +11,12 @@ import Json.Encode as E
 import PatrolMission exposing (Mission)
 import Sim.Coast as Coast exposing (Coastline)
 import Sim.ColdWatch as Watch
-import Sim.FleetVolleys exposing (Position)
+import Sim.SaveParts exposing (encodeTraffic, encodeVolley, traffic)
 import Sim.Ship as Ship exposing (Ship)
 import Sim.Stands as Stands
 import Sim.TrafficEncounters as Encounters exposing (Traffic)
-import Sim.TrafficSaves as Saves exposing (SavedTraffic, SavedVolley)
+import Sim.TrafficSaves as Saves exposing (savedTraffic)
 import SimHarness.Codec exposing (arg)
-import SimHarness.Fleet exposing (encodeVolley, volley)
 
 
 type alias Watch =
@@ -37,16 +36,6 @@ type alias Watch =
 mission : D.Decoder Mission
 mission =
     D.string |> D.andThen (\id -> PatrolMission.fromId id |> Maybe.map D.succeed |> Maybe.withDefault (D.fail id))
-
-
-traffic : D.Decoder Traffic
-traffic =
-    D.map4 Traffic (D.field "window" D.int) (D.field "next" D.float) (D.field "turn" D.int) (D.field "volleys" (D.list volley))
-
-
-encodeTraffic : Traffic -> E.Value
-encodeTraffic t =
-    E.object [ ( "window", E.int t.window ), ( "next", E.float t.next ), ( "turn", E.int t.turn ), ( "volleys", E.list encodeVolley t.volleys ) ]
 
 
 watch : D.Decoder Watch
@@ -87,41 +76,6 @@ encodeWatch s =
         , ( "weaponSequence", E.int s.weaponSequence )
         , ( "log", E.list identity s.log )
         ]
-
-
-position : D.Decoder Position
-position =
-    D.map3 Position (D.field "x" D.float) (D.field "y" D.float) (D.field "altitude" D.float)
-
-
-savedVolley : D.Decoder SavedVolley
-savedVolley =
-    D.map8 (\id source target underwater warning from to launched -> { id = id, source = source, target = target, underwater = underwater, warning = warning, from = from, to = to, launched = launched, arrives = 0, damage = 0 })
-        (D.field "id" D.float)
-        (D.field "source" D.string)
-        (D.field "target" D.string)
-        (D.field "underwater" D.bool)
-        (D.field "warning" D.bool)
-        (D.field "from" position)
-        (D.field "to" position)
-        (D.field "launched" D.float)
-        |> D.andThen (\v -> D.map2 (\arrives damage -> { v | arrives = arrives, damage = damage }) (D.field "arrives" D.float) (D.field "damage" D.float))
-
-
-savedTraffic : D.Decoder SavedTraffic
-savedTraffic =
-    D.field "time" D.float
-        |> D.andThen
-            (\now ->
-                D.map7 SavedTraffic
-                    (D.succeed now)
-                    (D.field "weaponSequence" D.float)
-                    (D.field "ships" (D.list (Ship.decoder now)))
-                    (D.at [ "traffic", "window" ] D.float)
-                    (D.at [ "traffic", "turn" ] D.float)
-                    (D.at [ "traffic", "next" ] D.float)
-                    (D.at [ "traffic", "volleys" ] (D.list savedVolley))
-            )
 
 
 point : D.Decoder { x : Float, y : Float }

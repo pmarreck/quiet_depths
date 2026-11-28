@@ -126,7 +126,7 @@ timeHours id =
 
 
 type alias Config =
-    { startDay : Maybe Float, chartSeed : Float, startHour : Float, startWeather : WeatherId, changing : Bool, seed : Float }
+    { startDay : Maybe Float, chartSeed : Maybe Float, startHour : Float, startWeather : WeatherId, changing : Bool, seed : Float }
 
 
 defaultSeed : Float
@@ -169,7 +169,7 @@ makeEnvironment seed options =
                 options.weather |> Maybe.andThen (\name -> List.filter (\id -> weatherIdName id == name) weatherIds |> List.head) |> Maybe.withDefault Clear
     in
     { startDay = Just (toFloat (Calendar.sailingDay seed))
-    , chartSeed = unsigned seed
+    , chartSeed = Just (unsigned seed)
     , startHour = startHour
     , startWeather = startWeather
     , changing = options.changing

@@ -10,10 +10,10 @@ import Sim.Debrief as Debrief
 import Sim.EarlyEnd as EarlyEnd
 import Sim.Mechanics as Mechanics exposing (LogEntry)
 import Sim.PatrolPhase as PatrolPhase exposing (Phase)
+import Sim.SaveParts exposing (logKind)
 import Sim.Ship as Ship exposing (Ship)
 import Sim.Status as Status exposing (Status)
 import SimHarness.Codec exposing (andMap, arg, point)
-import SimHarness.Hulls exposing (logKind)
 
 
 type alias Patrol =

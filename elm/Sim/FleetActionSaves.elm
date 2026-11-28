@@ -1,4 +1,4 @@
-module Sim.FleetActionSaves exposing (SavedTheater, SavedVolley, validTheater)
+module Sim.FleetActionSaves exposing (SavedTheater, SavedVolley, savedTheater, validTheater)
 
 {-| Whether a saved fleet action can be resumed: a round counter and a next
 round time, both patrol areas, all eight task-group units with their planned
@@ -9,11 +9,13 @@ Restore has checked the time, the weapon sequence and the ships themselves
 before it asks.
 -}
 
+import Json.Decode as D
 import Set
 import Sim.FleetTheater exposing (Area)
 import Sim.FleetVolleys exposing (Position)
 import Sim.Math as M
-import Sim.Ship exposing (Ship)
+import Sim.SaveParts exposing (area, position)
+import Sim.Ship as Ship exposing (Ship)
 import Sim.Vessel exposing (Kind(..), Side(..), SurfaceShip(..))
 
 
@@ -164,3 +166,36 @@ validVolley s v =
 distinct : List Float -> Bool
 distinct ids =
     List.length ids == Set.size (Set.fromList ids)
+
+
+savedVolley : D.Decoder SavedVolley
+savedVolley =
+    D.map8 SavedVolley
+        (D.field "id" D.float)
+        (D.field "underwater" D.bool)
+        (D.field "from" position)
+        (D.field "to" position)
+        (D.field "source" D.string)
+        (D.field "target" D.string)
+        (D.field "launched" D.float)
+        (D.field "arrives" D.float)
+        |> D.andThen (\make -> D.map make (D.field "damage" D.float))
+
+
+{-| The fleet action as a save holds it, with the clock, weapon sequence and
+ships its checks read.
+-}
+savedTheater : D.Decoder SavedTheater
+savedTheater =
+    D.field "time" D.float
+        |> D.andThen
+            (\now ->
+                D.map7 SavedTheater
+                    (D.succeed now)
+                    (D.field "weaponSequence" D.float)
+                    (D.field "ships" (D.list (Ship.decoder now)))
+                    (D.at [ "battle", "round" ] D.float)
+                    (D.at [ "battle", "next" ] D.float)
+                    (D.at [ "battle", "areas" ] (D.list area))
+                    (D.at [ "battle", "volleys" ] (D.list savedVolley))
+            )

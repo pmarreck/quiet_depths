@@ -288,7 +288,7 @@ createGame missionId seed options =
             , scope = True
             , scopeTravel = Nothing
             , drone = freshDrone
-            , chart = Just (Coast.coastline environment.chartSeed)
+            , chart = Maybe.map Coast.coastline environment.chartSeed
             , impacts = []
             , weaponSequence = 1
             , events = [ { t = 0, text = "Helm steady. Faint screws bearing 028. Your patrol begins.", kind = Info } ]

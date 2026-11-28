@@ -1,4 +1,4 @@
-module SimHarness.Objectives exposing (encodeSearch, function, searchArea)
+module SimHarness.Objectives exposing (function)
 
 {-| Harness entries for mission objectives and the periscope. Each uses the
 mission definition's own criteria, as the TypeScript does.
@@ -13,6 +13,7 @@ import Sim.PatrolSearch as Search
 import Sim.Periscope as Periscope
 import Sim.ReconPhotos as ReconPhotos
 import Sim.RescueOperation as Rescue
+import Sim.SaveParts exposing (encodeSearch, searchArea)
 import Sim.Site as Site
 import Sim.Vessel as Vessel
 import Sim.WreckSurvey as WreckSurvey
@@ -174,33 +175,6 @@ setup =
         (D.at [ "patrol", "seed" ] D.float)
         (D.field "ships" (D.list traffic))
         (D.field "site" (D.nullable (D.map2 Search.Point (D.field "x" D.float) (D.field "y" D.float))))
-
-
-searchArea : D.Decoder Search.SearchArea
-searchArea =
-    D.succeed Search.SearchArea
-        |> andMap (D.field "x" D.float)
-        |> andMap (D.field "y" D.float)
-        |> andMap (D.field "radius" D.float)
-        |> andMap (D.field "targets" (D.list D.string))
-        |> andMap (D.field "recognized" (D.list D.string))
-        |> andMap (D.field "located" D.bool)
-        |> andMap (D.field "activeSeconds" D.float)
-        |> andMap (D.field "protectedTime" D.float)
-
-
-encodeSearch : Search.SearchArea -> E.Value
-encodeSearch a =
-    E.object
-        [ ( "x", E.float a.x )
-        , ( "y", E.float a.y )
-        , ( "radius", E.float a.radius )
-        , ( "targets", E.list E.string a.targets )
-        , ( "recognized", E.list E.string a.recognized )
-        , ( "located", E.bool a.located )
-        , ( "activeSeconds", E.float a.activeSeconds )
-        , ( "protectedTime", E.float a.protectedTime )
-        ]
 
 
 encodeApproach : Search.Approach -> E.Value

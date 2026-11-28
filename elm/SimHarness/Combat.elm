@@ -1,4 +1,4 @@
-module SimHarness.Combat exposing (encodeGun, function)
+module SimHarness.Combat exposing (function)
 
 {-| Harness entries for combat: the boat's torpedoes and deck gun, an enemy's
 torpedo, torpedo saves, and each moment of combat. The conditions come from
@@ -10,12 +10,13 @@ import Json.Encode as E
 import Sim.Combat as Combat
 import Sim.Contact as Contact
 import Sim.Environment as Env
+import Sim.OrdnanceSaves exposing (blast, encodeAirSupport, encodeAircraft, encodeBlast, encodeRound, encodeTorpedo)
+import Sim.SaveParts exposing (encodeGun)
 import Sim.Ship as Ship
 import Sim.TorpedoSaves as TorpedoSaves
 import SimHarness.Codec exposing (arg)
 import SimHarness.Fleet exposing (optional)
 import SimHarness.HostileTracks exposing (track)
-import SimHarness.Ordnance exposing (blast, encodeAirSupport, encodeAircraft, encodeBlast, encodeRound, encodeTorpedo)
 import SimHarness.Patrol as Patrol exposing (Patrol)
 import SimHarness.World as World
 
@@ -38,11 +39,6 @@ encodeCombat s =
                , ( "crewQuietUntil", E.float s.crewQuietUntil )
                ]
         )
-
-
-encodeGun : Combat.Gun -> E.Value
-encodeGun g =
-    E.object [ ( "ammo", E.float g.ammo ), ( "cooldown", E.float g.cooldown ), ( "shots", E.float g.shots ), ( "angle", E.float g.angle ), ( "elevation", E.float g.elevation ) ]
 
 
 patrol : D.Decoder Patrol

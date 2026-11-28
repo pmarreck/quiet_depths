@@ -15,12 +15,12 @@ import Sim.HunterReports as Reports exposing (SavedReport, Track)
 import Sim.InvalidNumber exposing (InvalidNumber)
 import Sim.Mechanics as Mechanics exposing (LogEntry)
 import Sim.PowerPlant as Plant exposing (EngineMode)
+import Sim.SaveParts exposing (logKind)
 import Sim.Ship as Ship exposing (Report)
 import Sim.Sound as Sound exposing (Sound)
 import Sim.Systems exposing (Difficulty)
 import SimHarness.Codec exposing (andMap, arg)
 import SimHarness.Fleet exposing (optional)
-import SimHarness.Hulls exposing (logKind)
 import SimHarness.Patrol as Patrol exposing (encodeShell, shell, systems)
 
 

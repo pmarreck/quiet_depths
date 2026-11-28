@@ -1,4 +1,4 @@
-module SimHarness.Leaves exposing (encodeWarnings, function, warnings)
+module SimHarness.Leaves exposing (function)
 
 {-| Harness entries for the arithmetic and the small leaf modules.
 -}
@@ -10,6 +10,7 @@ import Sim.Difficulty as Difficulty
 import Sim.Equipment as Equipment
 import Sim.HullDesign as HullDesign
 import Sim.Math as SimMath
+import Sim.SaveParts exposing (encodeWarnings, warnings)
 import Sim.SeabedRest as SeabedRest
 import Sim.SonarTransmitters as Sonar
 import Sim.Text as Text
@@ -36,29 +37,6 @@ battery =
                     _ ->
                         D.fail ("unknown battery warning " ++ String.fromInt level)
             )
-
-
-batteryLevel : WatchWarnings.Battery -> Int
-batteryLevel level =
-    case level of
-        WatchWarnings.Charged ->
-            0
-
-        WatchWarnings.Low ->
-            1
-
-        WatchWarnings.Critical ->
-            2
-
-
-warnings : D.Decoder WatchWarnings.Warnings
-warnings =
-    D.map2 WatchWarnings.Warnings (D.field "bottom" D.bool) (D.field "battery" battery)
-
-
-encodeWarnings : WatchWarnings.Warnings -> E.Value
-encodeWarnings w =
-    E.object [ ( "bottom", E.bool w.bottom ), ( "battery", E.int (batteryLevel w.battery) ) ]
 
 
 entry : D.Decoder Debrief.Entry
