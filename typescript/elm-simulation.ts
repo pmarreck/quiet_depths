@@ -68,10 +68,10 @@ const isRecord = (v: unknown): v is Fields => !!v && typeof v === 'object' && !A
 // present field as malformed when it is undefined.
 const pick = (from: Fields, keys: readonly string[]) => Object.fromEntries(keys.filter(k => from[k] !== undefined).map(k => [k, from[k]]));
 const defined = (from: object) => pick(from as Fields, Object.keys(from));
-// A copy as JSON would carry it, undefined fields and functions left out,
-// but with every number exact: -0, NaN and the infinities included.
-const plain = (v: unknown): unknown => Array.isArray(v) ? v.map(x => x === undefined || typeof x === 'function' ? null : plain(x))
-  : isRecord(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined && typeof x !== 'function').map(([k, x]) => [k, plain(x)])) : v;
+// A copy as JSON would carry it, undefined fields left out, but with every
+// number exact: -0, NaN and the infinities included.
+const plain = (v: unknown): unknown => Array.isArray(v) ? v.map(x => x === undefined ? null : plain(x))
+  : isRecord(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).map(([k, x]) => [k, plain(x)])) : v;
 
 export interface Options {onStray?: (fields: string[]) => void}
 
@@ -196,15 +196,12 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
     t.replied = simulated(s);
   };
   let held: object | null = null;
-  // Loads a patrol the worker does not hold, as the worker last knew it; the
-  // world it sends back is that one, so the page's object stands as it is.
-  const holding = async (s: World, t: Track, exchange: Exchange) => {
+  // Loads a patrol the worker does not hold. Its orders do not matter: the
+  // call's command, sent next, sets every one. The world the worker sends
+  // back is the one sent, so the page's object stands as it is.
+  const holding = async (s: World, exchange: Exchange) => {
     if (s === held) return;
-    const world = {...s, gun: {...s.gun}, drone: {...s.drone}} as Fields;
-    places.forEach(([part, f], i) => {
-      const into = part ? world[part] as Fields : world;
-      if (t.base[i] === undefined) delete into[f]; else into[f] = t.base[i];
-    });
+    const world = {...s} as Fields;
     for (const k of PAGE_FIELDS) delete world[k];
     await exchange({kind: 'load', world: plain(world)});
     held = s;
@@ -252,12 +249,12 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
     }),
     step: (s, dt, input = {}) => call(s, async (exchange, t, own) => {
       const {afterTick, beforeTicks, ...frame} = input;
-      await holding(s, t, exchange);
+      await holding(s, exchange);
       const ticks = (await exchange({kind: 'step', orders: orders(t, own), dt, input: defined(frame)})).ticks ?? [];
       landed(s, t, ticks.map(tick => changesOf(tick)!), own, () => beforeTicks?.(s), i => { announce(s, ticks[i]); afterTick?.(s); });
     }),
     act: (s, action) => call(s, async (exchange, t, own) => {
-      await holding(s, t, exchange);
+      await holding(s, exchange);
       const done = await exchange({kind: 'act', orders: orders(t, own), action: defined(action)});
       landed(s, t, [changesOf(done)!], own);
       announce(s, done);

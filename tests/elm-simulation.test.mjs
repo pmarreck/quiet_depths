@@ -34,9 +34,10 @@ function shippedWorker() {
 function transport({hold = false, shipped = false} = {}) {
   const source = shipped ? (w => ({send: c => w.postMessage(c), subscribe: l => w.addEventListener('message', e => l(e.data))}))(shippedWorker())
     : (app => ({send: c => app.ports.commands.send(c), subscribe: l => app.ports.replies.subscribe(l)}))(program.init());
-  const held = [], sent = [];
+  const held = [], sent = [], received = [];
   let listener = null, arrived = null;
   source.subscribe(reply => {
+    received.push(reply);
     if (!hold) { listener(reply); return; }
     held.push(reply);
     arrived?.();
@@ -45,6 +46,7 @@ function transport({hold = false, shipped = false} = {}) {
     send: command => { sent.push(command); source.send(command); },
     listen: l => { listener = l; },
     sent,
+    received,
     // Delivers the next reply once the worker has sent it.
     async release() {
       while (!held.length) await new Promise(resolve => { arrived = resolve; });
@@ -566,4 +568,58 @@ test('a reply that answers no command is refused', async () => {
   deliver({boat: [], gun: [], drone: []});
   await starting;
   assert.throws(() => deliver({boat: []}), /replied to no command/);
+});
+
+// A step that reaches a waypoint clears the route, and a call queued behind
+// it, made before, must not bring the route back: what the worker reports
+// removed is removed.
+for (const [how, via] of SOURCES) test('an order a reply removes stays removed for a queued call, ' + how, async () => {
+  const tr = transport({...via, hold: true}), starting = elmSimulation(tr, strict);
+  await tr.release();
+  const sim = await starting, made = sim.create('recon', 25);
+  await tr.release();
+  const m = await made, t = createGame('recon', 25);
+  for (const s of [m, t]) Object.assign(s, {route: {x: s.x + 5, y: s.y + 5, radius: 60}, targetSpeed: 4});
+  const calls = [sim.step(m, 2, {timeRate: 1}), sim.act(m, {kind: 'ping'})];
+  for (const call of calls) { await tr.release(); await call; }
+  step(t, 2, {timeRate: 1});
+  assert.equal(t.route ?? null, null, 'the TypeScript reached the waypoint');
+  ping(t);
+  sameResults([pageless(m)], [pageless(t)]);
+  const last = sim.step(m, 2, {timeRate: 1});
+  await tr.release();
+  await last;
+  step(t, 2, {timeRate: 1});
+  sameResults([pageless(m)], [pageless(t)]);
+});
+
+// A patrol loaded back into the worker goes without the fields the page
+// left undefined, as JSON would carry it; the TypeScript reads an undefined
+// route as it reads none.
+for (const [how, via] of SOURCES) test('a patrol loaded back leaves out what the page left undefined, ' + how, async () => {
+  const sim = await elmSimulation(transport(via), strict), a = createGame('survey', 26);
+  const ma = await sim.restore(save(a));
+  await sim.restore(save(createGame('intercept', 27)));
+  ma.route = undefined;
+  a.route = null;
+  await sim.step(ma, 5, {timeRate: 4});
+  step(a, 5, {timeRate: 4});
+  sameResults([pageless(ma)], [pageless(a)]);
+});
+
+// The shipped worker sends a new patrol whole, then each tick only the
+// fields that changed.
+test('the shipped worker sends only the fields that changed', async () => {
+  const tr = transport({shipped: true}), sim = await elmSimulation(tr, strict), m = await sim.create('recon', 28);
+  const created = tr.received.at(-1).changes;
+  assert.equal(created.whole, true);
+  assert.ok('mission' in created.set && 'time' in created.set);
+  await sim.step(m, 1, {timeRate: 1});
+  const ticks = tr.received.at(-1).ticks;
+  assert.ok(ticks.length > 0);
+  for (const {changes} of ticks) {
+    assert.equal(changes.whole, false);
+    assert.ok('time' in changes.set && !('mission' in changes.set) && !('patrol' in changes.set), Object.keys(changes.set).join(' '));
+    assert.ok(['targetSpeed', 'gun', 'drone'].every(k => k in changes.set), 'the orders always go');
+  }
 });

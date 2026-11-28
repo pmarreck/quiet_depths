@@ -1361,3 +1361,29 @@ The throttling applies to the page's thread; the protocol would not reach
 the worker's, so the worker's own time is unthrottled in these figures.
 The worker still encodes each whole world; that cost is off the page's
 thread, and a step's round trip stays well inside a frame.
+
+## Replaying real play (plan, 2026-11-28)
+
+A side agent's note, which the owner endorsed: the differential tests show
+the Elm simulation equal to the TypeScript only for the inputs they make up,
+and every fault the page found came from an input no test had made: the
+null observation the page sends away from a feed (which froze both
+submerged missions), the new year greeting's and patrol id's writes, and an
+order the relay dropped when the simulation applied it and returned it to
+its old value within one reply. Before the TypeScript simulation is
+deleted, the tests should also replay inputs recorded from real play.
+
+- Recording: the page's simulation module logs each call (create, restore,
+  step with its frame input, each action with its arguments) and the page's
+  orders at that moment, as changes from the last call. Orders are the only
+  fields the page writes (the adapter's guard holds it to that), so the
+  calls and the orders are everything the page puts into the simulation.
+- Sources: headless Chromium sessions of every mission working the real
+  controls, and the owner's own play under `?record`, which saves the
+  recording for the corpus.
+- Replay: a test drives the TypeScript and the worker (on the page and
+  through the shipped file) from each recording and compares after every
+  call, the per-tick hook's worlds included.
+- The oracle after the TypeScript: each recording keeps a digest of the
+  TypeScript's world after every call, so once the TypeScript is gone the
+  replay still checks the Elm against what it did.
