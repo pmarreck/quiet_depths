@@ -466,7 +466,32 @@ copy results with `exact` (tests/sim-harness.mjs), which keeps every number
 and drops only undefined keys, and `sameResults` compares with
 `isDeepStrictEqual`, whose `Object.is` semantics keep NaN, Infinity,
 -Infinity, 0, -0 and null apart. A self-test in sim-math holds the comparison
-to that, the hurt test asserts that NaN results reach it as NaN, and hits of
-infinite size joined the cases. All three mutants now fail the tests. JSON
+to that, and hits of infinite size joined the cases. (The hurt test first
+asserted that its NaN results reached the comparison as NaN; those results
+were a bug, fixed below.) All three mutants now fail the tests. JSON
 stays only where the thing under test is itself a save (record codecs, save
 validation).
+
+## Fix TypeScript bugs first, never copy them (owner rule, 2026-11-27)
+
+When porting turns up a bug in the TypeScript, do not reproduce it in Elm.
+Fix it in the TypeScript first, with a regression test that fails before the
+fix, then port the corrected behavior, so the differential tests hold both
+languages to the right answer rather than the same wrong one. Bugs found in a
+module already ported are fixed in both, TypeScript first.
+
+First case: `hurt` rejected hits of size `<= 0`, which NaN passes, so a NaN
+hit left the outer hull and the flooding NaN, and an infinite hit flooded the
+boat while `damagePart` spared its pressure hull. The port had copied this.
+`hurt` now rejects any hit whose size is not a finite number, as
+`damagePart` and `damageSystem` already did (tests/equipment.test.mjs holds
+the TypeScript to it; the differential test's guard asserts such hits change
+nothing).
+
+Candidates for the audit of modules ported before this rule:
+- `power || 1` in acoustics.ts, mirrored in `Sim.Acoustics`: a sound of zero
+  power counts as full power. Probably meant `??`; check its callers.
+- Guards of the form `x <= 0` or `x < limit` on values that can be NaN.
+- `||` defaults on numbers, non-null assertions (`!`), and the partial
+  operations (division, `sqrt`, `acos`, `log`, `exp`, `**`) where their
+  inputs are not already bounded.

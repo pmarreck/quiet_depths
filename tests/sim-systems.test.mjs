@@ -118,9 +118,9 @@ test('hurting the boat matches: hull, flooding, section hits, cook-offs and loss
   assert.ok(runs.some(r => r.output.cookoff && !r.input.cookoff), 'a cook-off happens');
   assert.ok(runs.some(r => r.output.status === 'lost' && !r.output.cookoff), 'a breach loses the boat');
   assert.ok(runs.some(r => r.output.events.some(e => /^(BOW|MIDSHIPS|STERN) hit/.test(e.text))), 'section hits are logged');
-  // NaN must reach the comparison as NaN, not as JSON's null, or a port that
-  // produced an infinity instead would pass.
-  assert.ok(runs.filter(r => Number.isNaN(r.output.outerHull) && Number.isNaN(r.output.flood)).length > 100, 'NaN hits leave NaN hulls');
+  // A hit with no finite size once left NaN hulls and flooding; it now changes nothing.
+  const phantom = runs.filter(r => !Number.isFinite(r.args[0]));
+  assert.ok(phantom.length > 100 && phantom.every(r => Object.is(r.output.outerHull, r.input.outerHull) && Object.is(r.output.flood, r.input.flood) && r.output.events.length === r.input.events.length), 'hits of no finite size change nothing');
   sameResults(await elm('systems.hurt', runs.map(r => [r.input, ...r.args])), runs.map(r => r.output));
 });
 

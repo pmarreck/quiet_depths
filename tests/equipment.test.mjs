@@ -191,3 +191,14 @@ test('pre-compartment saves retain propulsion health and repair ceilings, and da
  assert.deepEqual(restore(save(old)),old);old.systems.tubes=19;assert.equal(fire(old,t.id),false);
  delete old.systems.batteryBank;assert.equal(restore(save(old)),null);
 });
+
+// A hit with no real size, NaN or infinite, once left the outer hull and the
+// flooding NaN (every later comparison then false, and null after a save) or
+// flooded the boat while sparing its pressure hull. Such a hit changes nothing.
+test('a hit whose size is not a finite number changes nothing', () => {
+ for (const amount of [NaN, Infinity, -Infinity]) for (const subsystem of [null, 'sonar']) {
+  const s = boat(), before = structuredClone(s), point = {x: s.x, y: s.y + 20, depth: s.depth};
+  hurt(s, amount, 'Phantom impact.', subsystem, point);
+  assert.deepStrictEqual(s, before, `a hit of ${amount}${subsystem ? ' to the ' + subsystem : ''}`);
+ }
+});

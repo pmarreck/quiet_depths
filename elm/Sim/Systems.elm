@@ -201,7 +201,7 @@ in the struck section, and, rarely, a torpedo-room cook-off.
 -}
 hurt : Float -> String -> Maybe System -> Maybe Point -> World w -> World w
 hurt given text subsystem point start =
-    if given <= 0 || start.status /= Status.Patrol then
+    if isNaN given || isInfinite given || given <= 0 || start.status /= Status.Patrol then
         start
 
     else

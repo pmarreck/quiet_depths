@@ -135,7 +135,7 @@ function scrapeSeabed(s: Boat, dt: number) {
 }
 
 export function hurt(s: Boat, amount: number, text: string, subsystem: SystemKey | null = null, point: Point | null = null): void {
-  if (amount <= 0 || s.status !== 'patrol') return;
+  if (!Number.isFinite(amount) || amount <= 0 || s.status !== 'patrol') return;
   amount *= 2 ** -(s.difficulty?.damage ?? 0);
   s.outerHull = clamp(s.outerHull - amount * .85, 0, 100);
   damagePart(s, s.repairLimits, 'hull', amount); s.flood = clamp(s.flood + amount * .11, 0, 25); s.shock = 2; log(s, text, 'damage');
