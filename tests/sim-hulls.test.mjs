@@ -21,7 +21,7 @@ function scenario(random, i) {
     scope: i % 2 === 0, events: [], hull: 100};
   if (i % 5 === 0) s.scopeTravel = random();
   if (i % 3 === 1) s.debrief = [];
-  if (i % 4 === 2) s.site = {x: s.x + (random() - .5) * 80, y: s.y + (random() - .5) * 80, hull: 100, depth: s.depth + (random() - .5) * 20, heading: random() * 360, kind: ['surface', 'wreck', 'sub'][i % 3], name: 'Site', speed: i % 8 === 6 ? 2 : 0};
+  if (i % 4 === 2) s.site = {x: s.x + (random() - .5) * 80, y: s.y + (random() - .5) * 80, hull: 100, depth: s.depth + (random() - .5) * 20, heading: random() * 360, kind: ['surface', 'wreck', 'sub'][i % 3], name: 'Site', speed: 0};
   for (let j = 0; j < 1 + i % 5; j++) {
     const kind = kinds[(i + j) % 5], near = random() < .8, sunk = random() < .15;
     const v = {id: 'v' + j, name: 'Vessel ' + j, kind, x: s.x + (random() - .5) * (near ? 120 : 2000), y: s.y + (random() - .5) * (near ? 120 : 2000), heading: random() * 360,

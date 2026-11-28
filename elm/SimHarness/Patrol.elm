@@ -18,7 +18,6 @@ import Sim.Debrief as Debrief
 import Sim.Drone as Drone exposing (Drone)
 import Sim.FleetTheater exposing (Battle)
 import Sim.HostileTracks exposing (Noisemaker)
-import Sim.HullGeometry exposing (Body)
 import Sim.InvalidNumber exposing (InvalidNumber)
 import Sim.Mechanics as Mechanics exposing (LogEntry)
 import Sim.Ordnance exposing (Blast, Round)
@@ -27,6 +26,7 @@ import Sim.PatrolSearch exposing (SearchArea)
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
 import Sim.ReplayEvents as Replay
 import Sim.Ship as Ship exposing (Ship)
+import Sim.Site as Site exposing (Site)
 import Sim.Sound as Sound exposing (Sound)
 import Sim.Status as Status exposing (Status)
 import Sim.Systems exposing (Difficulty, Impact)
@@ -36,7 +36,7 @@ import Sim.TrafficEncounters exposing (Traffic)
 import SimHarness.Codec exposing (andMap)
 import SimHarness.ColdWatch as ColdWatch
 import SimHarness.Fleet as Fleet
-import SimHarness.Hulls exposing (body, logKind)
+import SimHarness.Hulls exposing (logKind)
 import SimHarness.Lamp as Lamp
 import SimHarness.Objectives as Objectives
 import SimHarness.Ordnance exposing (airSupport, aircraft, blast, gunRound, torpedo)
@@ -104,7 +104,7 @@ type alias Patrol =
     , acoustics : List Sound
     , soundSequence : Int
     , ships : List Ship
-    , site : Maybe Body
+    , site : Maybe Site
     , replay : List Replay.Marked
     , invalid : List InvalidNumber
     , mission : Mission
@@ -303,7 +303,7 @@ decoder =
                                 |> andMap (D.field "acoustics" (D.list (Sound.decoder (List.map .id ships))))
                                 |> andMap (D.field "soundSequence" D.int)
                                 |> andMap (D.succeed ships)
-                                |> andMap (optional "site" (D.nullable body) |> D.map (Maybe.andThen identity))
+                                |> andMap (optional "site" (D.nullable Site.decoder) |> D.map (Maybe.andThen identity))
                                 |> andMap (D.succeed [])
                                 |> andMap (D.succeed [])
                                 |> andMap (D.field "mission" (D.string |> D.andThen (\id -> PatrolMission.fromId id |> Maybe.map D.succeed |> Maybe.withDefault (D.fail ("unknown mission: " ++ id)))))

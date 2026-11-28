@@ -5,12 +5,12 @@ module Sim.DroneOrders exposing (Flying, damageDrone, deployDrone, droneDeployRe
 
 import Sim.Drone exposing (Drone, Mode(..))
 import Sim.Equipment as Equipment
-import Sim.HullGeometry exposing (Body)
 import Sim.InvalidNumber as InvalidNumber
 import Sim.Math as M
 import Sim.Mechanics as Mechanics exposing (LogKind(..))
 import Sim.PowerPlant exposing (EngineMode)
 import Sim.Ship exposing (Ship)
+import Sim.Site exposing (Site)
 import Sim.Status as Status
 import Sim.SurfaceMotion exposing (Point, boatLocal)
 import Sim.Systems exposing (World, bottom, damageScale, hullOf)
@@ -220,7 +220,7 @@ damageDrone given reason s =
 uses.
 -}
 type alias Flying w =
-    World { w | targetHeading : Float, engine : EngineMode, ships : List Ship, site : Maybe Body }
+    World { w | targetHeading : Float, engine : EngineMode, ships : List Ship, site : Maybe Site }
 
 
 setDrone : Drone -> Flying w -> Flying w

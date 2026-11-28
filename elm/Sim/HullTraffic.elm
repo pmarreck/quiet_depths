@@ -13,6 +13,7 @@ import Sim.Debrief as Debrief
 import Sim.HullGeometry exposing (Body)
 import Sim.Mechanics exposing (LogEntry)
 import Sim.Ship exposing (Ship)
+import Sim.Site as MissionSite
 import Sim.SurfaceMotion exposing (Point)
 import Sim.Vessel as Vessel
 
@@ -40,7 +41,7 @@ type alias Traffic t c r =
         , speed : Float
         , verticalSpeed : Float
         , time : Float
-        , site : Maybe Body
+        , site : Maybe MissionSite.Site
         , ships : List Ship
         , chart : Maybe Coastline
         , collisionHits : Dict String Float
@@ -112,7 +113,7 @@ bodyOf role w =
             boatBody w.s
 
         Site ->
-            Maybe.withDefault (boatBody w.s) w.s.site
+            Maybe.map MissionSite.body w.s.site |> Maybe.withDefault (boatBody w.s)
 
         Afloat i ->
             Array.get i w.ships |> Maybe.map shipBody |> Maybe.withDefault (boatBody w.s)
@@ -141,7 +142,7 @@ store role b w =
                 s =
                     w.s
             in
-            { w | s = { s | site = Just b } }
+            { w | s = { s | site = Maybe.map (MissionSite.withBody b) s.site } }
 
         Afloat i ->
             case Array.get i w.ships of

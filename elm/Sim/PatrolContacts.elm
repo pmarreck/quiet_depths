@@ -17,13 +17,13 @@ import Sim.Equipment as Equipment
 import Sim.FleetTheater as FleetTheater
 import Sim.FleetVolleys as Volleys exposing (Volley)
 import Sim.HostileTracks exposing (Noisemaker)
-import Sim.HullGeometry exposing (Body)
 import Sim.Math as M
 import Sim.Mechanics as Mechanics exposing (LogEntry, LogKind(..))
 import Sim.Ordnance exposing (Blast, BlastKind)
 import Sim.PatrolSearch exposing (SearchArea)
 import Sim.ReconPhotos as ReconPhotos
 import Sim.Ship exposing (Ship)
+import Sim.Site exposing (Site)
 import Sim.Status as Status
 import Sim.Suspicion as Suspicion
 import Sim.Systems as Systems
@@ -66,7 +66,7 @@ type alias Pinging s p c t d =
             , pingCooldown : Float
             , systems : Boat.Systems
             , search : Maybe SearchArea
-            , site : Maybe Body
+            , site : Maybe Site
             , projectiles : List Torpedo
             , traffic : Maybe { t | volleys : List Volley }
             , torpedoTracks : List TorpedoWatch.Track
@@ -95,7 +95,7 @@ ping s0 =
         let
             s1 : Pinging s p c t d
             s1 =
-                case ( s0.search, Maybe.andThen (\site -> Maybe.map (\depth -> { x = site.x, y = site.y, depth = depth }) site.depth) s0.site ) of
+                case ( s0.search, s0.site ) of
                     ( Just search, Just site ) ->
                         if not search.located && Mechanics.separation s0 site < 1500 * reach then
                             Mechanics.log "Mission site echo identified. Position marked on chart." Success { s0 | search = Just { search | located = True }, pingAge = 0, pingCooldown = 15 }

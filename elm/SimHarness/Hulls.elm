@@ -1,4 +1,4 @@
-module SimHarness.Hulls exposing (body, function, logKind)
+module SimHarness.Hulls exposing (function, logKind)
 
 {-| Harness entries for hull contacts.
 -}
@@ -12,6 +12,7 @@ import Sim.HullContacts as Contacts
 import Sim.HullGeometry as Geometry exposing (Body)
 import Sim.Mechanics as Mechanics
 import Sim.Ship as Ship
+import Sim.Site as Site
 import SimHarness.Codec exposing (andMap, arg, call2)
 
 
@@ -38,35 +39,6 @@ body =
         |> andMap (optional "military" D.bool)
         |> andMap (optional "fixedWreck" D.bool |> D.map (Maybe.withDefault False))
         |> andMap (optional "directHits" D.float)
-
-
-encodeBody : Body -> E.Value
-encodeBody b =
-    let
-        field : String -> (a -> E.Value) -> Maybe a -> Maybe ( String, E.Value )
-        field key enc =
-            Maybe.map (\v -> ( key, enc v ))
-    in
-    E.object
-        ([ ( "x", E.float b.x ), ( "y", E.float b.y ), ( "heading", E.float b.heading ), ( "speed", E.float b.speed ) ]
-            ++ List.filterMap identity
-                [ field "depth" E.float b.depth
-                , field "pitch" E.float b.pitch
-                , field "roll" E.float b.roll
-                , field "verticalSpeed" E.float b.verticalSpeed
-                , field "kind" E.string b.kind
-                , field "id" E.string b.id
-                , field "name" E.string b.name
-                , field "hull" E.float b.hull
-                , field "military" E.bool b.military
-                , field "directHits" E.float b.directHits
-                , if b.fixedWreck then
-                    Just ( "fixedWreck", E.bool True )
-
-                  else
-                    Nothing
-                ]
-        )
 
 
 encodePoint : { a | x : Float, y : Float, depth : Float } -> E.Value
@@ -140,7 +112,7 @@ traffic =
                     |> andMap (D.field "speed" D.float)
                     |> andMap (D.field "verticalSpeed" D.float)
                     |> andMap (D.field "time" D.float)
-                    |> andMap (optional "site" (D.nullable body) |> D.map (Maybe.andThen identity))
+                    |> andMap (optional "site" (D.nullable Site.decoder) |> D.map (Maybe.andThen identity))
                     |> andMap (D.field "ships" (D.list (Ship.decoder now)))
                     |> andMap (D.at [ "environment", "chartSeed" ] D.float)
                     |> andMap (D.field "collisionHits" (D.dict D.float))
@@ -155,7 +127,7 @@ traffic =
             )
 
 
-encodeTraffic : { a | x : Float, y : Float, depth : Float, speed : Float, verticalSpeed : Float, site : Maybe Body, ships : List Ship.Ship, collisionHits : Dict.Dict String Float, systems : { periscope : Float }, repairLimits : { periscope : Float }, scope : Bool, scopeTravel : Maybe Float, events : List Mechanics.LogEntry, debrief : List Debrief.Entry, collisions : List { target : Maybe String, point : { x : Float, y : Float, depth : Float } }, hurts : List Recorded, hull : Float } -> E.Value
+encodeTraffic : { a | x : Float, y : Float, depth : Float, speed : Float, verticalSpeed : Float, site : Maybe Site.Site, ships : List Ship.Ship, collisionHits : Dict.Dict String Float, systems : { periscope : Float }, repairLimits : { periscope : Float }, scope : Bool, scopeTravel : Maybe Float, events : List Mechanics.LogEntry, debrief : List Debrief.Entry, collisions : List { target : Maybe String, point : { x : Float, y : Float, depth : Float } }, hurts : List Recorded, hull : Float } -> E.Value
 encodeTraffic s =
     E.object
         [ ( "x", E.float s.x )
@@ -163,7 +135,7 @@ encodeTraffic s =
         , ( "depth", E.float s.depth )
         , ( "speed", E.float s.speed )
         , ( "verticalSpeed", E.float s.verticalSpeed )
-        , ( "site", Maybe.map encodeBody s.site |> Maybe.withDefault E.null )
+        , ( "site", Maybe.map Site.encode s.site |> Maybe.withDefault E.null )
         , ( "ships", E.list Ship.encode s.ships )
         , ( "collisionHits", E.dict identity E.float s.collisionHits )
         , ( "systems", E.object [ ( "periscope", E.float s.systems.periscope ) ] )

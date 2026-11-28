@@ -12,6 +12,7 @@ import Sim.Math as M
 import Sim.Mechanics as Mechanics
 import Sim.ReplayEvents as Replay
 import Sim.Ship exposing (Ship)
+import Sim.Site as MissionSite
 import Sim.Systems as Systems
 import Sim.Vessel exposing (Kind(..), SurfaceShip(..))
 
@@ -64,9 +65,9 @@ obstacles s =
         siteObstacle =
             case s.site of
                 Just site ->
-                    [ { body = { x = site.x, y = site.y, depth = Maybe.withDefault (0 / 0) site.depth, heading = site.heading, pitch = Maybe.withDefault 0 site.pitch, speed = site.speed }
+                    [ { body = { x = site.x, y = site.y, depth = site.depth, heading = site.heading, pitch = 0, speed = 0 }
                       , half =
-                            if site.kind == Just "surface" then
+                            if site.kind == MissionSite.SurfaceCasualty then
                                 19
 
                             else
