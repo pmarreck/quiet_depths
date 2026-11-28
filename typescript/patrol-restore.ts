@@ -102,6 +102,7 @@ export function restore(raw: string): World | null {
     if (s.shells === undefined) s.shells = [];
     if (s.site === undefined) s.site = null;
     if (s.operation === undefined) s.operation = null;
+    if (s.route === undefined) s.route = null;
     if (s.drone) {
       const drone = s.drone as unknown as Fields;
       for (const [k, v] of Object.entries({...freshDrone(), targetDepth: s.drone.depth, targetHeading: s.drone.heading})) if (drone[k] === undefined) drone[k] = v;
@@ -157,11 +158,11 @@ export function restore(raw: string): World | null {
         !['known', 'holding', 'active', 'completed'].every(k => typeof o[k] === 'boolean') || !Array.isArray(o.photoAngles) || !o.photoAngles.every(finite)) return null;
       // Survivors move one at a time, so their counts are whole; the survey's find is text once made.
       if (!['rescued', 'remaining', 'dead'].every(k => Number.isInteger(o[k])) || !(o.find === undefined || o.find === null || typeof o.find === 'string')) return null;
-    } else if (s.site || s.operation) return null;
+    } else if (s.site !== null || s.operation !== null) return null;
     for (const p of s.shells) if (!allFinite(p, ['id', 'x', 'y', 'depth', 'delay', 'fromX', 'fromY', 'total'])) return null;
     if (!allFinite(s.drone, ['x', 'y', 'heading', 'depth', 'battery', 'speed', 'targetSpeed', 'targetDepth', 'targetHeading'])) return null;
     // A route reaches its point within a positive radius, or within the default when it has none.
-    if (s.route && (!finite(s.route.x) || !finite(s.route.y) || s.route.radius !== undefined && !(finite(s.route.radius) && s.route.radius > 0))) return null;
+    if (s.route !== null && (!s.route || !finite(s.route.x) || !finite(s.route.y) || s.route.radius !== undefined && !(finite(s.route.radius) && s.route.radius > 0))) return null;
     // These ship checks are mirrored in elm/Sim/Ship.elm's decoder until the simulation moves to Elm: change both.
     for (const ship of s.ships) if (!ship || typeof ship.id !== 'string' || typeof ship.name !== 'string' || !['merchant', 'fishing', 'escort', 'sub', 'carrier'].includes(ship.kind) ||
       !allFinite(ship, ['x', 'y', 'heading', 'speed', 'hull', 'alert', 'attack'])) return null;
