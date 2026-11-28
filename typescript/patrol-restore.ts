@@ -154,6 +154,8 @@ export function restore(raw: string): World | null {
     // These ship checks are mirrored in elm/Sim/Ship.elm's decoder until the simulation moves to Elm: change both.
     for (const ship of s.ships) if (!ship || typeof ship.id !== 'string' || typeof ship.name !== 'string' || !['merchant', 'fishing', 'escort', 'sub', 'carrier'].includes(ship.kind) ||
       !allFinite(ship, ['x', 'y', 'heading', 'speed', 'hull', 'alert', 'attack'])) return null;
+    // A depth, when a ship has one, is a number; a submarine always has one.
+    for (const ship of s.ships) if (ship.depth !== undefined ? !finite(ship.depth) : ship.kind === 'sub') return null;
     for (const v of s.ships) {
       const vessel = v as unknown as Fields;
       for (const key of ['sinkDepth', 'sunkAt', 'nextCreak', 'collapsedAt', 'nextSweep', 'neutralHitAt']) if (vessel[key] !== undefined && (!finite(vessel[key]) || (vessel[key] as number) < 0)) return null;
