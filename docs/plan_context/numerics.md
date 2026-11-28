@@ -355,3 +355,60 @@ only a non-zero value that shrinks stops at ±MIN. When the number types are
 built across modules, every multiplicative fade and every test of such a
 value against zero is checked, and a test that depends on underflow reaching
 zero becomes a threshold test, TypeScript first.
+
+## The pilot: combat geometry with number types (2026-11-27, `fc52e31`)
+
+`Sim.Finite` holds the rules as types: `Finite` (never NaN, an infinity,
+±MAX or -0; zero or at least MIN), `Unit` ([-1, 1]) and `Pending` (the
+result of arithmetic that may have left the range, carried along as an
+infinity would be until `settle` returns `Within`, `Beyond` or
+`Indeterminate`). Operations that cannot leave the range return `Finite`;
+sums, differences, products, quotients and hypotenuses return `Pending`. A
+source check limits the unchecked `literal` and `unitLiteral` to numeric
+literals in range. `Sim.CombatGeometry`'s ship-box and sphere tests were
+rewritten with them, behind their unchanged Float interface.
+
+**Correctness.** Every differential test still matches the TypeScript bit
+for bit (605 tests): within the range the rules change no result.
+
+**Speed** (`scripts/elm-geometry-bench.mjs`, `--optimize`, 5,000 paths,
+best of 5, Node 24):
+
+| Function | Float ns/call | Finite ns/call | Times Float |
+|---|---|---|---|
+| `shipHit` | 1,019 | 1,715 | 1.68 |
+| `sphereHit` | 119 | 328 | 2.5 to 2.8 |
+
+- The overhead is about 10 to 15 ns per typed operation: Elm calls every
+  function through its curried `A2`, where an operator compiles inline. Only
+  operators or inlining, which the fork could give, remove it.
+- Style mattered: `Maybe.andThen` and `Maybe.map` pipelines made
+  `sphereHit` 3.9 times slower than Float; the same logic as direct `case`
+  on `settle` is 2.6 times.
+- Per tick: a gunfight's few hundred hit tests would add about 0.2 ms.
+
+**Ceremony.** The module grew from 146 to 203 code lines (+39%) and from
+2,244 to 4,288 characters (1.9x), with 128 calls into `Sim.Finite`, plus
+186 lines for `Sim.Finite` itself, once. `(low - s) / v` became
+`F.over (F.minus (F.pending low) (F.pending s)) (F.pending v)`. The compiler
+forced a decision at 11 points; all 10 resulting "beyond the range" branches
+are unreachable while coordinates stay below 1e150, and each fails closed (no
+hit). `Beyond` lost its side: no caller here needed it.
+
+**What it bought here.** No new bug: the TypeScript already guarded its one
+division and its zero-length path. What changed is that the guards became
+structural. No operation in the module can yield NaN or an infinity
+unhandled, and the compiler, not an audit, says so.
+
+**Findings for the decision.**
+
+1. The partial operations (division, `sqrt`, `acos`, `asin`, `log`, powers)
+   are where NaN and infinities actually arise. Typing them (`NonZero`,
+   `NonNegative`, `Unit` arguments, quotients as `Pending`) costs little:
+   a handful of call sites per module.
+2. Typing every `+`, `-` and `*` as `Pending` produced most of the ceremony
+   and all of the unreachable branches. Game magnitudes are bounded, so
+   those branches guard against values no patrol holds.
+3. Storage is the natural settle point: world fields held as `Finite` would
+   catch an overflow when a tick writes it, and saves already must reject
+   ±MAX and ±MIN.
