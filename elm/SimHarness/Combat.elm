@@ -1,4 +1,4 @@
-module SimHarness.Combat exposing (function)
+module SimHarness.Combat exposing (encodeGun, function)
 
 {-| Harness entries for combat: the boat's torpedoes and deck gun, an enemy's
 torpedo, torpedo saves, and each moment of combat. The conditions come from

@@ -21,7 +21,7 @@ import Sim.Systems exposing (Difficulty)
 import SimHarness.Codec exposing (andMap, arg)
 import SimHarness.Fleet exposing (optional)
 import SimHarness.Hulls exposing (logKind)
-import SimHarness.Patrol as Patrol exposing (systems)
+import SimHarness.Patrol as Patrol exposing (encodeShell, shell, systems)
 
 
 type alias Hunt =
@@ -76,20 +76,6 @@ encodeTrack t =
 difficulty : D.Decoder Difficulty
 difficulty =
     Patrol.difficulty
-
-
-shell : D.Decoder Shell
-shell =
-    D.map8 Shell (D.field "id" D.int) (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float) (D.field "delay" D.float) (D.field "fromX" D.float) (D.field "fromY" D.float) (D.field "total" D.float)
-        |> D.andThen (\make -> D.map make (optional "hit" D.bool))
-
-
-encodeShell : Shell -> E.Value
-encodeShell v =
-    E.object
-        ([ ( "id", E.int v.id ), ( "x", E.float v.x ), ( "y", E.float v.y ), ( "depth", E.float v.depth ), ( "delay", E.float v.delay ), ( "fromX", E.float v.fromX ), ( "fromY", E.float v.fromY ), ( "total", E.float v.total ) ]
-            ++ (Maybe.map (\h -> [ ( "hit", E.bool h ) ]) v.hit |> Maybe.withDefault [])
-        )
 
 
 hunt : D.Decoder Hunt
@@ -153,7 +139,7 @@ encodeHunt s =
         ]
 
 
-attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float, airSupport : Maybe Bool, satellite : Maybe Bool, pingDetection : Maybe Float, longPatrol : Maybe Bool }
+attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float, airSupport : Maybe Bool, satellite : Maybe Bool, pingDetection : Maybe Float, longPatrol : Maybe Bool, showSuspicion : Maybe Bool, omniscientChart : Maybe Bool, orbitCamera : Maybe Bool, instantReplay : Maybe Bool, enemyReplay : Maybe Bool, torpedoCam : Maybe Bool }
 attacks =
     { dropCharge = \c s -> { s | charges = s.charges ++ [ c ] }
     , launchTorpedo =

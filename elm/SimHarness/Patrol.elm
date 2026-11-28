@@ -1,151 +1,51 @@
-module SimHarness.Patrol exposing (Patrol, decoder, difficulty, encode, encodeFields, limits, systems)
+module SimHarness.Patrol exposing (Patrol, decoder, difficulty, encode, encodeFields, encodeShell, encodeStrike, limits, shell, systems)
 
 {-| The flat patrol record the systems modules work on, decoded from a saved
 patrol and encoded back with every field systems can change.
 -}
 
-import Dict exposing (Dict)
 import Json.Decode as D
 import Json.Encode as E
-import PatrolMission exposing (Mission)
-import Sim.AirSupport exposing (AirSupport, Aircraft)
+import PatrolMission
 import Sim.Boat exposing (Limits, Systems)
-import Sim.Coast as Coast exposing (Coastline)
+import Sim.Coast as Coast
 import Sim.Combat exposing (Gun)
-import Sim.Contact as Contact exposing (Contact)
+import Sim.Contact as Contact
 import Sim.ConvoyWatch exposing (AlliedLamp, Convoy)
 import Sim.Debrief as Debrief
-import Sim.Drone as Drone exposing (Drone)
-import Sim.Environment as Env
-import Sim.FleetTheater exposing (Battle)
-import Sim.HostileTracks exposing (Noisemaker)
-import Sim.InvalidNumber exposing (InvalidNumber)
-import Sim.Mechanics as Mechanics exposing (LogEntry)
-import Sim.Operation as Operation exposing (Operation)
-import Sim.Ordnance exposing (Blast, Round)
+import Sim.Drone as Drone
+import Sim.HostileTracks exposing (Noisemaker, Shell)
+import Sim.Mechanics as Mechanics
+import Sim.Operation as Operation
 import Sim.PatrolPhase as PatrolPhase exposing (Phase)
 import Sim.PatrolReports exposing (Report)
-import Sim.PatrolSearch exposing (SearchArea)
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
+import Sim.ReconSaves as ReconSaves
 import Sim.ReplayEvents as Replay
-import Sim.Ship as Ship exposing (Ship)
-import Sim.Site as Site exposing (Site)
-import Sim.Sound as Sound exposing (Sound)
-import Sim.Status as Status exposing (Status)
+import Sim.Ship as Ship
+import Sim.Site as Site
+import Sim.SonarTransmitters as SonarTransmitters
+import Sim.Sound as Sound
+import Sim.Status as Status
+import Sim.SurfaceWake as Wake
 import Sim.Systems exposing (Difficulty, Impact)
-import Sim.Torpedo exposing (Torpedo)
-import Sim.TorpedoWatch as TorpedoWatch
-import Sim.TrafficEncounters exposing (Traffic)
+import Sim.World exposing (Strike, World)
 import SimHarness.Codec exposing (andMap)
 import SimHarness.ColdWatch as ColdWatch
 import SimHarness.Fleet as Fleet
 import SimHarness.Hulls exposing (logKind)
 import SimHarness.Lamp as Lamp
+import SimHarness.Leaves as Leaves
 import SimHarness.Objectives as Objectives
 import SimHarness.Ordnance exposing (airSupport, aircraft, blast, gunRound, torpedo)
 import SimHarness.Watch as Watch
 import SimHarness.World as World
 
 
+{-| The world, as the differential tests decode and encode it.
+-}
 type alias Patrol =
-    { status : Status
-    , time : Float
-    , rng : Int
-    , difficulty : Maybe Difficulty
-    , x : Float
-    , y : Float
-    , depth : Float
-    , heading : Float
-    , pitch : Float
-    , roll : Maybe Float
-    , speed : Float
-    , targetSpeed : Float
-    , targetHeading : Float
-    , targetDepth : Float
-    , verticalSpeed : Float
-    , systems : Systems
-    , repairLimits : Limits
-    , hull : Float
-    , outerHull : Float
-    , flood : Float
-    , shock : Float
-    , fuel : Float
-    , fuelLeak : Float
-    , fuelFire : Float
-    , battery : Float
-    , oxygen : Float
-    , water : Float
-    , ballast : Float
-    , planes : Float
-    , rudder : Float
-    , propAngle : Float
-    , cavitation : Maybe Float
-    , propRpm : Maybe Float
-    , noise : Float
-    , silent : Bool
-    , gunLoudUntil : Maybe Float
-    , unpoweredSince : Maybe Float
-    , repair : Float
-    , floodAlarm : Bool
-    , collisionCooldown : Float
-    , collisionHits : Dict String Float
-    , bottomed : Bool
-    , torps : Int
-    , cookoff : Bool
-    , engine : EngineMode
-    , dieselMode : DieselMode
-    , pressureAlarm : Int
-    , criticalExposure : Float
-    , imploded : Bool
-    , scope : Bool
-    , scopeTravel : Maybe Float
-    , drone : Drone
-    , chart : Maybe Coastline
-    , impacts : List Impact
-    , weaponSequence : Int
-    , events : List LogEntry
-    , debrief : List Debrief.Entry
-    , acoustics : List Sound
-    , soundSequence : Int
-    , ships : List Ship
-    , site : Maybe Site
-    , replay : List Replay.Marked
-    , invalid : List InvalidNumber
-    , mission : Mission
-    , patrol : { seed : Float, startingTorpedoes : Int, photoGoal : Float, trackGoal : Float, variant : Int }
-    , runSetting : Float
-    , projectiles : List Torpedo
-    , aircraft : List Aircraft
-    , airSupport : AirSupport
-    , blasts : List Blast
-    , gunRounds : List Round
-    , noisemaker : Maybe Noisemaker
-    , reports : List Report
-    , contacts : List Contact
-    , tubeReadyAt : { port_ : Float, starboard : Float }
-    , gun : Gun
-    , crewQuietUntil : Float
-    , nextId : Float
-    , convoy : Maybe Convoy
-    , battle : Maybe Battle
-    , traffic : Maybe Traffic
-    , search : Maybe SearchArea
-    , pingAge : Float
-    , pingCooldown : Float
-    , torpedoTracks : List TorpedoWatch.Track
-    , photos : List String
-    , photoCooldown : Float
-    , decoys : Int
-    , alert : Float
-    , alliedLamp : Maybe AlliedLamp
-    , operation : Maybe Operation
-    , route : Maybe { x : Float, y : Float, radius : Maybe Float }
-    , home : { x : Float, y : Float }
-    , environment : Env.Config
-    , phase : Phase
-    , departure : Maybe { x : Float, y : Float }
-    , trackTime : Float
-    }
+    World
 
 
 optional : String -> D.Decoder a -> D.Decoder (Maybe a)
@@ -253,7 +153,7 @@ decoder =
                 D.field "ships" (D.list (Ship.decoder now))
                     |> D.andThen
                         (\ships ->
-                            D.succeed Patrol
+                            D.succeed World
                                 |> andMap (D.field "status" (named Status.statusName Status.statuses))
                                 |> andMap (D.succeed now)
                                 |> andMap (D.field "rng" D.int)
@@ -351,6 +251,25 @@ decoder =
                                 |> andMap (D.field "phase" phase)
                                 |> andMap (optional "departure" point)
                                 |> andMap (D.field "trackTime" D.float)
+                                |> andMap (D.field "version" D.int)
+                                |> andMap (optional "plantVersion" D.int)
+                                |> andMap (D.field "scopeAngle" D.float)
+                                |> andMap (D.field "scopeSteerBearing" (D.nullable D.float))
+                                |> andMap (D.field "towerAngle" D.float)
+                                |> andMap (D.field "towerPitch" D.float)
+                                |> andMap (D.field "lightning" (D.list strike))
+                                |> andMap (D.field "nextLightningAt" D.float)
+                                |> andMap (optional "wavePhase" D.float)
+                                |> andMap (D.field "imagers" SonarTransmitters.decoder)
+                                |> andMap (D.field "recon" ReconSaves.decoder)
+                                |> andMap (D.field "reconArchivedSequence" D.float)
+                                |> andMap (D.field "soundBearings" (D.list (D.map5 (\x y bearing time kind -> { x = x, y = y, bearing = bearing, time = time, kind = kind }) (D.field "x" D.float) (D.field "y" D.float) (D.field "bearing" D.float) (D.field "time" D.float) (D.field "kind" D.string))))
+                                |> andMap (D.field "wake" (D.list (D.map6 Wake.WakeSample (D.field "x" D.float) (D.field "y" D.float) (D.field "heading" D.float) (D.field "time" D.float) (D.field "width" D.float) (D.field "strength" D.float))))
+                                |> andMap (optional "watchWarnings" Leaves.warnings)
+                                |> andMap (D.field "shells" (D.list shell))
+                                |> andMap (optional "imagingTime" D.float)
+                                |> andMap (optional "newYearWatch" D.float)
+                                |> andMap (optional "patrolId" D.string)
                         )
             )
 
@@ -517,6 +436,12 @@ difficulty =
         |> andMap (optional "satellite" D.bool)
         |> andMap (optional "pingDetection" D.float)
         |> andMap (optional "longPatrol" D.bool)
+        |> andMap (optional "showSuspicion" D.bool)
+        |> andMap (optional "omniscientChart" D.bool)
+        |> andMap (optional "orbitCamera" D.bool)
+        |> andMap (optional "instantReplay" D.bool)
+        |> andMap (optional "enemyReplay" D.bool)
+        |> andMap (optional "torpedoCam" D.bool)
 
 
 {-| A chart route: a point, and the radius within which it counts as reached.
@@ -543,3 +468,30 @@ phase =
                     [] ->
                         D.fail ("no patrol phase is " ++ name)
             )
+
+
+strike : D.Decoder Strike
+strike =
+    D.map7 Strike (D.field "id" D.int) (D.field "time" D.float) (D.field "x" D.float) (D.field "y" D.float) (D.field "height" D.float) (D.field "seed" D.float) (optional "altitude" D.float)
+
+
+encodeStrike : Strike -> E.Value
+encodeStrike v =
+    E.object
+        ([ ( "id", E.int v.id ), ( "time", E.float v.time ), ( "x", E.float v.x ), ( "y", E.float v.y ), ( "height", E.float v.height ), ( "seed", E.float v.seed ) ]
+            ++ (Maybe.map (\a -> [ ( "altitude", E.float a ) ]) v.altitude |> Maybe.withDefault [])
+        )
+
+
+shell : D.Decoder Shell
+shell =
+    D.map8 Shell (D.field "id" D.int) (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float) (D.field "delay" D.float) (D.field "fromX" D.float) (D.field "fromY" D.float) (D.field "total" D.float)
+        |> D.andThen (\make -> D.map make (optional "hit" D.bool))
+
+
+encodeShell : Shell -> E.Value
+encodeShell v =
+    E.object
+        ([ ( "id", E.int v.id ), ( "x", E.float v.x ), ( "y", E.float v.y ), ( "depth", E.float v.depth ), ( "delay", E.float v.delay ), ( "fromX", E.float v.fromX ), ( "fromY", E.float v.fromY ), ( "total", E.float v.total ) ]
+            ++ (Maybe.map (\h -> [ ( "hit", E.bool h ) ]) v.hit |> Maybe.withDefault [])
+        )

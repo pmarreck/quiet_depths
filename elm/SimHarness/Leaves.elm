@@ -1,4 +1,4 @@
-module SimHarness.Leaves exposing (function)
+module SimHarness.Leaves exposing (encodeWarnings, function, warnings)
 
 {-| Harness entries for the arithmetic and the small leaf modules.
 -}
