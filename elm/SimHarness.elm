@@ -35,6 +35,7 @@ import SimHarness.PatrolRestore
 import SimHarness.PatrolTick
 import SimHarness.Recon
 import SimHarness.Records
+import SimHarness.Sim
 import SimHarness.Systems
 import SimHarness.TorpedoRun
 import SimHarness.Watch
@@ -66,7 +67,7 @@ function name =
                     table name
         )
         Nothing
-        [ SimHarness.Leaves.function, SimHarness.Acoustics.function, SimHarness.Watch.function, SimHarness.Objectives.function, SimHarness.Boat.function, SimHarness.World.function, SimHarness.Mechanics.function, SimHarness.Enemy.function, SimHarness.Lamp.function, SimHarness.Crew.function, SimHarness.Records.function, SimHarness.Hulls.function, SimHarness.Systems.function, SimHarness.Fleet.function, SimHarness.MessWatch.function, SimHarness.MissionObjective.function, SimHarness.HostileTracks.function, SimHarness.ColdWatch.function, SimHarness.EarlyEnd.function, SimHarness.AirSupport.function, SimHarness.TorpedoRun.function, SimHarness.Combat.function, SimHarness.Recon.function, SimHarness.PatrolContacts.function, SimHarness.ConvoyWatch.function, SimHarness.Operation.function, SimHarness.Missions.function, SimHarness.WorldSave.function, SimHarness.PatrolCreate.function, SimHarness.PatrolTick.function, SimHarness.PatrolRestore.function ]
+        [ SimHarness.Leaves.function, SimHarness.Acoustics.function, SimHarness.Watch.function, SimHarness.Objectives.function, SimHarness.Boat.function, SimHarness.World.function, SimHarness.Mechanics.function, SimHarness.Enemy.function, SimHarness.Lamp.function, SimHarness.Crew.function, SimHarness.Records.function, SimHarness.Hulls.function, SimHarness.Systems.function, SimHarness.Fleet.function, SimHarness.MessWatch.function, SimHarness.MissionObjective.function, SimHarness.HostileTracks.function, SimHarness.ColdWatch.function, SimHarness.EarlyEnd.function, SimHarness.AirSupport.function, SimHarness.TorpedoRun.function, SimHarness.Combat.function, SimHarness.Recon.function, SimHarness.PatrolContacts.function, SimHarness.ConvoyWatch.function, SimHarness.Operation.function, SimHarness.Missions.function, SimHarness.WorldSave.function, SimHarness.PatrolCreate.function, SimHarness.PatrolTick.function, SimHarness.PatrolRestore.function, SimHarness.Sim.function ]
 
 
 run : { id : Int, fn : String, batch : List D.Value } -> { id : Int, results : List E.Value, error : Maybe String }

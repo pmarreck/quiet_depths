@@ -1,4 +1,4 @@
-module Sim.PatrolTick exposing (Input, step)
+module Sim.PatrolTick exposing (Input, sky, step, tick)
 
 {-| The patrol's clock: a frame of play split into quarter-second ticks,
 each moving the sea, the sky, the boat, every ship, the traffic and the

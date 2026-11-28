@@ -126,8 +126,8 @@ test('every TypeScript module mirrored in Elm says so and names its twin', () =>
   const harness = new URL('../elm/SimHarness/', import.meta.url), prefixes = new Set();
   for (const file of readdirSync(harness).filter(f => f.endsWith('.elm')))
     for (const [, prefix] of readFileSync(new URL(file, harness), 'utf8').matchAll(/\n {8}"([a-zA-Z]+)\.\w+" ->/g)) prefixes.add(prefix);
-  // Harness prefixes with no TypeScript module of their own, and the one whose module is named differently.
-  const noModule = new Set(['text', 'ship', 'contact', 'sound', 'boat', 'world']), renamed = {math: ['sim-math', 'Math']};
+  // Harness prefixes with no TypeScript module of their own, and those whose modules are named differently.
+  const noModule = new Set(['text', 'ship', 'contact', 'sound', 'boat', 'world']), renamed = {math: ['sim-math', 'Math'], sim: ['sim', 'Patrol']};
   const missing = [];
   for (const prefix of [...prefixes].filter(p => !noModule.has(p))) {
     const [file, elm] = renamed[prefix] ?? [prefix.replace(/[A-Z]/g, c => '-' + c.toLowerCase()), prefix[0].toUpperCase() + prefix.slice(1)];
