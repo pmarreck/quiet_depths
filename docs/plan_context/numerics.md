@@ -412,3 +412,16 @@ unhandled, and the compiler, not an audit, says so.
 3. Storage is the natural settle point: world fields held as `Finite` would
    catch an overflow when a tick writes it, and saves already must reject
    ±MAX and ±MIN.
+
+## The development beta ran out of memory on quiet_depths (2026-11-27 20:17-20:36)
+
+Five out-of-memory kills, each an Elm compiler at 89 to 97 GB resident,
+came from the elm-compiler agent's A/B benchmark (`bench/run4/ab.sh`), which
+compiles a copy of quiet_depths' `elm/` tree with each candidate compiler:
+two of the killed PIDs appear in its output, and the script's own comment
+says the 0.19.4 beta runs out of memory on quiet_depths (it gained a switch
+to skip the project). This session's compiles in that window all finished
+normally. Since the fork now tracks that development release, pinning it
+here must wait until it compiles quiet_depths in ordinary memory; a memory
+cap on such benchmarks (a `systemd-run --user -p MemoryMax=` scope) would
+turn a host-wide out-of-memory event into one failed run.
