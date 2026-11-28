@@ -177,3 +177,11 @@ question is where the checks go.
   remove the ceremony. Sent to the elm-compiler agent as a requirement.
 
 None of these were measured for speed here; the bench in elm/Bench can.
+
+**Fork base (owner, 2026-11-27 19:31):** the elm-compiler fork's changes now
+apply to a fork of Elm's latest development (beta) release, not 0.19.2.
+quiet_depths pins it only when Peter says it is ready. The switch then
+changes `"elm-version"` in elm.json and review/elm.json, the package cache
+directory and the elm2nix sources, and may change behavior the development
+branch altered, so every differential test and the numbers bench rerun
+across it, and the bench compares the two compilers' output speed.
