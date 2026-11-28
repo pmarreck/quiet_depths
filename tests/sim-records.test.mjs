@@ -42,7 +42,7 @@ test('saved ships from every mission round-trip through the Elm ship record unch
   sameResults(await elm('ship.roundTrip', calls), calls.map(([v]) => normalized(v)));
 });
 
-test('the Elm ship decoder rejects what restore rejects, and is stricter only on wrong types', async () => {
+test('the Elm ship decoder rejects exactly what restore rejects, wrong types included', async () => {
   const bases = savedPatrols().filter((s, i) => i % 7 === 3 && s.ships.length && restore(JSON.stringify(s)) !== null).slice(0, 8);
   assert.ok(bases.length >= 6, 'restorable patrols with ships');
   const rejected = [v => { v.id = 5; }, v => { delete v.name; }, v => { v.kind = 'raft'; }, v => { v.x = null; }, v => { v.x = NaN; }, v => { v.sinkDepth = Infinity; }, v => { v.heading = '90'; }, v => { delete v.hull; },
@@ -54,20 +54,18 @@ test('the Elm ship decoder rejects what restore rejects, and is stricter only on
   const accepted = [v => { v.sinkDepth = 0; }, v => { v.torpedoDecoys = 2; }, (v, now) => { v.clue = {x: 1, y: 1, time: now}; }, v => { v.nextInquiry = 0; },
     v => { v.tracking = null; }, v => { delete v.patrolSpeed; }, (v, now) => { v.report = {x: 1, y: 2, depth: 3, heading: 4, speed: 5, time: now, reason: 'a patrol sweep'}; },
     v => { v.wreckMark = {x: 1, y: 2, observed: true}; }, v => { delete v.sinkDepth; }];
-  // Restore never looks at these fields' types (it does check `military` through the
-  // mission's targets in some patrols); the Elm decoder does.
-  const stricter = [v => { v.lights = 'yes'; }, v => { v.roll = 'level'; }, v => { v.clue = null; }];
+  // Restore once kept these wrong types, which the Elm decoder always rejected.
+  rejected.push(v => { v.lights = 'yes'; }, v => { v.roll = 'level'; }, v => { v.clue = null; });
   const cases = [];
-  for (const [verdict, mutations] of [['rejected', rejected], ['accepted', accepted], ['stricter', stricter]])
+  for (const [verdict, mutations] of [['rejected', rejected], ['accepted', accepted]])
     for (const base of bases) for (const index of [0, base.ships.length - 1]) for (const mutate of mutations) {
       const state = structuredClone(base); mutate(state.ships[index], state.time);
       cases.push({verdict, ship: state.ships[index], now: state.time, restores: restore(JSON.stringify(state)) !== null});
     }
   const decoded = (await elm('ship.roundTrip', cases.map(c => [c.ship, c.now]))).map(r => r !== null);
-  const disagreements = cases.filter((c, i) => c.verdict !== 'stricter' && decoded[i] !== c.restores);
+  const disagreements = cases.filter((c, i) => decoded[i] !== c.restores);
   assert.deepEqual(disagreements.map(c => ({verdict: c.verdict, ship: c.ship.id})), []);
   assert.ok(cases.every((c, i) => c.verdict !== 'rejected' || !c.restores) && cases.every((c, i) => c.verdict !== 'accepted' || c.restores), 'each mutation does what it claims');
-  assert.ok(cases.every((c, i) => c.verdict !== 'stricter' || (c.restores && !decoded[i])), 'restore accepts the wrong types and the Elm rejects them');
 });
 
 // A contact carrying all 24 fields saves can hold.
@@ -96,7 +94,7 @@ test('saved contacts round-trip through the Elm contact record, with old labels 
   sameResults(await elm('trackEstimates.designation', indices.map(i => [i])), indices.map(designation));
 });
 
-test('the Elm contact decoder rejects what restore rejects, and is stricter only on wrong types', async () => {
+test('the Elm contact decoder rejects exactly what restore rejects, wrong types included', async () => {
   const bases = savedPatrols().filter(s => s.contacts.length && restore(JSON.stringify(s)) !== null).filter((s, i) => i % 5 === 2).slice(0, 10);
   assert.ok(bases.length >= 8, 'restorable patrols with contacts');
   const rejected = [c => { c.id = 5; }, c => { delete c.label; }, c => { c.label = 7; }, c => { c.x = null; }, c => { c.x = NaN; }, c => { c.bearing = '1'; }, c => { delete c.age; },
@@ -109,18 +107,17 @@ test('the Elm contact decoder rejects what restore rejects, and is stricter only
   const accepted = [c => { c.label = 'Sierra 12'; }, c => { c.fix = {x: 1, y: 2, time: 3}; }, c => { c.fix = {x: 1, y: 2, time: 3, vx: null}; }, c => { c.depthEstimate = 40; }, c => { c.courseEstimated = true; },
     (c, now) => { Object.assign(c, {passiveAt: now, passiveBearing: 1, passiveX: 1, passiveY: 1}); }, (c, now) => { c.lastSweep = now; }, (c, now) => { c.sweepArea = {x: 1, y: 2, size: 900, time: now}; },
     c => { delete c.name; }];
-  // Restore never looks at these fields' types; the Elm decoder does.
-  const stricter = [c => { c.identified = 'yes'; }, c => { c.method = 'sonar'; }, c => { c.kind = 'raft'; }];
+  // Restore once kept these wrong types, which the Elm decoder always rejected.
+  rejected.push(c => { c.identified = 'yes'; }, c => { c.method = 'sonar'; }, c => { c.kind = 'raft'; });
   const cases = [];
-  for (const [verdict, mutations] of [['rejected', rejected], ['accepted', accepted], ['stricter', stricter]])
+  for (const [verdict, mutations] of [['rejected', rejected], ['accepted', accepted]])
     for (const base of bases) for (const index of [0, base.contacts.length - 1]) for (const mutate of mutations) {
       const state = structuredClone(base); mutate(state.contacts[index], state.time);
       cases.push({verdict, contact: state.contacts[index], now: state.time, restores: restore(JSON.stringify(state)) !== null});
     }
   const decoded = (await elm('contact.roundTrip', cases.map(c => [c.contact, c.now]))).map(r => r !== null);
-  assert.deepEqual(cases.filter((c, i) => c.verdict !== 'stricter' && decoded[i] !== c.restores).map(c => ({verdict: c.verdict, label: c.contact.label})), []);
+  assert.deepEqual(cases.filter((c, i) => decoded[i] !== c.restores).map(c => ({verdict: c.verdict, label: c.contact.label})), []);
   assert.ok(cases.every(c => c.verdict !== 'rejected' || !c.restores) && cases.every(c => c.verdict !== 'accepted' || c.restores), 'each mutation does what it claims');
-  assert.ok(cases.every((c, i) => c.verdict !== 'stricter' || (c.restores && !decoded[i])), 'restore accepts the wrong types and the Elm rejects them');
 });
 
 // A sound carrying every field saves hold, an echoing seeker's.

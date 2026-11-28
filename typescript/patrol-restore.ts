@@ -27,6 +27,7 @@ import {patrolDifficulty} from './difficulty.ts';
 import {validSearch} from './patrol-search.ts';
 import {validDebrief} from './debrief.ts';
 import {createGame, getSoundings} from './patrol-create.ts';
+import {savedRecordsHold} from './save-fields.ts';
 import type {World} from './patrol-world.ts';
 
 type Fields = Record<string, unknown>;
@@ -76,6 +77,7 @@ export function restore(raw: string): World | null {
     if (s.photoSequence === undefined) s.photoSequence = 1;
     const archive = s.photoArchive as unknown[];
     if (!validateReconState(s.recon) || !Array.isArray(archive) || archive.length > 24 || !Number.isSafeInteger(s.photoSequence) || s.photoSequence < 1) return null;
+    if (s.recon.packet === undefined) s.recon.packet = null;
     if (!archive.every(p => validPhoto(p) && Number.isSafeInteger(p.id) && (p.id as number) > 0) || new Set(archive.map(p => (p as Fields).id)).size !== archive.length ||
       archive.reduce((n: number, p) => n + (p as {image: string}).image.length, 0) > PHOTO_BUDGET) return null;
     photoArchive(s);
@@ -142,6 +144,7 @@ export function restore(raw: string): World | null {
     if (!support || !['idle', 'arming', 'airborne', 'spent'].includes(support.status) || !support.base || !allFinite(support.base, ['x', 'y'])) return null;
     for (const k of ['requestedAt', 'launchAt'] as const) if (support[k] !== null && !finite(support[k])) return null;
     if (support.lastKnown && !validReport(support.lastKnown, s.time, true)) return null;
+    if (support.lastKnown === undefined) support.lastKnown = null;
     for (const p of s.aircraft) if (!allFinite(p, ['x', 'y', 'altitude', 'heading', 'speed', 'hull']) || typeof p.id !== 'string') return null;
     for (const p of s.gunRounds) if (!allFinite(p, ['id', 'x', 'y', 'altitude', 'vx', 'vy', 'vz', 'age']) || !['player', 'aircraft'].includes(p.owner) || typeof p.tracer !== 'boolean') return null;
     for (const p of s.impacts) if (!allFinite(p, ['id', 'x', 'y', 'altitude', 'time'])) return null;
@@ -158,6 +161,7 @@ export function restore(raw: string): World | null {
         !['known', 'holding', 'active', 'completed'].every(k => typeof o[k] === 'boolean') || !Array.isArray(o.photoAngles) || !o.photoAngles.every(finite)) return null;
       // Survivors move one at a time, so their counts are whole; the survey's find is text once made.
       if (!['rescued', 'remaining', 'dead'].every(k => Number.isInteger(o[k])) || !(o.find === undefined || o.find === null || typeof o.find === 'string')) return null;
+      if (o.find === undefined) o.find = null;
     } else if (s.site !== null || s.operation !== null) return null;
     for (const p of s.shells) if (!allFinite(p, ['id', 'x', 'y', 'depth', 'delay', 'fromX', 'fromY', 'total'])) return null;
     if (!allFinite(s.drone, ['x', 'y', 'heading', 'depth', 'battery', 'speed', 'targetSpeed', 'targetDepth', 'targetHeading'])) return null;
@@ -222,6 +226,7 @@ export function restore(raw: string): World | null {
       if (e.echo !== undefined && (e.type !== 'seeker' || !validEcho(e.echo as Parameters<typeof validEcho>[0], e.time) || (e.echo as {time: number}).time !== e.time)) return null;
       if (e.ownHit !== undefined && typeof e.ownHit !== 'boolean') return null;
     }
+    if (!savedRecordsHold(s)) return null;
     return s;
   } catch { return null; }
 }

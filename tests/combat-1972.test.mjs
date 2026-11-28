@@ -20,7 +20,7 @@ function vessel(id,x,y,extra={}){
  return {id,name:id,kind:'merchant',military:true,x,y,heading:0,speed:0,hull:100,alert:0,attack:999,noise:100,...extra};
 }
 function plane(id,x,y,altitude,extra={}){
- return {id,name:id,x,y,altitude,heading:0,speed:0,hull:100,phase:'approach',attack:999,bank:0,...extra};
+ return {id,name:id,x,y,altitude,heading:0,speed:0,hull:100,phase:'approach',takeoffUntil:0,attack:999,bank:0,bombDropped:false,...extra};
 }
 function readyGun(s){
  for(let elapsed=0;s.gun.cooldown>0&&elapsed<60;elapsed+=.25)step(s,.25);
