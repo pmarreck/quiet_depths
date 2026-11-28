@@ -39,7 +39,7 @@ import {wrapHeading,relativeBearing,scopeBearing,alignScope,canIssue,feedActive,
 import {affiliation,sidesAfloat} from './fleet-action.js';
 import {isSurfaced,droneStatus} from './vehicle-status.js';
 import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReading,boatReading,droneBayReading,stationReading,logReading,missionReading,operationReading,footerReading,resourceReading,torpedoReading} from './panel-readings.js';
-import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
+import {reconcileKeyedChildren,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
 import {reconStatus,reconAreaForDisplay} from './recon.js';
@@ -280,6 +280,7 @@ const footerStatus=globalThis.Elm.FooterStatus.init({node:$('footer-status-root'
 const resourcePanel=globalThis.Elm.ResourcePanel.init({node:$('resources-root')});
 const torpedoControl=globalThis.Elm.TorpedoControl.init({node:$('torpedo-control-root'),flags:{maxRun:MAX_RUN}});
 const gunControl=globalThis.Elm.GunControl.init({node:$('gun-control-root')});
+const contactsPanel=globalThis.Elm.ContactsPanel.init({node:$('contacts-panel-root')});
 const endMission=globalThis.Elm.EndMission.init({node:$('end-mission-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
@@ -544,7 +545,7 @@ function assignDamageControl(){
 // The Elm deck gun panel sends orders; the visual target is the page's own
 // choice, which the gun sight's aim command reads, and the rest are checked
 // against the moment they arrive.
-let gunTarget='',gunHandled=0;
+let gunTarget='',gunHandled=0,contactsHandled=0;
 const gunOrders={
  open:{enabled:()=>true,run:()=>setView('gun')},
  decoy:{enabled:()=>state.decoys>0,run:()=>decoy(state).then(away=>{if(away){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}})},
@@ -579,7 +580,9 @@ torpedoControl.ports.torpedoOrder.subscribe(({kind,value,seq})=>{
  updateUI();
 });
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
- $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;gunTarget=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
+ // Selecting a contact in the Elm panel sets the target for torpedoes and the
+ // deck gun, and turns a working periscope onto it.
+ contactsPanel.ports.contactOrder.subscribe(({id,seq})=>{contactsHandled=Math.max(contactsHandled,seq);selected=id;gunTarget=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();});
 bindCommand('deploy-drone','click',()=>deployDrone(state).then(launched=>{if(launched){setView('drone');if(!compactLayout.matches)toast(rovKeyHint());}else toast(droneDeployReason(state));}),()=>!droneDeployReason(state));
 bindCommand('drone-photo','click',takePhoto,()=>feedActive(state,'drone')&&state.photoCooldown===0);
 // The Elm operation card sends orders; each is checked against the moment it arrives.
@@ -870,9 +873,6 @@ function updateUI(){
  const batteryAlert=s.watchWarnings.battery===2,alertOn=batteryAlert||s.pressureAlarm>0||seriousRepairs(s)||threats(s).length>0;
  $('red-beacon').classList.toggle('lit',alertOn);$('red-beacon').setAttribute('aria-label',batteryAlert?'Red alert · Critical battery':alertOn?'Red alert':'Red alert off');
  updateTicker(patrolNotices(s,optical&&active,sound.on,view,rate,paused));
- reconcileKeyedChildren($('torpedo-tracks'),s.torpedoTracks,t=>String(t.id),()=>document.createElement('div'),(node,t)=>{
-  node.textContent='T'+t.id+' · Torpedo · '+Math.round(distance(s,t))+' m range · '+t.depth+' m depth · '+t.speed+' kn · '+(t.course===null?'Ping again for course':deg(t.course)+'° true')+(s.time-t.time>8?' · Last heard':'');
- });
  $('hydrophones').hidden=view!=='sonar'||instrument!=='bearings'||!operatingFraction(s.systems.sonar);
  $('chart-tools').classList.toggle('hidden',view!=='chart');$('drone-tools').classList.toggle('hidden',view!=='drone');
  $('scope-toggle').innerHTML=(s.scope?'LOWER SCOPE':'RAISE SCOPE')+' <kbd>'+esc(keyLabel(bindings.KeyP))+'</kbd>';$('scope-toggle').dataset.short=s.scope?'Lower':'Raise';
@@ -890,10 +890,10 @@ function updateUI(){
  const droneSounding=view==='drone'&&['remote','return'].includes(s.drone.mode),seabed=getSoundings(s,droneSounding);
  soundingsStrip.ports.soundingsReading.send(soundingsReading(seabed,droneSounding,env.wind));
  $('ping').innerHTML=s.pingCooldown>0?`RECHARGING ${Math.ceil(s.pingCooldown)}s`:'ACTIVE PING <kbd>'+esc(keyLabel(bindings.KeyG))+'</kbd>';
- $('contacts-count').textContent=String(s.contacts.length).padStart(2,'0');
  const lampContact=matchingBearing(s.convoy?.pin,s,s.time,s.contacts);
  const contactModels=s.contacts.map(c=>{const {range,bearing}=sonarReading(s,c);return{id:c.id,selected:selected===c.id,icon:c.identified?(c.kind==='escort'?'⌁':c.kind==='fishing'?'△':'◇'):c.kind==='sub'?'◆':'◌',title:c.label+(c.identified?' · '+c.name:''),detail:(c.fix?.source==='lamp'?'LAMP FIX · '+Math.round(s.time-c.fix.time)+' s old':c.id===lampContact?'POSSIBLE SUB · LAMP + PASSIVE':affiliation(c)||(c.kind==='sub'?'SUBMARINE':'UNCLASSIFIED'))+' · '+(range===null?'RANGE ?':(range/1000).toFixed(1)+' KM'),bearing:deg(relativeBearing(bearing,s.heading))+'° R'};});
- reconcileKeyedChildren($('contacts'),contactModels,c=>c.id,()=>contactRow(document),updateContactRow);
+ const tracks=s.torpedoTracks.map(t=>({id:String(t.id),text:'T'+t.id+' · Torpedo · '+Math.round(distance(s,t))+' m range · '+t.depth+' m depth · '+t.speed+' kn · '+(t.course===null?'Ping again for course':deg(t.course)+'° true')+(s.time-t.time>8?' · Last heard':'')}));
+ contactsPanel.ports.contactsReading.send({count:String(s.contacts.length).padStart(2,'0'),contacts:contactModels,tracks,handled:contactsHandled});
 
  {const able=enabled=>canIssue(s,context())&&enabled();
   torpedoControl.ports.torpedoReading.send({...torpedoReading(s,s.contacts.find(c=>c.id===selected)),fireEnabled:able(torpedoOrders.fire.enabled),runEnabled:able(torpedoOrders.run.enabled),handled:torpedoHandled});}

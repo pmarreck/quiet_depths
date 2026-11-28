@@ -32,7 +32,7 @@ test('every deck gun order has the rule its control had, and the target is the p
  // The aim command and a contact's selection read and set the same choice.
  assert.match(app,/bindCommand\('aim-gun','click',\(\)=>\{const id=gunTarget,/);
  assert.match(app,/\},\(\)=>view==='gun'&&feedActive\(state,'gun'\)&&!!gunTarget\);/);
- assert.match(app,/selected=b\.dataset\.contact;gunTarget=selected;/);
+ assert.match(app,/contactsPanel\.ports\.contactOrder\.subscribe\(\(\{id,seq\}\)=>\{contactsHandled=Math\.max\(contactsHandled,seq\);selected=id;gunTarget=selected;/);
  assert.ok(app.includes("const wanted=gunTarget||selected||'';gunTarget=options.some(o=>o.id===wanted)?wanted:'';"));
  // A chosen target is held until handled; opening the sight and deploying claim no new sequence number.
  assert.match(elm,/if reading\.handled >= model\.seq then/);

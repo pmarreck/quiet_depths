@@ -85,17 +85,3 @@ export function reconcileKeyedChildren<T>(container: HTMLElement, items: T[], ke
   for (const node of [...container.children]) if (!keep.has(node)) node.remove();
 }
 
-export function contactRow(document: Document): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.className = 'contact-row';
-  for (const name of ['contact-icon', 'contact-summary', 'contact-bearing']) { const span = document.createElement('span'); span.className = name; button.appendChild(span); }
-  const summary = button.children[1];
-  summary.appendChild(document.createElement('strong')); summary.appendChild(document.createElement('small'));
-  return button;
-}
-
-export function updateContactRow(button: HTMLElement, model: {id: string; selected: boolean; icon: string; title: string; detail: string; bearing: string}): void {
-  button.dataset.contact = model.id; button.classList.toggle('active', model.selected); button.setAttribute('aria-pressed', String(model.selected));
-  button.children[0].textContent = model.icon; button.children[1].children[0].textContent = model.title; button.children[1].children[1].textContent = model.detail;
-  button.children[2].textContent = model.bearing;
-}
