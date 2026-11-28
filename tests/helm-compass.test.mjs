@@ -29,12 +29,13 @@ test('every Elm program that the page starts is compiled into the browser bundle
  const started=[...app.matchAll(/globalThis\.Elm\.(\w+)\.init/g)].map(m=>m[1]);
  assert.ok(started.includes('HelmCompass'));
  const bundle=flake.match(/elm make ((?:elm\/\w+\.elm )+)--optimize --output=mission-picker\.js/)[1];
- // The simulation worker has its own bundle, its ports changed to answer at
- // once, which the page loads only when asked to run the Elm simulation.
+ // The simulation worker has its own file, the stock program and the lines
+ // that run it in a Web Worker, which the page starts only when asked to run
+ // the Elm simulation.
  const script=await read('scripts/build-sim-worker.mjs');
- assert.ok(started.includes('SimWorker')&&script.includes("'elm/SimWorker.elm'")&&flake.includes('node scripts/build-sim-worker.mjs sim-worker.js')&&
-  flake.includes('cp sim-worker.js "$out/sim-worker.js"')&&app.includes("tag.src='sim-worker.js'"),'the simulation worker is built into its own bundle, installed and loaded');
- for(const program of new Set([...started.filter(p=>p!=='SimWorker'),'MissionPicker']))assert.ok(bundle.includes('elm/'+program+'.elm'),program+' must be in the bundle');
+ assert.ok(!started.includes('SimWorker')&&script.includes("'elm/SimWorker.elm'")&&script.includes('workerScript(')&&flake.includes('node scripts/build-sim-worker.mjs sim-worker.js')&&
+  flake.includes('cp sim-worker.js "$out/sim-worker.js"')&&app.includes("new Worker('sim-worker.js')"),'the simulation worker is built into its own file, installed and started');
+ for(const program of new Set([...started,'MissionPicker']))assert.ok(bundle.includes('elm/'+program+'.elm'),program+' must be in the bundle');
 });
 
 test('the compass replaces the widescreen heading slider without removing the accessible control',async()=>{

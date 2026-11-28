@@ -33,7 +33,8 @@ function exclusively(work) {
 // Compiles an Elm program with the project's Elm, optimized as the page
 // builds it, and returns the `Elm` object its output defines, after any
 // change `transform` makes to the compiled JavaScript.
-export function compiledElm(main, transform = js => js) {
+// The optimized JavaScript Elm compiles from `main`.
+export function elmSource(main) {
   const dir = mkdtempSync(join(tmpdir(), 'quiet-depths-sim-'));
   try {
     const output = join(dir, 'compiled.js');
@@ -42,12 +43,16 @@ export function compiledElm(main, transform = js => js) {
     } catch (error) {
       throw new Error('Could not compile ' + main + '. Run the tests through ./test or nix develop, which provide Elm.\n' + (error.stderr ?? error.message));
     }
-    const scope = {};
-    new Function('scope', transform(readFileSync(output, 'utf8')).replace(/\}\(this\)\);\s*$/, '}(scope));'))(scope);
-    return scope.Elm;
+    return readFileSync(output, 'utf8');
   } finally {
     rmSync(dir, {recursive: true, force: true});
   }
+}
+
+export function compiledElm(main, transform = js => js) {
+  const scope = {};
+  new Function('scope', transform(elmSource(main)).replace(/\}\(this\)\);\s*$/, '}(scope));'))(scope);
+  return scope.Elm;
 }
 
 function load() {

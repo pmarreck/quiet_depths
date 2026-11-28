@@ -1255,3 +1255,71 @@ default, so that order never changed anything. With those added, 50 fail;
 two are equivalent (the step's first emptying of the outboxes, which every
 world reaching it already has empty, and an action's replay marks, which
 no action announces).
+
+## The page goes asynchronous (owner, 2026-11-28 09:15 EST)
+
+The owner chose to make the page asynchronous around the simulation rather
+than keep the one-line patch to Elm's port timer. Asked about the costs,
+the agent named: what the screen shows trails the player's orders by about
+one frame; the player's input can race a step in flight (a reply carrying
+the world from before a click could overwrite it, and a button checking a
+stale world could accept a second click); the TypeScript game, still the
+default, takes the same path until the cutover; and some call sites are
+rewritten now and again when the panels move into Elm. What it buys: the
+simulation can run in a real Web Worker, so its 1 to 3 ms a frame leaves the
+page's thread (the Elm "worker" is today a headless Elm program on the main
+thread), and when a step runs long the page keeps drawing and skips a step
+instead of stuttering; and Elm's runtime runs unpatched. The agent
+recommended going all the way to the real Web Worker.
+
+The design, chosen so the races cannot happen rather than be avoided:
+
+- One command in flight. Each command waits for the reply to the one before
+  it.
+- Every write keeps its place in the page's order. A call carries the
+  orders the page changed since its previous call, read when it is called
+  (not when it is sent), applied on top of the orders the worker last
+  reported. On each reply, the page's orders the worker has not yet applied
+  (later calls' and those written since the last call) are laid back over
+  the reply's last world, so a reply never overwrites one. Every outcome is
+  therefore the synchronous page's, in the page's own order, which is what
+  a test can compare against the TypeScript. A first version read the
+  orders when the command was sent; the page's `photograph(...)` followed
+  by `state.photoCooldown = 4` showed the flaw before it shipped, since the
+  write would have reached the worker ahead of the photograph.
+- A frame sends a step only when none is in flight; otherwise its time
+  joins the next step, so the simulation keeps real time without queueing
+  work. The checks that follow a step (sounds, toasts, time compression
+  dropping) run when its reply lands, against a snapshot taken just before
+  the reply is applied.
+- Actions resolve with their result when the reply lands; the page acts on
+  the result then. The simulation, not the page's enabled check, decides
+  whether an action succeeds, so a stale check costs only a refused action.
+- The TypeScript simulation applies each call at once and delivers its
+  result as a resolved promise, so the page's code is the same in both
+  modes and the default game keeps its timing and its exact order. The
+  cost: a page that reads the patrol right after a call, expecting the
+  call's effect, works in the TypeScript mode and not under the worker, so
+  the browser check plays every mission in both.
+- The worker is a classic Web Worker: the stock Elm bundle with a few lines
+  relaying messages to its ports. Tests drive a transport whose replies
+  arrive only when the test releases them, so no test depends on timing.
+
+The page went asynchronous in `d6a5ea2`, with the worker's program still on
+the page's thread, then moved it into a Web Worker: `sim-worker.js` is now
+the stock compiled program followed by the relay in
+`scripts/sim-worker-script.mjs`, and the port patch is gone. A test runs the
+shipped file in a stand-in for a worker's global scope, cloning everything
+that crosses as `postMessage` does, and plays three patrols tick for tick
+against the TypeScript. If the worker cannot start, the page logs why and
+the TypeScript runs the patrol. Stock replies mostly arrive within 0.05 ms
+of the command in Node; a few wait on a 1 ms timer.
+
+Played in headless Chromium with the worker in a real Web Worker, every
+mission runs with a quiet console. A step's round trip, from the call to
+its effect on the page's patrol object (posting, the worker's step and
+encoding, posting back, the refresh), takes 1.0 to 2.5 ms at 1x and 1.9 to
+4.8 ms at 20x, well inside a 16.7 ms frame. The page's own thread spends
+0.2 to 0.5 ms a tick receiving the world and refreshing its patrol object;
+the rest now runs off it. Before the move, the page's thread carried the
+whole 0.7 to 1.5 ms (1x) and 1.4 to 3.1 ms (20x).

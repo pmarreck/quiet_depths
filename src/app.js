@@ -25,7 +25,7 @@ import {disciplinaryFinding} from './patrol-reports.js';
 import {depthLimit,pressureLevel} from './pressure.js';
 import {bearing,delta,distance,rad,clamp,MISSIONS,getSoundings} from './sim.js';
 import {createGame,restore,step,ping,photograph,fire,decoy,deployDrone,recallDrone,log,fireDeckGun,aimGunAt,orderScope,requestRecon,startRescue,dronePhotograph,endPatrolEarly,useElmSimulation} from './simulation.js';
-import {elmSimulation,portTransport} from './elm-simulation.js';
+import {elmSimulation,workerTransport} from './elm-simulation.js';
 import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
 import {operationApproach,operationConditions} from './missions.js';
@@ -56,12 +56,15 @@ import {patrolKills,serviceRecord} from './service-record.js';
 import {extractionPrompt,partialCredit,partialSummary} from './early-end.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-// `?sim=elm` runs the patrol in the Elm simulation worker instead of the
-// TypeScript simulation, until it has been played enough to be the default.
+// `?sim=elm` runs the patrol in the Elm simulation, in a Web Worker, instead
+// of the TypeScript simulation, until it has been played enough to be the
+// default. If the worker cannot start, the TypeScript runs the patrol.
 if(new URLSearchParams(location.search).get('sim')==='elm'){
- await new Promise((loaded,failed)=>{const tag=document.createElement('script');tag.src='sim-worker.js';tag.onload=loaded;tag.onerror=failed;document.head.append(tag);});
+ const worker=new Worker('sim-worker.js');
+ const failed=new Promise((_,reject)=>worker.addEventListener('error',e=>reject(new Error(e.message||'the worker did not load')),{once:true}));
  // A field the page writes outside the orders would be lost; say which.
- useElmSimulation(await elmSimulation(portTransport(globalThis.Elm.SimWorker.init()),{onStray:fields=>console.warn('Elm simulation: the page wrote '+fields.join(', ')+', which only the simulation changes; the write is lost.')}));
+ try{useElmSimulation(await Promise.race([elmSimulation(workerTransport(worker),{onStray:fields=>console.warn('Elm simulation: the page wrote '+fields.join(', ')+', which only the simulation changes; the write is lost.')}),failed]));}
+ catch(e){console.error('The Elm simulation could not start; the TypeScript simulation runs this patrol.',e);worker.terminate();}
 }
 // Every simulation call resolves once its effect is on the patrol object; see simulation.ts.
 let state=await createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;

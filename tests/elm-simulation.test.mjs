@@ -8,10 +8,10 @@ import {startRescue, dronePhotograph} from '../src/operation.js';
 import {endPatrolEarly} from '../src/early-end.js';
 import {listenForReplayEvents} from '../src/replay-events.js';
 import {setInvalidNumberReporter} from '../src/invalid-numbers.js';
-import {elmSimulation} from '../src/elm-simulation.js';
+import {elmSimulation, workerTransport} from '../src/elm-simulation.js';
 import {refreshMirror} from '../src/world-mirror.js';
-import {synchronousPorts} from '../scripts/elm-sync-ports.mjs';
-import {compiledElm, sameResults, seeded, exact} from './sim-harness.mjs';
+import {workerScript} from '../scripts/sim-worker-script.mjs';
+import {compiledElm, elmSource, sameResults, seeded, exact} from './sim-harness.mjs';
 
 // The worker's program, stock: each reply arrives once the event loop turns.
 const program = compiledElm('elm/SimWorker.elm').SimWorker;
@@ -65,28 +65,53 @@ async function announced(world, marks, work) {
   try { return {result: await work(), replay: marks.slice(before), invalid}; } finally { setInvalidNumberReporter(previous); }
 }
 
-// The page's bundle, until it moves to a Web Worker, removes the ports'
-// timer, so Elm sends each reply before `send` returns, command after
-// command. A stock outgoing port answers once per turn of the event loop,
-// which the adapter, now asynchronous, takes either way.
-test('the worker answers each command within the call, one after another', () => {
-  const worker = () => compiledElm('elm/SimWorker.elm', synchronousPorts).SimWorker.init();
-  const stock = compiledElm('elm/SimWorker.elm').SimWorker.init();
-  let late = null;
-  stock.ports.replies.subscribe(r => { late = r; });
-  stock.ports.commands.send({kind: 'orderFields'});
-  assert.equal(late, null, 'a stock port waits for the event loop');
-  const app = worker();
-  let reply = null;
-  app.ports.replies.subscribe(r => { reply = r; });
-  for (let n = 0; n < 3; n++) {
-    reply = null;
-    app.ports.commands.send({kind: 'orderFields'});
-    assert.ok(reply && Array.isArray(reply.boat), 'reply ' + n + ' arrived before send returned');
-  }
-  reply = null;
+// The worker file the site ships, run in a stand-in for a Web Worker's
+// global scope; what crosses between the page and the worker is cloned as
+// postMessage clones it, so a function or other value a worker could not
+// receive fails here.
+function shippedWorker() {
+  const listeners = [], scope = {postMessage: reply => { const data = structuredClone(reply); for (const l of listeners) l({data}); }};
+  new Function('self', workerScript(elmSource('elm/SimWorker.elm'))).call(scope, scope);
+  return {postMessage: command => scope.onmessage({data: structuredClone(command)}), addEventListener: (type, l) => { if (type === 'message') listeners.push(l); }};
+}
+
+// A stock outgoing port answers once the event loop turns, never within the
+// command; the adapter waits for each reply, and a command needing a patrol
+// before one exists is refused.
+test('the worker answers each command after the call, and refuses one without a patrol', async () => {
+  const app = program.init(), replies = [];
+  app.ports.replies.subscribe(r => replies.push(r));
+  app.ports.commands.send({kind: 'orderFields'});
+  assert.equal(replies.length, 0, 'a stock port waits for the event loop');
+  while (!replies.length) await new Promise(resolve => setTimeout(resolve, 0));
+  assert.ok(Array.isArray(replies[0].boat));
   app.ports.commands.send({kind: 'step', orders: {}, dt: 1, input: {}});
-  assert.match(reply.error, /no patrol/, 'a command needing a patrol, before one exists, is refused');
+  while (replies.length < 2) await new Promise(resolve => setTimeout(resolve, 0));
+  assert.match(replies[1].error, /no patrol/);
+});
+
+// The shipped worker file, posted to as the page posts, plays patrols as
+// the TypeScript does, with every action and a long frame.
+test('the shipped worker file plays a patrol as the TypeScript does', async () => {
+  const sim = await elmSimulation(workerTransport(shippedWorker()), strict);
+  let stepped = 0;
+  for (const [mission, seed] of [['recon', 41], ['intercept', 42], ['surface-rescue', 43]]) {
+    const t = createGame(mission, seed), m = await sim.create(mission, seed);
+    for (const [k, kind] of Object.keys(TYPESCRIPT).entries()) {
+      const action = {kind, look: 30, id: t.contacts[0]?.id ?? 'nobody', bearing: 90, elevation: 5, x: t.x + 400, y: t.y, raised: k % 2 === 0,
+        area: {x: t.x + 1500, y: t.y + 2500, size: 10000}, text: 'Captain to the bridge.'};
+      for (const s of [t, m]) s.targetSpeed = k % 5;
+      const expected = TYPESCRIPT[kind](t, action), got = await sim.act(m, action);
+      sameResults([exact({result: got ?? null, world: pageless(m)})], [exact({result: expected ?? null, world: pageless(t)})]);
+      const ticks = [], expectedTicks = [];
+      step(t, 20, {timeRate: 4, observation: null, afterTick: s => expectedTicks.push(s.time)});
+      await sim.step(m, 20, {timeRate: 4, observation: null, afterTick: s => ticks.push(s.time)});
+      assert.deepEqual(ticks, expectedTicks, mission + ' after ' + kind + ': the same ticks');
+      stepped += ticks.length;
+      sameResults([pageless(m)], [pageless(t)]);
+    }
+  }
+  assert.ok(stepped > 300, 'many ticks: ' + stepped);
 });
 
 // The page's patrol object refreshed from a reply keeps its identity, its
