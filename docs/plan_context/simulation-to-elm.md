@@ -510,3 +510,38 @@ equivalent: the rules before it require `launched <= time < arrives`, so with
 a finite time (restore guarantees one) the check can never decide. The first
 pass also left the 1800 m turn-back distance unchecked, since the far units
 stood 2,600 m out; theaters with units at 1,760 to 1,840 m now pin it.
+
+## Audit of modules ported before the rule (2026-11-27)
+
+Swept the 40 TypeScript modules carrying the Mirrored marker at d5ba3a1,
+plus fleet-action.ts, for the shapes the NaN-hit bug had: `||` defaults on
+numbers, non-null assertions, early returns that NaN slips past, and partial
+operations (`sqrt`, `asin`, `acos`, `log`, `**`).
+
+Fixed, each in the TypeScript first with a regression test that failed
+before the fix, then in Elm, with the differential tests widened to cover
+the case (they failed against the unfixed Elm, as they should):
+- `hurt` (d5ba3a1): NaN and infinite hits.
+- `damageDrone`: the same `amount <= 0` guard; a NaN or infinite hit damaged
+  nothing (`damagePart` refuses it) but still logged a drone impact.
+- `perceivedSound`'s `power || 1`: a zero-power sound played at full power,
+  an infinite power gave the unclamped gunfire and thunder path an infinite
+  gain, and a negative power a negative one. Power is now loudness: a finite
+  power floored at zero, and 1 when missing or not finite. Every sound the
+  game emits has a positive literal power, so none of this was reachable in
+  play.
+
+Checked and left alone: `|| 0` on optional depths, altitudes, pitches and
+speeds (absent or NaN becomes 0, and 0 stays 0); `Math.sign(speed ||
+targetSpeed || 1)`, a deliberate direction fallback; non-null assertions on
+static mission lookups, `point!` (only bow hits, which need a point, reach
+it), `estimateAt` straight after `fixContact` stores a finite fix, the fleet
+action's targets (validTheater guarantees them) and weather lookups over
+their own keys; `sqrt` in `pushOffShoal` (slopes under 1e-8 return first) and
+the wake (exposure only grows from 0), `asin` in the signal lamp (only when
+range exceeds radius), `tanh` (clamped past ±20); early returns on state that
+restore validates as finite.
+
+What a sweep like this cannot find: wrong formulas or logic that both
+languages share. The differential tests only prove the two agree, so those
+need gameplay tests and review.

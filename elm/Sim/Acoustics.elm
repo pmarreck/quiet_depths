@@ -19,8 +19,9 @@ where, and how loud. Constant speeds over a flat air/water interface; not a
 full ocean acoustic model. Typical speeds: NOAA,
 <https://oceanservice.noaa.gov/facts/sound.html>.
 
-Optional numbers follow the TypeScript's `value || default`, so a missing,
-zero or NaN power counts as 1 and a missing, zero or NaN depth as 0.
+Optional depths and altitudes follow the TypeScript's `value || 0`, so a
+missing, zero or NaN one counts as 0. A source's power is its loudness: never
+below silence, and 1 when missing or not finite.
 
 -}
 
@@ -118,6 +119,23 @@ type alias Source a =
 
 type alias Perceived =
     { distance : Float, delay : Float, pan : Float, gain : Float, cutoff : Float }
+
+
+{-| How loud a source is: its power, never below silence; a missing or
+non-finite power counts as 1.
+-}
+loudness : Maybe Float -> Float
+loudness power =
+    case power of
+        Just p ->
+            if isNaN p || isInfinite p then
+                1
+
+            else
+                M.max 0 p
+
+        Nothing ->
+            1
 
 
 {-| JavaScript's `value || fallback` for an optional number.
@@ -250,7 +268,7 @@ perceivedSound source listener =
         , delay = propagationTime source listener
         , pan = spatialPan source listener
         , gain =
-            or 1 source.power
+            loudness source.power
                 / (1 + (hypot2 horizontal (or 0 source.altitude) / 3400) ^ 1.2)
                 * (if under then
                     0.55 * exp (-depth / 170)
@@ -270,7 +288,7 @@ perceivedSound source listener =
         { distance = distance
         , delay = propagationTime source listener
         , pan = spatialPan source listener
-        , gain = M.clamp 0 1 (or 1 source.power / (1 + (distance / 220) ^ 1.25))
+        , gain = M.clamp 0 1 (loudness source.power / (1 + (distance / 220) ^ 1.25))
         , cutoff = M.max 130 (4200 / (1 + distance / 1200))
         }
 

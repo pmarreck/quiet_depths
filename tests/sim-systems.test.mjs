@@ -126,7 +126,7 @@ test('hurting the boat matches: hull, flooding, section hits, cook-offs and loss
 
 test('damage to the drone matches, through to its loss', async () => {
   const runs = [];
-  for (const s of restorable().filter((_, i) => i % 3 === 2)) for (const mode of ['remote', 'return', 'stowed']) for (const [k, amount] of [0, -2, 4, 35, 120, 260].entries()) {
+  for (const s of restorable().filter((_, i) => i % 3 === 2)) for (const mode of ['remote', 'return', 'stowed']) for (const [k, amount] of [0, -2, NaN, Infinity, 4, 35, 120, 260].entries()) {
     runs.push({args: [amount, 'seabed'], ...runTypeScript(withDrone({...s, difficulty: {...s.difficulty, damage: [undefined, -1, 1][k % 3]}}, {mode}), w => damageDrone(w, amount, 'seabed'))});
   }
   assert.ok(runs.some(r => r.output.drone.mode === 'lost' && r.input.drone.mode !== 'lost'), 'a drone is destroyed');

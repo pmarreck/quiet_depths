@@ -184,7 +184,7 @@ function fuelEmergency(s: Boat, dt: number, crew: number) {
 
 export function damageDrone(s: Boat, amount: number, reason: string): void {
   const d = s.drone;
-  if (!['remote', 'return'].includes(d.mode) || amount <= 0) return;
+  if (!['remote', 'return'].includes(d.mode) || !Number.isFinite(amount) || amount <= 0) return;
   amount *= 2 ** -(s.difficulty?.damage ?? 0);
   for (const part of DRONE_PARTS) damagePart(d, d.repairLimits, part, amount * DRONE_HIT_FACTORS[part]);
   log(s, 'Drone impact: ' + reason + ' Integrity ' + Math.ceil(d.hull) + '%.', 'damage');

@@ -202,3 +202,14 @@ test('a hit whose size is not a finite number changes nothing', () => {
   assert.deepStrictEqual(s, before, `a hit of ${amount}${subsystem ? ' to the ' + subsystem : ''}`);
  }
 });
+
+// The drone's damage guard had the same gap as hurt's: a NaN or infinite hit
+// passed it, damaged nothing, and still logged an impact.
+test('a drone hit whose size is not a finite number changes nothing', () => {
+ for (const amount of [NaN, Infinity, -Infinity]) for (const mode of ['remote', 'return']) {
+  const s = boat(); s.drone.mode = mode;
+  const before = structuredClone(s);
+  damageDrone(s, amount, 'phantom contact.');
+  assert.deepStrictEqual(s, before, `a drone hit of ${amount} while ${mode}`);
+ }
+});

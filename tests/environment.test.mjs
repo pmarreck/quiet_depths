@@ -170,3 +170,17 @@ test('weather and time names are looked up only among the defined ones, never on
  const e=environmentAt({environment:makeEnvironment(7,{weather:'constructor'}),time:0});
  assert.ok(Number.isFinite(e.visibility)&&e.weatherId==='clear');
 });
+
+// A sound's power scales its gain. Zero or negative power is silent; a
+// missing or non-finite power counts as 1. `power || 1` once played a
+// zero-power sound at full power and passed infinities and negatives through.
+test('a sound of zero or negative power is silent, and a missing or non-finite power counts as 1', () => {
+ const listener = {x: 0, y: 0, heading: 0, depth: 0};
+ for (const type of ['thunder', 'detonation']) {
+  const gain = power => perceivedSound({type, x: 300, y: 0, altitude: 50, ...(power === undefined ? {} : {power})}, listener).gain;
+  assert.equal(gain(0), 0, type + ' at zero power');
+  assert.equal(gain(-1), 0, type + ' at negative power');
+  for (const power of [undefined, NaN, Infinity, -Infinity]) assert.equal(gain(power), gain(1), `${type} at power ${power}`);
+  assert.ok(gain(.5) > 0 && gain(.5) < gain(1), type + ' scales with power');
+ }
+});

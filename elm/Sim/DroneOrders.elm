@@ -165,7 +165,7 @@ damageDrone given reason s =
         d =
             s.drone
     in
-    if not (d.mode == Remote || d.mode == Returning) || given <= 0 then
+    if not (d.mode == Remote || d.mode == Returning) || isNaN given || isInfinite given || given <= 0 then
         s
 
     else

@@ -13,6 +13,7 @@ const optional = (random, scale) => {
 function source(random, id = 0) {
   const s = {id, time: random() * 200, type: kinds[Math.floor(random() * kinds.length)], x: (random() - .5) * 12000, y: (random() - .5) * 12000, heard: false};
   for (const [key, scale] of [['depth', 300], ['altitude', 2000], ['power', 2]]) {const v = optional(random, scale); if (v !== undefined) s[key] = v;}
+  if (random() < .08) s.power = [Infinity, -Infinity, -1, -0][Math.floor(random() * 4)];
   if (random() < .3) s.vessel = 'ship-' + id;
   if (random() < .2) s.echo = {id, x: 1, y: 2};
   return s;
