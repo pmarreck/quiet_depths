@@ -47,15 +47,30 @@ function runs() {
     const anchor = pick(random, afloat());
     const a = random() * Math.PI * 2, d = 700 + random() * 900;
     Object.assign(w, {x: anchor.x + Math.sin(a) * d, y: anchor.y + Math.cos(a) * d, depth: pick(random, [12, 30, 60]), speed: 2, heading: random() * 360, scope: false});
+    // Saves may leave out a ship's noise, or a submarine's depth, and a flooding
+    // ship rides lower in the water.
+    if (random() < .5) for (const v of w.ships) delete v.noise;
+    const deepless = w.ships.find(v => v.kind === 'sub');
+    if (deepless && random() < .4) delete deepless.depth;
+    for (const v of afloat()) if (v.kind !== 'sub') v.sinkDepth = pick(random, [0, 0, 2, 4]);
     for (let step = 0; step < 120; step++) {
       if (step % 30 === 0) {
         for (let n = 0; n < 2; n++) {
           const target = pick(random, afloat());
           if (!target) break;
           const heading = (bearingTo(w, target) + (random() - .5) * pick(random, [0, 10, 40]) + 360) % 360, tubeSide = pick(random, [-1, 0, 1]);
-          putTorpedoInWater(w, 'player', {x: w.x, y: w.y, depth: w.depth}, heading, surfaceDepth(target),
-            {intended: target.id, heading: (heading + tubeSide * 20 + 360) % 360, pitch: tubeSide ? pick(random, [-.2, .1]) : 0, tubeSide, runOut: pick(random, [0, 200, 600])});
+          const shot = putTorpedoInWater(w, 'player', {x: w.x, y: w.y, depth: w.depth}, heading, surfaceDepth(target),
+            {intended: target.id, heading: (heading + tubeSide * 20 + 360) % 360, pitch: tubeSide ? pick(random, [-.2, .1]) : 0, tubeSide, runOut: pick(random, [0, 240, 300, 600])});
+          // A torpedo already pulled off by a decoy no longer prefers its target.
+          if (random() < .3) shot.diverted = true;
         }
+        // Ordered within a meter of the boat's depth, so the tube's exit pitch can
+        // dive or climb against the depth it wants.
+        if (random() < .5) putTorpedoInWater(w, 'player', {x: w.x, y: w.y, depth: w.depth}, w.heading, w.depth + pick(random, [-1, 1]), {heading: w.heading, pitch: pick(random, [-.2, .2]), tubeSide: pick(random, [-1, 1]), runOut: 300});
+        // Restored runs late in their life, and one spent inside a ship's hull.
+        if (random() < .4) putTorpedoInWater(w, 'player', {x: w.x, y: w.y, depth: w.depth}, random() * 360, w.depth, {age: pick(random, [168, 176, 179.5])});
+        const hull = pick(random, afloat());
+        if (hull && random() < .3) { const spent = putTorpedoInWater(w, 'player', {x: hull.x, y: hull.y, depth: surfaceDepth(hull)}, hull.heading, surfaceDepth(hull), {}); spent.age = 20; spent.traveled = spent.runLimit; }
         const hostile = afloat().filter(v => v.military && v.side !== 'friendly');
         if (hostile.length) {
           const ship = pick(random, hostile), aim = {x: w.x + (random() - .5) * pick(random, [0, 60, 400]), y: w.y + (random() - .5) * pick(random, [0, 60, 400])};
@@ -64,12 +79,15 @@ function runs() {
           // noisemaker diverts can lock on to her.
           const escort = afloat().find(v => v.military && v !== ship);
           if (escort && random() < .5) { const b = random() * Math.PI * 2; escort.x = w.x + Math.sin(b) * 400; escort.y = w.y + Math.cos(b) * 400; }
-          if (random() < .3) putTorpedoInWater(w, 'enemy', {...aim, x: aim.x + 300, depth: w.depth}, bearingTo({x: aim.x + 300, y: aim.y}, aim), w.depth, {age: ARMING_TIME, launcher: random() < .5 ? null : ship.id, aim});
-          else putTorpedoInWater(w, 'enemy', origin, bearingTo(origin, aim), w.depth, {heading: ship.heading, tubeSide: pick(random, [-1, 0, 1]), launcher: ship.id, aim});
+          // Some run above or below the boat and climb or dive into her.
+          const runDepth = Math.max(3, w.depth + pick(random, [-12, 0, 0, 12]));
+          if (random() < .3) putTorpedoInWater(w, 'enemy', {...aim, x: aim.x + 300, depth: runDepth}, bearingTo({x: aim.x + 300, y: aim.y}, aim), runDepth, {age: ARMING_TIME, launcher: random() < .5 ? null : ship.id, aim});
+          else putTorpedoInWater(w, 'enemy', origin, bearingTo(origin, aim), runDepth, {heading: ship.heading, tubeSide: pick(random, [-1, 0, 1]), launcher: ship.id, aim});
         }
         if (random() < .6) w.noisemaker = {x: w.x, y: w.y, depth: w.depth, heading: w.heading, speed: 0, time: w.time};
       }
-      const dt = pick(random, [.25, .5, 1]);
+      // A tick off the quarter-second grid lets a ping fall due between 2.4 and 2.5 s.
+      const dt = pick(random, [.25, .5, 1, .3]);
       w.time += dt;
       for (const v of afloat()) { const r = v.heading * Math.PI / 180; v.x += Math.sin(r) * v.speed * .514444 * dt; v.y += Math.cos(r) * v.speed * .514444 * dt; }
       w.x += Math.sin(w.heading * Math.PI / 180) * w.speed * .514444 * dt; w.y += Math.cos(w.heading * Math.PI / 180) * w.speed * .514444 * dt;
@@ -111,4 +129,48 @@ test('a fresh run\'s orders and a torpedo put in the water match', async () => {
   ]);
   const expected = launches.map(([s, ...rest]) => { const w = structuredClone(s); const shot = putTorpedoInWater(w, ...rest); return exact([shot, w.weaponSequence, w.projectiles]); });
   sameResults(await elm('torpedoRun.putTorpedoInWater', launches), expected);
+});
+
+// Single ticks built at the edges the long runs rarely reach: a torpedo
+// closing on a submarine that may drop a decoy, a run reaching its run-out
+// distance exactly, a torpedo climbing or diving through the boat's or a
+// low-riding ship's hull, and a diverted torpedo striking its intended neutral.
+test('single torpedo ticks match at the edges of decoys, run-out, hull faces and diverted strikes', async () => {
+  const random = seeded(143), calls = [];
+  const worlds = Object.fromEntries(['seek-and-destroy-sub', 'intercept', 'recon'].map(m => [m, restore(save(createGame(m, 9, {weather: 'clear', timeOfDay: 'day', changing: false})))]));
+  for (let n = 0; n < 1500; n++) {
+    const kind = n % 5, w = structuredClone(worlds[kind === 0 ? 'seek-and-destroy-sub' : kind === 4 ? 'intercept' : 'recon']);
+    w.rng = 1 + Math.floor(random() * 2 ** 30); w.projectiles = []; w.acoustics = []; w.depth = pick(random, [20, 40]);
+    const dt = pick(random, [.25, .5, 1]), along = (from, heading, d) => ({x: from.x + Math.sin(heading * Math.PI / 180) * d, y: from.y + Math.cos(heading * Math.PI / 180) * d});
+    let p;
+    if (kind === 0) {
+      const sub = pick(random, w.ships.filter(v => v.kind === 'sub' && v.military && v.hull > 0)), heading = random() * 360;
+      p = putTorpedoInWater(w, 'player', {...along(sub, heading + 180, 120 + random() * 90), depth: sub.depth}, heading, sub.depth, {intended: sub.id, heading});
+    } else if (kind === 1) {
+      w.ships = []; p = putTorpedoInWater(w, 'player', {x: w.x, y: w.y, depth: w.depth}, w.heading, w.depth, {runOut: 300});
+      p.traveled = 300 - 24 * dt;
+    } else if (kind === 2) {
+      const above = random() < .5, aim = {x: w.x + (random() - .5) * 6, y: w.y + (random() - .5) * 6};
+      p = putTorpedoInWater(w, 'enemy', {...aim, depth: w.depth + (above ? -1 : 1) * pick(random, [8, 9.5])}, random() * 360, w.depth + (above ? 30 : -30), {launcher: null, aim});
+    } else if (kind === 3) {
+      const ship = pick(random, w.ships.filter(v => v.kind !== 'sub' && v.hull > 0));
+      ship.sinkDepth = pick(random, [0, 2, 4]);
+      p = putTorpedoInWater(w, 'player', {x: ship.x + (random() - .5) * 6, y: ship.y + (random() - .5) * 6, depth: pick(random, [11, 14])}, random() * 360, 3, {intended: ship.id});
+    } else {
+      const boat = pick(random, w.ships.filter(v => !v.military && v.hull > 0)), heading = random() * 360;
+      // A diverted torpedo striking its intended neutral reads as a plain strike;
+      // one meant for another ship reads as the decoy's doing.
+      const intended = random() < .3 ? w.ships.find(v => v !== boat).id : boat.id;
+      p = putTorpedoInWater(w, 'player', {...along(boat, heading + 180, 20 + random() * 20), depth: 3}, heading, 3, {intended, heading});
+      p.diverted = random() < .7;
+    }
+    p.age = 10; p.pingAge = random() * 3;
+    const input = exact(w);
+    calls.push({input, dt, output: tick(input, dt).output});
+  }
+  const outs = calls.map(c => c.output), texts = new Set(outs.flatMap(o => o.debrief.map(e => e.text)));
+  assert.ok(calls.some((c, i) => c.input.projectiles[0] && outs[i].projectiles[0]?.decoyTarget), 'a submarine dropping a decoy');
+  assert.ok([...texts].some(t => t.startsWith('Your torpedo struck the neutral')) && [...texts].some(t => t.startsWith('A decoy diverted your torpedo')), 'neutral strikes by diverted and undiverted torpedoes');
+  assert.ok(outs.some(o => o.debrief.some(e => e.text === 'An incoming torpedo struck your sub.')), 'strikes through the boat\'s hull');
+  sameResults(await elm('torpedoRun.updateTorpedoes', calls.map(c => [c.input, c.dt])), outs);
 });

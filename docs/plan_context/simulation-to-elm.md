@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Torpedo runs (130 lines, four Elm modules) | about 60 min | matched on the first comparison; 54 of 55 mutants killed, the last equivalent |
 | Air support (115 lines, two Elm modules) | about 40 min | matched on the first run; found and fixed a TypeScript bug first (a surfaced boat's bomb depth); 55 of 55 mutants killed after four input gaps closed |
 | Early end (90 lines) | about 15 min | matched on the first run; 18 of 19 mutants killed, the last equivalent under the real mission catalog |
 | Cold watch (176 lines, five Elm modules) | about 45 min | matched on the first run; 108 of 108 mutants killed after the tests met rarer encounters and coastal passages |
@@ -621,3 +622,36 @@ reached each threshold: an island base over open water (restore checks only
 that the base is finite), a falling plane ending a tick between -10 and -5 m,
 a plane flying home on a tick short enough that the 10 m arrival floor binds,
 and a strafing cooldown ending a tick between 0 and 0.1 s.
+
+## Torpedo runs ported (2026-11-27)
+
+`torpedo-run.ts` (130 code lines) became `Sim.Torpedo` (the torpedo and its
+launch), `Sim.TorpedoCourse` (steering), `Sim.TorpedoStrike` (strikes) and
+`Sim.TorpedoRun` (each moment's run), about 60 minutes including the harness
+work, matched on the first comparison (`8f20c9f`). An enemy torpedo's
+launcher and aim live in its owner, so a player's torpedo cannot carry them.
+The strike calls both the boat's damage and the carrier's alarm, so the
+shared patrol harness grew to decode the mission, torpedoes, aircraft,
+blasts, gun rounds, noisemaker and reports, and the difficulty record gained
+its air-support switch.
+
+The first full gate failed where the local run passed: the build replaces
+`src/` with compiled modules, and the test imported the TypeScript source
+directly, so its replay listener sat on a second copy of the replay module
+and heard nothing. Importing through `src/` like every other test fixed it.
+
+Mutation testing killed 42 of 55 mutants at first. The long runs never met a
+torpedo near its 180-second life, a submarine or ship missing its depth or
+noise, a ping falling due between 2.4 and 2.5 s (quarter-second ticks keep
+ping ages on a 0.25 grid), climbs and dives through a hull's top or bottom
+face, ships riding low, a run reaching its run-out exactly, or a diverted
+torpedo striking its intended neutral. Wider runs and 1,500 constructed
+single ticks now kill 54. The last makes a torpedo recheck a noisemaker it
+already checked; the diversion roll is a hash of the torpedo and the
+noisemaker's time, so the recheck always repeats the first answer: an
+equivalent mutant.
+
+Porting `combat.ts` turned up two TypeScript fixes, made first: the deck gun
+silently refused an aim that was not a finite number (`f5d0c77`), and a
+saved torpedo's id passed validation as any finite number, though ids come
+from the integer weapon sequence.
