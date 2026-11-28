@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/PatrolTick.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {exp} from './sim-math.ts';
 import {activeClue, imagerClue, leaveClue, searchClue} from './suspicion.ts';
 import {recordWake} from './surface-wake.ts';

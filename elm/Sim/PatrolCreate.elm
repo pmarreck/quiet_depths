@@ -401,7 +401,7 @@ longPatrol s =
                     let
                         east : Float
                         east =
-                            sign (second.x - first.x)
+                            M.sign (second.x - first.x)
                     in
                     { placed
                         | ships =
@@ -435,17 +435,3 @@ longPatrol s =
     Mechanics.log "Long patrol. Search the dashed area on the chart. Its center is an estimate."
         Info
         { apart | departure = Maybe.map (\_ -> { x = apart.x, y = apart.y }) apart.departure }
-
-
-{-| JavaScript's Math.sign: the sign of a number, zero for zero, NaN for NaN.
--}
-sign : Float -> Float
-sign v =
-    if 0 < v then
-        1
-
-    else if v < 0 then
-        -1
-
-    else
-        v

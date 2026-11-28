@@ -1,4 +1,4 @@
-module SimHarness.Enemy exposing (function)
+module SimHarness.Enemy exposing (function, instrument, profile)
 
 {-| Harness entries for what the enemy suspects.
 -}
