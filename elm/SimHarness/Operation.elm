@@ -74,5 +74,8 @@ function name =
         "operation.updateOperation" ->
             Just (D.map2 (\s dt -> withWorld E.bool (OperationWork.updateOperation dt s)) patrol (arg 1 D.float))
 
+        "operation.validOperation" ->
+            Just (arg 0 (D.oneOf [ Operation.decoder |> D.map (\_ -> E.bool True), D.succeed (E.bool False) ]))
+
         _ ->
             Nothing

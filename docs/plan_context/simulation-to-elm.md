@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Rescues and surveys (119 lines, two Elm modules) | about 40 min after the audit and site record | setup matched at once; two test fixes; four restore gaps fixed first; 65 of 65 mutants killed |
 | Convoy and allied lamp watch (188 lines, three Elm modules) | about 30 min | matched once the test dropped a bookkeeping flag; 58 of 58 mutants killed |
 | Contact reports, ping and photographs (114 lines, two Elm modules) | about 25 min | matched once the test passed both languages the same look; a restore gap fixed first; 52 of 52 mutants killed |
 | Orbital reconnaissance (196 lines, three Elm modules) | about 20 min after the TypeScript fix | matched on the first comparison; save checks tightened in the TypeScript first; 69 of 74 mutants killed, the other five equivalent |
@@ -767,3 +768,35 @@ constructed-edges test and every breaker on every save now kill all 58. Its
 first fix cases were dead on arrival: at time zero a 42-second-old fix is
 older than a fresh watch's last issue, so the quiet chart now starts ten
 minutes in, and the test asserts that fixes are issued.
+
+## Rescues and surveys ported (2026-11-28)
+
+Porting began by auditing `missions.ts` against restore, which found four
+gaps, each closed in the TypeScript first with a regression test
+(`f41acfa`, `b61c69c`): survivor counts could be fractional (0.5 remaining
+becomes -0.5 after a transfer and the rescue never finishes), a site's kind
+need not match its mission, a survey's find was never checked as text, and
+a site's speed was never checked though nothing gives a site speed. The Elm
+site then became a precise record (`39ab312`) in place of a general hull
+body whose depth, kind and name were all optional.
+
+The rescue and survey code moved unchanged into its own module,
+`operation.ts` (119 code lines), mirrored by `Sim.Operation` and
+`Sim.OperationWork` at `f781466`. The objective panel and seed helpers moved
+to `mission-panel.ts` (`0c5a251`), outside the simulation, and the mission
+target checks to restore, their only caller (`ebb19a2`). Setup matched on
+the first run; the tick and photograph tests needed two test fixes: the
+ROV's constructed conditions had to pass through restore, which zeroes a
+destroyed part's repair limit, and one rescue had to stay away long enough
+for its casualty to founder with survivors aboard.
+
+Mutation testing killed 56 of 65 mutants at first. The played operations
+never saved an operation restore refuses, approached before a long patrol
+found its site or over a site shallower than the approach depth, started a
+rescue with a route set, lost a survivor exactly on the deadline, settled
+a casualty exactly to the lost-below mark, passed more than 32 m above the
+wreck, or aimed the camera at exactly its reach or a side exactly the
+separation from one recorded. A constructed-edges test now covers each,
+comparing the operation decoder's verdict with restore's; the exact mark
+needs a site where the chart reads exactly 20 m, found by bisection. All 65
+mutants fail the tests.

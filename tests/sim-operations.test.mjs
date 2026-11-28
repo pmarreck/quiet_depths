@@ -1,6 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame, save, restore} from '../src/sim.js';
+import {casualtyDepth, surfaceRescue} from '../src/rescue-operation.js';
+import {hash01} from '../src/environment.js';
+import {bottom} from '../src/mechanics.js';
 import {setupOperation, operationApproach, operationConditions, startRescue, casualtyDeadline, dronePhotograph, updateOperation} from '../src/operation.js';
 import {listenForReplayEvents} from '../src/replay-events.js';
 import {collectInvalidNumbers} from '../src/invalid-numbers.js';
@@ -117,4 +120,85 @@ test('the ROV\'s survey photographs match: aim, reach, a damaged camera, a recor
   const outcomes = new Set(calls.map(c => c.expected[0].text.replace(/[0-9]+/g, 'N')));
   assert.ok(outcomes.size >= 5, 'every outcome: ' + [...outcomes].join(' | '));
   sameResults(await elm('operation.dronePhotograph', calls.map(c => [c.input])), calls.map(c => c.expected));
+});
+
+// Edges the played operations rarely reach: a saved operation's decoder
+// against restore, an approach before the site is found, a site shallower
+// than the approach depth, a route left set, a loss exactly on its deadline,
+// a casualty settling exactly to the lost-below mark, and the ROV camera at
+// exactly its reach and exactly the separation from a recorded side.
+test('the operation\'s constructed edges match', async () => {
+  const saves = [], looks = [], starts = [], ticks = [], photos = [];
+  // Saved operations: restore keeps or refuses each change, and the decoder must agree.
+  for (const mission of OPERATIONS) {
+    const saved = JSON.parse(save(createGame(mission, 11)));
+    const changes = [o => o, o => ({...o, remaining: -1}), o => ({...o, dead: 2.5}), o => ({...o, rescued: 3}), ...['assessment', 'boarding', 'diverReturn', 'scan', 'lastCasualty'].map(k => o => ({...o, [k]: -1})),
+      ...['known', 'holding', 'active', 'completed'].map(k => o => ({...o, [k]: 'yes'})), o => ({...o, photoAngles: [10, 'x']}), o => ({...o, photoAngles: [10, 200.5]}),
+      o => ({...o, find: 5}), o => ({...o, find: 'A bell.'}), o => { const c = {...o}; delete c.find; return c; }, o => ({...o, scan: 3.25, assessment: 0})];
+    for (const change of changes) {
+      const copy = structuredClone(saved);
+      copy.operation = change(copy.operation);
+      saves.push({operation: copy.operation, kept: restore(JSON.stringify(copy)) !== null});
+    }
+  }
+  assert.ok(saves.some(s => s.kept) && saves.some(s => !s.kept), 'operations kept and refused');
+  for (const mission of OPERATIONS) {
+    // A long patrol must find its site first; a site may lie shallower than the approach depth.
+    const hunted = exact(restore(save(createGame(mission, 12, {difficulty: {longPatrol: true}}))));
+    assert.ok(hunted.search && !hunted.search.located, 'a long patrol searches for its site');
+    const found = structuredClone(hunted);
+    found.search.located = true;
+    const shallow = structuredClone(found);
+    shallow.site.depth = 6;
+    for (const w of [hunted, found, shallow]) looks.push({input: w, approach: exact(operationApproach(w) ?? null)});
+    // On station with a route still set.
+    const w = exact(restore(save(createGame(mission, 13))));
+    const depth = w.site.kind === 'surface' ? 0 : w.site.depth - 11;
+    Object.assign(w, {x: w.site.x - 50, y: w.site.y, depth, speed: 0, route: {x: 10, y: 20, radius: 40}});
+    starts.push({input: w, expected: (r => [r.result, r.output])(run(w, s => startRescue(s)))});
+  }
+  // A loss exactly on its deadline, and a casualty settling exactly to the lost-below mark.
+  for (const mission of ['undersea-rescue', 'surface-rescue']) {
+    const w = exact(restore(save(createGame(mission, 5))));
+    assert.ok(w.operation.remaining > 0, 'survivors to lose');
+    Object.assign(w, {x: w.site.x + 1000, time: casualtyDeadline(w)});
+    ticks.push({input: w, dt: 1, expected: (r => [r.result, r.output])(run(w, s => updateOperation(s, 1)))});
+  }
+  // A survey pass from well above the wreck and from below it, where the shelf drops away beside it.
+  for (const below of [-40, -31, 31, 40]) {
+    const w = exact(restore(save(createGame('survey', 15))));
+    Object.assign(w, {x: w.site.x - 50, y: w.site.y, depth: w.site.depth + below, speed: 1});
+    ticks.push({input: w, dt: 1, expected: (r => [r.result, r.output])(run(w, s => updateOperation(s, 1)))});
+  }
+  // The casualty rests 5 m above the seabed, so a site where the chart reads
+  // exactly 20 m settles exactly to the 15 m mark: found by bisection along x.
+  const sink = surfaceRescue.sinking, settled = exact(restore(save(createGame('surface-rescue', 5))));
+  const chartSeed = settled.environment.chartSeed, mark = sink.lostBelow + 5;
+  const ulps = (x, k) => new Float64Array(new BigInt64Array([new BigInt64Array(new Float64Array([x]).buffer)[0] + BigInt(k)]).buffer)[0];
+  let place = null;
+  search: for (let y = -8000; y <= 8000; y += 400) for (let x = -8000; x < 8000; x += 400) {
+    const a = bottom(x, y, chartSeed), b = bottom(x + 400, y, chartSeed);
+    if ((a - mark) * (b - mark) > 0) continue;
+    let lo = x, hi = x + 400;
+    for (let k = 0; k < 200; k++) { const mid = (lo + hi) / 2; if ((bottom(mid, y, chartSeed) - mark) * (a - mark) > 0) lo = mid; else hi = mid; }
+    for (let k = -300; k <= 300; k++) if (bottom(ulps(lo, k), y, chartSeed) === mark) { place = {x: ulps(lo, k), y}; break search; }
+  }
+  assert.ok(place && settled.operation.remaining >= 2, 'a site exactly 20 m deep, with survivors to lose');
+  Object.assign(settled.site, place);
+  Object.assign(settled, {x: place.x + 1000, y: place.y, time: 3000});
+  assert.equal(casualtyDepth(3000, hash01(settled.patrol.seed, 820), sink, bottom(place.x, place.y, chartSeed) - 5), sink.lostBelow, 'it settles exactly to the mark');
+  ticks.push({input: settled, dt: 1, expected: (r => [r.result, r.output])(run(settled, s => updateOperation(s, 1)))});
+  // The ROV due north of the wreck: exactly at the camera's reach, and exactly a side's separation from a recorded one.
+  for (const [d, angles] of [[85, []], [84.9, []], [30, [55]], [30, [54.9]], [30, [305]]]) {
+    const w = exact(restore(save(createGame('survey', 14))));
+    Object.assign(w.drone, {mode: 'remote', x: w.site.x, y: w.site.y + d, depth: w.site.depth, heading: 180, camera: 100});
+    Object.assign(w, {photoCooldown: 0});
+    w.operation.photoAngles = angles;
+    photos.push({input: w, expected: (r => [r.result, r.output])(run(w, s => dronePhotograph(s)))});
+  }
+  sameResults(await elm('operation.validOperation', saves.map(s => [s.operation])), saves.map(s => s.kept));
+  sameResults(await elm('operation.operationApproach', looks.map(l => [l.input])), looks.map(l => l.approach));
+  sameResults(await elm('operation.startRescue', starts.map(s => [s.input])), starts.map(s => s.expected));
+  sameResults(await elm('operation.updateOperation', ticks.map(t => [t.input, t.dt])), ticks.map(t => t.expected));
+  sameResults(await elm('operation.dronePhotograph', photos.map(p => [p.input])), photos.map(p => p.expected));
 });
