@@ -434,3 +434,14 @@ adding transcendental functions and matrix operations. Those would serve
 the simulation's 2D and 3D geometry that is not handed to three.js. Nothing
 here depends on it yet. It bears on the `Num` question and the numerics
 experiment above once either is taken up after the switch.
+
+## The memory cap was already in place (2026-11-28 15:35 EST)
+
+The owner approved asking the elm-compiler agent to cap its compile memory.
+Its repository shows that done already, at the owner's direction of
+2026-11-28 00:02: every benchmarked compile runs with a heap cap, and
+quiet_depths is out of its benchmark corpus (commit `b72d69d8`). It also
+found the cause of the 90 GB compiles: a 0.19.4 regression in unifying two
+extensible records that each add a field, filed upstream as #2370 and fixed
+in the fork by `75340ed8`; its checks now compile quiet_depths. No message
+was sent, since it would only have asked for what is done.
