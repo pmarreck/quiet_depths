@@ -149,14 +149,11 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
     const now = simulated(s), stray = [...new Set([...now.keys(), ...t.replied.keys()])].filter(k => now.get(k) !== t.replied.get(k));
     if (stray.length) onStray(stray);
   };
+  // Every patrol object comes from `create` or `restore`, which track it.
   const tracks = new WeakMap<object, Track>();
   const track = (s: World): Track => {
-    let t = tracks.get(s);
-    if (!t) {
-      const orders = places.map(p => structuredClone(at(s, p)));
-      t = {base: orders, logged: orders.map(key), unreplied: [], replied: simulated(s)};
-      tracks.set(s, t);
-    }
+    const t = tracks.get(s);
+    if (!t) throw new Error('The Elm simulation was handed a patrol it did not create or restore');
     return t;
   };
   // Applies a reply's worlds to the page's object in turn, then lays back
@@ -213,7 +210,13 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
     });
   };
   const orders = (t: Track, own: Map<number, unknown>) => shaped(merged(t.base, [own]));
-  const adopt = <T>(world: T): T => { if (world) { held = world as object; tracks.delete(world as object); track(world as unknown as World); } return world; };
+  const adopt = <T>(world: T): T => {
+    if (!world) return world;
+    const s = world as unknown as World, orders = places.map(p => structuredClone(at(s, p)));
+    tracks.set(s, {base: orders, logged: orders.map(key), unreplied: [], replied: simulated(s)});
+    held = s;
+    return world;
+  };
   const announce = (s: World, {replay = [], invalid = []}: Partial<Announced>) => {
     for (const m of replay) markReplay(s, m.time, m.event);
     for (const p of invalid) reportInvalidNumber(p.where, p.value);

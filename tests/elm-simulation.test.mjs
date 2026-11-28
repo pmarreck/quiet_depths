@@ -382,3 +382,77 @@ test('a refused command leaves the page\'s orders for the next call', async () =
   step(t, 10, {timeRate: 4});
   sameResults([pageless(m)], [pageless(t)]);
 });
+
+// A patrol the worker no longer holds is loaded as the worker last knew it,
+// so a write the page made after the call still reaches the worker after
+// that call, not with the load ahead of it.
+test('a patrol loaded back keeps the page\'s later writes for later', async () => {
+  const sim = await elmSimulation(worker(), strict), a = createGame('recon', 13);
+  const ma = await sim.restore(save(a));
+  await sim.restore(save(createGame('intercept', 14)));
+  for (const s of [ma, a]) s.targetSpeed = 9;
+  const stepped = sim.step(ma, 20, {timeRate: 4});
+  ma.targetSpeed = 0;
+  ma.targetHeading = 200;
+  await stepped;
+  step(a, 20, {timeRate: 4});
+  Object.assign(a, {targetSpeed: 0, targetHeading: 200});
+  sameResults([pageless(ma)], [pageless(a)]);
+  await sim.step(ma, 20, {timeRate: 4});
+  step(a, 20, {timeRate: 4});
+  sameResults([pageless(ma)], [pageless(a)]);
+});
+
+// The hook before a step's ticks sees the patrol as it was, once, before
+// any tick lands; then each tick's hook sees that tick.
+test('the hook before a step sees the patrol before its ticks', async () => {
+  const sim = await elmSimulation(worker(), strict), m = await sim.create('survey', 15), seen = [];
+  const before = m.time;
+  await sim.step(m, 5, {timeRate: 4, beforeTicks: s => seen.push(['before', s.time]), afterTick: s => seen.push(['tick', s.time])});
+  assert.deepEqual(seen[0], ['before', before]);
+  assert.equal(seen.filter(([k]) => k === 'before').length, 1);
+  assert.ok(seen.length > 2 && seen.slice(1).every(([k, time]) => k === 'tick' && time > before));
+});
+
+// Only patrols the adapter created or restored can be stepped or acted on.
+test('the adapter refuses a patrol it did not create or restore', async () => {
+  const sim = await elmSimulation(worker(), strict);
+  assert.throws(() => sim.step(createGame('recon', 16), 1), /did not create or restore/);
+  assert.throws(() => sim.act(createGame('recon', 16), {kind: 'ping'}), /did not create or restore/);
+});
+
+// A field only the simulation changes, written by a per-tick hook in a step
+// whose reply must be followed by the page's own orders, is still named.
+test('the guard names a hook\'s stray write under orders laid over a reply', async () => {
+  const heard = [], sim = await elmSimulation(worker(), {onStray: fields => heard.push(fields)});
+  const s = await sim.create('recon', 17), ticks = [];
+  const stepped = sim.step(s, 1, {afterTick: w => { ticks.push(w.time); w.alert = 99; }});
+  s.targetSpeed = 7;
+  await stepped;
+  assert.ok(ticks.length > 0);
+  assert.deepEqual(heard, [['alert']]);
+});
+
+// Every function the page imports resolves asynchronously in both modes, and
+// a failing TypeScript call is delivered as a rejection, as the worker's is.
+test('the page-side simulation answers with promises in both modes', async () => {
+  const page = await import('../src/simulation.js');
+  const exercise = async () => {
+    const s = page.createGame('recon', 18);
+    assert.ok(s instanceof Promise);
+    const w = await s, seen = [];
+    const calls = [page.step(w, 2, {beforeTicks: x => seen.push(x.time)}), page.ping(w), page.photograph(w, 10), page.fire(w, 'nobody'), page.decoy(w), page.deployDrone(w),
+      page.recallDrone(w), page.log(w, 'Note.'), page.fireDeckGun(w, {bearing: 1, elevation: 2}), page.aimGunAt(w, {x: 1, y: 2}), page.orderScope(w, true),
+      page.requestRecon(w, {x: 1, y: 2, size: 3}), page.startRescue(w), page.dronePhotograph(w), page.endPatrolEarly(w), page.restore('{}')];
+    for (const call of calls) assert.ok(call instanceof Promise);
+    await Promise.allSettled(calls);
+    assert.equal(seen.length, 1, 'the hook before the step ran once');
+    return w;
+  };
+  await exercise();
+  const typed = page.step(null, 1);
+  assert.ok(typed instanceof Promise);
+  await assert.rejects(typed);
+  page.useElmSimulation(await elmSimulation(worker(), strict));
+  try { await exercise(); } finally { page.useElmSimulation(null); }
+});
