@@ -77,6 +77,15 @@ test('a refreshed mirror keeps the identities the page relies on', () => {
   assert.equal(mirror.events[1], old, 'an unchanged log line keeps its identity');
   assert.notEqual(mirror.events[0], old, 'a new log line is a new object');
 });
+// An entry differing from an old one only in the sign of a zero is new, so
+// the mirror holds the sign the simulation sent.
+test('a refreshed mirror keeps the sign of a zero', () => {
+  const mirror = {wake: [{x: 0, time: 1}]};
+  refreshMirror(mirror, {wake: [{x: -0, time: 1}]});
+  assert.ok(Object.is(mirror.wake[0].x, -0));
+  refreshMirror(mirror, {wake: [{x: 0, time: 1}]});
+  assert.ok(Object.is(mirror.wake[0].x, 0));
+});
 
 // Every mission, short and long, played continuously both ways: the
 // TypeScript game's patrol, and the page's mirror of the Elm worker's. The
@@ -107,7 +116,7 @@ test('the page played through the Elm worker matches the TypeScript game', async
       Object.assign(m, structuredClone(orders));
       // Now and then, every other field the page writes, on both patrols.
       if (random() < .15) for (const s of [t, m]) {
-        Object.assign(s, {engine: k % 2 ? 'diesel' : 'electric', dieselMode: pick(seeded(k), ['charge', 'drive', 'assist']), scopeAngle: 20, towerAngle: 15, towerPitch: -3,
+        Object.assign(s, {engine: k % 2 ? 'diesel' : 'electric', dieselMode: ['charge', 'drive', 'assist'][k % 3], scopeAngle: 20, towerAngle: 15, towerPitch: -3,
           repair: 120, photoCooldown: 2, reconArchivedSequence: s.recon.sequence, newYearWatch: 2});
         s.patrolId ??= 'abcdef0123456789abcdef0123456789';
         Object.assign(s.gun, {angle: 30, elevation: 8});
@@ -121,7 +130,10 @@ test('the page played through the Elm worker matches the TypeScript game', async
         area: {x: t.x + 1500, y: t.y + 2500, size: 10000}, text: 'Captain to the bridge.'};
       const a = announced(t, tMarks, () => TYPESCRIPT[kind](t, action)), b = announced(m, mMarks, () => sim.act(m, action));
       sameResults([exact({result: b.result ?? null, replay: b.replay, invalid: b.invalid, world: pageless(m)})], [exact({result: a.result ?? null, replay: a.replay, invalid: a.invalid, world: pageless(t)})]);
-      const dt = pick(random, [1 / 60, .25, 1, 5, 30]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, 'scope', 'tower']),
+      const before = t;
+      const dt = pick(random, [1 / 60, .25, 1, 5, 30, 90]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, 'scope', 'tower']),
+        paused: pick(random, [undefined, undefined, undefined, undefined, true]), modal: pick(random, [undefined, undefined, undefined, undefined, true]),
+        imaging: pick(random, [undefined, undefined, {mode: 'scribbler', profile: 'survey'}, {mode: 'painter', profile: 'detail'}]), lampInView: pick(random, [undefined, null, before.ships[0]?.id, before.ships[1]?.id]),
         look: pick(random, [undefined, random() * 360])});
       const shipsBefore = new Map(m.ships.map(v => [v.id, v])), eventsBefore = new Set(m.events);
       const tTicks = [], mTicks = [];

@@ -93,12 +93,16 @@ test('the simulation as the page drives it matches the TypeScript, tick by tick 
         w = before;
       }
       const before = restore(save(w));
-      const dt = pick(random, [1 / 60, .25, 1, 5, 30]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, 'scope', 'tower', 'drone']), look: pick(random, [undefined, random() * 360])});
+      const dt = pick(random, [1 / 60, .25, 1, 5, 30, 90]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, 'scope', 'tower', 'drone']), look: pick(random, [undefined, random() * 360]),
+        paused: pick(random, [undefined, undefined, undefined, undefined, true]), modal: pick(random, [undefined, undefined, undefined, undefined, true]),
+        imaging: pick(random, [undefined, undefined, {mode: 'scribbler', profile: 'survey'}, {mode: 'painter', profile: 'detail'}]), lampInView: pick(random, [undefined, null, before.ships[0]?.id, before.ships[1]?.id]),});
       steps.push({args: [JSON.parse(save(before)), dt, input], expected: ticked(before, dt, input)});
       w = before;
     }
   }
   assert.ok(steps.some(s => s.expected.length > 4) && steps.some(s => s.expected.some(t => t.replay.length)), 'frames of many ticks, and replay marks');
+  for (const key of ['paused', 'modal', 'imaging', 'lampInView']) assert.ok(steps.some(s => s.args[2][key]), 'frames sent ' + key);
+  assert.ok(steps.some(s => s.args[1] > 60 && s.expected.length === 240), 'a frame held to a minute');
   for (const kind of kinds) assert.ok(acts.some(a => a.args[1].kind === kind), 'each action taken: ' + kind);
   assert.ok(acts.some(a => a.expected.result === true) && acts.some(a => a.expected.result === false), 'actions both taken and refused');
   sameResults(await elm('sim.step', steps.map(s => s.args)), steps.map(s => s.expected));
@@ -115,6 +119,11 @@ test('each action completed matches the TypeScript', async () => {
       Object.assign(w, {heading: 0, targetHeading: 0, speed: 0, targetSpeed: 0, depth: 10, targetDepth: 10, scope: true, photoCooldown: 0, photos: []});
       Object.assign(w.ships.find(v => v.kind === 'merchant' && !v.incidental), at(w, 800, 2), {speed: 0});
     }, {kind: 'photograph', look: 0}, true],
+    ['a merchant at the reticle\'s edge', 'recon', {timeOfDay: 'day', weather: 'clear', changing: false}, w => {
+      Object.assign(w, {heading: 0, targetHeading: 0, speed: 0, targetSpeed: 0, depth: 10, targetDepth: 10, scope: true, photoCooldown: 0, photos: []});
+      Object.assign(w.ships.find(v => v.kind === 'merchant' && !v.incidental), at(w, 800, -4.8), {speed: 0});
+    }, {kind: 'photograph', look: 0}, true],
+    ['a rescue ended with crew aboard', 'surface-rescue', {}, w => { pickup(w).operation.rescued = 2; }, {kind: 'endPatrolEarly'}, 'partial'],
     ['a rescue begun below', 'undersea-rescue', {}, w => { w.ships = []; Object.assign(w, {x: w.site.x + 48, y: w.site.y, depth: w.site.depth - 25, speed: 0, targetSpeed: 3, route: {x: 0, y: 0}}); }, {kind: 'startRescue'}, true],
     ['a rescue begun on the surface', 'surface-rescue', {}, w => { w.ships = []; Object.assign(w, {x: w.site.x + 48, y: w.site.y, depth: 6, speed: 0, targetSpeed: 3, route: {x: 0, y: 0}}); }, {kind: 'startRescue'}, true],
     ['a survey photograph', 'survey', {}, w => {
