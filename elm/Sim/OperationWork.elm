@@ -1,4 +1,4 @@
-module Sim.OperationWork exposing (Photographing, Working, dronePhotograph, updateOperation)
+module Sim.OperationWork exposing (Photographing, Working, dronePhotograph, updateOperation, updateRescue, updateSurvey)
 
 {-| An operation's work each tick: a survey scanning the wreck from a slow
 pass, a rescue assessing, transferring survivors and recovering its team

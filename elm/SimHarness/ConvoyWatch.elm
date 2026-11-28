@@ -1,4 +1,4 @@
-module SimHarness.ConvoyWatch exposing (function)
+module SimHarness.ConvoyWatch exposing (encodeConvoy, function)
 
 {-| Harness entries for the wolf in the henhouse and the allied lamp watch:
 the convoy's setup, its lamp, the hunter's raid, the escort's charges, and
@@ -13,7 +13,7 @@ import Sim.AlliedWatch as AlliedWatch
 import Sim.Contact as Contact
 import Sim.ContactReports as ContactReports
 import Sim.ConvoySaves as ConvoySaves exposing (StationMessage(..))
-import Sim.ConvoyWatch as ConvoyWatch exposing (Observation)
+import Sim.ConvoyWatch as ConvoyWatch exposing (Convoy, Observation)
 import Sim.Environment as Env
 import Sim.Ship as Ship
 import SimHarness.Codec exposing (arg)
@@ -58,17 +58,7 @@ encodeWorld s =
                ]
             ++ (case s.convoy of
                     Just c ->
-                        [ ( "convoy"
-                          , E.object
-                                [ ( "message", nullable (Lamp.encodeTransmission Lamp.encodeEstimate) c.message )
-                                , ( "pin", nullable Lamp.encodeEstimate c.pin )
-                                , ( "number", E.float c.number )
-                                , ( "round", E.int c.round )
-                                , ( "next", E.float c.next )
-                                , ( "shot", nullable encodeVolley c.shot )
-                                ]
-                          )
-                        ]
+                        [ ( "convoy", encodeConvoy c ) ]
 
                     Nothing ->
                         []
@@ -81,6 +71,20 @@ encodeWorld s =
                         []
                )
         )
+
+
+{-| The convoy as a save writes it.
+-}
+encodeConvoy : Convoy -> E.Value
+encodeConvoy c =
+    E.object
+        [ ( "message", nullable (Lamp.encodeTransmission Lamp.encodeEstimate) c.message )
+        , ( "pin", nullable Lamp.encodeEstimate c.pin )
+        , ( "number", E.float c.number )
+        , ( "round", E.int c.round )
+        , ( "next", E.float c.next )
+        , ( "shot", nullable encodeVolley c.shot )
+        ]
 
 
 {-| The functions this module answers for, by the TypeScript name each replaces.

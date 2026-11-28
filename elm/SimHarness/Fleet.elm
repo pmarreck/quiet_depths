@@ -1,4 +1,4 @@
-module SimHarness.Fleet exposing (battle, encodeVolley, function, optional, shots, volley)
+module SimHarness.Fleet exposing (battle, encodeBattle, encodeVolley, function, optional, shots, volley)
 
 {-| Harness entries for the fleet action: its stage, its battle, its volleys
 and its save validation.

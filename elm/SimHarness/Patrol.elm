@@ -23,6 +23,7 @@ import Sim.InvalidNumber exposing (InvalidNumber)
 import Sim.Mechanics as Mechanics exposing (LogEntry)
 import Sim.Operation as Operation exposing (Operation)
 import Sim.Ordnance exposing (Blast, Round)
+import Sim.PatrolPhase as PatrolPhase exposing (Phase)
 import Sim.PatrolReports exposing (Report)
 import Sim.PatrolSearch exposing (SearchArea)
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
@@ -111,7 +112,7 @@ type alias Patrol =
     , replay : List Replay.Marked
     , invalid : List InvalidNumber
     , mission : Mission
-    , patrol : { seed : Float, photoGoal : Float }
+    , patrol : { seed : Float, startingTorpedoes : Int, photoGoal : Float, trackGoal : Float, variant : Int }
     , runSetting : Float
     , projectiles : List Torpedo
     , aircraft : List Aircraft
@@ -141,6 +142,9 @@ type alias Patrol =
     , route : Maybe { x : Float, y : Float, radius : Maybe Float }
     , home : { x : Float, y : Float }
     , environment : Env.Config
+    , phase : Phase
+    , departure : Maybe { x : Float, y : Float }
+    , trackTime : Float
     }
 
 
@@ -314,7 +318,7 @@ decoder =
                                 |> andMap (D.succeed [])
                                 |> andMap (D.succeed [])
                                 |> andMap (D.field "mission" (D.string |> D.andThen (\id -> PatrolMission.fromId id |> Maybe.map D.succeed |> Maybe.withDefault (D.fail ("unknown mission: " ++ id)))))
-                                |> andMap (D.map2 (\seed goal -> { seed = seed, photoGoal = goal }) (D.at [ "patrol", "seed" ] D.float) (D.at [ "patrol", "photoGoal" ] D.float))
+                                |> andMap (D.field "patrol" (D.map5 (\seed torpedoes photoGoal trackGoal variant -> { seed = seed, startingTorpedoes = torpedoes, photoGoal = photoGoal, trackGoal = trackGoal, variant = variant }) (D.field "seed" D.float) (D.field "startingTorpedoes" D.int) (D.field "photoGoal" D.float) (D.field "trackGoal" D.float) (D.field "variant" D.int)))
                                 |> andMap (D.field "runSetting" D.float)
                                 |> andMap (D.field "projectiles" (D.list torpedo))
                                 |> andMap (D.field "aircraft" (D.list aircraft))
@@ -344,6 +348,9 @@ decoder =
                                 |> andMap (optional "route" (D.nullable route) |> D.map (Maybe.andThen identity))
                                 |> andMap (D.field "home" point)
                                 |> andMap (D.field "environment" World.config)
+                                |> andMap (D.field "phase" phase)
+                                |> andMap (optional "departure" point)
+                                |> andMap (D.field "trackTime" D.float)
                         )
             )
 
@@ -522,3 +529,17 @@ route =
 point : D.Decoder { x : Float, y : Float }
 point =
     D.map2 (\x y -> { x = x, y = y }) (D.field "x" D.float) (D.field "y" D.float)
+
+
+phase : D.Decoder Phase
+phase =
+    D.string
+        |> D.andThen
+            (\name ->
+                case List.filter (\p -> PatrolPhase.phaseName p == name) PatrolPhase.phases of
+                    p :: _ ->
+                        D.succeed p
+
+                    [] ->
+                        D.fail ("no patrol phase is " ++ name)
+            )

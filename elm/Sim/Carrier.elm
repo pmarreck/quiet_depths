@@ -1,4 +1,4 @@
-module Sim.Carrier exposing (Carrier, advanceCarrierFlood, carrierDescentFactor, carrierDoomed, carrierId, carrierSize, incidentalHull, registerCarrierHit, validCarrier)
+module Sim.Carrier exposing (Carrier, advanceCarrierFlood, carrierDescentFactor, carrierDoomed, carrierGroup, carrierId, carrierSize, incidentalHull, registerCarrierHit, validCarrier)
 
 {-| The fleet carrier of the carrier hunt: how direct hits doom her, how she
 floods and settles, and the floor other damage cannot push her below until
@@ -9,12 +9,42 @@ renderer's.
 
 import PatrolMission
 import Sim.Math as M
+import Sim.Ship as Ship exposing (Ship)
 import Sim.Vessel exposing (Kind(..), SurfaceShip(..))
 
 
 carrierId : String
 carrierId =
     "solstice"
+
+
+{-| The fleet carrier Solstice and her escorts, Kestrel and Gull, with Petrel
+when the patrol rolls a third escort; the carrier carries one to three
+fighters.
+-}
+carrierGroup : Float -> Float -> Float -> Float -> Bool -> Float -> List Ship
+carrierGroup x y heading speed extraEscort fighterRoll =
+    let
+        ship : String -> String -> Kind -> Float -> Float -> Ship
+        ship id name kind dx dy =
+            Ship.fresh { id = id, name = name, kind = kind, x = x + dx, y = y + dy, heading = heading, speed = speed }
+                |> (\v -> { v | military = Just True, flood = Just 0, disabled = Just False, sinkDepth = Just 0 })
+
+        carrier : Ship
+        carrier =
+            ship carrierId "Fleet carrier Solstice" (Surface Carrier) 0 0
+
+        escorts : List Ship
+        escorts =
+            [ ship "kestrel" "Kestrel" (Surface Escort) -460 210, ship "gull" "Gull" (Surface Escort) 320 -530 ]
+                ++ (if extraEscort then
+                        [ ship "petrel" "Petrel" (Surface Escort) 510 380 ]
+
+                    else
+                        []
+                   )
+    in
+    { carrier | directHits = Just 0, fighterCount = Just (toFloat (1 + floor (fighterRoll * 3))) } :: escorts
 
 
 carrierSize : { halfLength : Float, halfBeam : Float, deckHeight : Float }

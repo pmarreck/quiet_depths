@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/Missions.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {recordLocalLaunch} from './mess-watch.ts';
 import {carrierGroup} from './carrier.ts';
 import {setupHenhouse} from './convoy-watch.ts';
