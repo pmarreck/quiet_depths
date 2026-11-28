@@ -109,7 +109,7 @@
           tsc --project tsconfig.json --noEmit false --outDir "$TMPDIR/typed-game"
           tsc --project tsconfig.worker.json --noEmit false --outDir "$TMPDIR/typed-worker"
           cp "$TMPDIR/typed-game/"*.js src/
-          elm make elm/MissionPicker.elm elm/SonarTabs.elm elm/EngineTelegraph.elm elm/HelmCompass.elm elm/HelmPropulsion.elm elm/HelmAxis.elm elm/Soundings.elm elm/BoatCondition.elm elm/DroneBay.elm elm/StationStrip.elm elm/HelmCaption.elm elm/CaptainsLog.elm elm/MissionBlock.elm elm/OperationCard.elm elm/FooterStatus.elm elm/ResourcePanel.elm elm/TorpedoControl.elm elm/GunControl.elm elm/ContactsPanel.elm elm/ViewHeader.elm elm/ViewHints.elm elm/EndMission.elm --optimize --output=mission-picker.js
+          elm make elm/MissionPicker.elm elm/SonarTabs.elm elm/EngineTelegraph.elm elm/HelmCompass.elm elm/HelmPropulsion.elm elm/HelmAxis.elm elm/Soundings.elm elm/BoatCondition.elm elm/DroneBay.elm elm/StationStrip.elm elm/HelmCaption.elm elm/CaptainsLog.elm elm/MissionBlock.elm elm/OperationCard.elm elm/FooterStatus.elm elm/ResourcePanel.elm elm/TorpedoControl.elm elm/GunControl.elm elm/ContactsPanel.elm elm/ViewHeader.elm elm/ViewHints.elm elm/TimeControls.elm elm/EndMission.elm --optimize --output=mission-picker.js
           node scripts/build-sim-worker.mjs sim-worker.js
           runHook postBuild
         '';

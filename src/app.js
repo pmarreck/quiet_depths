@@ -105,11 +105,10 @@ const sound=new SoundSystem(()=>state,context,status=>{
  if(status.last){el.dataset.lastAcoustic=status.last.type;el.dataset.lastDelay=status.last.delay.toFixed(3);el.dataset.lastGain=(status.last.currentGain??status.last.gain).toFixed(4);el.dataset.lastCutoff=(status.last.currentCutoff??status.last.cutoff).toFixed(0);}else{for(const key of ['lastAcoustic','lastDelay','lastGain','lastCutoff'])delete el.dataset[key];}
 });
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
-let saveStatusTimer,saveWarning='';
+let saveStatusTimer,saveWarning='',saveStatus='LOCAL AUTOSAVE',timeHandled=0;
 function persist(){
  if(!patrolStarted||installingBackup)return;
  library=photoArchive(state);
- const status=$('save-status');
  clearTimeout(saveStatusTimer);
  let warning='';
  try{
@@ -118,8 +117,8 @@ function persist(){
   else if(!photosSaved)warning='Photos could not be saved.';
   else if(!recordSaved)warning='Service record could not be saved.';
  }catch{warning='Patrol progress could not be saved.';}
- status.textContent=warning||'PATROL SAVED';
- if(!warning)saveStatusTimer=setTimeout(()=>status.textContent='LOCAL AUTOSAVE',1400);
+ saveStatus=warning||'PATROL SAVED';sendTime();
+ if(!warning)saveStatusTimer=setTimeout(()=>{saveStatus='LOCAL AUTOSAVE';sendTime();},1400);
  if(warning&&warning!==saveWarning)toast(warning);
  saveWarning=warning;
 }
@@ -142,7 +141,9 @@ function bindOrderRange(id,axisForInput){
  },pilotEnabled);
 }
 function closeDrawer(){drawer=null;document.body.removeAttribute('data-drawer');$('drawer-backdrop').classList.add('hidden');all('[data-panel]').forEach(b=>b.setAttribute('aria-expanded','false'));}
-function setRate(r){rate=r;all('[data-time]').forEach(b=>b.classList.toggle('active',+b.dataset.time===r));$('mobile-time').textContent=r+'×';$('mobile-time').setAttribute('aria-label','Time compression '+r+' times');}
+function setRate(r){rate=r;$('mobile-time').classList.toggle('active',r===1);$('mobile-time').textContent=r+'×';$('mobile-time').setAttribute('aria-label','Time compression '+r+' times');sendTime();}
+// The Elm time controls show the rate, whether it may change now, and the autosave.
+function sendTime(){timeControls.ports.timeReading.send({rate,enabled:canIssue(state,context()),save:saveStatus,handled:timeHandled});}
 function setPaused(p){paused=p;held.clear();drag=null;document.body.classList.toggle('paused',p);$('pause').setAttribute('aria-label',p?'Resume patrol':'Pause patrol');updateUI();sound.update();persist();}
 function setView(v){if(v==='drone'&&!state.difficulty.drone)return;zooms[view]=zoom;zoom=zooms[v]||1;orderAxis=null;$('order-sheet').classList.add('hidden');if(v==='scope'&&state.systems.periscope===0)v='tower';view=v;document.body.classList.toggle('orbiting',v==='orbit');held.clear();drag=null;closeDrawer();all('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===v);b.setAttribute('aria-pressed',b.dataset.view===v);});updateUI();sound.update();}
 function changeOrbit(){
@@ -282,6 +283,8 @@ const torpedoControl=globalThis.Elm.TorpedoControl.init({node:$('torpedo-control
 const gunControl=globalThis.Elm.GunControl.init({node:$('gun-control-root')});
 const contactsPanel=globalThis.Elm.ContactsPanel.init({node:$('contacts-panel-root')});
 const viewHeader=globalThis.Elm.ViewHeader.init({node:$('view-header-root')}),viewHints=globalThis.Elm.ViewHints.init({node:$('view-hints-root')});
+const timeControls=globalThis.Elm.TimeControls.init({node:$('time-controls-root')});
+timeControls.ports.timeOrder.subscribe(({rate:chosen,seq})=>{timeHandled=Math.max(timeHandled,seq);if(view!=='orbit'&&canIssue(state,context()))setRate(chosen);sendTime();updateUI();});
 const endMission=globalThis.Elm.EndMission.init({node:$('end-mission-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
@@ -485,7 +488,7 @@ $('choose-mission').onclick=openBriefing;
 $('another-patrol').onclick=()=>{$('result-dialog').close();openBriefing();};
 $('sound').onclick=()=>{sound.toggle();renderSound();};$('pause').onclick=()=>setPaused(!paused);$('guide').onclick=()=>{held.clear();$('help-dialog').showModal();updateUI();};$('close-help').onclick=()=>{$('help-dialog').close();updateUI();};$('new-patrol').onclick=()=>{$('help-dialog').close();openBriefing();};document.querySelector('.brand').onclick=e=>{e.preventDefault();openBriefing();};
 all('dialog').forEach(d=>d.addEventListener('close',()=>{held.clear();updateUI();}));
-all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-time]').forEach(b=>bindCommand(b,'click',()=>setRate(b.id==='mobile-time'?(rate===1?5:rate===5?20:1):+b.dataset.time)));
+all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));bindCommand('mobile-time','click',()=>setRate(rate===1?5:rate===5?20:1));
 $('open-orbit').onclick=changeOrbit;$('orbit-exit').onclick=changeOrbit;$('orbit-pause').onclick=()=>setPaused(!paused);
 $('torpedo-cam').onclick=e=>{const b=e.target.closest('[data-follow]');if(b)followDigit(Number(b.dataset.follow));};
 $('orbit-in').onclick=()=>zoomOrbit(1/1.2);$('orbit-out').onclick=()=>zoomOrbit(1.2);
@@ -908,6 +911,7 @@ function updateUI(){
  updateExtras(s,env,v);
  $('viewport').dataset.paused=String(paused);$('viewport').dataset.station=view;
  for(const {el,enabled} of commandControls)el.disabled=!canIssue(s,context())||!enabled();
+ sendTime();
  all('[data-key]').forEach(b=>{b.disabled=!canIssue(s,context())||(b.dataset.key==='KeyJ'?view!=='gun'||!active||s.gun.ammo<=0||!operatingFraction(s.systems.deckgun):!pilotEnabled());if(b.disabled||!keys.has(b.dataset.key))b.classList.remove('held');});
 }
 
