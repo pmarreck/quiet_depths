@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Convoy and allied lamp watch (188 lines, three Elm modules) | about 30 min | matched once the test dropped a bookkeeping flag; 58 of 58 mutants killed |
 | Contact reports, ping and photographs (114 lines, two Elm modules) | about 25 min | matched once the test passed both languages the same look; a restore gap fixed first; 52 of 52 mutants killed |
 | Orbital reconnaissance (196 lines, three Elm modules) | about 20 min after the TypeScript fix | matched on the first comparison; save checks tightened in the TypeScript first; 69 of 74 mutants killed, the other five equivalent |
 | Combat (209 lines, four Elm modules) | not measured (written across a context break) | matched once the test stated the one deliberate difference (a player torpedo's launcher and aim); two TypeScript save checks fixed first; 61 of 62 mutants killed, the last equivalent |
@@ -742,3 +743,27 @@ to 1.5 km off, torpedoes 5 to 6 km away, fleet volleys in flight near the
 ping's reach, a disabled opponent in earshot, a contact already holding a
 guess at its side, or an incidental merchant in the reticle. Wider inputs
 and constructed photographs now kill all 52.
+
+## The wolf in the henhouse and the allied lamp watch ported (2026-11-28)
+
+`convoy-watch.ts` (188 code lines) became `Sim.ConvoyWatch` (the convoy's
+setup, its lamp, the hunter's raid and the escort's charges),
+`Sim.AlliedWatch` (friendly ships signaling fixes) and `Sim.ConvoySaves`
+(the save checks and the station lamp's message), at `9a4d11b`, about 30
+minutes after the contacts commit. It matched once the test stopped
+carrying a bookkeeping flag on blasts into its inputs. The escort's charge
+is marked by the id the drop returns rather than by counting back from the
+sound sequence, which the first draft did.
+
+Mutation testing killed 34 of 58 mutants at first. The played henhouse never
+hailed from between 1 and 2 m, from the edges of the hail's reach by day or
+night, copied at the edges of scope or tower depth, the lamp's range or with
+a damaged periscope, met a torpedo arriving on the tick or at a sunk ship, a
+disabled escort, or a charge at the edge of reach or odds; the allied watch
+never swept near its reach, offered a fix near its freshness limit, held an
+uncopied message near three minutes, waited for the convoy's own report, or
+began fresh; and one random breaker per save left most save checks unmet. A
+constructed-edges test and every breaker on every save now kill all 58. Its
+first fix cases were dead on arrival: at time zero a 42-second-old fix is
+older than a fresh watch's last issue, so the quiet chart now starts ten
+minutes in, and the test asserts that fixes are issued.
