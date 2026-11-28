@@ -299,17 +299,18 @@ test('the tick\'s thresholds and rarer branches match the TypeScript', async () 
   assert.ok(last('second sweep').contacts.some(c => c.sweepArea), 'a second sweep within two minutes marks its square');
 
   // A passing sub and escort square off within the boat's hearing, on an
-  // ordinary day and on Christmas.
+  // ordinary day and on Christmas. Traffic draws its odds from each ship's
+  // id; this sub challenges in its first turns, 5.3 km from the boat.
   const passing = (w, day) => {
     if (day !== undefined) w.environment.startDay = day;
     const [a, b] = merchants(w);
     clear(w, [a, b]);
     deep(w);
-    Object.assign(a, at(w, 5300, 90), {id: 'passage-1-0-0', incidental: true, side: 'hostile', kind: 'sub', military: true, depth: 20, speed: 3});
-    Object.assign(b, {x: a.x, y: a.y + 1500, id: 'passage-1-0-1', incidental: true, side: 'friendly', kind: 'escort', military: true, speed: 3});
+    Object.assign(a, at(w, 5300, 90), {id: 'passage-1-1-2', incidental: true, side: 'hostile', kind: 'sub', military: true, depth: 20, speed: 3});
+    Object.assign(b, {x: a.x, y: a.y + 1500, id: 'passage-1-2-2', incidental: true, side: 'friendly', kind: 'escort', military: true, speed: 3});
   };
   play('challenge ping', 'recon', {}, w => passing(w), Array.from({length: 10}, () => [30, {}]));
-  assert.ok(heard('Challenge ping heard'), 'a passing sub challenged within hearing');
+  assert.ok(named('challenge ping').some(c => c.expected.world.acoustics.some(e => e.warning && e.vessel === 'passage-1-1-2')), 'a passing sub challenged within hearing');
   play('holiday traffic', 'recon', {}, w => passing(w, 359), Array.from({length: 10}, () => [30, {}]));
   assert.ok(named('holiday traffic').every(c => environmentAt(c.prior).holiday === 'christmas') && named('holiday traffic').some(c => c.expected.world.ships.some(v => v.parley)), 'traffic squares off on Christmas');
 

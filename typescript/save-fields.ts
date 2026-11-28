@@ -1,9 +1,11 @@
+// Mirrored in elm/Sim/WorldDecoder.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // The fields each record in a saved patrol may hold beyond those restore
 // checks one by one, and the type each must have when present. A save holding
 // anything else is refused, so the simulation never meets a field of the
 // wrong type: a switch that is text, a number that is a list, a record that
-// is null. elm/Sim/PatrolRestore.elm decodes the same records with the same
-// types; tests/sim-patrol-restore.test.mjs holds them equal.
+// is null. The world decoder and the record decoders it composes (ship,
+// contact, sound, ordnance) hold the same fields to the same types;
+// tests/sim-patrol-restore.test.mjs holds the two restores equal.
 
 type FieldType = 'number' | 'integer' | 'boolean' | 'string' | 'record' | readonly (string | null)[];
 type Fields = Readonly<Record<string, FieldType>>;
