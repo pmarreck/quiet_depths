@@ -222,3 +222,39 @@ Impossible by construction, by stage:
 
 The invalid-number reports stay as tripwires until then: tests throw, play
 warns in the console.
+
+### Total arithmetic: the owner's proposal and its consequences (2026-11-27 20:00)
+
+Peter proposed: 0 divided by anything is 0; anything else divided by 0 is
+divided by the smallest representable number instead; ±Infinity becomes
+±MAX (1.7976931348623157e308). Consequences, as analyzed:
+
+- The smallest double is 5e-324, and x / 5e-324 overflows for any |x| above
+  8.9e-16, so with the third rule x/0 is ±MAX. His literal 1e-20 would give
+  x × 1e20 instead (5/0 = 5e20): finite and proportional. The two need a
+  choice.
+- Gains: division never yields NaN or infinity; Infinity − Infinity and
+  0 × Infinity vanish with the infinities (MAX − MAX = 0, MAX × 0 = 0);
+  comparisons still order a/0 above everything, so the three ±Infinity
+  starting values (hull-contact floor, wake leading edge, propeller sigma)
+  keep working as ±MAX.
+- Still NaN: sqrt, log, acos and asin outside their domains and negative
+  bases to fractional powers; log(0) gives −Infinity. Each needs a rule.
+- MAX + MAX overflows, so a guarantee needs a finite check after every
+  operation once MAX can appear: a branch per operation (unmeasured).
+- A divide-by-zero bug yields a plausible clamped value (collision severity
+  saturates at its maximum) instead of a visible NaN, so every coercion
+  should still be reported.
+- One global rule is right at some sites (time to arrive at zero speed: MAX,
+  "never"; a zero-length flight: progress 1, "arrived") and wrong at others
+  (normalizing a zero vector flings it to ±MAX), so those keep explicit
+  guards.
+- The GPU and Web Audio use float32 (largest 3.4e38): MAX becomes Infinity
+  there, so values leaving the simulation need clamping to each consumer.
+- JSON stores MAX (where Infinity became null and failed restore), so a
+  corrupted MAX survives save and restore unless fields are range-checked.
+- Until the switch the helpers exist in both languages; only Elm can enforce
+  their use.
+- Precedent for the alternative x/0 = 0: Lean, Isabelle, Pony's integers and
+  Elm's own `//`. It never creates huge values (no overflow checks), but
+  says "now" where the limit says "never".
