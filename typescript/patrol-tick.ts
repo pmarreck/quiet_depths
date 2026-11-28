@@ -153,7 +153,6 @@ function tick(s: World, dt: number, input: StepInput) {
   if (s.scopeSteerBearing !== null) { s.scopeAngle = (s.scopeSteerBearing - s.heading + 360) % 360; if (Math.abs(delta(s.scopeSteerBearing, s.heading)) < .1) { s.scopeAngle = 0; s.scopeSteerBearing = null; } }
   // Suppress repeated damage log spam while retaining actual damage.
   if (s.events.length > 1 && s.events[0].text === s.events[1].text) s.events.splice(1, 1);
-  if (s.hull <= 0) s.status = 'lost';
   const scan = input.imaging;
   const scribbler = s.imagers.scribbler ?? (scan?.mode === 'scribbler' ? scan.profile : null);
   const painter = s.imagers.painter ?? (scan?.mode === 'painter' ? scan.profile : null);

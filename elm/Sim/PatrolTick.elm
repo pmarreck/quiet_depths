@@ -373,7 +373,7 @@ recon dt s =
 
         s1 : World
         s1 =
-            { s | recon = Maybe.withDefault s.recon passed.recon, ships = passed.ships }
+            { s | recon = Maybe.withDefault s.recon passed.recon }
     in
     case packet |> Maybe.andThen (\p -> TrackEstimates.applyReconPacket (estimates p) s1 |> Maybe.map (Tuple.pair p)) of
         Just ( p, applied ) ->
@@ -393,13 +393,6 @@ afloat dt input env diesel ( approaching, formationTravel ) s0 =
             { s0 | wake = SurfaceWake.recordWake s0 env s0.wake }
                 |> steerScope
                 |> dropRepeat
-                |> (\s ->
-                        if s.hull <= 0 then
-                            { s | status = Lost }
-
-                        else
-                            s
-                   )
 
         scribbler : Maybe Profile
         scribbler =
