@@ -874,6 +874,15 @@ warnings, which the tick calls, are tested directly with earlier warnings
 standing, since creation only ever starts without them. One test assertion
 first read the oldest log entries: the log keeps its newest first.
 
+Mutation testing killed 35 of 40 creation mutants; the other five are
+equivalent. Three change starting values the mission layout always
+overwrites (the Cobalt's starting position, the boat's heading, the
+extraction point); one drops the watch's check for an earlier battery
+warning, which is redundant since with none the earlier level reads as
+zero and no level is lower; and one changes the long patrol's heading for
+fleets whose patrol areas share an x coordinate, which never happens, since
+the fleet action's two areas always lie 1,080 m apart east to west.
+
 ## Restore and save (plan, 2026-11-28)
 
 `restore` (about 230 code lines with the mission target checks) parses a
