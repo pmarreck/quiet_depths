@@ -98,7 +98,8 @@ export function restoreTorpedo(s: CombatWorld, input: unknown): boolean {
     path: [{x: p.x, y: p.y, depth, time: s.time}], ...torpedoOrders(s, p.id, p.heading, depth)})) if (fields[k] === undefined) fields[k] = v;
   const decoy = p.decoyTarget as Record<string, unknown> | null;
   return Number.isFinite(p.runLimit) && p.runLimit >= 100 && p.runLimit <= MAX_RUN && Number.isFinite(p.traveled) && p.traveled >= 0 && p.traveled <= p.runLimit &&
-    Number.isSafeInteger(p.id) && ['depth', 'pingAge', 'orderedHeading', 'orderedDepth', 'pitch', 'searchAge', 'runOut'].every(k => Number.isFinite(fields[k])) && p.runOut >= 0 &&
+    Number.isSafeInteger(p.id) && (p.intended === null || typeof p.intended === 'string') && (p.lock === null || typeof p.lock === 'string') &&
+    ['depth', 'pingAge', 'orderedHeading', 'orderedDepth', 'pitch', 'searchAge', 'runOut'].every(k => Number.isFinite(fields[k])) && p.runOut >= 0 &&
     (p.owner === 'player' || p.owner === 'enemy' && (p.launcher === null || typeof p.launcher === 'string') &&
       (p.aim === null || !!p.aim && Number.isFinite(p.aim.x) && Number.isFinite(p.aim.y))) &&
     [-1, 1].includes(p.searchDirection) && [-1, 0, 1].includes(p.tubeSide) && typeof p.diverted === 'boolean' &&
