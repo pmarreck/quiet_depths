@@ -1,4 +1,4 @@
-module Sim.Systems exposing (Difficulty, Impact, World, addDebrief, bottom, damageScale, damageSystem, draw, emitSound, hullOf, hurt, onboardExplosion)
+module Sim.Systems exposing (Difficulty, Emission, Impact, Sounding, World, addDebrief, bottom, damageScale, damageSystem, draw, emit, emitSound, hullOf, hurt, onboardExplosion)
 
 {-| Damage to the boat: its systems, its hulls, and onboard explosions. The
 drone's orders and damage are in `Sim.DroneOrders`, the boat's per-tick motion
@@ -24,7 +24,7 @@ import Sim.SurfaceMotion exposing (Point)
 
 
 type alias Difficulty =
-    { drone : Maybe Bool, damage : Maybe Float }
+    { drone : Maybe Bool, damage : Maybe Float, pursuit : Maybe Float, depthStealth : Maybe Float, detection : Maybe Float }
 
 
 type alias Impact =
@@ -93,7 +93,7 @@ bottom s =
     Coast.chartDepth s.chart
 
 
-addDebrief : String -> World w -> World w
+addDebrief : String -> { s | time : Float, debrief : List Debrief.Entry } -> { s | time : Float, debrief : List Debrief.Entry }
 addDebrief text s =
     { s | debrief = Debrief.add s.time text s.debrief }
 
@@ -198,7 +198,7 @@ sectionName section =
             "STERN"
 
 
-draw : World w -> ( Float, World w )
+draw : { s | rng : Int } -> ( Float, { s | rng : Int } )
 draw s =
     let
         ( r, rng ) =
@@ -344,15 +344,31 @@ onboardExplosion kind at s =
             )
 
 
+{-| A sound made in the water or the air: where, how high or deep, and how
+loud. A power that is not a finite, non-negative number is reported.
+-}
+type alias Emission =
+    { kind : Acoustics.Kind, x : Float, y : Float, depth : Maybe Float, altitude : Maybe Float, power : Float }
+
+
+type alias Sounding s =
+    { s | time : Float, soundSequence : Int, acoustics : List Sound, invalid : List InvalidNumber }
+
+
 {-| A sound at a point, appended to the patrol's acoustic history.
 -}
-emitSound : Acoustics.Kind -> Point -> Float -> World w -> World w
-emitSound kind at power start =
+emitSound : Acoustics.Kind -> Point -> Float -> Sounding s -> Sounding s
+emitSound kind at power =
+    emit { kind = kind, x = at.x, y = at.y, depth = Just at.depth, altitude = Nothing, power = power }
+
+
+emit : Emission -> Sounding s -> Sounding s
+emit e start =
     let
-        s : World w
+        s : Sounding s
         s =
-            if isNaN power || isInfinite power || power < 0 then
-                InvalidNumber.report "emitSound power" power start
+            if isNaN e.power || isInfinite e.power || e.power < 0 then
+                InvalidNumber.report "emitSound power" e.power start
 
             else
                 start
@@ -361,13 +377,13 @@ emitSound kind at power start =
         sound =
             { id = s.soundSequence
             , time = s.time
-            , kind = kind
-            , x = at.x
-            , y = at.y
-            , power = Just power
+            , kind = e.kind
+            , x = e.x
+            , y = e.y
+            , power = Just e.power
             , heard = False
-            , depth = Just at.depth
-            , altitude = Nothing
+            , depth = e.depth
+            , altitude = e.altitude
             , heardAt = Nothing
             , perceived = Nothing
             , vessel = Nothing

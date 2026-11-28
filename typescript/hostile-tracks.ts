@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/HostileTracks.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its reports, projection, scatter and search time are elm/Sim/HunterReports.elm.
 import {exp} from './sim-math.ts';
 import {scopeExtension} from './periscope.ts';
 import {searchSeconds} from './suspicion.ts';
