@@ -279,6 +279,7 @@ const operationCard=globalThis.Elm.OperationCard.init({node:$('operation-card-ro
 const footerStatus=globalThis.Elm.FooterStatus.init({node:$('footer-status-root')});
 const resourcePanel=globalThis.Elm.ResourcePanel.init({node:$('resources-root')});
 const torpedoControl=globalThis.Elm.TorpedoControl.init({node:$('torpedo-control-root'),flags:{maxRun:MAX_RUN}});
+const gunControl=globalThis.Elm.GunControl.init({node:$('gun-control-root')});
 const endMission=globalThis.Elm.EndMission.init({node:$('end-mission-root')});
 // Damage control from the Elm boat panel, checked as the button's clicks were.
 boatCondition.ports.boatOrder.subscribe(kind=>{
@@ -504,8 +505,7 @@ function silent(forceBoat=false){if(!canIssue(state,context())||view==='drone'&&
 $('scope-align-toggle').onclick=()=>{const open=$('scope-alignment').classList.toggle('open');$('scope-align-toggle').setAttribute('aria-expanded',String(open));};
 bindCommand('center-scope','click',()=>{alignScope(state,context(),'center');$('scope-alignment').classList.remove('open');$('scope-align-toggle').setAttribute('aria-expanded','false');},()=>feedActive(state,'scope'));
 bindCommand('steer-scope','click',()=>{alignScope(state,context(),'helm-to-scope');$('scope-alignment').classList.remove('open');$('scope-align-toggle').setAttribute('aria-expanded','false');},()=>feedActive(state,'scope'));
-bindCommand('open-gun','click',()=>setView('gun'));
-bindCommand('aim-gun','click',()=>{const id=$('gun-target').value,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range){const e=estimateAt(c,state.time);aimGunAt(state,{x:e.x,y:e.y,vx:c.fix?.vx||0,vy:c.fix?.vy||0,altitude:2});}},()=>view==='gun'&&feedActive(state,'gun')&&!!$('gun-target').value);
+bindCommand('aim-gun','click',()=>{const id=gunTarget,c=state.contacts.find(c=>c.id===id),air=state.aircraft.find(p=>p.id===id);if(air&&visualAircraft().some(v=>v.id===id)){aimGunAt(state,{...air,vx:Math.sin(rad(air.heading))*air.speed,vy:Math.cos(rad(air.heading))*air.speed});return;}if(c?.range){const e=estimateAt(c,state.time);aimGunAt(state,{x:e.x,y:e.y,vx:c.fix?.vx||0,vy:c.fix?.vy||0,altitude:2});}},()=>view==='gun'&&feedActive(state,'gun')&&!!gunTarget);
 bindCommand('scope-toggle','click',scopeToggle,()=>operatingFraction(state.systems.periscope)>0);bindCommand('photo','click',takePhoto,()=>feedActive(state,'scope')&&state.photoCooldown===0&&!scopeWashed(state));bindCommand('ping','click',doPing,()=>state.pingCooldown===0&&operatingFraction(state.systems.sonar)>0);
 function routeDieselPower(mode){
  if(!isDieselMode(mode))return;
@@ -541,7 +541,21 @@ function assignDamageControl(){
  state.repair=120;log(state,'Damage control assigned. Sealing leaks, restoring equipment and pumping the bilge.');
  toast('Damage control working for 2 minutes. Uses battery.');
 }
-bindCommand('decoy','click',()=>decoy(state).then(away=>{if(away){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}}),()=>state.decoys>0);
+// The Elm deck gun panel sends orders; the visual target is the page's own
+// choice, which the gun sight's aim command reads, and the rest are checked
+// against the moment they arrive.
+let gunTarget='',gunHandled=0;
+const gunOrders={
+ open:{enabled:()=>true,run:()=>setView('gun')},
+ decoy:{enabled:()=>state.decoys>0,run:()=>decoy(state).then(away=>{if(away){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}})},
+};
+gunControl.ports.gunOrder.subscribe(({kind,target,seq})=>{
+ gunHandled=Math.max(gunHandled,seq);
+ if(kind==='target')gunTarget=target;
+ const command=gunOrders[kind];
+ if(command&&view!=='orbit'&&canIssue(state,context())&&command.enabled())command.run();
+ updateUI();
+});
 // Torpedo orders from the Elm panel, checked as the button and slider were. Every
 // order counts as handled, refused or not, so the panel stops holding the run.
 function askEndMission(){
@@ -565,7 +579,7 @@ torpedoControl.ports.torpedoOrder.subscribe(({kind,value,seq})=>{
  updateUI();
 });
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
- $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
+ $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;gunTarget=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
 bindCommand('deploy-drone','click',()=>deployDrone(state).then(launched=>{if(launched){setView('drone');if(!compactLayout.matches)toast(rovKeyHint());}else toast(droneDeployReason(state));}),()=>!droneDeployReason(state));
 bindCommand('drone-photo','click',takePhoto,()=>feedActive(state,'drone')&&state.photoCooldown===0);
 // The Elm operation card sends orders; each is checked against the moment it arrives.
@@ -883,7 +897,10 @@ function updateUI(){
 
  {const able=enabled=>canIssue(s,context())&&enabled();
   torpedoControl.ports.torpedoReading.send({...torpedoReading(s,s.contacts.find(c=>c.id===selected)),fireEnabled:able(torpedoOrders.fire.enabled),runEnabled:able(torpedoOrders.run.enabled),handled:torpedoHandled});}
- $('decoy-count').textContent=s.decoys+' LEFT';$('gun-ammo').textContent=s.gun.ammo;const choice=$('gun-target').value;const options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.side!=='friendly'&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];reconcileKeyedChildren($('gun-target'),options,o=>o.id,()=>document.createElement('option'),(node,o)=>{node.value=o.id;node.textContent=o.label;});$('gun-target').value=choice||selected||'';$('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='SUB STOP';
+ {const able=enabled=>canIssue(s,context())&&enabled(),options=[{id:'',label:'MANUAL AIM'},...s.contacts.filter(c=>c.identified&&c.side!=='friendly'&&c.age<10&&c.range&&c.kind!=='sub').map(c=>({id:c.id,label:`${c.name} · ${(c.range/1000).toFixed(1)} KM`})),...visualAircraft().map(p=>({id:p.id,label:`${p.name} · ${Math.round(p.altitude)} M ALT`}))];  // The chosen target, else the selected contact, while it is in sight; manual aim otherwise.
+  const wanted=gunTarget||selected||'';gunTarget=options.some(o=>o.id===wanted)?wanted:'';
+  gunControl.ports.gunReading.send({ammo:String(s.gun.ammo),decoys:s.decoys+' LEFT',targets:options,target:gunTarget,openEnabled:able(gunOrders.open.enabled),decoyEnabled:able(gunOrders.decoy.enabled),handled:gunHandled});}
+ $('mobile-engine').textContent=s.engine.toUpperCase();$('mobile-silent').classList.toggle('active',s.silent);$('mobile-stop').textContent='SUB STOP';
  resourcePanel.ports.resourceReading.send(resourceReading(s));
  footerStatus.ports.footerReading.send(footerReading(s,getSoundings(s).belowKeel));
  $('damage-flash').style.opacity=s.shock?String(s.shock*.2):'0';$('cracks').classList.toggle('hidden',!(drone?active&&s.drone.camera<65:view==='scope'&&active&&s.systems.periscope<=45));

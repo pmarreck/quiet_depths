@@ -6,8 +6,8 @@ const read=path=>readFile(new URL('../'+path,import.meta.url),'utf8');
 const [page,app,elm]=await Promise.all([read('src/index.html'),read('src/app.js'),read('elm/TorpedoControl.elm')]);
 const fn=(name,next)=>elm.match(new RegExp(`\\n${name} [a-z]+ =\\n([\\s\\S]*?)\\n\\n\\n${next}`))[1].replace(/\s+/g,' ').trim();
 
-test('torpedo control is drawn only by its Elm view, beside the static deck gun controls',()=>{
- assert.match(page,/<section class="weapons"><div id="torpedo-control-root"><\/div><div class="gun-control">/);
+test('torpedo control is drawn only by its Elm view, beside the deck gun panel',()=>{
+ assert.match(page,/<section class="weapons"><div id="torpedo-control-root"><\/div><div id="gun-control-root"><\/div>/);
  for(const id of ['torp-count','tube-port','tube-starboard','run-limit','run-readout','fire','weapon-hint','torpedo-status'])
   assert.doesNotMatch(page,new RegExp(`id="${id}"`),'index.html must not keep a static #'+id);
  for(const id of ['torp-count','run-limit','run-readout','fire','weapon-hint','torpedo-status'])assert.match(elm,new RegExp(`id "${id}"`),'the Elm view renders #'+id);
