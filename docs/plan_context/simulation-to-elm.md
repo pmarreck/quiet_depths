@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Orbital reconnaissance (196 lines, three Elm modules) | about 20 min after the TypeScript fix | matched on the first comparison; save checks tightened in the TypeScript first; 69 of 74 mutants killed, the other five equivalent |
 | Combat (209 lines, four Elm modules) | not measured (written across a context break) | matched once the test stated the one deliberate difference (a player torpedo's launcher and aim); two TypeScript save checks fixed first; 61 of 62 mutants killed, the last equivalent |
 | Torpedo runs (130 lines, four Elm modules) | about 60 min | matched on the first comparison; 54 of 55 mutants killed, the last equivalent |
 | Air support (115 lines, two Elm modules) | about 40 min | matched on the first run; found and fixed a TypeScript bug first (a surfaced boat's bomb depth); 55 of 55 mutants killed after four input gaps closed |
@@ -684,3 +685,34 @@ ship flooding, or a wreck crossing the depths at which it collapses. Wider
 inputs and 1,200 constructed single ticks now kill 61. The last removes the
 charge's "has an air time" test, which `elapsed < air` already implies
 because `elapsed` is never negative: an equivalent mutant.
+
+## Orbital reconnaissance ported (2026-11-27)
+
+`recon.ts` (196 code lines) became `Sim.Recon` (the task, its request, radio
+link and panel), `Sim.ReconPasses` (each moment: uplink, overpass, two
+exposures, processing and the transfer home) and `Sim.ReconSaves` (a saved
+task read with every check restore makes), at `3a2ec96`, about 20 minutes
+after the TypeScript fix, and matched on the first comparison. An image's
+size and an area's footprint are fixed, so the Elm types do not store them;
+the encoder writes the constants back. A phase missing a time its update
+reads holds where it is, which saves now refuse to reach.
+
+Porting found the save checks too loose, fixed first (`4216822`): a
+photographed ship's kind, name, military flag and side, a frame's weather
+name, an identified track's fields and a daytime scene ship's kind went
+unchecked, and a saved tasking, imaging or processing phase could lack the
+start time its update reads, which JavaScript then read as zero.
+
+Mutation testing killed 53 of 74 mutants at first. The played tasks never
+requested a square 19 to 20 km out, on a finished patrol, with a negative
+clock, or while a task was busy past its cooldown; never met a storm between
+0.5 and 0.6, daylight between 0.25 and 0.3, cloud between 0.35 and 0.4,
+light rain under thin cloud, or the clouds' floors; never photographed a sunk
+ship, exposures under a second apart, or a delivery after a long cooldown;
+and never saved a negative wave scale or a completed task without its
+receipt time. Constructed requests and moments now sit on each, and 69 mutants fail the tests. Five
+mutants are equivalent: the link's floor at zero depth (a negative depth
+reads the same), the panel's guard against a NaN progress (saves cannot hold
+one), a queued task's link check (the uplink step already returns the task
+untouched when the link is down), unique track ids (implied by the scene
+ships' checks), and the refusal of a negative clock (saved cooldowns are never negative, so the cooldown check already refuses it).

@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame, save, restore} from '../src/sim.js';
 import {freshRecon, requestRecon, updateRecon, reconStatus, reconLink, reconAreaForDisplay, validateReconState} from '../src/recon.js';
+import {environmentAt} from '../src/environment.js';
 import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 
 const pick = (random, list) => list[Math.floor(random() * list.length)];
@@ -78,6 +79,7 @@ test('saved recon tasks are accepted and refused exactly as the TypeScript does'
     r => { if (r.packet?.tracks[0]) r.packet.tracks[0].time = r.packet.capturedAt + 1; }, r => { if (r.packet?.tracks[1]) r.packet.tracks[1].id = r.packet.tracks[0].id; }, r => { if (r.packet?.sceneShips[0]) r.packet.sceneShips[0].id = 'unseen'; },
     r => { if (r.packet?.sceneShips[0]) r.packet.sceneShips.pop(); }, r => { if (r.packet?.tracks[0]) r.packet.tracks[0].kind = 'raft'; }, r => { if (r.packet?.sceneShips[0]) r.packet.sceneShips[0].kind = r.packet.night ? 'merchant' : 'light'; },
     r => { if (r.packet) r.packet.coverage = 1.5; }, r => { if (r.packet) r.packet.weather.name = 4; },
+    r => { if (r.firstFrame) r.firstFrame.weather.waveScale = -1; else if (r.packet) r.packet.weather.waveScale = -1; }, r => { if (r.packet) r.packet.receivedAt = null; },
   ];
   for (const state of states.filter((_, i) => i % 3 === 0)) {
     values.push(state);
@@ -100,4 +102,63 @@ test('the radio link, the displayed square and a fresh task match', async () => 
     for (const [held, selected] of [[area, next], [area, null], [null, next], [null, null]]) displays.push([{phase, area: held}, selected]);
   sameResults(await elm('recon.reconAreaForDisplay', displays), displays.map(([r, s]) => reconAreaForDisplay(r, s) ?? null));
   assert.deepEqual((await elm('recon.freshRecon'))[0], freshRecon());
+});
+
+// The first time from `start` at which the patrol's conditions satisfy `test`.
+function when(w, start, test) {
+  for (let at = start; at < start + 200000; at += 5) if (test(environmentAt({...w, time: at}))) return at;
+  return null;
+}
+
+// Single requests, moments and panels built on the edges the played tasks
+// rarely reach: squares at the chart's edge, a finished patrol, a negative
+// clock, a busy task whose cooldown has passed, conditions just either side
+// of a storm, of night, of clear skies and of the clouds' floor, sunk ships in
+// the square, exposures under a second apart, and a delivery after a long
+// cooldown was already set.
+test('single recon requests and moments match at the edges of weather, light, timing and cooldown', async () => {
+  const random = seeded(163), {states} = tasks(), requests = [], updates = [], panels = [];
+  const w0 = restore(save(createGame('recon', 21, {weather: 'clear', timeOfDay: 'dusk', changing: true})));
+  Object.assign(w0, {depth: 0, scope: false});
+  const windows = {
+    storm: when(w0, w0.time + 200, e => e.storm > .5 && e.storm <= .6), dusk: when(w0, w0.time + 200, e => e.daylight >= .25 && e.daylight < .3),
+    hazy: when(w0, w0.time + 200, e => Math.max(e.cloud, e.fog) >= .35 && Math.max(e.cloud, e.fog) < .4), drizzle: when(w0, w0.time + 200, e => Math.max(e.cloud, e.fog) < .35 && e.rain >= .1 && e.rain < .2),
+    downpour: when(w0, w0.time + 200, e => e.cloud >= .99 && e.rain >= .9),
+  };
+  for (const [name, at] of Object.entries(windows)) assert.ok(at !== null, 'conditions found: ' + name);
+  const center = {x: Math.round(w0.x / 100) * 100, y: Math.round(w0.y / 100) * 100}, area = {x: center.x, y: center.y, size: 10000};
+  w0.ships = w0.ships.filter(v => v.kind !== 'sub');
+  const crowd = Array.from({length: 30}, (_, i) => ({...structuredClone(w0.ships[i % w0.ships.length]), id: 'crowd-' + i, x: center.x + (random() - .5) * 9000, y: center.y + (random() - .5) * 9000, hull: i % 6 === 0 ? 0 : 100, depth: 0}));
+  for (const v of crowd) { delete v.sunkAt; delete v.sinkDepth; delete v.lights; delete v.blackout; }
+  const at = time => { const w = structuredClone(w0); w.time = time; w.ships = structuredClone(crowd); return w; };
+  // Requests.
+  for (const time of [windows.storm, windows.storm - 600, w0.time]) for (const x of [center.x, 19500, 20500]) requests.push([at(time), {x, y: center.y, size: 10000}]);
+  requests.push([Object.assign(at(w0.time), {status: 'won'}), area]);
+  requests.push([Object.assign(at(w0.time), {time: -5, ships: []}), area]);
+  // A busy task past its cooldown, on a calm day, so only the task refuses.
+  const calm = when(w0, w0.time + 2000, e => e.storm < .2);
+  for (const state of states.filter(r => !['idle', 'complete', 'failed'].includes(r.phase)).slice(0, 12)) requests.push([Object.assign(at(calm), {recon: {...structuredClone(state), cooldownUntil: 0}}), area]);
+  // Exposures and overpasses under each window's conditions.
+  const imaging = states.find(r => r.phase === 'imaging'), tasking = states.find(r => r.phase === 'tasking'), receiving = states.find(r => r.phase === 'receiving');
+  for (const time of Object.values(windows)) for (const gap of [10, .5]) {
+    const w = at(time);
+    w.recon = {...structuredClone(imaging), area: {...area}, startedAt: time - 10, firstFrame: {...structuredClone(imaging.firstFrame), time: time - gap, ships: crowd.filter(v => v.hull > 0).map(v => ({id: v.id, x: v.x - 30, y: v.y + 20, heading: v.heading, speed: v.speed, kind: v.kind, hull: v.hull, name: v.name, ...(v.military === undefined ? {} : {military: v.military}), ...(v.side ? {side: v.side} : {})}))}};
+    updates.push([w, .25]);
+    const t2 = at(time);
+    t2.recon = {...structuredClone(tasking), area: {...area}, startedAt: time - 100, readyAt: time - .1};
+    updates.push([t2, .25]);
+    panels.push([at(time)]);
+  }
+  const late = at(windows.dusk);
+  late.recon = {...structuredClone(receiving), cooldownUntil: windows.dusk + 1000, progress: .999};
+  updates.push([late, 1]);
+  const expectedRequests = requests.map(([w, a]) => { const c = structuredClone(w), ok = requestRecon(c, a); return [ok, exact(c.recon)]; });
+  const expectedUpdates = updates.map(([w, dt]) => { const c = structuredClone(w), packet = updateRecon(c, dt); return [packet ? exact(packet) : null, exact(c.recon)]; });
+  const packets = expectedUpdates.map(([, r]) => r.packet).filter(Boolean);
+  assert.ok(packets.some(p => p.coverage === .12) && packets.some(p => p.quality < .15), 'the clouds\' floors');
+  assert.ok(expectedRequests.some(([ok]) => ok) && expectedRequests.filter(([ok]) => !ok).length > 10, 'requests queued and refused');
+  assert.ok(requests.some(([w], i) => !['idle', 'complete', 'failed'].includes(w.recon.phase) && w.recon.cooldownUntil === 0 && !expectedRequests[i][0]), 'busy tasks refused on a calm day');
+  sameResults(await elm('recon.requestRecon', requests.map(([w, a]) => [exact(w), a])), expectedRequests);
+  sameResults(await elm('recon.updateRecon', updates.map(([w, dt]) => [exact(w), dt])), expectedUpdates);
+  sameResults(await elm('recon.reconStatus', panels.map(([w]) => [exact(w)])), panels.map(([w]) => exact(reconStatus(structuredClone(w)))));
 });
