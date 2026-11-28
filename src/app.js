@@ -60,7 +60,8 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 // TypeScript simulation, until it has been played enough to be the default.
 if(new URLSearchParams(location.search).get('sim')==='elm'){
  await new Promise((loaded,failed)=>{const tag=document.createElement('script');tag.src='sim-worker.js';tag.onload=loaded;tag.onerror=failed;document.head.append(tag);});
- useElmSimulation(await elmSimulation(globalThis.Elm.SimWorker.init()));
+ // A field the page writes outside the orders would be lost; say which.
+ useElmSimulation(await elmSimulation(globalThis.Elm.SimWorker.init(),{onStray:fields=>console.warn('Elm simulation: the page wrote '+fields.join(', ')+', which only the simulation changes; the write is lost.')}));
 }
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;

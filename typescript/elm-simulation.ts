@@ -11,6 +11,10 @@
 // when the page steps or acts on a different patrol object than the one it
 // last created or restored (a save slot checked, then the autosave resumed),
 // the adapter first loads that patrol into the worker.
+//
+// The worker takes only the orders from the page's patrol object; anything
+// else the page writes there would be lost at the next reply. `onStray`, when
+// given, hears the names of such fields before each command.
 import {refreshMirror} from './world-mirror.ts';
 import {markReplay, type ReplayEvent} from './replay-events.ts';
 import {reportInvalidNumber, type InvalidNumber} from './invalid-numbers.ts';
@@ -42,20 +46,26 @@ const isRecord = (v: unknown): v is Fields => !!v && typeof v === 'object' && !A
 const pick = (from: Fields, keys: readonly string[]) => Object.fromEntries(keys.filter(k => from[k] !== undefined).map(k => [k, from[k]]));
 const defined = (from: object) => pick(from as Fields, Object.keys(from));
 
-export function elmSimulation(worker: SimWorker): Promise<ElmSimulation> {
+export interface Options {onStray?: (fields: string[]) => void}
+
+// Tells apart every value a reply can hold, -0, NaN and the infinities included.
+const key = (v: unknown): string => JSON.stringify(v, (_, x) =>
+  typeof x === 'number' && (Object.is(x, -0) || !Number.isFinite(x)) ? '\u0000' + (Object.is(x, -0) ? '-0' : String(x)) : x);
+
+export function elmSimulation(worker: SimWorker, options: Options = {}): Promise<ElmSimulation> {
   return new Promise((resolve, reject) => {
     let started = false;
     worker.ports.replies.subscribe(reply => {
       if (started) return;
       started = true;
       if (reply.error || !reply.boat || !reply.gun || !reply.drone) reject(new Error('The Elm simulation did not start: ' + (reply.error ?? 'no order fields')));
-      else resolve(ready(worker, {boat: reply.boat, gun: reply.gun, drone: reply.drone}));
+      else resolve(ready(worker, {boat: reply.boat, gun: reply.gun, drone: reply.drone}, options));
     });
     worker.ports.commands.send({kind: 'orderFields'});
   });
 }
 
-function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone: string[]}): ElmSimulation {
+function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone: string[]}, {onStray}: Options): ElmSimulation {
   let answer: Reply | null = null;
   worker.ports.replies.subscribe(reply => { answer = reply; });
   const call = (command: Fields): Reply => {
@@ -68,15 +78,33 @@ function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone:
     return reply;
   };
   const orders = (s: World) => ({...pick(s as unknown as Fields, fields.boat), gun: pick(s.gun as unknown as Fields, fields.gun), drone: pick(s.drone as unknown as Fields, fields.drone)});
+  // Each field the simulation alone changes, as the last reply left it.
+  const simulated = (s: World) => {
+    const w = s as unknown as Fields, out = new Map<string, string>();
+    for (const [k, v] of Object.entries(w)) {
+      if (fields.boat.includes(k) || (PAGE_FIELDS as readonly string[]).includes(k)) continue;
+      const own = k === 'gun' ? fields.gun : k === 'drone' ? fields.drone : null;
+      out.set(k, key(own && v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([f]) => !own.includes(f))) : v));
+    }
+    return out;
+  };
+  let replied = new Map<string, string>();
+  const settled = (s: World) => { if (onStray) replied = simulated(s); };
+  const checked = (s: World) => {
+    if (!onStray) return;
+    const now = simulated(s), stray = [...new Set([...now.keys(), ...replied.keys()])].filter(k => now.get(k) !== replied.get(k));
+    if (stray.length) onStray(stray);
+  };
   let held: object | null = null;
   const holding = (s: World) => {
-    if (s === held) return;
+    if (s === held) { checked(s); return; }
     const world = {...s} as Fields;
     for (const k of PAGE_FIELDS) delete world[k];
     refreshMirror(s, call({kind: 'load', world: JSON.parse(JSON.stringify(world))}).world as Fields, PAGE_FIELDS);
     held = s;
+    settled(s);
   };
-  const adopt = <T>(world: T): T => { if (world) held = world as object; return world; };
+  const adopt = <T>(world: T): T => { if (world) { held = world as object; settled(world as unknown as World); } return world; };
   const announce = (s: World, {replay = [], invalid = []}: Partial<Announced>) => {
     for (const m of replay) markReplay(s, m.time, m.event);
     for (const p of invalid) reportInvalidNumber(p.where, p.value);
@@ -100,6 +128,7 @@ function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone:
       holding(s);
       for (const tick of call({kind: 'step', orders: orders(s), dt, input: defined(frame)}).ticks ?? []) {
         refreshMirror(s, tick.world, PAGE_FIELDS);
+        settled(s);
         announce(s, tick);
         afterTick?.(s);
       }
@@ -108,6 +137,7 @@ function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone:
       holding(s);
       const done = call({kind: 'act', orders: orders(s), action: defined(action)});
       refreshMirror(s, done.world as Fields, PAGE_FIELDS);
+      settled(s);
       announce(s, done);
       return done.result;
     },
