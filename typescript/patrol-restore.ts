@@ -139,14 +139,18 @@ export function restore(raw: string): World | null {
     for (const p of s.gunRounds) if (!allFinite(p, ['id', 'x', 'y', 'altitude', 'vx', 'vy', 'vz', 'age']) || !['player', 'aircraft'].includes(p.owner) || typeof p.tracer !== 'boolean') return null;
     for (const p of s.impacts) if (!allFinite(p, ['id', 'x', 'y', 'altitude', 'time'])) return null;
     if (!allFinite(s.drone, ['hull', 'mobility', 'buoyancy', 'camera', 'verticalSpeed', 'collisionCooldown', 'returnStage', 'returnClearance', 'returnHoldSide', 'returnHoldForward'])) return null;
-    if (['undersea-rescue', 'surface-rescue', 'survey'].includes(s.mission)) {
+    // Each operation's mission makes one kind of site.
+    const siteKind = ({'undersea-rescue': 'sub', 'surface-rescue': 'surface', survey: 'wreck'} as Record<string, string>)[s.mission];
+    if (siteKind) {
       const site = s.site;
-      if (!site || !s.operation || !allFinite(site, ['x', 'y', 'depth', 'heading']) || !['surface', 'wreck', 'sub'].includes(site.kind) || typeof site.name !== 'string') return null;
+      if (!site || !s.operation || !allFinite(site, ['x', 'y', 'depth', 'heading']) || site.kind !== siteKind || typeof site.name !== 'string') return null;
       site.hull ??= 100;
       if (!finite(site.hull) || site.hull < 0 || site.hull > 100) return null;
       const o = s.operation as unknown as Fields;
       if (!['rescued', 'remaining', 'dead', 'assessment', 'boarding', 'diverReturn', 'scan', 'lastCasualty'].every(k => finite(o[k]) && (o[k] as number) >= 0) ||
         !['known', 'holding', 'active', 'completed'].every(k => typeof o[k] === 'boolean') || !Array.isArray(o.photoAngles) || !o.photoAngles.every(finite)) return null;
+      // Survivors move one at a time, so their counts are whole; the survey's find is text once made.
+      if (!['rescued', 'remaining', 'dead'].every(k => Number.isInteger(o[k])) || !(o.find === undefined || o.find === null || typeof o.find === 'string')) return null;
     } else if (s.site || s.operation) return null;
     for (const p of s.shells) if (!allFinite(p, ['id', 'x', 'y', 'depth', 'delay', 'fromX', 'fromY', 'total'])) return null;
     if (!allFinite(s.drone, ['x', 'y', 'heading', 'depth', 'battery', 'speed', 'targetSpeed', 'targetDepth', 'targetHeading'])) return null;
