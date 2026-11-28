@@ -1425,3 +1425,25 @@ order that a reply reports gone, which the adapter must then forget:
 The route test could not catch either: a cleared route crosses as `null`,
 a value, not as a removal. The new test, "an order the page removes stays
 removed for a queued call", kills both, with and without a patrol switch.
+
+### The environment mutation check, finished (2026-11-28)
+
+The owner approved resuming the check the low-memory guard stopped.
+`tests/mutants/environment2.mutants` is the first list
+(`environment.mutants`) brought up to the current code, at 41cc635: six
+patterns follow code that moved (the keel, spray and scope eye to
+`Sim.BoatSensors`; the daylight and moonrise lines reformatted), and the
+first front's blend guard is gone, removed earlier as equivalent. Each
+mutant took about 3 s.
+
+- 47 of 49 killed at first, `weather-order` among them (3 failures). Its
+  first run printed no test summary at all, so that run itself failed
+  rather than its tests passing; the cause is not known, and it now fails
+  on every run.
+- `dawn-dusk` survives, equivalent as noted above: no hour between 11 and
+  12 has mid daylight.
+- `strike-end` (a strike still flashing at exactly 0.75 s) survived: in
+  the test's corpus every strike at an edge shares its sky with a younger,
+  brighter one, and its ages are rarely exact. A lone strike at each edge
+  of the flash (0.75 s, just younger, just struck, not yet struck) now
+  kills it and `strike-start`, and the test pins which of them flash.

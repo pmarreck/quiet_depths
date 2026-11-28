@@ -43,7 +43,14 @@ test('the Elm sky matches the TypeScript through fronts, fog, moonlight, holiday
     skies.push(s);
   }
   skies.push({time: 10, lightning: [{time: 9.9, x: 0, y: 0}]});
+  // A lone strike at each edge of its flash, so that edge alone decides it:
+  // exactly 0.75 s old (over), just younger, just struck, and 2^-20 s
+  // before it strikes. In the corpus above a younger strike always
+  // outshines one at an edge, and its ages are rarely exact.
+  const edges = [.75, .7499, 0, -(2 ** -20)];
+  for (const age of edges) skies.push({time: 10, x: 0, y: 0, lightning: [{time: 10 - age, x: 0, y: 0}]});
   const expected = skies.map(s => env.environmentAt(s));
+  assert.deepEqual(expected.slice(-edges.length).map(e => e.flash > 0), [false, true, true, false], 'a strike flashes from the moment it strikes until 0.75 s');
   const seen = key => new Set(expected.map(e => e[key]));
   assert.ok(seen('weather').has('Morning fog') && seen('phase').size === 4 && seen('seaState').size === 4 && seen('holiday').size === 3 && seen('navigationLights').size === 2, 'the corpus covers fog, each phase, each sea state and both holidays');
   const presets = Object.values(env.WEATHER).map(w => w.cloud);
