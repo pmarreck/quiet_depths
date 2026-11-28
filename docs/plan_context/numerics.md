@@ -258,3 +258,48 @@ divided by the smallest representable number instead; ±Infinity becomes
 - Precedent for the alternative x/0 = 0: Lean, Isabelle, Pony's integers and
   Elm's own `//`. It never creates huge values (no overflow checks), but
   says "now" where the limit says "never".
+
+### The owner's number rules (decided 2026-11-27 20:20)
+
+1. **Domains by type.** `sqrt`, `log` and raising to a power take a
+   non-negative argument by type; `acos` and `asin` take a value in [-1, 1]
+   by type. Passing anything else is a compile error, not a runtime NaN.
+   `log 0` is −MAX.
+2. **Saturation.** x/0 is ±MAX by the sign of x; 0/0 is 0; ±Infinity
+   becomes ±MAX. Underflow follows the same rules toward ±MIN: a nonzero
+   result too small to represent becomes ±MIN rather than 0. A value that
+   reaches ±MAX or ±MIN is handled where it can arise, by context.
+3. **No negative zero.** Impossible by construction.
+4. **Zero denominators** are impossible by construction where types are
+   used (a non-zero type), or handled by context (a default direction for a
+   zero-length vector).
+5. **Narrowing and widening** between widths maps MAX to the target's MAX
+   (and MIN to its MIN), in both directions.
+6. **Saves and restores** reject ±MAX and ±MIN as well as non-finite values.
+7. **Both languages** follow the rules until the switch.
+8. Lean's x/0 = 0 was rejected: it puts a jump at 0 where ±MAX follows the
+   curve from the side the numerator's sign gives.
+
+What the type systems can and cannot carry (as analyzed): Elm's opaque types
+and TypeScript's branded types can enforce domains (non-negative, non-zero,
+the unit range, no negative zero), because a constructor checks once and
+closed operations preserve the property (`sqrt` of a non-negative is
+non-negative; a product of non-zeros, with underflow to ±MIN, is non-zero).
+Neither can track magnitudes through arithmetic, which needs refinement or
+dependent types (Lean, Liquid Haskell, F*), so overflow and underflow are
+caught by saturating at run time, not proved absent at compile time. Sums
+are not closed for non-zero (a + (−a) = 0), so a sum used as a denominator
+must be re-checked by its constructor, and the code must say what a zero
+means there. Ruling out negative zero entirely means an opaque number type
+in place of Float in the simulation, every operation normalizing; in stock
+Elm that is a function call per operation, which the fork's dedicated
+operators would remove.
+
+**What MAX means (owner, 20:22):** "probably infinite, definitely
+representable, but we have run out of representation room and should be
+already handling this situation long before it got to this point in the
+code." So MAX is a last-resort floor under a bug, not a working value: the
+code that can saturate handles it where it arises, and a MAX that reaches
+later arithmetic is itself a bug to report. That answers the stickiness
+concern (MAX × 0.5 = 8.99e307, an ordinary finite number, where Infinity ×
+0.5 stays Infinity): saturated values must not travel.

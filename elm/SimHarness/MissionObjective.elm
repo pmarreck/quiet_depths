@@ -1,9 +1,9 @@
 module SimHarness.MissionObjective exposing (function)
 
 {-| Harness entries for judging a patrol's objective. The rescue and survey
-work stand-ins log their calls and answer by the tick's length, as the test's
-TypeScript stand-ins do, so the comparison covers which work runs and that
-its state comes back.
+work stand-ins log each call with the tick it was given and answer by the
+tick's length, as the test's TypeScript stand-ins do, so the comparison
+covers which work runs, with what tick, and that its state comes back.
 -}
 
 import Json.Decode as D
@@ -51,8 +51,8 @@ judged =
 
 work : ObjectiveWork Judged
 work =
-    { rescue = \dt _ s -> ( 0.5 < dt, { s | workCalls = s.workCalls ++ [ "rescue" ] } )
-    , survey = \dt _ s -> ( 0.5 < dt, { s | workCalls = s.workCalls ++ [ "survey" ] } )
+    { rescue = \dt _ s -> ( 0.5 < dt, { s | workCalls = s.workCalls ++ [ "rescue " ++ String.fromFloat dt ] } )
+    , survey = \dt _ s -> ( 0.5 < dt, { s | workCalls = s.workCalls ++ [ "survey " ++ String.fromFloat dt ] } )
     }
 
 

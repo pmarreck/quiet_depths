@@ -8,8 +8,8 @@ import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 const FIELDS = ['time', 'x', 'y', 'mission', 'home', 'patrol', 'photos', 'ships', 'trackTime'];
 // Stand-ins for the rescue and survey work, matching the harness's Elm ones.
 const work = {
-  rescue: (s, dt) => { s.workCalls.push('rescue'); return dt > .5; },
-  survey: (s, dt) => { s.workCalls.push('survey'); return dt > .5; },
+  rescue: (s, dt) => { s.workCalls.push('rescue ' + dt); return dt > .5; },
+  survey: (s, dt) => { s.workCalls.push('survey ' + dt); return dt > .5; },
 };
 
 // Each objective on both sides of its threshold, on a fresh game of each mission.
@@ -20,6 +20,8 @@ function variants(s, objective, random) {
   for (const t of [track - .001, track, track + 5, 0]) out.push({trackTime: t});
   const radius = objective.radius ?? 200;
   for (const d of [radius - .01, radius, radius + .01, 5000]) { const a = random() * 2 * Math.PI; out.push({x: s.home.x + Math.sin(a) * d, y: s.home.y + Math.cos(a) * d}); }
+  // Along an axis, so the distance is exactly the radius.
+  out.push({x: s.home.x + radius, y: s.home.y}, {x: s.home.x, y: s.home.y - radius});
   const targets = objective.targets ?? (objective.hunter ? [objective.hunter] : []);
   if (targets.length) {
     const sink = (ids, hull) => s.ships.map(v => ids.includes(v.id) ? {...v, hull} : v);
