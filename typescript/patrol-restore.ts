@@ -1,5 +1,5 @@
 // Mirrored in elm/Sim/PatrolRestore.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
-import {captainName} from './captain.ts';
+import {restorePageFields} from './page-fields.ts';
 import {earlyEndRule} from './early-end.ts';
 import {freshTransmitters, validTransmitters} from './sonar-transmitters.ts';
 import {watchWarnings, validWarnings} from './watch-warnings.ts';
@@ -22,7 +22,6 @@ import {freshSystems, freshMotion, freshDrone} from './systems.ts';
 import {MAX_RUN, ENEMY_DECOY_SUPPLY, freshCombat, restoreIncomingRun, restoreTorpedo} from './combat.ts';
 import {freshRecon, validateReconState} from './recon.ts';
 import {designation, fixContact} from './track-estimates.ts';
-import {photoArchive, validPhoto, PHOTO_BUDGET} from './photos.ts';
 import {validReport} from './hostile-tracks.ts';
 import {patrolDifficulty} from './difficulty.ts';
 import {validSearch} from './patrol-search.ts';
@@ -45,7 +44,7 @@ export function restore(raw: string): World | null {
     const s = parsed as World, fields = parsed as Fields;
     if (!s || s.version !== 1 || !MISSIONS.some(m => m.id === s.mission) || !['patrol', 'won', 'partial', 'withdrawn', 'lost', 'compromised', 'expired', 'convoy-lost'].includes(s.status)) return null;
     if (s.scopeTravel !== undefined && (!finite(s.scopeTravel) || s.scopeTravel < 0 || s.scopeTravel > 1)) return null;
-    if (s.captain !== undefined && (typeof s.captain !== 'string' || !s.captain || s.captain !== captainName(s.captain))) return null;
+    if (!restorePageFields(fields)) return null;
     if (s.mission !== 'wolf-in-the-henhouse' && (s.convoy !== undefined || s.status === 'convoy-lost')) return null;
     // Only the fleet action fights a battle, and only the transit departs from a gate.
     if (s.mission !== 'tiebreaker' && s.battle !== undefined || s.mission !== 'sneaky-seamen' && s.departure !== undefined) return null;
@@ -74,14 +73,8 @@ export function restore(raw: string): World | null {
     // Migrate existing v1 patrols without discarding their progress or drone state.
     if (s.recon === undefined) s.recon = freshRecon();
     if (s.reconArchivedSequence === undefined) s.reconArchivedSequence = 0;
-    if (s.photoArchive === undefined) s.photoArchive = [];
-    if (s.photoSequence === undefined) s.photoSequence = 1;
-    const archive = s.photoArchive as unknown[];
-    if (!validateReconState(s.recon) || !Array.isArray(archive) || archive.length > 24 || !Number.isSafeInteger(s.photoSequence) || s.photoSequence < 1) return null;
+    if (!validateReconState(s.recon)) return null;
     if (s.recon.packet === undefined) s.recon.packet = null;
-    if (!archive.every(p => validPhoto(p) && Number.isSafeInteger(p.id) && (p.id as number) > 0) || new Set(archive.map(p => (p as Fields).id)).size !== archive.length ||
-      archive.reduce((n: number, p) => n + (p as {image: string}).image.length, 0) > PHOTO_BUDGET) return null;
-    photoArchive(s);
     if (s.scopeAngle === undefined) s.scopeAngle = 0;
     if (s.scopeSteerBearing === undefined) s.scopeSteerBearing = null;
     if (s.environment === undefined) { s.environment = makeEnvironment(s.patrol?.seed ?? s.rng); delete (s.environment as Partial<World['environment']>).chartSeed; }
