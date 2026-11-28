@@ -1202,3 +1202,42 @@ Not yet done: playing it in a browser. That needs either the owner or
 headless Chromium, whose restart after the low-memory guard stopped it
 waits on the owner's answer. Until then the TypeScript simulation stays
 the default.
+
+## A frame's cost through the worker (2026-11-28, Node 24, optimized Elm)
+
+`scripts/elm-frame-bench.mjs` plays busy patrols ten minutes in and times
+a frame both ways: the TypeScript step on the patrol, and the page's step
+through the worker (orders sent, the step, the world encoded after each
+tick, the page's patrol object refreshed). Medians of 300 frames, in ms:
+
+| Patrol | Save KB | 1x TypeScript | 1x Elm | 16x TypeScript | 16x Elm | Elm share of a 60 Hz frame, 1x and 16x |
+|---|---|---|---|---|---|---|
+| Fleet action | 19.7 | 0.038 | 1.298 | 0.050 | 2.323 | 7.8%, 13.9% |
+| Carrier hunt | 18.7 | 0.045 | 1.176 | 0.072 | 2.293 | 7.1%, 13.8% |
+| Convoy attack | 17.7 | 0.028 | 1.245 | 0.070 | 2.474 | 7.5%, 14.8% |
+| Reconnaissance | 17.3 | 0.035 | 1.185 | 0.072 | 2.237 | 7.1%, 13.4% |
+
+(The convoy defense patrol had ended by ten minutes in, so it measured
+nothing and is left out.) Of a 1x frame's 1.2 ms, the worker's step with
+encoding the world takes about 1.0 ms and refreshing the mirror about
+0.27 ms; the port round trip itself is negligible. A 16x frame has two
+ticks, and every tick's world is encoded for the per-tick hook, so its
+cost doubles. Affordable for a trial (the renderer and its browser work
+dominate a frame), but 30 times the TypeScript step, and the obvious
+savings are there to take before the Elm simulation becomes the default:
+encode intermediate ticks only with what the replay recorder and sonar
+paper read, and skip re-encoding records a tick did not change. The
+browser figure still waits on a browser.
+
+## Page writes the orders missed (2026-11-28)
+
+A scan of the page's modules for writes to the patrol found two outside
+the orders. The crew's ambience records the day it wished the boat a happy
+new year (`newYearWatch`, a saved field), so the greeting does not repeat
+after a reload; under the worker that write would be lost at the next
+reply, and the greeting would start again every frame on New Year's Day.
+And the page assigns a patrol its id when it starts (`state.patrolId ??=`),
+which a first scan missed by matching only `=`, `+=` and `-=`; lost, the
+id would be reassigned whenever that line ran. Both are now orders. The
+adapter's guard (`onStray`) would have named either at run time under
+`?sim=elm`; the scans found them first.
