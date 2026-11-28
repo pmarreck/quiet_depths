@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {stationHint} from '../src/panel-readings.js';
 
 const read=path=>readFile(new URL('../'+path,import.meta.url),'utf8');
 const [page,app,header,hints]=await Promise.all([read('src/index.html'),read('src/app.js'),read('elm/ViewHeader.elm'),read('elm/ViewHints.elm')]);
@@ -31,4 +32,16 @@ test('each part is worded once, the tower\'s binoculars and the sonar imagers in
  assert.ok(app.includes("bowShown:view==='scope'&&active,"));
  assert.ok(app.includes("compassShown:optical&&active,marks:[-2,-1,0,1,2].map(i=>deg(absLook+i*(drone?15:7.5/zoom))),look:deg(absLook)+'° TRUE'"));
  assert.ok(app.includes("viewHints.ports.hintsReading.send(imaging?{hint:instrument==='scribbler'?'Seafloor strip · newest returns at the top':'Forward sweep · elevation increases upward',range:''}:{hint,range});"));
+});
+
+// Each station's line under the view names what that station does; the
+// photos station once fell through to the drone's NO DRONE SIGNAL.
+test('the line under the view is worded for each station',()=>{
+ assert.equal(stationHint('photos',false,0),'NO PHOTOGRAPHS ARCHIVED');
+ assert.equal(stationHint('photos',false,3),'SELECT A PHOTOGRAPH TO ENLARGE · NEWEST FIRST');
+ assert.deepEqual(['scope','drone'].map(v=>[stationHint(v,true,0),stationHint(v,false,0)]),[['DRAG TO ROTATE SCOPE · WHEEL TO ZOOM','NO OPTICAL SIGNAL'],['CAMERA FIXED TO ROV NOSE','NO DRONE SIGNAL']]);
+ assert.deepEqual(['sonar','chart','tower','gun'].map(v=>stationHint(v,false,0)),['BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL','DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT','DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS','DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING']);
+ assert.equal(stationHint('orbit',true,0),'','the orbit camera hides the line');
+ assert.equal(stationHint('constructor',true,0),'','only a station has a hint');
+ assert.ok(app.includes('const hint=stationHint(view,active,photoArchive(s).length);'));
 });

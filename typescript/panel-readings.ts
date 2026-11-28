@@ -177,3 +177,21 @@ export function torpedoReading(s: Parameters<typeof torpedoTubes>[0] & {systems:
     target: target ? {side: String(target.side ?? ''), probableSide: String(target.probableSide ?? ''), identified: !!target.identified, military: !!target.military, bearing: deg(firingBearing(s, target))} : null,
     running: s.projectiles.filter(p => p.owner === 'player').map((p, i) => `TORP ${i + 1} · ${p.age < 4 ? 'ARMING' : p.lock ? 'SONAR TRACK' : 'SEARCHING'} · ${deg(p.heading)}°`).join(' / ')};
 }
+
+// The line under the view at each station, worded for that station: a
+// station left out of STATION_HINTS fails to type-check. `active` is
+// whether the station's feed works; `archived`, how many photographs the
+// archive holds. The orbit camera hides the line.
+export type Station = 'scope' | 'sonar' | 'chart' | 'drone' | 'tower' | 'gun' | 'photos';
+const STATION_HINTS: Record<Station, (active: boolean, archived: number) => string> = {
+  scope: active => active ? 'DRAG TO ROTATE SCOPE · WHEEL TO ZOOM' : 'NO OPTICAL SIGNAL',
+  sonar: () => 'BOW AT TOP · CONTACT BEARINGS RELATIVE TO HULL',
+  chart: () => 'DRAG TO PAN · WHEEL TO ZOOM · CLICK TO PLOT',
+  drone: active => active ? 'CAMERA FIXED TO ROV NOSE' : 'NO DRONE SIGNAL',
+  tower: () => 'DRAG TO LOOK AROUND / DOWN · WHEEL FOR BINOCULARS',
+  gun: () => 'DRAG TO AIM · HOLD FIRE / J · WATERLINE HITS CAUSE FLOODING',
+  photos: (_, archived) => archived ? 'SELECT A PHOTOGRAPH TO ENLARGE · NEWEST FIRST' : 'NO PHOTOGRAPHS ARCHIVED',
+};
+export function stationHint(view: string, active: boolean, archived: number): string {
+  return Object.hasOwn(STATION_HINTS, view) ? STATION_HINTS[view as Station](active, archived) : '';
+}
