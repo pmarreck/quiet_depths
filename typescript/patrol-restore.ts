@@ -45,6 +45,8 @@ export function restore(raw: string): World | null {
     if (s.scopeTravel !== undefined && (!finite(s.scopeTravel) || s.scopeTravel < 0 || s.scopeTravel > 1)) return null;
     if (s.captain !== undefined && (typeof s.captain !== 'string' || !s.captain || s.captain !== captainName(s.captain))) return null;
     if (s.mission !== 'wolf-in-the-henhouse' && (s.convoy !== undefined || s.status === 'convoy-lost')) return null;
+    // Only the fleet action fights a battle, and only the transit departs from a gate.
+    if (s.mission !== 'tiebreaker' && s.battle !== undefined || s.mission !== 'sneaky-seamen' && s.departure !== undefined) return null;
     if (['partial', 'withdrawn'].includes(s.status) && (s.phase !== 'objective' || earlyEndRule(s.mission) === null)) return null;
     if (s.imagers === undefined) s.imagers = freshTransmitters();
     if (!validTransmitters(s.imagers)) return null;
