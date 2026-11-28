@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Mess watch (48 lines) | about 20 min | matched on the first run; 34 of 34 mutants killed |
 | Fleet action (118 lines, four Elm modules) | about 25 min | matched on the first run; the mission handler threads through the state in order |
 | Systems (327 lines, seven Elm modules) | about 35 min | every function matched on its first full run; the slices compose the earlier ports (pressure, power plant, periscope, hull geometry) unchanged |
 | Boat and drone records | about 20 min | systems and limits as records with exhaustive accessors; restore's eight boat migrations inventoried, not ported |
@@ -545,3 +546,15 @@ restore validates as finite.
 What a sweep like this cannot find: wrong formulas or logic that both
 languages share. The differential tests only prove the two agree, so those
 need gameplay tests and review.
+
+## Mess watch ported (2026-11-27)
+
+`mess-watch.ts` (48 code lines) became `Sim.MessWatch`, with aircraft phases
+as the closed type `Sim.AircraftPhase`. About 20 minutes; matched on the
+first run; all 34 mutants killed. The port's neighbor fix: `activeVolleys`
+now takes the nested `convoy.shot` and `traffic.volleys` fields the patrol
+really has, where the fleet-action port had flattened them. Under the
+fix-TypeScript-first rule, new games now start with `shock: 0` instead of
+leaving the declared number undefined until the first tick. The project's
+arithmetic test caught a `/= 0` (Elm compiles comparisons with zero to
+JavaScript truthiness); `M.truthy` mirrors the TypeScript's truthiness test.

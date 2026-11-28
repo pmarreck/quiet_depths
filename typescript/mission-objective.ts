@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/MissionObjective.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {missions, patrol} from './mission-catalog.ts';
 import {friendlyLead} from './fleet-action.ts';
 import type {SurveyCriteria} from './wreck-survey.ts';
