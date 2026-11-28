@@ -223,7 +223,7 @@ decoder =
                                 |> andMap (D.field "status" (named Status.statusName Status.statuses))
                                 |> andMap (D.succeed now)
                                 |> andMap (D.field "rng" D.int)
-                                |> andMap (optional "difficulty" (D.map6 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool)))
+                                |> andMap (optional "difficulty" (D.map7 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool) (optional "satellite" D.bool)))
                                 |> andMap (D.field "x" D.float)
                                 |> andMap (D.field "y" D.float)
                                 |> andMap (D.field "depth" D.float)

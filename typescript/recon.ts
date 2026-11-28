@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/Recon.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its moment-by-moment passes are elm/Sim/ReconPasses.elm and its save checks elm/Sim/ReconSaves.elm.
 import {environmentAt, hash01, WEATHER, type EnvironmentConfig} from './environment.ts';
 import {isSurfaceShip} from './foundering.ts';
 // Experimental 1972 imagery relay is a deliberate historical exception. Real

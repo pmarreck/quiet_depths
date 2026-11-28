@@ -1,4 +1,4 @@
-module SimHarness.HostileTracks exposing (function, track)
+module SimHarness.HostileTracks exposing (difficulty, function, track)
 
 {-| Harness entries for the hunters: their reports, senses, debrief lines and
 attacks. The depth-charge and torpedo stand-ins log what they are handed, and
@@ -75,7 +75,7 @@ encodeTrack t =
 
 difficulty : D.Decoder Difficulty
 difficulty =
-    D.map6 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool)
+    D.map7 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool) (optional "satellite" D.bool)
 
 
 shell : D.Decoder Shell
@@ -153,7 +153,7 @@ encodeHunt s =
         ]
 
 
-attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float, airSupport : Maybe Bool }
+attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float, airSupport : Maybe Bool, satellite : Maybe Bool }
 attacks =
     { dropCharge = \c s -> { s | charges = s.charges ++ [ c ] }
     , launchTorpedo =
