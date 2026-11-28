@@ -148,3 +148,32 @@ cache; only x86_64-linux is built and tested so far. quiet_depths already
 works around the one case it met, so adoption can wait for `Num` or wider
 platform coverage. Next in the fork: the `? [rank = 1]` crashes that swallow
 an ordinary type error (#2153, #2066, #2013).
+
+## A finite-only number type (owner question, 2026-11-27 19:15)
+
+Asked after the NaN-hit bug (d5ba3a1): can a numeric type require that its
+values be rational and finite, and at what ceremony? Every finite double is
+already rational (a dyadic fraction); the only values outside the rationals
+are NaN and the two infinities. So the requirement is "finite", and the
+question is where the checks go.
+
+- **Stock Elm, opaque `Finite` around Float.** A smart constructor
+  (`fromFloat : Float -> Maybe Finite`) proves finiteness once; holders can
+  rely on it. But Float addition and multiplication can overflow, so a closed
+  type needs every `+` and `*` to return `Maybe`, which is heavy ceremony
+  for game magnitudes that never approach 1e308. Saturating instead keeps
+  the type closed but silently changes values.
+- **The light version, like Elixir guards.** Keep Float inside the
+  simulation; reject non-finite values where they enter (restore's checks,
+  decoders) and make the partial operations total (division, `sqrt`,
+  `acos`, `log`, `exp`, `**`), with a test that forbids the raw ones in
+  `Sim.*`, as one already forbids the Basics arithmetic that differs from
+  JavaScript. Bounded magnitudes plus total operations keep every value
+  finite without touching `+`. Only possible after the switch, since the
+  TypeScript must match until then.
+- **The fork's `Num`.** A {mantissa, exponent} pair cannot represent NaN or
+  infinity, so finiteness is structural; partial operations return
+  `Maybe`/`Result` or take refined arguments (`NonZero`); dedicated operators
+  remove the ceremony. Sent to the elm-compiler agent as a requirement.
+
+None of these were measured for speed here; the bench in elm/Bench can.

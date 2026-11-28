@@ -7,18 +7,23 @@ import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 // Theaters laid out from many origins and seeds, then varied so every
 // branch of the battle runs: disabled, damaged and sunk units, a side
 // outnumbered from the start, units far from their patrol areas, and an
-// incidental merchant that neither side counts.
+// incidental merchant that neither side counts, and units just either side
+// of the 1800 m at which a unit turns back for its patrol area.
 function theaters() {
   const random = seeded(71), out = [];
-  for (let k = 0; k < 36; k++) {
+  for (let k = 0; k < 42; k++) {
     const origin = {x: (random() - .5) * 8000, y: (random() - .5) * 8000}, seed = Math.floor(random() * 1e6);
     const s = {time: 0, weaponSequence: 1 + Math.floor(random() * 40), patrol: {seed}, ...fleetTheater(origin, seed)};
-    const variant = k % 6;
+    const variant = k < 36 ? k % 6 : 6;
     if (variant === 1) for (const v of s.ships.slice(0, 3)) v.hull = 20 + random() * 18;
     if (variant === 2) { s.ships[1].hull = 0; s.ships[2].hull = 0; s.ships[6].disabled = true; }
     if (variant === 3) for (const v of s.ships.filter((_, i) => i % 2 === 0)) { v.x += 2500; v.y -= 900; }
     if (variant === 4) s.ships.push({id: 'traffic-1', name: 'Halcyon', kind: 'merchant', side: 'hostile', incidental: true, x: origin.x, y: origin.y + 1300, heading: 90, speed: 8, hull: 100, alert: 0, attack: 0});
     if (variant === 5) { s.ships[4].hull = 0; s.ships[5].hull = 0; s.ships[6].hull = 0; }
+    if (variant === 6) for (const [i, v] of s.ships.entries()) {
+      const a = s.battle.areas[v.kind === 'sub' ? 1 : 0], d = [1760, 1795, 1805, 1840][i % 4], bearing = random() * 2 * Math.PI;
+      v.x = a.x + Math.sin(bearing) * d; v.y = a.y + Math.cos(bearing) * d;
+    }
     out.push(s);
   }
   return out;
@@ -72,6 +77,8 @@ test('the fleet action matches, step by step: volleys, arrivals, turns, yielding
   });
   assert.ok(yielded, 'a damaged unit yields its turn');
   assert.ok(runs.some(r => r.output.log.some(e => e.fired && Math.hypot(e.ship.x - r.input.battle.areas[e.ship.kind === 'sub' ? 1 : 0].x, e.ship.y - r.input.battle.areas[e.ship.kind === 'sub' ? 1 : 0].y) > 1800)), 'a unit far from its area turns for it');
+  const reach = r => r.output.log.filter(e => e.fired).map(e => Math.hypot(e.ship.x - r.input.battle.areas[e.ship.kind === 'sub' ? 1 : 0].x, e.ship.y - r.input.battle.areas[e.ship.kind === 'sub' ? 1 : 0].y));
+  assert.ok(runs.some(r => reach(r).some(d => d > 1750 && d <= 1800)) && runs.some(r => reach(r).some(d => d > 1800 && d < 1850)), 'units fire just inside and just outside the turn-back distance');
   assert.ok(runs.some(r => r.output.ships.some(v => v.hull === 0) && r.input.ships.every(v => v.incidental || v.hull > 0)), 'ships sink');
   sameResults(await elm('fleetAction.advanceFleetAction', runs.map(r => [r.input])), runs.map(r => r.output));
 });

@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Fleet action (118 lines, four Elm modules) | about 25 min | matched on the first run; the mission handler threads through the state in order |
 | Systems (327 lines, seven Elm modules) | about 35 min | every function matched on its first full run; the slices compose the earlier ports (pressure, power plant, periscope, hull geometry) unchanged |
 | Boat and drone records | about 20 min | systems and limits as records with exhaustive accessors; restore's eight boat migrations inventoried, not ported |
 | Sound record | about 13 min | fits the acoustics' `Heard` record as it is (`id : Int`, `power : Maybe Float`), so the ported update runs on saved sounds |
@@ -495,3 +496,17 @@ Candidates for the audit of modules ported before this rule:
 - `||` defaults on numbers, non-null assertions (`!`), and the partial
   operations (division, `sqrt`, `acos`, `log`, `exp`, `**`) where their
   inputs are not already bounded.
+
+## Fleet action ported (2026-11-27)
+
+`fleet-action.ts` (118 code lines) became four Elm modules: `Sim.FleetAction`
+(the battle), `Sim.FleetTheater` (layout, side counts, echo affiliation),
+`Sim.FleetVolleys` (volleys in flight) and `Sim.FleetActionSaves`. The
+mission's per-event handler is a function threaded through the state in the
+TypeScript's order. About 25 minutes of work, matched on the first run; no
+TypeScript bugs found in it. Mutation check: 52 mutants, 51 killed. The one
+survivor relaxes `arrives <= launched` to `<` in save validation, which is
+equivalent: the rules before it require `launched <= time < arrives`, so with
+a finite time (restore guarantees one) the check can never decide. The first
+pass also left the 1800 m turn-back distance unchecked, since the far units
+stood 2,600 m out; theaters with units at 1,760 to 1,840 m now pin it.
