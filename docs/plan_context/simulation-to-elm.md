@@ -848,3 +848,56 @@ The harness's patrol becomes an alias of the world, so every existing
 differential test keeps decoding through it. A round trip then checks the
 save half: a TypeScript save decoded and re-encoded by Elm, compared with
 the save itself minus the page's fields.
+
+## The world record and patrol creation (2026-11-28)
+
+`Sim.World` holds the whole patrol (`dade90b`): the harness's patrol record
+moved into the simulation, with the 16 missing fields and the optional
+imaging time, New Year watch and patrol ID. The harness's patrol is now an
+alias of it. The saved difficulty also carries six interface switches the
+simulation never reads (`showSuspicion`, `omniscientChart`, `orbitCamera`,
+`instantReplay`, `enemyReplay`, `torpedoCam`); a save must keep them, so the
+Elm difficulty record holds them as opaque switches. A round trip decodes
+120 saves, from every mission's short and long patrols at several points in
+play, and encodes them again: each comes back as the save itself, apart from
+the page's fields and a ship's lost track, which the game saves as null or
+not at all alike.
+
+`Sim.PatrolCreate` (`9e51fb9`, 62 code lines of TypeScript) builds a new
+patrol in that record. The fresh boat, drone and combat stores the
+TypeScript builds in `systems.ts` and `combat.ts` had no Elm counterpart
+though those modules are marked as mirrored; they are constants, now
+written out in the creation module. Creation matched on its first run
+across 104 patrols (every mission and an unknown one, edge seeds, every
+kind of briefing choice, nonsense included). The soundings and the watch's
+warnings, which the tick calls, are tested directly with earlier warnings
+standing, since creation only ever starts without them. One test assertion
+first read the oldest log entries: the log keeps its newest first.
+
+## Restore and save (plan, 2026-11-28)
+
+`restore` (about 230 code lines with the mission target checks) parses a
+save and, in a fixed order, migrates older saves in place (filling fields
+added since, sometimes from other fields: an older patrol's extraction
+timer from its time, its outer hull from its hull, the drone's targets from
+its pose, the start day from the seed, the plant's new systems from the
+engine, an old fleet action's torpedo load, blast ids from the sound
+sequence, pre-torpedo-run weapon blasts into incoming runs, old contact
+labels, the crew's quiet time from torpedoes in flight) while checking each
+field, often against fields already migrated, and against a fresh
+patrol's template. Save is `JSON.stringify`.
+
+The Elm port follows the same order in two stages. First, decode the save
+into a record holding each field as absent or a value of the right shape,
+since absence drives every migration. Then a pure function applies the
+migrations and checks in the TypeScript's order, yielding the world or
+nothing. Many checks already exist in Elm from earlier ports (transmitters,
+torpedo tracks, debrief, reports, reconnaissance, tube times, repair limits,
+traffic, the allied watch, the search, warnings, contact fixes, torpedoes,
+incoming runs, designations); `validMissionTargets` moved into restore for
+this. The page splits off the photo archive and captain's name first.
+
+Testing compares restore's verdict and result on current saves from every
+mission, on each field damaged in turn, and on saves made older by removing
+fields each migration fills, so every migration and every refusal is
+exercised. Mutation testing follows, as for every port.

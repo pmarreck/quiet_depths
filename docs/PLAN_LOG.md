@@ -200,3 +200,4 @@ Publication evidence: the first public release commit, 7fe8e4d4300d0354bbc721a32
 ## Retired 2026-11-28
 
 - [x] [Elm migration › Move the simulation to Elm leaf-first, each module proven ag…] Checkpoint: complete or abandon the Elm simulation? Answer: complete it, judged on speed, how well the agent writes Elm, how well its tooling catches errors, how informative it is and how maintainable, with the owner valuing no runtime errors above all (owner, 2026-11-27 16:40; context: docs/plan_context/checkpoint-2026-11-27.md; done 2026-11-27 16:40 EST).
+- [x] [Elm migration › Move the simulation to Elm leaf-first, each module proven ag…] Question for the owner: add elm-format to the gate? Answer: yes, and elm-review too, both from nixpkgs, fixing what they find methodically (owner, 2026-11-27 16:40; done 2026-11-27 16:40 EST).
