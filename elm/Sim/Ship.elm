@@ -1,4 +1,4 @@
-module Sim.Ship exposing (Order, Parley, Pursuit(..), Report, Ship, decoder, encode)
+module Sim.Ship exposing (Order(..), Parley, Pursuit(..), Report, Ship, decoder, encode, fresh)
 
 {-| One vessel at sea, as saves hold it. The record mirrors the TypeScript
 field for field while both implementations change together: the fields a
@@ -414,3 +414,58 @@ encode s =
                 , field "fighterCount" E.float s.fighterCount
                 ]
         )
+
+
+{-| A ship with only its identity, position and motion set: full hull, no
+alert or attack, and every optional field absent.
+-}
+fresh : { id : String, name : String, kind : Kind, x : Float, y : Float, heading : Float, speed : Float } -> Ship
+fresh v =
+    { id = v.id
+    , name = v.name
+    , kind = v.kind
+    , x = v.x
+    , y = v.y
+    , heading = v.heading
+    , speed = v.speed
+    , hull = 100
+    , alert = 0
+    , attack = 0
+    , military = Nothing
+    , side = Nothing
+    , depth = Nothing
+    , sinkDepth = Nothing
+    , flood = Nothing
+    , disabled = Nothing
+    , playerDamaged = Nothing
+    , neutralHitAt = Nothing
+    , wreckMark = Nothing
+    , lampFix = Nothing
+    , nextSweep = Nothing
+    , incidental = Nothing
+    , roll = Nothing
+    , verticalSpeed = Nothing
+    , fixedWreck = Nothing
+    , groundedAt = Nothing
+    , clue = Nothing
+    , nextInquiry = Nothing
+    , report = Nothing
+    , tracking = Nothing
+    , patrolSpeed = Nothing
+    , lastAttackAt = Nothing
+    , parley = Nothing
+    , lights = Nothing
+    , blackout = Nothing
+    , pitch = Nothing
+    , noise = Nothing
+    , torpedoDecoys = Nothing
+    , lastTubeSide = Nothing
+    , lastHitLog = Nothing
+    , directHits = Nothing
+    , settled = Nothing
+    , sunkAt = Nothing
+    , nextCreak = Nothing
+    , collapsed = Nothing
+    , collapsedAt = Nothing
+    , fighterCount = Nothing
+    }

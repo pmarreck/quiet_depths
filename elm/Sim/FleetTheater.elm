@@ -7,7 +7,7 @@ each side afloat; and how a sonar echo or a contact reads its affiliation.
 
 import Sim.FleetVolleys exposing (Volley)
 import Sim.Math as M
-import Sim.Ship exposing (Ship)
+import Sim.Ship as Ship exposing (Ship)
 import Sim.SurfaceMotion exposing (hash01)
 import Sim.Vessel exposing (Kind(..), Side(..), SurfaceShip(..))
 
@@ -84,59 +84,25 @@ sideName side =
 
 theaterShip : { id : String, name : String, side : Side, sub : Bool, x : Float, y : Float, depth : Float, heading : Float, speed : Float } -> Ship
 theaterShip v =
-    { id = v.id
-    , name = v.name
-    , kind =
-        if v.sub then
-            Submarine
+    let
+        base : Ship
+        base =
+            Ship.fresh
+                { id = v.id
+                , name = v.name
+                , kind =
+                    if v.sub then
+                        Submarine
 
-        else
-            Surface Escort
-    , x = v.x
-    , y = v.y
-    , heading = v.heading
-    , speed = v.speed
-    , hull = 100
-    , alert = 0
-    , attack = 0
-    , military = Just True
-    , side = Just v.side
-    , depth = Just v.depth
-    , sinkDepth = Just 0
-    , flood = Just 0
-    , disabled = Just False
-    , playerDamaged = Nothing
-    , neutralHitAt = Nothing
-    , wreckMark = Nothing
-    , lampFix = Nothing
-    , nextSweep = Nothing
-    , incidental = Nothing
-    , roll = Nothing
-    , verticalSpeed = Nothing
-    , fixedWreck = Nothing
-    , groundedAt = Nothing
-    , clue = Nothing
-    , nextInquiry = Nothing
-    , report = Nothing
-    , tracking = Nothing
-    , patrolSpeed = Nothing
-    , lastAttackAt = Nothing
-    , parley = Nothing
-    , lights = Nothing
-    , blackout = Nothing
-    , pitch = Nothing
-    , noise = Nothing
-    , torpedoDecoys = Nothing
-    , lastTubeSide = Nothing
-    , lastHitLog = Nothing
-    , directHits = Nothing
-    , settled = Nothing
-    , sunkAt = Nothing
-    , nextCreak = Nothing
-    , collapsed = Nothing
-    , collapsedAt = Nothing
-    , fighterCount = Nothing
-    }
+                    else
+                        Surface Escort
+                , x = v.x
+                , y = v.y
+                , heading = v.heading
+                , speed = v.speed
+                }
+    in
+    { base | military = Just True, side = Just v.side, depth = Just v.depth, sinkDepth = Just 0, flood = Just 0, disabled = Just False }
 
 
 {-| The two task groups and their patrol areas, laid out from the patrol's

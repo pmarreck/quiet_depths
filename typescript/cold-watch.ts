@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/ColdWatch.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its traffic schedule and arrivals are elm/Sim/TrafficEncounters.elm, and validTraffic is elm/Sim/TrafficSaves.elm.
 import {incidentalHull} from './carrier.ts';
 import {chartDepth} from './coast.ts';
 import {hash01} from './surface-motion.ts';
