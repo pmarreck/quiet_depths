@@ -32,6 +32,8 @@ Until the simulation cutover to Elm, every gameplay feature or fix that touches 
 
 ## New gameplay
 
+- [ ] After the Elm cutover (owner, 2026-11-27 23:50 EST): aircraft spot a submerged hull from the air down to a depth somewhat below periscope depth, and nothing deeper; today they see only a surfaced boat (2 m or shallower) or a raised periscope within 400 m at 15 m or shallower (elm/Sim/AircraftFlight.elm `pursue`, typescript/aircraft-flight.ts), so the cutoff depth and how visibility, light and sea state shrink the range are to be chosen then.
+
 
 ## Future features
 
