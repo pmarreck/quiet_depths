@@ -11,6 +11,8 @@ import PatrolMission exposing (Mission)
 import Sim.AirSupport exposing (AirSupport, Aircraft)
 import Sim.Boat exposing (Limits, Systems)
 import Sim.Coast as Coast exposing (Coastline)
+import Sim.Combat exposing (Gun)
+import Sim.Contact as Contact exposing (Contact)
 import Sim.Debrief as Debrief
 import Sim.Drone as Drone exposing (Drone)
 import Sim.HostileTracks exposing (Noisemaker)
@@ -105,6 +107,10 @@ type alias Patrol =
     , gunRounds : List Round
     , noisemaker : Maybe Noisemaker
     , reports : List Report
+    , contacts : List Contact
+    , tubeReadyAt : { port_ : Float, starboard : Float }
+    , gun : Gun
+    , crewQuietUntil : Float
     }
 
 
@@ -287,6 +293,10 @@ decoder =
                                 |> andMap (D.field "gunRounds" (D.list gunRound))
                                 |> andMap (optional "noisemaker" (D.map6 Noisemaker (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float) (D.field "heading" D.float) (D.field "speed" D.float) (D.field "time" D.float)))
                                 |> andMap (D.field "reports" (D.list (D.map3 Report (D.field "id" D.string) (D.field "text" D.string) (D.field "time" D.float))))
+                                |> andMap (D.field "contacts" (D.list (Contact.decoder now)))
+                                |> andMap (D.field "tubeReadyAt" (D.map2 (\p st -> { port_ = p, starboard = st }) (D.field "port" D.float) (D.field "starboard" D.float)))
+                                |> andMap (D.field "gun" (D.map5 Gun (D.field "ammo" D.float) (D.field "cooldown" D.float) (D.field "shots" D.float) (D.field "angle" D.float) (D.field "elevation" D.float)))
+                                |> andMap (D.field "crewQuietUntil" D.float)
                         )
             )
 

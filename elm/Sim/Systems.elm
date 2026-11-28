@@ -1,4 +1,4 @@
-module Sim.Systems exposing (Difficulty, Emission, Impact, Sounding, World, addDebrief, bottom, damageScale, damageSystem, draw, emit, emitSound, emitWith, hullOf, hurt, onboardExplosion)
+module Sim.Systems exposing (Difficulty, Emission, Impact, Sounding, World, addDebrief, bottom, damageScale, damageSystem, draw, emit, emitSound, emitWith, hullOf, hurt, launchNoise, onboardExplosion)
 
 {-| Damage to the boat: its systems, its hulls, and onboard explosions. The
 drone's orders and damage are in `Sim.DroneOrders`, the boat's per-tick motion
@@ -406,3 +406,11 @@ emitWith detail e start =
             }
     in
     { s | acoustics = s.acoustics ++ [ detail sound ], soundSequence = s.soundSequence + 1 }
+
+
+{-| A torpedo leaving its tube, heard where it was launched; `own` marks the
+boat's own launch.
+-}
+launchNoise : { l | x : Float, y : Float } -> Maybe Float -> Bool -> Sounding s -> Sounding s
+launchNoise launcher depth own =
+    emitWith (\sound -> { sound | own = Just own }) { kind = Acoustics.Launch, x = launcher.x, y = launcher.y, depth = Just (Maybe.withDefault 0 depth), altitude = Nothing, power = 0.75 }

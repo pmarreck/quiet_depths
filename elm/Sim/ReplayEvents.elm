@@ -16,6 +16,8 @@ type Kind
     | Collision
     | Blast
     | Torpedo
+    | Sinking
+    | Collapse
 
 
 kindName : Kind -> String
@@ -32,6 +34,12 @@ kindName kind =
 
         Torpedo ->
             "torpedo"
+
+        Sinking ->
+            "sinking"
+
+        Collapse ->
+            "collapse"
 
 
 type alias ReplayEvent =

@@ -1,4 +1,4 @@
-module Sim.TrackEstimates exposing (ChartContact(..), ExactPosition, Observation, Packet, Track, applyReconPacket, chartContacts, designation, fixContact)
+module Sim.TrackEstimates exposing (ChartContact(..), ExactPosition, Observation, Packet, Track, applyReconPacket, chartContacts, designation, estimate, fixContact)
 
 {-| Timestamped observations of contacts, independent of live vessel state:
 fixing a contact from an observation, folding a reconnaissance packet into

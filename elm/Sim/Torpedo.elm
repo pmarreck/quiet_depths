@@ -1,4 +1,4 @@
-module Sim.Torpedo exposing (DecoyTarget, Launching, Orders, Owner(..), Torpedo, Trace, armingTime, enemyDecoySupply, maxPitch, putTorpedoInWater, surfaceRunDepth, torpedoLife, torpedoOrders, torpedoSpeed)
+module Sim.Torpedo exposing (DecoyTarget, Launching, Orders, Owner(..), Torpedo, Trace, armingTime, enemyDecoySupply, maxPitch, maxRun, putTorpedoInWater, surfaceRunDepth, torpedoLife, torpedoOrders, torpedoSpeed)
 
 {-| A torpedo in the water and how one is put there. Fictional combat tuning;
 positions are meters. The run itself is `Sim.TorpedoCourse` and

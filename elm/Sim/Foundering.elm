@@ -1,4 +1,4 @@
-module Sim.Foundering exposing (Vessel, descentSpeed, founderingPose, submergedDepth, wreckVisible)
+module Sim.Foundering exposing (Vessel, descentSpeed, founderingPose, submergedDepth, surfaceCollapseAge, wreckVisible)
 
 {-| How a sinking surface ship lists, trims and settles as it passes beneath
 the surface, and when its wreck can be seen. The bow is local -Z.

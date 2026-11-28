@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/Combat.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its gun rounds are elm/Sim/GunRounds.elm, ship damage elm/Sim/ShipDamage.elm and torpedo saves elm/Sim/TorpedoSaves.elm.
 import {playerSignal} from './cold-watch.ts';
 import {recordLocalLaunch} from './mess-watch.ts';
 import {isOpponent} from './fleet-action.ts';

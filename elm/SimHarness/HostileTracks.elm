@@ -1,4 +1,4 @@
-module SimHarness.HostileTracks exposing (function)
+module SimHarness.HostileTracks exposing (function, track)
 
 {-| Harness entries for the hunters: their reports, senses, debrief lines and
 attacks. The depth-charge and torpedo stand-ins log what they are handed, and
