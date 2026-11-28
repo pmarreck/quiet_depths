@@ -215,9 +215,13 @@ export function restore(raw: string): World | null {
       if (b.exploded === undefined) b.exploded = b.age > 0;
       if (b.exploded && b.explodedAt === undefined) b.explodedAt = s.time - b.age;
     }
+    // Before torpedo runs a weapon was saved as a blast: one still to arrive
+    // resumes as a torpedo in the water, and one that went off leaves only
+    // its fading cloud, dropped with it.
     s.blasts = s.blasts.filter(b => {
-      if (b.kind !== 'weapon' || b.exploded) return true;
-      restoreIncomingRun(s, b); return false;
+      if (b.kind !== 'weapon') return true;
+      if (!b.exploded) restoreIncomingRun(s, b);
+      return false;
     });
     for (const e of s.lightning) if (!allFinite(e, ['id', 'time', 'x', 'y', 'height', 'seed'])) return null;
     for (const e of s.acoustics) {

@@ -44,9 +44,13 @@ const PERCEIVED: Fields = {distance: 'number', delay: 'number', pan: 'number', g
 const AIRCRAFT: Fields = {name: 'string', phase: AIRCRAFT_PHASES, takeoffUntil: 'number', attack: 'number', bank: 'number', bombDropped: 'boolean', previous: 'record', egress: 'number'};
 const ALOFT: Fields = {x: 'number', y: 'number', altitude: 'number'};
 const DRONE: Fields = {lostReason: 'string', lowAlarm: 'boolean', rangeAlarm: 'boolean'};
+const BLAST: Fields = {
+  id: 'integer', totalDelay: 'number', exploded: 'boolean', explodedAt: 'number', airTime: 'number', airHeight: 'number', splashed: 'boolean', convoyCharge: 'boolean',
+  kind: ['charge', 'bomb'],
+};
 
 interface Saved {
-  ships: unknown[]; contacts: unknown[]; acoustics: unknown[]; aircraft: unknown[]; impacts: unknown[]; lightning: unknown[]; drone: unknown;
+  ships: unknown[]; contacts: unknown[]; acoustics: unknown[]; aircraft: unknown[]; impacts: unknown[]; lightning: unknown[]; blasts: unknown[]; drone: unknown;
   patrol: {variant: unknown}; airSupport: {lastKnown?: unknown};
 }
 const all = (list: unknown[], ok: (r: Record<string, unknown>) => boolean) => list.every(r => !!r && typeof r === 'object' && ok(r as Record<string, unknown>));
@@ -60,6 +64,7 @@ export function savedRecordsHold(s: Saved): boolean {
     && all(s.aircraft, p => fieldsHold(p, AIRCRAFT, ['name', 'phase', 'takeoffUntil', 'attack', 'bank', 'bombDropped']) && (p.previous === undefined || fieldsHold(p.previous, ALOFT, Object.keys(ALOFT))))
     && all(s.impacts, p => fieldsHold(p, {id: 'integer', kind: 'string'}, ['kind']))
     && all(s.lightning, e => fieldsHold(e, {id: 'integer'}))
+    && all(s.blasts, b => fieldsHold(b, BLAST, ['id', 'totalDelay', 'exploded', 'kind']))
     && fieldsHold(s.drone, DRONE, Object.keys(DRONE)) && Number.isInteger(s.patrol.variant)
     && (!lastKnown || fieldsHold(lastKnown, {reason: 'string'}));
 }
