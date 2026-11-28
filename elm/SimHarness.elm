@@ -27,6 +27,7 @@ import SimHarness.MissionObjective
 import SimHarness.Objectives
 import SimHarness.Records
 import SimHarness.Systems
+import SimHarness.TorpedoRun
 import SimHarness.Watch
 import SimHarness.World
 
@@ -55,7 +56,7 @@ function name =
                     table name
         )
         Nothing
-        [ SimHarness.Leaves.function, SimHarness.Acoustics.function, SimHarness.Watch.function, SimHarness.Objectives.function, SimHarness.Boat.function, SimHarness.World.function, SimHarness.Mechanics.function, SimHarness.Enemy.function, SimHarness.Lamp.function, SimHarness.Crew.function, SimHarness.Records.function, SimHarness.Hulls.function, SimHarness.Systems.function, SimHarness.Fleet.function, SimHarness.MessWatch.function, SimHarness.MissionObjective.function, SimHarness.HostileTracks.function, SimHarness.ColdWatch.function, SimHarness.EarlyEnd.function, SimHarness.AirSupport.function ]
+        [ SimHarness.Leaves.function, SimHarness.Acoustics.function, SimHarness.Watch.function, SimHarness.Objectives.function, SimHarness.Boat.function, SimHarness.World.function, SimHarness.Mechanics.function, SimHarness.Enemy.function, SimHarness.Lamp.function, SimHarness.Crew.function, SimHarness.Records.function, SimHarness.Hulls.function, SimHarness.Systems.function, SimHarness.Fleet.function, SimHarness.MessWatch.function, SimHarness.MissionObjective.function, SimHarness.HostileTracks.function, SimHarness.ColdWatch.function, SimHarness.EarlyEnd.function, SimHarness.AirSupport.function, SimHarness.TorpedoRun.function ]
 
 
 run : { id : Int, fn : String, batch : List D.Value } -> { id : Int, results : List E.Value, error : Maybe String }

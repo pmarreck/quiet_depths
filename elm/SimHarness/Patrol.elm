@@ -1,4 +1,4 @@
-module SimHarness.Patrol exposing (Patrol, decoder, encode, limits, systems)
+module SimHarness.Patrol exposing (Patrol, decoder, encode, encodeFields, limits, systems)
 
 {-| The flat patrol record the systems modules work on, decoded from a saved
 patrol and encoded back with every field systems can change.
@@ -7,21 +7,28 @@ patrol and encoded back with every field systems can change.
 import Dict exposing (Dict)
 import Json.Decode as D
 import Json.Encode as E
+import PatrolMission exposing (Mission)
+import Sim.AirSupport exposing (AirSupport, Aircraft)
 import Sim.Boat exposing (Limits, Systems)
 import Sim.Coast as Coast exposing (Coastline)
 import Sim.Debrief as Debrief
 import Sim.Drone as Drone exposing (Drone)
+import Sim.HostileTracks exposing (Noisemaker)
 import Sim.HullGeometry exposing (Body)
 import Sim.InvalidNumber exposing (InvalidNumber)
 import Sim.Mechanics as Mechanics exposing (LogEntry)
+import Sim.Ordnance exposing (Blast, Round)
+import Sim.PatrolReports exposing (Report)
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
 import Sim.ReplayEvents as Replay
 import Sim.Ship as Ship exposing (Ship)
 import Sim.Sound as Sound exposing (Sound)
 import Sim.Status as Status exposing (Status)
 import Sim.Systems exposing (Difficulty, Impact)
+import Sim.Torpedo exposing (Torpedo)
 import SimHarness.Codec exposing (andMap)
 import SimHarness.Hulls exposing (body, logKind)
+import SimHarness.Ordnance exposing (airSupport, aircraft, blast, gunRound, torpedo)
 
 
 type alias Patrol =
@@ -88,6 +95,16 @@ type alias Patrol =
     , site : Maybe Body
     , replay : List Replay.Marked
     , invalid : List InvalidNumber
+    , mission : Mission
+    , patrol : { seed : Float }
+    , runSetting : Float
+    , projectiles : List Torpedo
+    , aircraft : List Aircraft
+    , airSupport : AirSupport
+    , blasts : List Blast
+    , gunRounds : List Round
+    , noisemaker : Maybe Noisemaker
+    , reports : List Report
     }
 
 
@@ -200,7 +217,7 @@ decoder =
                                 |> andMap (D.field "status" (named Status.statusName Status.statuses))
                                 |> andMap (D.succeed now)
                                 |> andMap (D.field "rng" D.int)
-                                |> andMap (optional "difficulty" (D.map5 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float)))
+                                |> andMap (optional "difficulty" (D.map6 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool)))
                                 |> andMap (D.field "x" D.float)
                                 |> andMap (D.field "y" D.float)
                                 |> andMap (D.field "depth" D.float)
@@ -260,6 +277,16 @@ decoder =
                                 |> andMap (optional "site" (D.nullable body) |> D.map (Maybe.andThen identity))
                                 |> andMap (D.succeed [])
                                 |> andMap (D.succeed [])
+                                |> andMap (D.field "mission" (D.string |> D.andThen (\id -> PatrolMission.fromId id |> Maybe.map D.succeed |> Maybe.withDefault (D.fail ("unknown mission: " ++ id)))))
+                                |> andMap (D.at [ "patrol", "seed" ] D.float |> D.map (\seed -> { seed = seed }))
+                                |> andMap (D.field "runSetting" D.float)
+                                |> andMap (D.field "projectiles" (D.list torpedo))
+                                |> andMap (D.field "aircraft" (D.list aircraft))
+                                |> andMap (D.field "airSupport" airSupport)
+                                |> andMap (D.field "blasts" (D.list blast))
+                                |> andMap (D.field "gunRounds" (D.list gunRound))
+                                |> andMap (optional "noisemaker" (D.map6 Noisemaker (D.field "x" D.float) (D.field "y" D.float) (D.field "depth" D.float) (D.field "heading" D.float) (D.field "speed" D.float) (D.field "time" D.float)))
+                                |> andMap (D.field "reports" (D.list (D.map3 Report (D.field "id" D.string) (D.field "text" D.string) (D.field "time" D.float))))
                         )
             )
 
@@ -314,7 +341,14 @@ encodeReplay m =
 absent.
 -}
 encode : Patrol -> E.Value
-encode s =
+encode =
+    E.object << encodeFields
+
+
+{-| The fields `encode` writes, for harness entries that add their own.
+-}
+encodeFields : Patrol -> List ( String, E.Value )
+encodeFields s =
     let
         number : ( String, Float ) -> ( String, E.Value )
         number ( key, v ) =
@@ -324,69 +358,67 @@ encode s =
         field key enc =
             Maybe.map (\v -> ( key, enc v ))
     in
-    E.object
-        (List.map number
-            [ ( "time", s.time )
-            , ( "x", s.x )
-            , ( "y", s.y )
-            , ( "depth", s.depth )
-            , ( "heading", s.heading )
-            , ( "pitch", s.pitch )
-            , ( "speed", s.speed )
-            , ( "targetSpeed", s.targetSpeed )
-            , ( "targetHeading", s.targetHeading )
-            , ( "targetDepth", s.targetDepth )
-            , ( "verticalSpeed", s.verticalSpeed )
-            , ( "hull", s.hull )
-            , ( "outerHull", s.outerHull )
-            , ( "flood", s.flood )
-            , ( "shock", s.shock )
-            , ( "fuel", s.fuel )
-            , ( "fuelLeak", s.fuelLeak )
-            , ( "fuelFire", s.fuelFire )
-            , ( "battery", s.battery )
-            , ( "oxygen", s.oxygen )
-            , ( "water", s.water )
-            , ( "ballast", s.ballast )
-            , ( "planes", s.planes )
-            , ( "rudder", s.rudder )
-            , ( "propAngle", s.propAngle )
-            , ( "noise", s.noise )
-            , ( "repair", s.repair )
-            , ( "collisionCooldown", s.collisionCooldown )
-            , ( "criticalExposure", s.criticalExposure )
+    List.map number
+        [ ( "time", s.time )
+        , ( "x", s.x )
+        , ( "y", s.y )
+        , ( "depth", s.depth )
+        , ( "heading", s.heading )
+        , ( "pitch", s.pitch )
+        , ( "speed", s.speed )
+        , ( "targetSpeed", s.targetSpeed )
+        , ( "targetHeading", s.targetHeading )
+        , ( "targetDepth", s.targetDepth )
+        , ( "verticalSpeed", s.verticalSpeed )
+        , ( "hull", s.hull )
+        , ( "outerHull", s.outerHull )
+        , ( "flood", s.flood )
+        , ( "shock", s.shock )
+        , ( "fuel", s.fuel )
+        , ( "fuelLeak", s.fuelLeak )
+        , ( "fuelFire", s.fuelFire )
+        , ( "battery", s.battery )
+        , ( "oxygen", s.oxygen )
+        , ( "water", s.water )
+        , ( "ballast", s.ballast )
+        , ( "planes", s.planes )
+        , ( "rudder", s.rudder )
+        , ( "propAngle", s.propAngle )
+        , ( "noise", s.noise )
+        , ( "repair", s.repair )
+        , ( "collisionCooldown", s.collisionCooldown )
+        , ( "criticalExposure", s.criticalExposure )
+        ]
+        ++ [ ( "status", E.string (Status.statusName s.status) )
+           , ( "rng", E.int s.rng )
+           , ( "silent", E.bool s.silent )
+           , ( "floodAlarm", E.bool s.floodAlarm )
+           , ( "bottomed", E.bool s.bottomed )
+           , ( "torps", E.int s.torps )
+           , ( "cookoff", E.bool s.cookoff )
+           , ( "engine", E.string (engineName s.engine) )
+           , ( "dieselMode", E.string (dieselModeName s.dieselMode) )
+           , ( "pressureAlarm", E.int s.pressureAlarm )
+           , ( "imploded", E.bool s.imploded )
+           , ( "scope", E.bool s.scope )
+           , ( "collisionHits", E.dict identity E.float s.collisionHits )
+           , ( "systems", encodeParts (systemFields s.systems) )
+           , ( "repairLimits", encodeParts (( "hull", s.repairLimits.hull ) :: systemFields s.repairLimits) )
+           , ( "drone", Drone.encode s.drone )
+           , ( "impacts", E.list (\i -> E.object [ ( "id", E.int i.id ), ( "x", E.float i.x ), ( "y", E.float i.y ), ( "altitude", E.float i.altitude ), ( "time", E.float i.time ), ( "kind", E.string i.kind ) ]) s.impacts )
+           , ( "weaponSequence", E.int s.weaponSequence )
+           , ( "events", E.list (\e -> E.object [ ( "t", E.float e.t ), ( "text", E.string e.text ), ( "kind", E.string (Mechanics.logKindName e.kind) ) ]) s.events )
+           , ( "debrief", E.list (\d -> E.object [ ( "time", E.float d.time ), ( "text", E.string d.text ) ]) s.debrief )
+           , ( "acoustics", E.list Sound.encode s.acoustics )
+           , ( "soundSequence", E.int s.soundSequence )
+           , ( "replay", E.list encodeReplay s.replay )
+           , ( "invalid", E.list (\n -> E.object [ ( "where", E.string n.place ), ( "value", E.float n.value ) ]) s.invalid )
+           ]
+        ++ List.filterMap identity
+            [ field "roll" E.float s.roll
+            , field "cavitation" E.float s.cavitation
+            , field "propRpm" E.float s.propRpm
+            , field "gunLoudUntil" E.float s.gunLoudUntil
+            , field "unpoweredSince" E.float s.unpoweredSince
+            , field "scopeTravel" E.float s.scopeTravel
             ]
-            ++ [ ( "status", E.string (Status.statusName s.status) )
-               , ( "rng", E.int s.rng )
-               , ( "silent", E.bool s.silent )
-               , ( "floodAlarm", E.bool s.floodAlarm )
-               , ( "bottomed", E.bool s.bottomed )
-               , ( "torps", E.int s.torps )
-               , ( "cookoff", E.bool s.cookoff )
-               , ( "engine", E.string (engineName s.engine) )
-               , ( "dieselMode", E.string (dieselModeName s.dieselMode) )
-               , ( "pressureAlarm", E.int s.pressureAlarm )
-               , ( "imploded", E.bool s.imploded )
-               , ( "scope", E.bool s.scope )
-               , ( "collisionHits", E.dict identity E.float s.collisionHits )
-               , ( "systems", encodeParts (systemFields s.systems) )
-               , ( "repairLimits", encodeParts (( "hull", s.repairLimits.hull ) :: systemFields s.repairLimits) )
-               , ( "drone", Drone.encode s.drone )
-               , ( "impacts", E.list (\i -> E.object [ ( "id", E.int i.id ), ( "x", E.float i.x ), ( "y", E.float i.y ), ( "altitude", E.float i.altitude ), ( "time", E.float i.time ), ( "kind", E.string i.kind ) ]) s.impacts )
-               , ( "weaponSequence", E.int s.weaponSequence )
-               , ( "events", E.list (\e -> E.object [ ( "t", E.float e.t ), ( "text", E.string e.text ), ( "kind", E.string (Mechanics.logKindName e.kind) ) ]) s.events )
-               , ( "debrief", E.list (\d -> E.object [ ( "time", E.float d.time ), ( "text", E.string d.text ) ]) s.debrief )
-               , ( "acoustics", E.list Sound.encode s.acoustics )
-               , ( "soundSequence", E.int s.soundSequence )
-               , ( "replay", E.list encodeReplay s.replay )
-               , ( "invalid", E.list (\n -> E.object [ ( "where", E.string n.place ), ( "value", E.float n.value ) ]) s.invalid )
-               ]
-            ++ List.filterMap identity
-                [ field "roll" E.float s.roll
-                , field "cavitation" E.float s.cavitation
-                , field "propRpm" E.float s.propRpm
-                , field "gunLoudUntil" E.float s.gunLoudUntil
-                , field "unpoweredSince" E.float s.unpoweredSince
-                , field "scopeTravel" E.float s.scopeTravel
-                ]
-        )

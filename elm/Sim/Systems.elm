@@ -1,4 +1,4 @@
-module Sim.Systems exposing (Difficulty, Emission, Impact, Sounding, World, addDebrief, bottom, damageScale, damageSystem, draw, emit, emitSound, hullOf, hurt, onboardExplosion)
+module Sim.Systems exposing (Difficulty, Emission, Impact, Sounding, World, addDebrief, bottom, damageScale, damageSystem, draw, emit, emitSound, emitWith, hullOf, hurt, onboardExplosion)
 
 {-| Damage to the boat: its systems, its hulls, and onboard explosions. The
 drone's orders and damage are in `Sim.DroneOrders`, the boat's per-tick motion
@@ -24,7 +24,7 @@ import Sim.SurfaceMotion exposing (Point)
 
 
 type alias Difficulty =
-    { drone : Maybe Bool, damage : Maybe Float, pursuit : Maybe Float, depthStealth : Maybe Float, detection : Maybe Float }
+    { drone : Maybe Bool, damage : Maybe Float, pursuit : Maybe Float, depthStealth : Maybe Float, detection : Maybe Float, airSupport : Maybe Bool }
 
 
 type alias Impact =
@@ -363,7 +363,15 @@ emitSound kind at power =
 
 
 emit : Emission -> Sounding s -> Sounding s
-emit e start =
+emit =
+    emitWith identity
+
+
+{-| A sound with details beyond the emission's, such as a seeker's echo or
+whether the boat's own torpedo struck.
+-}
+emitWith : (Sound -> Sound) -> Emission -> Sounding s -> Sounding s
+emitWith detail e start =
     let
         s : Sounding s
         s =
@@ -397,4 +405,4 @@ emit e start =
             , echo = Nothing
             }
     in
-    { s | acoustics = s.acoustics ++ [ sound ], soundSequence = s.soundSequence + 1 }
+    { s | acoustics = s.acoustics ++ [ detail sound ], soundSequence = s.soundSequence + 1 }

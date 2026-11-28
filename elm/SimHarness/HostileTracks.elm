@@ -75,7 +75,7 @@ encodeTrack t =
 
 difficulty : D.Decoder Difficulty
 difficulty =
-    D.map5 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float)
+    D.map6 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool)
 
 
 shell : D.Decoder Shell
@@ -153,7 +153,7 @@ encodeHunt s =
         ]
 
 
-attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float }
+attacks : Hunt.Attacks { charges : List Charge, launches : List E.Value } { drone : Maybe Bool, damage : Maybe Float, airSupport : Maybe Bool }
 attacks =
     { dropCharge = \c s -> { s | charges = s.charges ++ [ c ] }
     , launchTorpedo =

@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/TorpedoRun.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its torpedo record and launch are elm/Sim/Torpedo.elm, its steering elm/Sim/TorpedoCourse.elm and its strikes elm/Sim/TorpedoStrike.elm.
 import {playerSignal} from './cold-watch.ts';
 import {exitPitch} from './torpedo-tubes.ts';
 import {replayEvent} from './replay-events.ts';

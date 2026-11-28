@@ -15,6 +15,7 @@ type Kind
     = Ground
     | Collision
     | Blast
+    | Torpedo
 
 
 kindName : Kind -> String
@@ -28,6 +29,9 @@ kindName kind =
 
         Blast ->
             "blast"
+
+        Torpedo ->
+            "torpedo"
 
 
 type alias ReplayEvent =
