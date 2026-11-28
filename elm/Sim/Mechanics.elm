@@ -1,4 +1,4 @@
-module Sim.Mechanics exposing (CapsuleContact, LogEntry, LogKind(..), bearing, capsuleContact, delta, distance, log, logKindName, propellerState, rad, rand, separation)
+module Sim.Mechanics exposing (CapsuleContact, LogEntry, LogKind(..), bearing, capsuleContact, delta, distance, log, logKindName, orZero, propellerState, rad, rand, separation)
 
 {-| Geometry, the patrol's seeded random draws, the captain's log, hull
 contact and propeller cavitation. Coordinates: x east, y north, depth down;

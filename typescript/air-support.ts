@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/AirSupport.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its aircraft update and depth bombs are elm/Sim/AircraftFlight.elm.
 import {scopeExtension} from './periscope.ts';
 import {canAttackPlayer} from './cold-watch.ts';
 import {isOpponent} from './fleet-action.ts';
