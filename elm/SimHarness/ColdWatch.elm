@@ -1,4 +1,4 @@
-module SimHarness.ColdWatch exposing (function)
+module SimHarness.ColdWatch exposing (function, traffic)
 
 {-| Harness entries for the cold watch and its traffic. The signal stand-in
 logs each action with a snapshot of the ship and its volley, and takes an

@@ -15,12 +15,15 @@ import Sim.Combat exposing (Gun)
 import Sim.Contact as Contact exposing (Contact)
 import Sim.Debrief as Debrief
 import Sim.Drone as Drone exposing (Drone)
+import Sim.FleetTheater exposing (Battle)
+import Sim.FleetVolleys exposing (Volley)
 import Sim.HostileTracks exposing (Noisemaker)
 import Sim.HullGeometry exposing (Body)
 import Sim.InvalidNumber exposing (InvalidNumber)
 import Sim.Mechanics as Mechanics exposing (LogEntry)
 import Sim.Ordnance exposing (Blast, Round)
 import Sim.PatrolReports exposing (Report)
+import Sim.PatrolSearch exposing (SearchArea)
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
 import Sim.ReplayEvents as Replay
 import Sim.Ship as Ship exposing (Ship)
@@ -28,9 +31,15 @@ import Sim.Sound as Sound exposing (Sound)
 import Sim.Status as Status exposing (Status)
 import Sim.Systems exposing (Difficulty, Impact)
 import Sim.Torpedo exposing (Torpedo)
+import Sim.TorpedoWatch as TorpedoWatch
+import Sim.TrafficEncounters exposing (Traffic)
 import SimHarness.Codec exposing (andMap)
+import SimHarness.ColdWatch as ColdWatch
+import SimHarness.Fleet as Fleet
 import SimHarness.Hulls exposing (body, logKind)
+import SimHarness.Objectives as Objectives
 import SimHarness.Ordnance exposing (airSupport, aircraft, blast, gunRound, torpedo)
+import SimHarness.Watch as Watch
 
 
 type alias Patrol =
@@ -98,7 +107,7 @@ type alias Patrol =
     , replay : List Replay.Marked
     , invalid : List InvalidNumber
     , mission : Mission
-    , patrol : { seed : Float }
+    , patrol : { seed : Float, photoGoal : Float }
     , runSetting : Float
     , projectiles : List Torpedo
     , aircraft : List Aircraft
@@ -111,6 +120,18 @@ type alias Patrol =
     , tubeReadyAt : { port_ : Float, starboard : Float }
     , gun : Gun
     , crewQuietUntil : Float
+    , nextId : Float
+    , convoy : Maybe { shot : Maybe Volley }
+    , battle : Maybe Battle
+    , traffic : Maybe Traffic
+    , search : Maybe SearchArea
+    , pingAge : Float
+    , pingCooldown : Float
+    , torpedoTracks : List TorpedoWatch.Track
+    , photos : List String
+    , photoCooldown : Float
+    , decoys : Int
+    , alert : Float
     }
 
 
@@ -223,7 +244,7 @@ decoder =
                                 |> andMap (D.field "status" (named Status.statusName Status.statuses))
                                 |> andMap (D.succeed now)
                                 |> andMap (D.field "rng" D.int)
-                                |> andMap (optional "difficulty" (D.map7 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool) (optional "satellite" D.bool)))
+                                |> andMap (optional "difficulty" (D.map8 Difficulty (optional "drone" D.bool) (optional "damage" D.float) (optional "pursuit" D.float) (optional "depthStealth" D.float) (optional "detection" D.float) (optional "airSupport" D.bool) (optional "satellite" D.bool) (optional "pingDetection" D.float)))
                                 |> andMap (D.field "x" D.float)
                                 |> andMap (D.field "y" D.float)
                                 |> andMap (D.field "depth" D.float)
@@ -284,7 +305,7 @@ decoder =
                                 |> andMap (D.succeed [])
                                 |> andMap (D.succeed [])
                                 |> andMap (D.field "mission" (D.string |> D.andThen (\id -> PatrolMission.fromId id |> Maybe.map D.succeed |> Maybe.withDefault (D.fail ("unknown mission: " ++ id)))))
-                                |> andMap (D.at [ "patrol", "seed" ] D.float |> D.map (\seed -> { seed = seed }))
+                                |> andMap (D.map2 (\seed goal -> { seed = seed, photoGoal = goal }) (D.at [ "patrol", "seed" ] D.float) (D.at [ "patrol", "photoGoal" ] D.float))
                                 |> andMap (D.field "runSetting" D.float)
                                 |> andMap (D.field "projectiles" (D.list torpedo))
                                 |> andMap (D.field "aircraft" (D.list aircraft))
@@ -297,6 +318,18 @@ decoder =
                                 |> andMap (D.field "tubeReadyAt" (D.map2 (\p st -> { port_ = p, starboard = st }) (D.field "port" D.float) (D.field "starboard" D.float)))
                                 |> andMap (D.field "gun" (D.map5 Gun (D.field "ammo" D.float) (D.field "cooldown" D.float) (D.field "shots" D.float) (D.field "angle" D.float) (D.field "elevation" D.float)))
                                 |> andMap (D.field "crewQuietUntil" D.float)
+                                |> andMap (D.field "nextId" D.float)
+                                |> andMap (optional "convoy" (D.nullable (D.map (\shot -> { shot = shot }) (optional "shot" (D.nullable Fleet.volley) |> D.map (Maybe.andThen identity)))) |> D.map (Maybe.andThen identity))
+                                |> andMap (optional "battle" (D.nullable Fleet.battle) |> D.map (Maybe.andThen identity))
+                                |> andMap (optional "traffic" ColdWatch.traffic)
+                                |> andMap (optional "search" Objectives.searchArea)
+                                |> andMap (D.field "pingAge" D.float)
+                                |> andMap (D.field "pingCooldown" D.float)
+                                |> andMap (D.field "torpedoTracks" (D.list Watch.track))
+                                |> andMap (D.field "photos" (D.list D.string))
+                                |> andMap (D.field "photoCooldown" D.float)
+                                |> andMap (D.field "decoys" D.int)
+                                |> andMap (D.field "alert" D.float)
                         )
             )
 

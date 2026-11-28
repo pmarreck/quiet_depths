@@ -1,4 +1,4 @@
-module SimHarness.Watch exposing (function)
+module SimHarness.Watch exposing (encodeTrack, function, track)
 
 {-| Harness entries for sinking ships and the torpedo watch.
 -}

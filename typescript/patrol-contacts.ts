@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/PatrolContacts.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its contact reports are elm/Sim/ContactReports.elm.
 import {leaveClue} from './suspicion.ts';
 import {gameEcho, observeTorpedo} from './torpedo-watch.ts';
 import {operatingFraction} from './equipment.ts';

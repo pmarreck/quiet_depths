@@ -1,4 +1,4 @@
-module SimHarness.Objectives exposing (function)
+module SimHarness.Objectives exposing (encodeSearch, function, searchArea)
 
 {-| Harness entries for mission objectives and the periscope. Each uses the
 mission definition's own criteria, as the TypeScript does.

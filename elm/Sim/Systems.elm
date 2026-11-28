@@ -24,7 +24,7 @@ import Sim.SurfaceMotion exposing (Point)
 
 
 type alias Difficulty =
-    { drone : Maybe Bool, damage : Maybe Float, pursuit : Maybe Float, depthStealth : Maybe Float, detection : Maybe Float, airSupport : Maybe Bool, satellite : Maybe Bool }
+    { drone : Maybe Bool, damage : Maybe Float, pursuit : Maybe Float, depthStealth : Maybe Float, detection : Maybe Float, airSupport : Maybe Bool, satellite : Maybe Bool, pingDetection : Maybe Float }
 
 
 type alias Impact =
