@@ -175,6 +175,28 @@ test('a save with a nested field missing or of the wrong type is refused or rest
 // Each bound restore checks, tried just inside it and just outside, with the
 // values a nearby wrong bound would treat differently, and the saves a
 // mission's own checks turn on.
+// Values the simulation can never reach: below zero for what counts down to
+// zero or up from it, above 100 for what fills to 100 at most, a fraction of
+// a noisemaker. Each field with its reachable edges and impossible values.
+const IMPOSSIBLE = [
+  ['time', [], [-1, -1e-9]], ['pingAge', [0], [-1]], ['pingCooldown', [0], [-.5]], ['photoCooldown', [0], [-.5]], ['shock', [0], [-1]], ['flood', [0], [-.01]],
+  ['battery', [0, 100], [-.01, 100.01]], ['oxygen', [0, 100], [-1, 101]], ['fuel', [0, 100], [-1, 101]], ['hull', [100], [-1, 100.5]], ['alert', [0, 100], [-1, 101]],
+  ['decoys', [0, 3], [-1, 1.5]],
+];
+const playedRecon = () => {
+  const s = createGame('recon', 41);
+  for (let k = 0; k < 20; k++) step(s, 15, {timeRate: 4});
+  return JSON.parse(save(s));
+};
+
+test('a save holding a value the simulation can never reach is refused, and its edges restore', () => {
+  const saved = playedRecon();
+  for (const [field, edges, impossible] of IMPOSSIBLE) {
+    for (const value of edges) assert.notEqual(verdict({...saved, [field]: value}), null, `${field} ${value} restores`);
+    for (const value of impossible) assert.equal(verdict({...saved, [field]: value}), null, `${field} ${value} is refused`);
+  }
+});
+
 test('a save at each of restore\'s bounds is refused or restored as the TypeScript does', async () => {
   const calls = [];
   const played = (mission, seed = 41, options = {}) => {
@@ -191,6 +213,7 @@ test('a save at each of restore\'s bounds is refused or restored as the TypeScri
   const hex = n => 'abcdef0123456789'.repeat(3).slice(0, n);
   for (const [field, values] of [['scopeTravel', [1, 1.5]], ['newYearWatch', [3, 2.5, 2 ** 53 - 1, 2 ** 53]], ['fuelFire', [24, 24.5]], ['torps', [6, 5.5]]])
     for (const value of values) edge(field + ' ' + value, recon, c => { c[field] = value; });
+  for (const [field, edges, impossible] of IMPOSSIBLE) for (const value of [...edges, ...impossible]) edge(field + ' ' + value, recon, c => { c[field] = value; });
   for (const offset of [.001, .5]) edge('imagingTime now + ' + offset, recon, (c, t) => { c.imagingTime = t + offset; });
   for (const offset of [0, 1]) edge('unpoweredSince now + ' + offset, recon, (c, t) => { c.unpoweredSince = t + offset; });
   for (const offset of [50, 100, 101]) edge('a tube ready at now + ' + offset, recon, (c, t) => { c.tubeReadyAt.port = t + offset; });

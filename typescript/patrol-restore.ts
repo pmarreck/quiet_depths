@@ -109,6 +109,11 @@ export function restore(raw: string): World | null {
       if (typeof v === 'boolean' && typeof fields[k] !== 'boolean') return null;
       if (Array.isArray(v) && !Array.isArray(fields[k])) return null;
     }
+    // Values the simulation can never reach: below zero for what counts down
+    // to zero or up from it, above 100 for what fills to 100 at most, and a
+    // fraction of a noisemaker.
+    if ([s.time, s.pingAge, s.pingCooldown, s.photoCooldown, s.shock, s.flood].some(v => v < 0) || [s.battery, s.oxygen, s.fuel, s.hull, s.alert].some(v => v < 0 || v > 100) ||
+      !Number.isInteger(s.decoys) || s.decoys < 0) return null;
     const hits = s.collisionHits as unknown;
     if (typeof s.bottomed !== 'boolean' || s.outerHull < 0 || s.outerHull > 100 || s.criticalExposure < 0 || ![0, 1, 2].includes(s.pressureAlarm) || !hits || Array.isArray(hits) ||
       typeof hits !== 'object' || !Object.values(hits).every(t => finite(t) && t >= 0 && t <= s.time)) return null;

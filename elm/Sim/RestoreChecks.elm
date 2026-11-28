@@ -69,8 +69,8 @@ template m f =
             )
 
 
-{-| The hulls, the plant's mode, the phase and engine, the extraction point
-and the drone's mode.
+{-| The values the boat can never reach, the hulls, the plant's mode, the
+phase and engine, the extraction point and the drone's mode.
 -}
 boat : Fields -> Bool
 boat f =
@@ -83,7 +83,13 @@ boat f =
         inRange key low high =
             number key f |> Maybe.map (\v -> low <= v && v <= high) |> Maybe.withDefault False
     in
-    field "bottomed" D.bool f
+    -- Values the simulation can never reach: below zero for what counts down
+    -- to zero or up from it, above 100 for what fills to 100 at most, and a
+    -- fraction of a noisemaker.
+    List.all (\key -> inRange key 0 (1 / 0)) [ "time", "pingAge", "pingCooldown", "photoCooldown", "shock", "flood" ]
+        && List.all (\key -> inRange key 0 100) [ "battery", "oxygen", "fuel", "hull", "alert" ]
+        && (number "decoys" f |> Maybe.map (\n -> integer n && 0 <= n) |> Maybe.withDefault False)
+        && field "bottomed" D.bool f
         /= Nothing
         && inRange "outerHull" 0 100
         && inRange "criticalExposure" 0 (1 / 0)

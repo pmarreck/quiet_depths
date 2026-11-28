@@ -1518,3 +1518,21 @@ can precede the moment the page last set its clock. Both simulations skip
 a step with `dt <= 0`, so nothing was lost, but the page's own clocks ran
 backward that frame; the page now clamps a frame's elapsed time at zero,
 and the format test checks that no recorded step goes back in time.
+
+## Restore refuses values the simulation can never reach (2026-11-28)
+
+The owner decided that restore should refuse impossible values, the
+TypeScript first. Restore checked the boat's numbers only for being
+finite. It now also refuses a save with any of these below zero: time,
+ping age, either cooldown, shock, flood, battery, oxygen, fuel, hull,
+alert or noisemakers. It also refuses battery, oxygen, fuel, hull or alert
+above 100, and a fraction of a noisemaker. Each bound is one the simulation
+holds by construction (battery to its bank and fuel to its tank, both at
+most 100; oxygen, hull and alert clamped to 100; the rest only count down
+to zero or up from it). Upper bounds stop at the 100 ceilings that have
+always held, so no older save is refused. A failing test came first (it
+failed at "pingAge -1 is refused"; negative time was already refused,
+since many recorded times may not exceed it), then the TypeScript, then
+`Sim.RestoreChecks`. The bounds test now compares each edge and impossible
+value between the two restores; with the Elm check removed it fails, 14 of
+83 differing.
