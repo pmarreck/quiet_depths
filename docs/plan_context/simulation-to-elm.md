@@ -931,3 +931,189 @@ TypeScript mutates ships in place while later calls read the list.
 Audit first, per the owner's rule: no TypeScript bug found on a first read
 of the tick and its three helpers (the patrol sweep, the receipt of heard
 sounds, the traffic signal).
+
+## The patrol tick (2026-11-28, `4b88d02`)
+
+`Sim.PatrolTick` (276 code lines of TypeScript, 457 of Elm, with
+`Sim.PatrolShips`, `Sim.PatrolHearing`, `Sim.PatrolHazards` and
+`Sim.PatrolEnd` beside it) composes the ported modules into a frame of play
+in the TypeScript's order. Three things shaped it:
+
+- The TypeScript changes ships in place while later calls read the list, so
+  the ship loop writes each ship back into the world before every call that
+  is handed both, and before moving to the next ship.
+- Several ported modules take a narrower record than the world: the traffic
+  watch wants a plain traffic record, hull contacts an outbox of collisions,
+  reconnaissance an optional record, the sky an optional environment and a
+  plainer strike, the suspicion rules plain difficulty numbers, convoy
+  tracking a sonar figure. The tick passes a view of the world to each and
+  copies back what it changed; collisions become replay marks afterwards,
+  in order, since nothing else in hull contacts marks the replay.
+- Elm compiles `a >= b` between variables to `!(a < b)`, true for NaN, so
+  every TypeScript `a >= b` is written `b <= a`.
+
+`updateAcoustics` and `observeTorpedo` had never been ported, though their
+modules are marked mirrored; the tick uses the existing pure
+`Acoustics.update` and `TorpedoWatch.observe` and applies the receipts and
+blasts afterwards, which is equivalent because no receipt or blast adds a
+sound (the TypeScript loop would otherwise hear it the same tick).
+
+The differential test plays every mission, short and long, in random and
+stormy weather, frame by frame with scripted orders and actions between
+frames (dives, sprints, pings, torpedoes, the gun, the drone, decoys,
+photographs, reconnaissance requests): 576 frames, each starting from the
+patrol as a save restores it. A second test drives constructed moments:
+each way a patrol ends, extraction opening, a search located three ways,
+escort shells, waypoints, a collision with the boat, a reconnaissance
+packet, an expiring noisemaker, an older save without a wave phase, and
+frames that move nothing. Each frame compares the live patrol through
+`exact`, so -0, NaN and the infinities count; a first version compared the
+save's JSON, which turns -0 into 0, and flagged an Elm -0 the TypeScript
+held too. The random play's reconnaissance requests had all been refused
+until the test used the required 10 km footprint. The tick matched on its
+first run.
+
+Mutation check (114 mutants across the five tick modules): 87 failed the
+tests at first and 25 survived, each a branch no frame of random or
+constructed play reached. A third test (`46ea297`, `60916be`) now sets up
+the one condition each branch turns on, between its threshold and a nearby
+wrong one, and asserts the TypeScript took the branch: thin morning fog
+found by searching start hours, sounds whose ids hash into the window
+between the right odds and a wrong one, a strike seed found by stepping the
+generator, a passing sub whose id makes it challenge at 5.3 km, and so on.
+Two cautions from it: a scenario's assertion must observe its own
+scenario (the first traffic check was met by an escort's challenge
+elsewhere, and the sub never pinged), and a time rate that is not a number
+reaches code that only `|| 1` protects, so the test sends one. Final: 111
+killed; one equivalent (the received packet's time feeds only checks that
+pass for any time from capture to now); and two lines no test could see
+because they never change anything, now removed from both languages
+(`3f29226`): the tick's hull check after moving the boat, which already
+marks the patrol lost, and the Elm tick copying back ships a
+reconnaissance pass returns unchanged.
+
+## Restore ported (2026-11-28, `82eba9f`)
+
+`Sim.PatrolRestore` resumes a saved patrol from untrusted JSON in the
+TypeScript's order. `Sim.SaveFields` reads JSON as JavaScript does (finite,
+safe integer, truthy, and a fill for `=== undefined` beside one for `??=`);
+`Sim.RestoreFields` and `Sim.RestoreStores` bring an older save up to date
+as JSON; `Sim.RestoreChecks` checks it field by field and against a fresh
+patrol's template. Only then is the world decoded, with the simulation's
+own codecs (moved out of the test harness at `a80042b`), and the typed
+checks and migrations run. Working on JSON fields first keeps the
+difference between an absent field and null, which drives every migration.
+Where the TypeScript assigns properties into a truthy primitive or an array
+(a strict-mode TypeError, caught as a refusal), the Elm refuses as well.
+
+The differential tests found four TypeScript gaps, each fixed
+TypeScript-first behind a failing test:
+
+- A falsy route, site or operation (0, false, an empty string) was kept;
+  now refused, and an older save's missing route becomes null (`47ffd01`).
+- Each record's further fields were kept in any type: a ship's disabled
+  switch as text, a contact's sighting method as a number, a sound's
+  perceived loudness as null, an aircraft without its phase, a fraction for
+  an id. `typescript/save-fields.ts` names each record's further fields with
+  their types; a null clue, parley, wreck mark, fix or sweep area is
+  refused; an older save missing air support's last report, an operation's
+  find or the reconnaissance packet gains null (`59c29ec`). Two record tests
+  that had recorded the Elm decoders as stricter now expect both to refuse.
+- A blast of any kind, or none, was kept, with its id, fuse, switches and
+  air drop in any type; now only depth charges and bombs, in their types.
+- An older save's weapon blast that had already exploded was kept as a
+  blast of a kind the game no longer makes; it is now dropped with its
+  fading cloud, while one still to arrive resumes as a torpedo in the water.
+
+One difference is only representational: a contact fix's null velocity or
+uncertainty, which the TypeScript keeps as null and reads as absent (`??`)
+wherever it is used, decodes in Elm as absent; the comparison treats the
+two alike.
+
+The differential tests restore every mission's saves, short and long,
+fresh and after play (72); each top-level field missing or replaced by
+junk of every JSON type (14,165); older saves with each migration's fields
+removed singly and all at once, an old fleet action's torpedo load, blasts
+without ids or fuses, weapon blasts exploded or not under every truthy and
+falsy switch, each blast field missing or of another type, torpedoes
+without a crew watch, and a site without a hull; and every nested field to
+depth four in the first two entries of each list, damaged in turn, with
+fractions and negatives for numbers and junk added to each record's absent
+optional fields (87,748). Each compares the restored patrol exactly, or
+both refuse.
+
+## The switch (plan, 2026-11-28 04:35 EST)
+
+With the tick and restore ported, 58 of 62 modules (97.9% of the
+simulation's code lines) are mirrored; the rest stay with the page by
+design (the photo archive and the captain's name) or are the facade
+(`sim.ts`, `world-slice.ts`). What the page does with the patrol today:
+
+- It holds the patrol as one mutable object, `state`, and reads it
+  everywhere: the renderer, the instruments, the audio, the HUD, about 30
+  helper functions.
+- It writes 19 player-controlled fields directly (26 places: helm orders,
+  silent running, the engine, the route, the scope, the tower, the gun's
+  aim, the run setting, the diesel mode, the imagers, repair priority), and
+  the input helpers in `controls.ts` write the same kind of fields from keys.
+- It calls about 15 simulation actions (ping, photograph, fire, decoy, the
+  drone, the deck gun, the scope order, reconnaissance, a rescue's start,
+  survey photographs, ending a patrol early, the log), each with an Elm twin.
+- Each frame it calls `step` with a hook run after every quarter-second tick,
+  which captures the instant replay (a picture every 0.1 s of patrol time)
+  and advances the sonar paper; the replay also listens for replay events.
+- It saves with `JSON.stringify` and restores through `restore`, splitting off
+  the photo archive and the captain's name.
+
+Proposed design: Elm owns the patrol in a worker; the page keeps a
+read-only mirror.
+
+1. `Sim.Patrol` (the port of `sim.ts`) exposes the simulation as pure
+   functions over the world: create, restore, save, each action, and a step
+   that returns, for each tick, its replay marks, its invalid numbers, and
+   the world as it stood after that tick.
+2. A worker program holds the world and answers commands through one port
+   pair. After each command it sends the world, encoded in the save's shape,
+   which the page adopts as its mirror, so every reader keeps working
+   unchanged. Elm's ports deliver the reply within the `send` call, so code
+   that reads right after acting sees the result.
+3. The page's player-controlled fields become orders: the page keeps
+   writing them on its mirror as today, and each step sends that fixed set of
+   fields, which Elm applies before stepping. Actions become commands.
+4. Per-tick worlds feed the replay recorder and the sonar paper, in order
+   with the replay marks. At 1x a frame is one tick, so nothing extra
+   crosses; at high compression a frame carries a few.
+5. The page saves the mirror and restores through the worker, keeping the
+   photo archive and captain beside it, as the boundary note planned.
+6. A query flag selects the Elm simulation until it has been played in a
+   browser; then it becomes the default and the TypeScript simulation is
+   deleted.
+
+Verification before any browser: a differential test drives the worker
+through the page's adapter and the TypeScript side by side over whole
+patrols (create, orders, actions, steps, save, restore), comparing every
+mirror exactly. The browser check (the boundary's per-frame cost in real
+ticks, and play) waits on the owner's answer about restarting headless
+Chromium.
+
+## `sim.ts` ported as `Sim.Patrol` (2026-11-28, `b0ed069`)
+
+`Sim.Patrol` is the simulation as the page drives it. `step` returns a
+frame tick by tick, each tick's world with the replay marks and invalid
+numbers it announced, taken out of the world's outboxes; `act` takes each
+of the 14 page actions and returns the result the TypeScript returns (a
+switch, a survey result, an early end's outcome, or nothing as null) with
+the world and its announcements. `Sim.PatrolCommand` reads the frame input
+and actions as JSON and writes outcomes back in the save's shape, ready for
+the worker. Twelve actions took the Elm world as it is; reconnaissance and
+the early end take narrower records (an optional reconnaissance record, a
+rescued count as a number), so the facade passes a view and copies back
+what changed, as the tick does.
+
+The differential test plays every mission, short and long, taking each
+action in turn before each frame (296 actions, 148 frames), then sets up
+each action random play seldom completes (a merchant photographed, a
+rescue begun below and on the surface, a survey photograph, an early end
+with part and none of the objective, a decoy with none left). Both matched
+on the first run. With `sim.ts` marked, 59 of 62 modules (98.1% of code
+lines) are mirrored; `captain` and `photos` stay with the page.
