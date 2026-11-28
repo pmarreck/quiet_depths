@@ -319,6 +319,7 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Contact reports, ping and photographs (114 lines, two Elm modules) | about 25 min | matched once the test passed both languages the same look; a restore gap fixed first; 52 of 52 mutants killed |
 | Orbital reconnaissance (196 lines, three Elm modules) | about 20 min after the TypeScript fix | matched on the first comparison; save checks tightened in the TypeScript first; 69 of 74 mutants killed, the other five equivalent |
 | Combat (209 lines, four Elm modules) | not measured (written across a context break) | matched once the test stated the one deliberate difference (a player torpedo's launcher and aim); two TypeScript save checks fixed first; 61 of 62 mutants killed, the last equivalent |
 | Torpedo runs (130 lines, four Elm modules) | about 60 min | matched on the first comparison; 54 of 55 mutants killed, the last equivalent |
@@ -716,3 +717,28 @@ reads the same), the panel's guard against a NaN progress (saves cannot hold
 one), a queued task's link check (the uplink step already returns the task
 untouched when the link is down), unique track ids (implied by the scene
 ships' checks), and the refusal of a negative clock (saved cooldowns are never negative, so the cooldown check already refuses it).
+
+## Contact reports, the ping and photographs ported (2026-11-27)
+
+`patrol-contacts.ts` (114 code lines) became `Sim.ContactReports` (a ship
+sighted, heard or ranged, the fix each method earns, and lamp fixes) and
+`Sim.PatrolContacts` (the periscope's view, the active ping, photographs,
+the noisemaker and depth charges), at `a78006b`, about 25 minutes after
+reading began, and matched once the test passed both languages the same
+look. Its `fire` is combat's `launchTorpedo` and needed no port. The shared
+patrol harness grew to decode the contact numbering, the convoy's shot, the
+fleet battle, traffic, the search area, ping timers, torpedo tracks,
+photographs, noisemakers left and the boat's alert.
+
+Porting found a restore gap, fixed first (`c6cfb65`): a saved ship's depth
+was never checked, so a submarine saved without one would have an active
+ping estimate a NaN depth for her. Restore now requires a finite depth when
+present and one on every submarine.
+
+Mutation testing killed 41 of 52 mutants at first (one pattern did not
+apply). The played patrols never sighted a ship close aboard, met a
+submarine deeper than 300 m, a boat between 15 and 16 m, a search site 1.4
+to 1.5 km off, torpedoes 5 to 6 km away, fleet volleys in flight near the
+ping's reach, a disabled opponent in earshot, a contact already holding a
+guess at its side, or an incidental merchant in the reticle. Wider inputs
+and constructed photographs now kill all 52.

@@ -53,6 +53,10 @@ test('contact reports match by every method, refixing as fixes age and the peris
     for (let n = 0; n < 120; n++) {
       w.time += pick(random, [.5, 2, 6]);
       const v = pick(random, w.ships), method = pick(random, ['passive', 'active', 'visual', 'lights']);
+      // Some ships close aboard, where a sighting's uncertainty reaches its floor,
+      // and submarines deeper than an estimate may report.
+      if (random() < .15) Object.assign(v, {x: w.x + (random() - .5) * 700, y: w.y + (random() - .5) * 700});
+      if (v.kind === 'sub' && random() < .3) v.depth = pick(random, [40, 315, 340]);
       const ship = random() < .2 ? {id: v.id, x: v.x + 30, y: v.y - 40} : random() < .1 ? {...v, id: 'stranger-' + n} : v;
       const sightedIn = s => s.ships.find(x => x === ship || x.id === ship.id && ship === v) ?? structuredClone(ship);
       const input = exact(w), {result, output} = run(input, s => contact(s, sightedIn(s), method));
@@ -78,8 +82,18 @@ test('the active ping matches: torpedoes, the fleet\'s volleys, the search site,
     if (random() < .5) putTorpedoInWater(w, 'enemy', {x: w.x + 800, y: w.y, depth: w.depth}, 270, w.depth, {heading: 270, launcher: near.id, aim: {x: w.x, y: w.y}});
     if (random() < .5) putTorpedoInWater(w, 'player', {x: w.x, y: w.y, depth: w.depth}, 90, 20, {intended: near.id});
     for (const v of w.ships) if (random() < .3) Object.assign(v, {x: w.x + (random() - .5) * 9000, y: w.y + (random() - .5) * 9000});
+    if (random() < .5) putTorpedoInWater(w, 'player', {x: w.x + pick(random, [5500, 6500]), y: w.y, depth: w.depth}, 90, w.depth, {});
     if (w.search && random() < .5) w.search.located = false;
-    if (w.site && random() < .5) Object.assign(w.site, {x: w.x + pick(random, [400, 2000]), y: w.y});
+    if (w.site && random() < .5) Object.assign(w.site, {x: w.x + pick(random, [400, 1450, 1550, 2000]), y: w.y, depth: w.depth});
+    // Volleys in flight on and under the water near the ping's reach.
+    if (w.battle && random() < .7) w.battle.volleys = [0, 1, 2].map(k => {
+      const d = pick(random, [3000, 5500, 6500]), from = {x: w.x + d, y: w.y + k * 40, altitude: -10}, to = {x: w.x - d, y: w.y + k * 40, altitude: -10};
+      return {id: 9000 + n * 3 + k, underwater: random() < .6, from, to, source: w.ships[0].id, target: w.ships[1].id, launched: w.time - 2, arrives: w.time + 600, damage: 0};
+    });
+    for (const v of w.ships) if (random() < .25) v.disabled = true;
+    // Contacts already holding a guess at their side.
+    for (const c of w.contacts) if (random() < .5 && !c.identified) c.probableSide = pick(random, ['friendly', 'hostile']);
+    for (const v of w.ships) if (v.kind === 'sub' && random() < .3) v.depth = pick(random, [315, 340]);
     const input = exact(w), {result, output} = run(input, s => ping(s));
     calls.push({input, expected: [result, output]});
   }
@@ -93,7 +107,8 @@ test('photographs, sightings, the noisemaker, depth charges and lamp fixes match
   const random = seeded(173), photos = [], sights = [], decoys = [], charges = [], lamps = [];
   for (const base of worlds()) for (let n = 0; n < 40; n++) {
     const w = structuredClone(base);
-    Object.assign(w, {depth: pick(random, [10, 12, 18]), scope: random() < .85, photoCooldown: pick(random, [0, 0, 2]), decoys: pick(random, [0, 3]), status: pick(random, ['patrol', 'patrol', 'lost'])});
+    Object.assign(w, {depth: pick(random, [10, 12, 15.5, 18]), scope: random() < .85, photoCooldown: pick(random, [0, 0, 2]), decoys: pick(random, [0, 3]), status: pick(random, ['patrol', 'patrol', 'lost'])});
+    for (const v of w.ships) if (random() < .3) v.incidental = true;
     w.systems = {...w.systems, periscope: pick(random, [100, 30, 0])};
     const v = pick(random, w.ships), look = (bearingTo(w, v) + pick(random, [0, 3, -4.5, 6, 20, 30]) + 360) % 360;
     if (random() < .4) Object.assign(v, {x: w.x + (random() - .5) * 3000, y: w.y + (random() - .5) * 3000, kind: pick(random, ['merchant', v.kind]), hull: pick(random, [100, 100, 0])});
@@ -105,6 +120,17 @@ test('photographs, sightings, the noisemaker, depth charges and lamp fixes match
     const target = random() < .5 && w.contacts.length ? pick(random, w.contacts).id : 'lamp-' + n;
     const fix = {text: 'Hunter', x: w.x + 500, y: w.y - 300, time: w.time - pick(random, [0, 5, 400]), radius: 200, sender: 'kestrel', number: n, target, depth: 80, course: random() * 360, speed: pick(random, [0, 4])};
     lamps.push({input: exact(w), fix, expected: run(exact(w), s => recordLampContact(s, fix)).output});
+  }
+  // A merchant framed dead ahead that is incidental traffic, with or without a
+  // listed merchant a few degrees off: only the listed one may be photographed.
+  for (const base of worlds()) for (const [offset, incidental] of [[0, true], [0, false], [3, true]]) {
+    const w = structuredClone(base);
+    Object.assign(w, {depth: 10, scope: true, photoCooldown: 0, status: 'patrol'});
+    w.systems = {...w.systems, periscope: 100};
+    const [first, second] = w.ships;
+    Object.assign(first, {kind: 'merchant', hull: 100, incidental, x: w.x + Math.sin(w.heading * Math.PI / 180) * 800, y: w.y + Math.cos(w.heading * Math.PI / 180) * 800});
+    if (second) Object.assign(second, {kind: 'merchant', hull: 100, incidental: false, x: w.x + Math.sin((w.heading + offset + 2) * Math.PI / 180) * 900, y: w.y + Math.cos((w.heading + offset + 2) * Math.PI / 180) * 900});
+    photos.push({input: exact(w), look: w.heading, expected: (r => [r.result, r.output])(run(exact(w), s => photograph(s, w.heading)))});
   }
   assert.ok(photos.some(p => p.expected[0]) && photos.some(p => !p.expected[0]), 'photographs taken and missed');
   assert.ok(sights.some(s => s.expected) && sights.some(s => !s.expected), 'ships seen and unseen');
