@@ -1,4 +1,5 @@
-import {save, restore, type World} from './sim.ts';
+import {save, type World} from './sim.ts';
+import {restore} from './simulation.ts';
 import {slotCount, readStorage, replaceStorage, type Backup} from './patrol-transfer.ts';
 
 const storeName = 'patrols';

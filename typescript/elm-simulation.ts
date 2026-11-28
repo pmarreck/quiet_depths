@@ -7,7 +7,10 @@
 // frame comes back tick by tick, so the per-tick hook still sees each tick.
 // The worker answers its first command once the event loop has turned, and
 // every later command within `send`, so the simulation is ready after a
-// first exchange and synchronous from then on.
+// first exchange and synchronous from then on. The worker holds one patrol;
+// when the page steps or acts on a different patrol object than the one it
+// last created or restored (a save slot checked, then the autosave resumed),
+// the adapter first loads that patrol into the worker.
 import {refreshMirror} from './world-mirror.ts';
 import {markReplay, type ReplayEvent} from './replay-events.ts';
 import {reportInvalidNumber, type InvalidNumber} from './invalid-numbers.ts';
@@ -34,7 +37,10 @@ export interface ElmSimulation {
 }
 
 const isRecord = (v: unknown): v is Fields => !!v && typeof v === 'object' && !Array.isArray(v);
-const pick = (from: Fields, keys: readonly string[]) => Object.fromEntries(keys.map(k => [k, from[k]]));
+// A field left undefined is absent, as JSON would leave it; Elm reads a
+// present field as malformed when it is undefined.
+const pick = (from: Fields, keys: readonly string[]) => Object.fromEntries(keys.filter(k => from[k] !== undefined).map(k => [k, from[k]]));
+const defined = (from: object) => pick(from as Fields, Object.keys(from));
 
 export function elmSimulation(worker: SimWorker): Promise<ElmSimulation> {
   return new Promise((resolve, reject) => {
@@ -62,6 +68,15 @@ function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone:
     return reply;
   };
   const orders = (s: World) => ({...pick(s as unknown as Fields, fields.boat), gun: pick(s.gun as unknown as Fields, fields.gun), drone: pick(s.drone as unknown as Fields, fields.drone)});
+  let held: object | null = null;
+  const holding = (s: World) => {
+    if (s === held) return;
+    const world = {...s} as Fields;
+    for (const k of PAGE_FIELDS) delete world[k];
+    refreshMirror(s, call({kind: 'load', world: JSON.parse(JSON.stringify(world))}).world as Fields, PAGE_FIELDS);
+    held = s;
+  };
+  const adopt = <T>(world: T): T => { if (world) held = world as object; return world; };
   const announce = (s: World, {replay = [], invalid = []}: Partial<Announced>) => {
     for (const m of replay) markReplay(s, m.time, m.event);
     for (const p of invalid) reportInvalidNumber(p.where, p.value);
@@ -69,7 +84,7 @@ function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone:
   return {
     create(mission, seed, options = {}) {
       const world = call({kind: 'create', mission, seed, options}).world as Fields;
-      return Object.assign(world, {photoArchive: [], photoSequence: 1}) as unknown as World;
+      return adopt(Object.assign(world, {photoArchive: [], photoSequence: 1}) as unknown as World);
     },
     restore(raw) {
       let saved: unknown;
@@ -78,18 +93,20 @@ function ready(worker: SimWorker, fields: {boat: string[]; gun: string[]; drone:
       const page = pick(saved, PAGE_FIELDS.filter(k => saved[k] !== undefined)), rest = {...saved};
       for (const k of PAGE_FIELDS) delete rest[k];
       const world = call({kind: 'restore', save: rest}).world;
-      return world ? Object.assign(world, page) as unknown as World : null;
+      return world ? adopt(Object.assign(world, page) as unknown as World) : null;
     },
     step(s, dt, input = {}) {
       const {afterTick, ...frame} = input;
-      for (const tick of call({kind: 'step', orders: orders(s), dt, input: frame}).ticks ?? []) {
+      holding(s);
+      for (const tick of call({kind: 'step', orders: orders(s), dt, input: defined(frame)}).ticks ?? []) {
         refreshMirror(s, tick.world, PAGE_FIELDS);
         announce(s, tick);
         afterTick?.(s);
       }
     },
     act(s, action) {
-      const done = call({kind: 'act', orders: orders(s), action});
+      holding(s);
+      const done = call({kind: 'act', orders: orders(s), action: defined(action)});
       refreshMirror(s, done.world as Fields, PAGE_FIELDS);
       announce(s, done);
       return done.result;

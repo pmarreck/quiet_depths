@@ -2,7 +2,6 @@ import {setInvalidNumberReporter,warnOnInvalidNumber} from './invalid-numbers.js
 // In play, a number the simulation refuses is logged rather than thrown. Imports
 // are hoisted, so this runs before any other statement here.
 setInvalidNumberReporter(warnOnInvalidNumber);
-import {orderScope} from './periscope.js';
 import {stationLamp} from './convoy-watch.js';
 import {bindTwoFinger} from './view-gestures.js';
 import {ImagerPaper,ImagerDisplay} from './sonar-imager.js';
@@ -24,13 +23,15 @@ import {operatingFraction} from './equipment.js';
 import {drawSonarGlass,lensFilter,signalOpacity} from './instrument-damage.js';
 import {disciplinaryFinding} from './patrol-reports.js';
 import {depthLimit,pressureLevel} from './pressure.js';
-import {createGame,step,bearing,delta,distance,rad,clamp,ping,photograph,fire,decoy,deployDrone,recallDrone,log,MISSIONS,restore,getSoundings} from './sim.js';
+import {bearing,delta,distance,rad,clamp,MISSIONS,getSoundings} from './sim.js';
+import {createGame,restore,step,ping,photograph,fire,decoy,deployDrone,recallDrone,log,fireDeckGun,aimGunAt,orderScope,requestRecon,startRescue,dronePhotograph,endPatrolEarly,useElmSimulation} from './simulation.js';
+import {elmSimulation} from './elm-simulation.js';
 import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
-import {operationApproach,operationConditions,startRescue,dronePhotograph} from './missions.js';
+import {operationApproach,operationConditions} from './missions.js';
 import {objectiveState,parsePatrolSeed,patrolSetup} from './mission-panel.js';
 import {OceanScene} from './scene.js';
-import {MAX_RUN,fireDeckGun,aimGunAt} from './combat.js';
+import {MAX_RUN} from './combat.js';
 import {HeldInput} from './input.js';
 import {SoundSystem} from './audio.js';
 import {environmentAt,WEATHER,TIMES,scopeWashed} from './environment.js';
@@ -41,7 +42,7 @@ import {deg,depthPresets,headingReading,depthReading,speedReading,soundingsReadi
 import {reconcileKeyedChildren,contactRow,updateContactRow,patrolNotices,hydrophoneStrength,sonarLayout,SONAR_RANGES,sonarRangeFraction} from './ui.js';
 import {photoArchive,recordPhoto,recordExposure,restorePhotos,validPhoto} from './photos.js';
 import {captureOptics,captureSatellite,captureSlotPortrait} from './photo-capture.js';
-import {requestRecon,reconStatus,reconAreaForDisplay} from './recon.js';
+import {reconStatus,reconAreaForDisplay} from './recon.js';
 import {chartContacts,estimateAt} from './track-estimates.js';
 import {sonarReading} from './contact-readings.js';
 import {lossPresentation} from './loss.js';
@@ -52,9 +53,15 @@ import {readStorage,saveDocument,stateDocument,decodeFile,checkStation,downloadJ
 import {difficultyPanel,patrolDifficulty} from './difficulty.js';
 import {actionForKey,shortcutConflict,allowedShortcut,keyLabel,shortcutActions,shortcutBindings} from './shortcuts.js';
 import {patrolKills,serviceRecord} from './service-record.js';
-import {endPatrolEarly,extractionPrompt,partialCredit,partialSummary} from './early-end.js';
+import {extractionPrompt,partialCredit,partialSummary} from './early-end.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// `?sim=elm` runs the patrol in the Elm simulation worker instead of the
+// TypeScript simulation, until it has been played enough to be the default.
+if(new URLSearchParams(location.search).get('sim')==='elm'){
+ await new Promise((loaded,failed)=>{const tag=document.createElement('script');tag.src='sim-worker.js';tag.onload=loaded;tag.onerror=failed;document.head.append(tag);});
+ useElmSimulation(await elmSimulation(globalThis.Elm.SimWorker.init()));
+}
 let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
 let installingBackup=false;

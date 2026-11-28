@@ -126,3 +126,46 @@ test('the page played through the Elm worker matches the TypeScript game', async
   }
   assert.ok(frames > 150 && ticks > 1000, 'many frames and ticks: ' + frames + ', ' + ticks);
 });
+
+// The worker holds one patrol. The page can restore another (a save slot
+// checked, an import validated) and then go back to the first; the adapter
+// loads it into the worker again before stepping it.
+test('the page can go back to a patrol the worker no longer holds', async () => {
+  const sim = await elmSimulation(worker());
+  const a = createGame('recon', 3), b = createGame('intercept', 4);
+  for (const s of [a, b]) step(s, 30, {timeRate: 4});
+  const ma = sim.restore(save(a)), mb = sim.restore(save(b));
+  for (const [t, m] of [[a, ma], [b, mb], [a, ma]]) {
+    step(t, 15, {timeRate: 4});
+    sim.step(m, 15, {timeRate: 4});
+    sameResults([pageless(m)], [pageless(t)]);
+  }
+  ping(a);
+  sim.act(ma, {kind: 'ping'});
+  sameResults([pageless(ma)], [pageless(a)]);
+});
+
+// The page imports its simulation from one module, which routes to the
+// TypeScript or, once handed the adapter, to the Elm worker.
+test('the page-side simulation routes to the Elm worker and back', async () => {
+  const page = await import('../src/simulation.js');
+  const typed = page.createGame('survey', 12);
+  page.step(typed, 30, {timeRate: 4});
+  page.ping(typed);
+  page.log(typed, 'Damage control assigned.');
+  assert.equal(page.elmSimulationActive(), false);
+  page.useElmSimulation(await elmSimulation(worker()));
+  try {
+    assert.equal(page.elmSimulationActive(), true);
+    const routed = page.createGame('survey', 12);
+    page.step(routed, 30, {timeRate: 4});
+    page.ping(routed);
+    page.log(routed, 'Damage control assigned.');
+    sameResults([pageless(routed)], [pageless(typed)]);
+    const resumed = page.restore(JSON.stringify(routed));
+    sameResults([pageless(resumed)], [pageless(restore(save(typed)))]);
+    assert.deepEqual(page.dronePhotograph(resumed), dronePhotograph(restore(save(typed))));
+  } finally {
+    page.useElmSimulation(null);
+  }
+});

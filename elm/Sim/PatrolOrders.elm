@@ -12,7 +12,7 @@ before acting. Everything else in the world only the simulation changes.
 import Json.Decode as D
 import Sim.Drone exposing (Drone)
 import Sim.PowerPlant as Plant exposing (DieselMode, EngineMode)
-import Sim.SaveCodec exposing (andMap)
+import Sim.SaveCodec exposing (andMap, optional)
 import Sim.SonarTransmitters as SonarTransmitters exposing (Transmitters)
 import Sim.World exposing (World)
 import Sim.WorldDecoder as WorldDecoder
@@ -66,7 +66,16 @@ named name values =
             )
 
 
-{-| The orders as the mirror holds them, in the save's shape.
+{-| A field JavaScript reads as null when it is absent.
+-}
+nullable : String -> D.Decoder a -> D.Decoder (Maybe a)
+nullable key value =
+    optional key (D.nullable value) |> D.map (Maybe.andThen identity)
+
+
+{-| The orders as the mirror holds them, in the save's shape; the route, the
+scope's steering bearing and the drone's nose pitch may be absent, as
+JavaScript reads an undefined one as none.
 -}
 decoder : D.Decoder Orders
 decoder =
@@ -77,9 +86,9 @@ decoder =
         |> andMap (D.field "silent" D.bool)
         |> andMap (D.field "engine" (named WorldDecoder.engineName [ Plant.Diesel, Plant.Electric ]))
         |> andMap (D.field "dieselMode" (named WorldDecoder.dieselModeName [ Plant.Charge, Plant.Drive, Plant.Assist ]))
-        |> andMap (D.field "route" (D.nullable WorldDecoder.route))
+        |> andMap (nullable "route" WorldDecoder.route)
         |> andMap (D.field "scopeAngle" D.float)
-        |> andMap (D.field "scopeSteerBearing" (D.nullable D.float))
+        |> andMap (nullable "scopeSteerBearing" D.float)
         |> andMap (D.field "towerAngle" D.float)
         |> andMap (D.field "towerPitch" D.float)
         |> andMap (D.field "gun" (D.map2 (\angle elevation -> { angle = angle, elevation = elevation }) (D.field "angle" D.float) (D.field "elevation" D.float)))
@@ -94,7 +103,7 @@ decoder =
                     (D.field "targetSpeed" D.float)
                     (D.field "targetDepth" D.float)
                     (D.field "targetHeading" D.float)
-                    (D.field "nosePitch" (D.nullable D.float))
+                    (nullable "nosePitch" D.float)
                 )
             )
 

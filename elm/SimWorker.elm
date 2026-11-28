@@ -8,6 +8,8 @@ page to mirror, with what the command announced. Commands:
   - `create`: a new patrol for a mission, seed and options.
   - `restore`: a saved patrol (without the page's photo archive and captain),
     or `world: null` when the save is refused.
+  - `load`: a patrol this worker sent earlier, held again in place of the
+    current one, when the page goes back to it.
   - `step`: a frame of play, answered tick by tick.
   - `act`: one of the page's actions, answered with its result.
   - `orderFields`: the names of the fields the page sends as orders.
@@ -23,6 +25,7 @@ import Sim.PatrolOrders as PatrolOrders
 import Sim.PatrolRestore as PatrolRestore
 import Sim.SaveCodec exposing (optional)
 import Sim.World exposing (World)
+import Sim.WorldDecoder as WorldDecoder
 import Sim.WorldEncoder as WorldEncoder
 
 
@@ -94,6 +97,9 @@ command model =
                                         Nothing ->
                                             ( model, E.object [ ( "world", E.null ) ] )
                                 )
+
+                    "load" ->
+                        D.field "world" WorldDecoder.decoder |> D.map (\s -> ( Just s, E.object [ ( "world", WorldEncoder.encodeWorld s ) ] ))
 
                     "step" ->
                         D.map3
