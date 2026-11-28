@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createGame,save,restore} from '../src/sim.js';
-import {MISSIONS,objectiveState,updateOperation,updateSurvey} from '../src/missions.js';
+import {MISSIONS,updateOperation,updateSurvey} from '../src/missions.js';
+import {objectiveState} from '../src/mission-panel.js';
 import {addScan,scanRate,surveyComplete,surveyCriteria} from '../src/wreck-survey.js';
 
 // Reference behavior recorded from r83: strict range cutoffs, an inclusive

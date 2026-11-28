@@ -4,7 +4,7 @@ import {createGame,step,save,restore,bearing} from '../src/sim.js';
 import {convoyLosses} from '../src/convoy-watch.js';
 import {copyLamp,copyPercent,dotSeconds,lampLit,lampRange,makeTransmission,matchingBearing,morseScript} from '../src/signal-lamp.js';
 import {patrolNotices} from '../src/ui.js';
-import {objectiveState} from '../src/missions.js';
+import {objectiveState} from '../src/mission-panel.js';
 
 const patrol=()=>createGame('wolf-in-the-henhouse',47,{timeOfDay:'day',weather:'clear',changing:false,difficulty:{airSupport:false,instantReplay:false}});
 test('lamp flashes the International Morse timing for SOS and leaves a seven-dot repeat gap',()=>{

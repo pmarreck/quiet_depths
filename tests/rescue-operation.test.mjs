@@ -59,7 +59,7 @@ test('assessment, transfers and the team’s return take the recorded times',()=
 });
 
 test('the Elm mission definitions supply the rescue criteria used by the briefings, rules and progress text',async()=>{
- const {MISSIONS,objectiveState}=await import('../src/missions.js');
+ const {MISSIONS}=await import('../src/missions.js'),{objectiveState}=await import('../src/mission-panel.js');
  const {readFile}=await import('node:fs/promises');
  const {rescueCriteriaFor,stationKeeping,surfaceRescue,underseaRescue}=await import('../src/rescue-operation.js');
  const team={assessmentSeconds:22,transferSeconds:9,returnSeconds:9,closestRange:30,fastestKnots:.6,

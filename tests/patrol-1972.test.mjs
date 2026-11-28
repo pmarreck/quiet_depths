@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createGame,step,MISSIONS,save,restore,bottom,contact,fire} from '../src/sim.js';
-import {objectiveState,parsePatrolSeed,patrolSetup} from '../src/missions.js';
+import {objectiveState,parsePatrolSeed,patrolSetup} from '../src/mission-panel.js';
 import * as controls from '../src/controls.js';
 import * as THREE from '../vendor/three.module.js';
 import * as acoustics from '../src/acoustics.js';
