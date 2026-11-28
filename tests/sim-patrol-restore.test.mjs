@@ -107,6 +107,16 @@ test('an older save is brought up to date as the TypeScript brings it', async ()
   older('a blast without id or fuse', charged, c => { c.blasts = [{...blast({}), id: undefined, totalDelay: undefined}].map(b => JSON.parse(JSON.stringify(b))); });
   older('an exploded blast without its time', charged, c => { c.blasts = [JSON.parse(JSON.stringify({...blast({age: 2, delay: -2}), exploded: undefined}))]; });
   older('an unexploded weapon blast', charged, c => { c.blasts = [blast({kind: 'weapon', id: 950, totalDelay: 3, exploded: false})]; });
+  for (const exploded of [true, 'yes', 1, 0, '', null, undefined])
+    older('a weapon blast exploded ' + JSON.stringify(exploded), charged, c => { c.blasts = [JSON.parse(JSON.stringify(blast({kind: 'weapon', id: 951, totalDelay: 3, age: 1, delay: -1, exploded})))]; });
+  // Each field of a blast missing or of another type.
+  for (const key of ['id', 'totalDelay', 'exploded', 'explodedAt', 'airTime', 'airHeight', 'splashed', 'convoyCharge', 'kind'])
+    for (const value of ['x', '', null, {}, [], true, 7.5, -1, undefined])
+      older('a blast with ' + key + ' ' + JSON.stringify(value), charged, c => {
+        const b = blast({id: 952, totalDelay: 3, exploded: false});
+        if (value === undefined) delete b[key]; else b[key] = value;
+        c.blasts = [b];
+      });
   // Torpedoes in flight from before the crew's quiet watch.
   const fired = JSON.parse(save(createGame('intercept', 4)));
   older('player torpedoes without a crew watch', fired, c => {

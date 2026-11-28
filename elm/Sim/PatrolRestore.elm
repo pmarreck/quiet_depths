@@ -186,16 +186,32 @@ crewWatch s =
     }
 
 
-weaponBlast : D.Value -> Bool
-weaponBlast v =
-    D.decodeValue (D.map2 (\kind exploded -> kind == "weapon" && not exploded) (D.field "kind" D.string) (D.oneOf [ D.field "exploded" D.bool, D.succeed False ])) v
-        |> Result.withDefault False
+{-| A weapon saved as a blast before torpedo runs, and whether it went off
+(truthy, as JavaScript reads the switch).
+-}
+savedWeapon : D.Value -> Maybe Bool
+savedWeapon v =
+    D.decodeValue
+        (D.map2
+            (\kind exploded ->
+                if kind == "weapon" then
+                    Just exploded
+
+                else
+                    Nothing
+            )
+            (D.field "kind" D.string)
+            (D.oneOf [ D.field "exploded" D.value |> D.map SaveFields.truthy, D.succeed False ])
+        )
+        v
+        |> Result.withDefault Nothing
 
 
 {-| The typed half of restore: the world decoded, the watch's warnings for
 an older save, the traffic, the allied watch, the mission's targets, the
 search and the contacts' fixes checked, torpedoes restored, an older save's
-crew watch, and pre-torpedo-run weapon blasts turned into incoming runs.
+crew watch, and pre-torpedo-run weapon blasts turned into incoming runs, or
+dropped with their fading cloud once they went off.
 -}
 resume : Bool -> Fields -> Maybe World
 resume legacyCrewWatch f =
@@ -212,7 +228,7 @@ resume legacyCrewWatch f =
         decoded =
             f
                 |> Dict.insert "projectiles" (E.list identity [])
-                |> Dict.insert "blasts" (E.list identity (List.filter (weaponBlast >> not) allBlasts))
+                |> Dict.insert "blasts" (E.list identity (List.filter (\b -> savedWeapon b == Nothing) allBlasts))
                 |> E.dict identity identity
                 |> D.decodeValue WorldDecoder.decoder
                 |> Result.toMaybe
@@ -262,5 +278,5 @@ resume legacyCrewWatch f =
                                 w
                     )
                     s
-                    (List.filter weaponBlast allBlasts)
+                    (List.filter (\b -> savedWeapon b == Just False) allBlasts)
             )
