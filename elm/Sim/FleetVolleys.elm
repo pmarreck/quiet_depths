@@ -29,7 +29,7 @@ type alias Volley =
 {-| The volleys in flight: the battle's, else the convoy's one shot, then any
 from passing traffic.
 -}
-activeVolleys : { s | battle : Maybe { b | volleys : List Volley }, convoyShot : Maybe Volley, trafficVolleys : Maybe (List Volley) } -> List Volley
+activeVolleys : { s | battle : Maybe { b | volleys : List Volley }, convoy : Maybe { c | shot : Maybe Volley }, traffic : Maybe { t | volleys : List Volley } } -> List Volley
 activeVolleys s =
     let
         mission : List Volley
@@ -39,9 +39,9 @@ activeVolleys s =
                     b.volleys
 
                 Nothing ->
-                    Maybe.withDefault [] (Maybe.map List.singleton s.convoyShot)
+                    Maybe.andThen .shot s.convoy |> Maybe.map List.singleton |> Maybe.withDefault []
     in
-    case s.trafficVolleys of
+    case Maybe.map .volleys s.traffic of
         Just ((_ :: _) as traffic) ->
             mission ++ traffic
 

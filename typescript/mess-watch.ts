@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/MessWatch.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its aircraft phases are elm/Sim/AircraftPhase.elm.
 import {SYSTEM_KEYS} from './equipment.ts';
 import {isOpponent,activeVolleys,fleetShotPose,type Volley} from './fleet-action.ts';
 import {missions} from './mission-catalog.ts';

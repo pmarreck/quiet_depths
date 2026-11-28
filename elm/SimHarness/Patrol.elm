@@ -1,4 +1,4 @@
-module SimHarness.Patrol exposing (Patrol, decoder, encode)
+module SimHarness.Patrol exposing (Patrol, decoder, encode, limits, systems)
 
 {-| The flat patrol record the systems modules work on, decoded from a saved
 patrol and encoded back with every field systems can change.

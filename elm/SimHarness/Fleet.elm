@@ -1,4 +1,4 @@
-module SimHarness.Fleet exposing (function)
+module SimHarness.Fleet exposing (function, optional, shots)
 
 {-| Harness entries for the fleet action: its stage, its battle, its volleys
 and its save validation.
@@ -201,12 +201,12 @@ savedTheater =
 {-| What `activeVolleys` reads: the battle's volleys, the convoy's shot and
 passing traffic's volleys, each possibly absent.
 -}
-shots : D.Decoder { battle : Maybe { volleys : List Volley }, convoyShot : Maybe Volley, trafficVolleys : Maybe (List Volley) }
+shots : D.Decoder { battle : Maybe { volleys : List Volley }, convoy : Maybe { shot : Maybe Volley }, traffic : Maybe { volleys : List Volley } }
 shots =
-    D.map3 (\b convoy traffic -> { battle = b, convoyShot = Maybe.andThen identity convoy, trafficVolleys = traffic })
+    D.map3 (\b convoy traffic -> { battle = b, convoy = convoy, traffic = traffic })
         (optional "battle" (D.map (\vs -> { volleys = vs }) (D.field "volleys" (D.list volley))))
-        (optional "convoy" (D.field "shot" (D.nullable volley)))
-        (optional "traffic" (D.field "volleys" (D.list volley)))
+        (optional "convoy" (D.map (\shot -> { shot = shot }) (D.field "shot" (D.nullable volley))))
+        (optional "traffic" (D.map (\vs -> { volleys = vs }) (D.field "volleys" (D.list volley))))
 
 
 afloat : D.Decoder (List { side : Maybe Side, hull : Float, incidental : Maybe Bool })

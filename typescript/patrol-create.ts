@@ -42,7 +42,7 @@ export function createGame(mission = 'recon', seed = 19830604, options: Options 
   const m = MISSIONS.find(m => m.id === mission) || MISSIONS[0];
   // The patrol is assembled in steps; randomizePatrol and the long-patrol setup complete it.
   const s = {version: 1, rng: seed || 1, time: 0, status: 'patrol', mission: m.id, phase: 'objective', trackTime: 0, photos: [], hull: 100, battery: 92, oxygen: 100, fuel: 86,
-    flood: 0, repair: 0, torps: m.torps, noise: 12, alert: 0, pingAge: 999, pingCooldown: 0, photoCooldown: 0, decoys: 3, engine: 'electric', silent: false, scope: true,
+    flood: 0, shock: 0, repair: 0, torps: m.torps, noise: 12, alert: 0, pingAge: 999, pingCooldown: 0, photoCooldown: 0, decoys: 3, engine: 'electric', silent: false, scope: true,
     scopeAngle: 0, scopeSteerBearing: null, towerAngle: 0, towerPitch: 0, systems: freshSystems(), ...freshMotion(), ...freshCombat(), cavitation: 0, propRpm: 52,
     speed: 4, targetSpeed: 4, depth: 12, targetDepth: 12, heading: 32, targetHeading: 32, x: 0, y: 0, route: null, home: {x: -1500, y: -1700},
     environment: makeEnvironment(seed, options), lightning: [], nextLightningAt: 8 + hash01(seed) * 8, acoustics: [], soundSequence: 1,

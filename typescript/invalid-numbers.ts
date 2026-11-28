@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/InvalidNumber.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Elm can neither throw nor log, so its side is the state's `invalid` outbox these reports mirror; the reporters stay here.
 // A number that must be finite but is not means a bug upstream: a collision
 // that divided by zero, say. The simulation ignores such a value so its state
 // stays sound, and reports it here. By default a report throws, so a test or
