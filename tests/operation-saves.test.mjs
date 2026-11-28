@@ -20,6 +20,10 @@ test('a restored operation keeps whole survivor counts, its find as text and the
     assert.ok(with_(c => { c.operation.find = 'A brass bell.'; }), mission + ': a find written');
     assert.ok(with_(c => { delete c.operation.find; }), mission + ': a save from before finds');
     assert.equal(with_(c => { c.operation.find = 5; }), null, mission + ': a find that is not text');
+    // A site never moves under its own power: hull contacts push it but leave its speed.
+    assert.equal(saved.site.speed, 0, mission + ' makes a still site');
+    for (const speed of [2, -1, null, '0']) assert.equal(with_(c => { c.site.speed = speed; }), null, mission + ': a site with speed ' + JSON.stringify(speed));
+    assert.equal(with_(c => { delete c.site.speed; }), null, mission + ': a site without a speed');
     for (const other of ['sub', 'surface', 'wreck'].filter(k => k !== kind))
       assert.equal(with_(c => { c.site.kind = other; }), null, mission + ': a ' + other + ' site');
   }

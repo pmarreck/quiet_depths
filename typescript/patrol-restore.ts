@@ -139,11 +139,11 @@ export function restore(raw: string): World | null {
     for (const p of s.gunRounds) if (!allFinite(p, ['id', 'x', 'y', 'altitude', 'vx', 'vy', 'vz', 'age']) || !['player', 'aircraft'].includes(p.owner) || typeof p.tracer !== 'boolean') return null;
     for (const p of s.impacts) if (!allFinite(p, ['id', 'x', 'y', 'altitude', 'time'])) return null;
     if (!allFinite(s.drone, ['hull', 'mobility', 'buoyancy', 'camera', 'verticalSpeed', 'collisionCooldown', 'returnStage', 'returnClearance', 'returnHoldSide', 'returnHoldForward'])) return null;
-    // Each operation's mission makes one kind of site.
+    // Each operation's mission makes one kind of site, which never moves under its own power.
     const siteKind = ({'undersea-rescue': 'sub', 'surface-rescue': 'surface', survey: 'wreck'} as Record<string, string>)[s.mission];
     if (siteKind) {
       const site = s.site;
-      if (!site || !s.operation || !allFinite(site, ['x', 'y', 'depth', 'heading']) || site.kind !== siteKind || typeof site.name !== 'string') return null;
+      if (!site || !s.operation || !allFinite(site, ['x', 'y', 'depth', 'heading']) || site.kind !== siteKind || typeof site.name !== 'string' || site.speed !== 0) return null;
       site.hull ??= 100;
       if (!finite(site.hull) || site.hull < 0 || site.hull > 100) return null;
       const o = s.operation as unknown as Fields;
