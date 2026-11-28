@@ -1447,3 +1447,74 @@ mutant took about 3 s.
   brighter one, and its ages are rarely exact. A lone strike at each edge
   of the flash (0.75 s, just younger, just struck, not yet struck) now
   kills it and `strike-start`, and the test pins which of them flash.
+
+## Replaying real play, built (2026-11-28)
+
+`?record` makes the page record every simulation call through the
+TypeScript simulation (`typescript/play-recording.ts`): each call's
+arguments (a step's frame values without its hooks; a restore's save
+without the page's own fields, so no photo images or captain's name), and
+the orders the page set or removed on the patrol since its last call. In
+the console, `quietDepthsRecording.save()` downloads the recording.
+`scripts/record-play.mjs` plays every mission in headless Chromium under
+`?record`, working the controls a player uses, and writes the recordings
+to `tests/recordings/`.
+
+### Engines compute transcendental functions differently
+
+The first recording would not replay in Node: at call 13 a contact's
+bearing differed in its last digit. Nothing was missing from the
+recording. Chromium 158 and Node 24 disagree on 2 to 18% of results of
+`sin`, `cos`, `tan`, `exp`, `log`, `atan`, `atan2`, `asin`, `acos`,
+`cbrt`, the hyperbolic functions, `log10`, `expm1` and `log1p` (20,000
+arguments each; `sqrt`, `pow` and `hypot` agreed). Against 60-digit
+references from `bc`, Chromium's result was the correctly rounded one in
+all 199 disagreements checked, Node's one unit in the last place off:
+Chromium has moved to correctly rounded math, and Node's V8 13.6 has not.
+
+What this means:
+
+- The game is not deterministic across engines today: one seed and one
+  sequence of inputs give different patrols in Chromium 158, in Node 24,
+  and very likely in Firefox and Safari, which have their own libraries.
+  Single-player play does not notice. Lockstep co-op across devices would
+  drift apart, and a recording replays exactly only under the math it was
+  recorded with.
+- The differential tests still prove what they claim: the TypeScript and
+  the Elm call the same `Math` functions with the same arguments, so they
+  agree in whichever engine runs both.
+- Correct rounding has one answer, so engines that adopt it agree. Node
+  will match Chromium once it ships that V8, and simulation math built on
+  correctly rounded functions of its own (PDEA's coming transcendental
+  functions, say) would be identical everywhere.
+
+### So a recording keeps an oracle per engine's math
+
+A recording keeps its inputs once and, apart from them, an oracle for each
+math implementation it has been replayed under: each call's result or
+failure, and a digest of the world after every action and every 30th
+step. Oracles are keyed by a fingerprint of the engine's transcendental
+results. The page writes the oracle for its own engine;
+`scripts/add-replay-oracle.mjs` adds one for Node's by replaying through
+the TypeScript (needed again whenever Node's math changes, while the
+TypeScript exists), as `record-play.mjs` does for each recording.
+
+- At record time, in the browser it was recorded in, `record-play.mjs`
+  replays each recording through the TypeScript, which shows the
+  recording missed nothing the page put in, and through the real Elm
+  worker; both must reach the page's oracle.
+- In `./test`, `tests/play-replay.test.mjs` holds the TypeScript to Node's
+  oracle, then the Elm, on the page and through the shipped worker file,
+  to the TypeScript's world and result after every call.
+  `tests/play-recording.test.mjs` records a session in Node and replays it
+  in both simulations.
+- Controls: a recording with one order removed fails "the TypeScript
+  reaches the recording's oracle"; the Elm ping's cooldown changed from 15
+  to 14 fails "call 39 (ping) leaves the TypeScript's world".
+
+The first recording also showed the page stepping a negative `dt` (-0.08
+s) on the frame after the briefing closed: an animation frame's timestamp
+can precede the moment the page last set its clock. Both simulations skip
+a step with `dt <= 0`, so nothing was lost, but the page's own clocks ran
+backward that frame; the page now clamps a frame's elapsed time at zero,
+and the format test checks that no recorded step goes back in time.

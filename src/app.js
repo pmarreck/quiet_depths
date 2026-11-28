@@ -24,7 +24,8 @@ import {drawSonarGlass,lensFilter,signalOpacity} from './instrument-damage.js';
 import {disciplinaryFinding} from './patrol-reports.js';
 import {depthLimit,pressureLevel} from './pressure.js';
 import {bearing,delta,distance,rad,clamp,MISSIONS,getSoundings} from './sim.js';
-import {createGame,restore,step,ping,photograph,fire,decoy,deployDrone,recallDrone,log,fireDeckGun,aimGunAt,orderScope,requestRecon,startRescue,dronePhotograph,endPatrolEarly,useElmSimulation} from './simulation.js';
+import {createGame,restore,step,ping,photograph,fire,decoy,deployDrone,recallDrone,log,fireDeckGun,aimGunAt,orderScope,requestRecon,startRescue,dronePhotograph,endPatrolEarly,useElmSimulation,recordPlay} from './simulation.js';
+import {playRecorder} from './play-recording.js';
 import {elmSimulation,workerTransport} from './elm-simulation.js';
 import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
@@ -56,10 +57,15 @@ import {patrolKills,serviceRecord} from './service-record.js';
 import {extractionPrompt,partialCredit,partialSummary} from './early-end.js';
 const $=id=>document.getElementById(id),all=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// `?record` records every simulation call for the replay tests, running the
+// TypeScript simulation (see play-recording.ts); in the console,
+// quietDepthsRecording.save() downloads the recording.
+const playRecording=new URLSearchParams(location.search).has('record')?playRecorder(navigator.userAgent.match(/(Firefox|Chrome|Safari)\/\d+/)?.[0]??'a browser'):null;
+if(playRecording){recordPlay(playRecording);window.quietDepthsRecording=playRecording;console.info('Recording play for the replay tests: quietDepthsRecording.save() downloads it.');}
 // `?sim=elm` runs the patrol in the Elm simulation, in a Web Worker, instead
 // of the TypeScript simulation, until it has been played enough to be the
 // default. If the worker cannot start, the TypeScript runs the patrol.
-if(new URLSearchParams(location.search).get('sim')==='elm'){
+if(!playRecording&&new URLSearchParams(location.search).get('sim')==='elm'){
  const worker=new Worker('sim-worker.js');
  const failed=new Promise((_,reject)=>worker.addEventListener('error',e=>reject(new Error(e.message||'the worker did not load')),{once:true}));
  // A field the page writes outside the orders would be lost; say which.
@@ -1145,7 +1151,9 @@ let stepping=false,unsteppedTime=0,gunFiring=false;
 function frame(now){
  frameRequest=null;
  if(!patrolStarted||$('briefing').open)return;
- const realDt=Math.min((now-last)/1000,.5);last=now;const ctx=context();
+ // A frame stamped before the page last set its clock (the first after the
+ // briefing closes) has taken no time, not negative time.
+ const realDt=Math.max(0,Math.min((now-last)/1000,.5));last=now;const ctx=context();
  if(replay){
   const r=vp.getBoundingClientRect();
   if(replay.advance(realDt)){scene.resize(r.width,r.height);scene.render(replay.world,'replay',1,replay.cursor,replay.camera(),replay.cursor);}
