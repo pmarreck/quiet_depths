@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/PatrolRestore.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {captainName} from './captain.ts';
 import {earlyEndRule} from './early-end.ts';
 import {freshTransmitters, validTransmitters} from './sonar-transmitters.ts';

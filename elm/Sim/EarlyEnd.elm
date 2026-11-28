@@ -1,4 +1,4 @@
-module Sim.EarlyEnd exposing (Extraction, Outcome, earlyEndOffered, endPatrolEarly, extractionPrompt, insidePickup, outcomeName, partialCredit, partialSummary)
+module Sim.EarlyEnd exposing (Extraction, Outcome, earlyEndOffered, earlyEndRule, endPatrolEarly, extractionPrompt, insidePickup, outcomeName, partialCredit, partialSummary)
 
 {-| Ending a patrol early at extraction: when the captain is asked, and what an
 early end has earned. The mission definition owns each mission's rule.
