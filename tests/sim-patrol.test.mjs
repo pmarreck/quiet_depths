@@ -93,15 +93,16 @@ test('the simulation as the page drives it matches the TypeScript, tick by tick 
         w = before;
       }
       const before = restore(save(w));
-      const dt = pick(random, [1 / 60, .25, 1, 5, 30, 90]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, 'scope', 'tower', 'drone']), look: pick(random, [undefined, random() * 360]),
-        paused: pick(random, [undefined, undefined, undefined, undefined, true]), modal: pick(random, [undefined, undefined, undefined, undefined, true]),
-        imaging: pick(random, [undefined, undefined, {mode: 'scribbler', profile: 'survey'}, {mode: 'painter', profile: 'detail'}]), lampInView: pick(random, [undefined, null, before.ships[0]?.id, before.ships[1]?.id]),});
+      const dt = pick(random, [1 / 60, .25, 1, 5, 30, 90]), input = exact({timeRate: pick(random, [undefined, null, 0, 1, 4, 16]), observation: pick(random, [undefined, null, 'scope', 'tower', 'drone']), look: pick(random, [undefined, null, random() * 360]),
+        paused: pick(random, [undefined, null, undefined, undefined, true]), modal: pick(random, [undefined, null, undefined, undefined, true]),
+        imaging: pick(random, [undefined, null, {mode: 'scribbler', profile: 'survey'}, {mode: 'painter', profile: 'detail'}]), lampInView: pick(random, [undefined, null, before.ships[0]?.id, before.ships[1]?.id]),});
       steps.push({args: [JSON.parse(save(before)), dt, input], expected: ticked(before, dt, input)});
       w = before;
     }
   }
   assert.ok(steps.some(s => s.expected.length > 4) && steps.some(s => s.expected.some(t => t.replay.length)), 'frames of many ticks, and replay marks');
   for (const key of ['paused', 'modal', 'imaging', 'lampInView']) assert.ok(steps.some(s => s.args[2][key]), 'frames sent ' + key);
+  for (const key of ['timeRate', 'observation', 'look', 'paused', 'modal', 'imaging', 'lampInView']) assert.ok(steps.some(s => s.args[2][key] === null), 'frames sent a null ' + key);
   assert.ok(steps.some(s => s.args[1] > 60 && s.expected.length === 240), 'a frame held to a minute');
   for (const kind of kinds) assert.ok(acts.some(a => a.args[1].kind === kind), 'each action taken: ' + kind);
   assert.ok(acts.some(a => a.expected.result === true) && acts.some(a => a.expected.result === false), 'actions both taken and refused');

@@ -131,9 +131,9 @@ test('the page played through the Elm worker matches the TypeScript game', async
       const a = announced(t, tMarks, () => TYPESCRIPT[kind](t, action)), b = announced(m, mMarks, () => sim.act(m, action));
       sameResults([exact({result: b.result ?? null, replay: b.replay, invalid: b.invalid, world: pageless(m)})], [exact({result: a.result ?? null, replay: a.replay, invalid: a.invalid, world: pageless(t)})]);
       const before = t;
-      const dt = pick(random, [1 / 60, .25, 1, 5, 30, 90]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, 'scope', 'tower']),
-        paused: pick(random, [undefined, undefined, undefined, undefined, true]), modal: pick(random, [undefined, undefined, undefined, undefined, true]),
-        imaging: pick(random, [undefined, undefined, {mode: 'scribbler', profile: 'survey'}, {mode: 'painter', profile: 'detail'}]), lampInView: pick(random, [undefined, null, before.ships[0]?.id, before.ships[1]?.id]),
+      const dt = pick(random, [1 / 60, .25, 1, 5, 30, 90]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, null, 'scope', 'tower']),
+        paused: pick(random, [undefined, null, undefined, undefined, true]), modal: pick(random, [undefined, null, undefined, undefined, true]),
+        imaging: pick(random, [undefined, null, {mode: 'scribbler', profile: 'survey'}, {mode: 'painter', profile: 'detail'}]), lampInView: pick(random, [undefined, null, before.ships[0]?.id, before.ships[1]?.id]),
         look: pick(random, [undefined, random() * 360])});
       const shipsBefore = new Map(m.ships.map(v => [v.id, v])), eventsBefore = new Set(m.events);
       const tTicks = [], mTicks = [];

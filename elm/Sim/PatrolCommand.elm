@@ -21,7 +21,15 @@ import Sim.WorldEncoder as WorldEncoder
 
 switch : String -> D.Decoder Bool
 switch key =
-    optional key D.bool |> D.map (Maybe.withDefault False)
+    given key D.bool |> D.map (Maybe.withDefault False)
+
+
+{-| A frame input the page may leave out or send as null (it sends a null
+observation and lamp when it has none); the TypeScript reads both as absent.
+-}
+given : String -> D.Decoder a -> D.Decoder (Maybe a)
+given key decoder =
+    optional key (D.nullable decoder) |> D.map (Maybe.andThen identity)
 
 
 named : List ( String, a ) -> D.Decoder a
@@ -38,7 +46,7 @@ named choices =
             )
 
 
-{-| What the page passes `step` each frame; absent fields take the
+{-| What the page passes `step` each frame; absent and null fields take the
 TypeScript's defaults.
 -}
 input : D.Decoder PatrolTick.Input
@@ -46,17 +54,17 @@ input =
     D.succeed PatrolTick.Input
         |> andMap (switch "paused")
         |> andMap (switch "modal")
-        |> andMap (optional "timeRate" D.float)
-        |> andMap (optional "look" D.float)
-        |> andMap (optional "observation" D.string)
+        |> andMap (given "timeRate" D.float)
+        |> andMap (given "look" D.float)
+        |> andMap (given "observation" D.string)
         |> andMap
-            (optional "imaging"
+            (given "imaging"
                 (D.map2 (\mode profile -> { mode = mode, profile = profile })
                     (D.field "mode" (named [ ( "scribbler", Sonar.Scribbler ), ( "painter", Sonar.Painter ) ]))
                     (D.field "profile" (named [ ( "survey", Sonar.Survey ), ( "detail", Sonar.Detail ) ]))
                 )
             )
-        |> andMap (optional "lampInView" (D.nullable D.string) |> D.map (Maybe.andThen identity))
+        |> andMap (given "lampInView" D.string)
 
 
 {-| An action by its `kind` and the arguments the TypeScript function takes.
