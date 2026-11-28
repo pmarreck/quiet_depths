@@ -1241,3 +1241,17 @@ which a first scan missed by matching only `=`, `+=` and `-=`; lost, the
 id would be reassigned whenever that line ran. Both are now orders. The
 adapter's guard (`onStray`) would have named either at run time under
 `?sim=elm`; the scans found them first.
+
+## The switch's mutation check (2026-11-28)
+
+52 mutants across `Sim.Patrol`, `Sim.PatrolCommand`, `Sim.PatrolOrders`,
+the worker, the mirror refresh, the adapter and the page-side module. 41
+failed the tests at first. The survivors were frame inputs the tests never
+sent (a paused or modal frame, a frame over a minute, imaging sweeps, a
+lamp in view), a photograph never at the reticle's edge, a rescue never
+ended early with crew aboard, a mirror never asked to tell -0 from 0, and
+a test bug: the adapter test's "random" diesel mode always drew the
+default, so that order never changed anything. With those added, 50 fail;
+two are equivalent (the step's first emptying of the outboxes, which every
+world reaching it already has empty, and an action's replay marks, which
+no action announces).
