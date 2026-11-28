@@ -57,7 +57,8 @@ export function requestSupport(s: CombatWorld): void {
 
 function dropBomb(s: CombatWorld, plane: Aircraft, report: Report) {
   if (report.reason === 'an explosion near the carrier') return;
-  const depth = clamp((report.depth || 40), 15, 90), airTime = 2 + plane.altitude / 70, delay = airTime + depth / 6;
+  // A legacy report saved without a depth assumes 40 m; a surfaced boat reports 0.
+  const depth = clamp(report.depth ?? 40, 15, 90), airTime = 2 + plane.altitude / 70, delay = airTime + depth / 6;
   const aim = projectedReport(report, s.time, delay), point = scatterAim(s, aim, 45 + aim.age * .9);
   s.blasts.push({id: s.soundSequence++, ...point, depth, delay, totalDelay: delay, airTime, airHeight: plane.altitude, age: 0, exploded: false, kind: 'bomb'});
   plane.bombDropped = true; addDebrief(s, 'An aircraft dropped its charge over the last reported position.');
