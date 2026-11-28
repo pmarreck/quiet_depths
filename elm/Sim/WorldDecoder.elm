@@ -1,4 +1,4 @@
-module Sim.WorldDecoder exposing (decoder, dieselModeName, difficulty, engineName, limits, shell, systems)
+module Sim.WorldDecoder exposing (decoder, dieselModeName, difficulty, engineName, limits, route, shell, systems)
 
 {-| A saved patrol decoded into the world record, as restore leaves it: the
 replay and invalid-number outboxes start empty.

@@ -9,3 +9,6 @@ const listeners=new WeakMap<object,ReplayListener>();
 export function listenForReplayEvents(world:object,listener:ReplayListener){listeners.set(world,listener);}
 // Any patrol object can announce an event; its listener is found by identity.
 export function replayEvent(s:{time:number},event:ReplayEvent){listeners.get(s)?.mark(s.time,event);}
+// The Elm simulation announces its events with each tick it returns; the page
+// passes them on to the listener on its mirror of that patrol.
+export function markReplay(world:object,time:number,event:ReplayEvent){listeners.get(world)?.mark(time,event);}

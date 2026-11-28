@@ -30,23 +30,31 @@ function exclusively(work) {
   try { return work(); } finally { rmSync(lock, {recursive: true, force: true}); }
 }
 
-function load() {
-  if (harness) return harness;
+// Compiles an Elm program with the project's Elm, optimized as the page
+// builds it, and returns the `Elm` object its output defines, after any
+// change `transform` makes to the compiled JavaScript.
+export function compiledElm(main, transform = js => js) {
   const dir = mkdtempSync(join(tmpdir(), 'quiet-depths-sim-'));
   try {
-    const output = join(dir, 'sim-harness.js');
+    const output = join(dir, 'compiled.js');
     try {
-      exclusively(() => execFileSync('elm', ['make', 'elm/SimHarness.elm', '--optimize', '--output=' + output], {cwd: root, stdio: 'pipe'}));
+      exclusively(() => execFileSync('elm', ['make', main, '--optimize', '--output=' + output], {cwd: root, stdio: 'pipe'}));
     } catch (error) {
-      throw new Error('Could not compile elm/SimHarness.elm. Run the tests through ./test or nix develop, which provide Elm.\n' + (error.stderr ?? error.message));
+      throw new Error('Could not compile ' + main + '. Run the tests through ./test or nix develop, which provide Elm.\n' + (error.stderr ?? error.message));
     }
     const scope = {};
-    new Function('scope', readFileSync(output, 'utf8').replace(/\}\(this\)\);\s*$/, '}(scope));'))(scope);
-    if (!scope.Elm?.SimHarness) throw new Error('The compiled harness did not define Elm.SimHarness');
-    harness = scope.Elm.SimHarness.init();
+    new Function('scope', transform(readFileSync(output, 'utf8')).replace(/\}\(this\)\);\s*$/, '}(scope));'))(scope);
+    return scope.Elm;
   } finally {
     rmSync(dir, {recursive: true, force: true});
   }
+}
+
+function load() {
+  if (harness) return harness;
+  const compiled = compiledElm('elm/SimHarness.elm');
+  if (!compiled?.SimHarness) throw new Error('The compiled harness did not define Elm.SimHarness');
+  harness = compiled.SimHarness.init();
   harness.ports.results.subscribe(({id, results, error}) => {
     const request = pending.get(id);
     pending.delete(id);
