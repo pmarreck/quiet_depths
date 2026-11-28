@@ -23,7 +23,7 @@ function patrol(random, i) {
 }
 
 function hunter(random, s, i) {
-  const kind = pick(random, ['escort', 'escort', 'sub', 'merchant']), range = pick(random, [150, 400, 900, 1500, 2400, 3000, 5000, 6000]), a = random() * 2 * Math.PI;
+  const kind = pick(random, ['escort', 'escort', 'sub', 'merchant']), range = pick(random, [150, 400, 410, 430, 900, 1500, 2250, 2290, 2310, 2400, 2590, 2610, 3000, 5000, 6000]), a = random() * 2 * Math.PI;
   const ship = {id: 'h' + i, name: 'Hunter ' + i, kind, x: s.x + Math.sin(a) * range, y: s.y + Math.cos(a) * range, heading: random() * 360, speed: 6, hull: 100,
     alert: pick(random, [0, 30, 42, 50, 55, 56, 90, 100]), attack: pick(random, [-1, 0, .1, 5]), military: true, side: 'hostile',
     depth: kind === 'sub' ? pick(random, [10, 15, 16, 60]) : 0};
@@ -47,7 +47,7 @@ test('a hunter\'s senses match: sight, hearing, the noisemaker, alert and the tr
   const random = seeded(101), cases = [];
   for (let i = 0; i < 4000; i++) {
     const s = patrol(random, i), ship = hunter(random, s, i), senses = {subVisualRange: pick(random, [1500, 4000, 9000]), storm: pick(random, [0, .5, 1])};
-    cases.push([withIds(s, ship), ship, senses, pick(random, [.25, 1, 3])]);
+    cases.push([withIds(s, ship), ship, senses, pick(random, [0, .25, 1, 3])]);
   }
   const expected = cases.map(([s, ship, senses, dt]) => { const c = structuredClone(ship); const t = updateHostileTrack(structuredClone(s), c, senses, dt); return [exact(c), t ? exact(t) : null]; });
   const reasons = new Set(expected.map(([ship]) => ship.report?.reason));

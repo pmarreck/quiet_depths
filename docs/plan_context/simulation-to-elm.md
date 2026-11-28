@@ -319,6 +319,8 @@ only when it finished with no failures and nothing canceled.
 |---|---|---|
 | Ship record (`b8f478b`) | about 30 min | type printed by the checker, survey of saves, decoder and parity tests; found two type holes |
 | Contact record (`4689d7b`) | about 12 min | reused the ship method; found restore's migrations |
+| Hostile hunters (107 lines, two Elm modules) | about 30 min | one representation difference (null against Nothing), normalized; 41 of 41 mutants killed after two input gaps closed |
+| Mission objectives (49 lines) | about 15 min | matched on the first run; 13 of 13 mutants killed after two test gaps closed |
 | Mess watch (48 lines) | about 20 min | matched on the first run; 34 of 34 mutants killed |
 | Fleet action (118 lines, four Elm modules) | about 25 min | matched on the first run; the mission handler threads through the state in order |
 | Systems (327 lines, seven Elm modules) | about 35 min | every function matched on its first full run; the slices compose the earlier ports (pressure, power plant, periscope, hull geometry) unchanged |
@@ -558,3 +560,22 @@ fix-TypeScript-first rule, new games now start with `shock: 0` instead of
 leaving the declared number undefined until the first tick. The project's
 arithmetic test caught a `/= 0` (Elm compiles comparisons with zero to
 JavaScript truthiness); `M.truthy` mirrors the TypeScript's truthiness test.
+
+## Mission objectives and hostile hunters ported (2026-11-27)
+
+`mission-objective.ts` (49 code lines) became `Sim.MissionObjective`, about
+15 minutes, matched on the first run; 13 mutants, all killed once two test
+gaps closed (an "exactly at the gate radius" point placed with sine and
+cosine missed the radius by rounding, and the rescue and survey stand-ins
+could not see a changed tick).
+
+`hostile-tracks.ts` (107 code lines) became `Sim.HostileTracks` and
+`Sim.HunterReports`, about 30 minutes, matched on the first run except one
+representation difference (TypeScript's `tracking: null` for a hunter that
+gave up, Elm's `Nothing`), normalized as the ship-record tests already do.
+Restore guarantees every hunter report a depth, course and speed, so the Elm
+report requires them, turning that invariant into a type. 41 mutants, all
+killed once the inputs gained hunters just either side of each weapon's
+reach and a zero-length tick (an alert lands on exactly 42 only by chance
+after an update). The systems helpers for the debrief, the random stream and
+sound now take only the fields they use, and sounds can carry an altitude.
