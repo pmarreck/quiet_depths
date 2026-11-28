@@ -5,6 +5,10 @@ import {fireDeckGun} from '../src/combat.js';
 import {requestRecon} from '../src/recon.js';
 import {listenForReplayEvents} from '../src/replay-events.js';
 import {collectInvalidNumbers} from '../src/invalid-numbers.js';
+import {emitSound} from '../src/acoustics.js';
+import {environmentAt} from '../src/environment.js';
+import {rand} from '../src/mechanics.js';
+import {hash01} from '../src/surface-motion.js';
 import {elm, sameResults, seeded, exact} from './sim-harness.mjs';
 
 // The patrol as the simulation holds it, every number exactly as a save
@@ -91,18 +95,23 @@ test('a frame of play matches the TypeScript on every mission, frame after frame
 // waypoint, the boat colliding, a reconnaissance packet, an expiring
 // noisemaker, an older save without a wave phase, and frames that move
 // nothing at all.
-test('each way a patrol ends, and other rare moments, match the TypeScript', async () => {
+// Plays constructed situations frame by frame from a patrol set up for each,
+// every frame starting from the patrol as a save restores it. A frame is a
+// time step and input, or a function of the patrol choosing them.
+function player() {
   const calls = [], seen = new Set();
   const play = (name, mission, options, setup, frames) => {
     let w = restore(save(createGame(mission, 41, exact(options))));
     setup(w);
-    for (const [k, [dt, frameInput]] of frames.entries()) {
+    for (const [k, chosen] of frames.entries()) {
       const before = restore(save(w));
       assert.ok(before, name + ': frame ' + k + ' restores');
+      const [dt, frameInput] = typeof chosen === 'function' ? chosen(before) : chosen;
       if (frameInput.olderSave) delete before.wavePhase;
       const args = [JSON.parse(save(before)), dt, exact({...frameInput, olderSave: undefined})];
+      const prior = structuredClone(before);
       const expected = frame(before, dt, args[2]);
-      calls.push({name, args, expected});
+      calls.push({name, args, expected, prior});
       for (const e of expected.world.events) seen.add(e.text);
       for (const e of expected.world.debrief) seen.add(e.text);
       seen.add(name + ': ' + expected.world.status + '/' + expected.world.phase);
@@ -110,9 +119,15 @@ test('each way a patrol ends, and other rare moments, match the TypeScript', asy
       if (w.status !== 'patrol') break;
     }
   };
-  const near = (w, p, dx = 40) => Object.assign(w, {x: p.x + dx, y: p.y, speed: 0, targetSpeed: 0});
-  const surfaced = w => Object.assign(w, {depth: 0, targetDepth: 0});
-  const once = [[1, {}]];
+  return {calls, seen, play};
+}
+const near = (w, p, dx = 40) => Object.assign(w, {x: p.x + dx, y: p.y, speed: 0, targetSpeed: 0});
+const surfaced = w => Object.assign(w, {depth: 0, targetDepth: 0});
+const once = [[1, {}]];
+const at = (w, range, bearing) => ({x: w.x + Math.sin(bearing * Math.PI / 180) * range, y: w.y + Math.cos(bearing * Math.PI / 180) * range});
+
+test('each way a patrol ends, and other rare moments, match the TypeScript', async () => {
+  const {calls, seen, play} = player();
   play('window', 'recon', {}, w => { w.time = 1799.5; }, once);
   play('long window', 'recon', {difficulty: {longPatrol: true}}, w => { w.time = 5400 + w.search.protectedTime - .5; }, once);
   play('fleet extraction window', 'tiebreaker', {}, w => { w.time = 1799.5; w.phase = 'extract'; w.battle.volleys = []; for (const v of w.ships) if (v.side === 'hostile' && !v.incidental) v.hull = 0; }, once);
@@ -166,5 +181,196 @@ test('each way a patrol ends, and other rare moments, match the TypeScript', asy
   assert.ok([...seen].some(t => t.startsWith('Orbital reconnaissance received.')), 'a reconnaissance packet');
   assert.ok(calls.some(c => c.expected.replay.some(r => r.event.kind === 'collision')), 'a collision with the boat');
   assert.ok(calls.some(c => c.name === 'shadowing' && c.expected.world.trackTime > 0), 'tracking time');
+  sameResults(await elm('patrolTick.step', calls.map(c => c.args)), calls.map(c => c.expected));
+});
+
+// Branches the mutation check found no frame reaching: each scenario sets up
+// the one condition a branch of the tick turns on, between the threshold and
+// a nearby wrong one, and checks that the TypeScript took the branch.
+test('the tick\'s thresholds and rarer branches match the TypeScript', async () => {
+  const {calls, seen, play} = player();
+  const named = name => calls.filter(c => c.name === name);
+  const last = name => named(name).at(-1).expected.world;
+  const heard = start => [...seen].some(t => t.startsWith(start));
+  const quiet = w => Object.assign(w, {speed: 0, targetSpeed: 0});
+  const deep = w => Object.assign(quiet(w), {depth: 60, targetDepth: 60});
+  const merchants = w => w.ships.filter(v => v.kind === 'merchant' && !v.incidental);
+  // Ships other than these leave the boat's waters.
+  const clear = (w, keep) => { for (const v of w.ships) if (!keep.includes(v)) Object.assign(v, {x: w.x + 40000, y: w.y + 40000}); };
+  // Advances a sound's id until its hash falls in [low, high).
+  const soundIdIn = (w, n, low, high) => { while (!(low <= hash01(w.patrol.seed, n + w.soundSequence) && hash01(w.patrol.seed, n + w.soundSequence) < high)) w.soundSequence++; };
+
+  play('repeated line', 'recon', {}, w => { w.events.unshift({...w.events[0]}); }, [[.25, {}]]);
+  assert.notEqual(last('repeated line').events[0].text, last('repeated line').events[1]?.text, 'the repeated line is dropped');
+
+  let fixed = [];
+  play('satellite fixes', 'recon', {}, w => {
+    w.time = 1000;
+    clear(w, []);
+    fixed = [[w.ships[0], 150], [w.ships[1], 50]].map(([v, time]) => {
+      const c = contact(w, v, 'passive');
+      Object.assign(c, {age: 300, method: 'satellite', fix: {x: v.x, y: v.y, time, vx: 0, vy: 0, positionSigma: 0, velocitySigma: .25, maneuverSigma: .008, source: 'satellite'}});
+      return c.id;
+    });
+  }, [[1, {}]]);
+  assert.deepEqual(fixed.map(id => last('satellite fixes').contacts.some(c => c.id === id)), [true, false], 'a satellite fix lasts fifteen minutes');
+
+  play('photo cooldown', 'recon', {}, w => { w.photoCooldown = 3; }, [[1, {}]]);
+  assert.equal(last('photo cooldown').photoCooldown, 2);
+
+  play('silent at speed', 'recon', {}, w => {
+    const [v] = merchants(w);
+    clear(w, [v]);
+    Object.assign(v, at(w, 2000, 90), {speed: 0});
+    Object.assign(w, {depth: 60, targetDepth: 60, speed: 12, targetSpeed: 12, silent: true, time: 2.9});
+  }, [[.25, {}]]);
+  assert.ok(last('silent at speed').contacts.some(c => c.method === 'passive'), 'heard while running silent at speed');
+
+  // Morning fog, thin enough that lights are the only sign of a ship beyond
+  // optical range.
+  let lit = [];
+  play('lights in fog', 'recon', {weather: 'clear'}, w => {
+    w.environment.startHour = 4.95;
+    const {fog} = environmentAt(w);
+    assert.ok(.16 < fog && fog < .3, 'thin fog: ' + fog);
+    const [a, b] = merchants(w);
+    clear(w, [a, b]);
+    Object.assign(a, at(w, 4000, 10), {speed: 0, lights: true});
+    Object.assign(b, at(w, 4000, 21), {speed: 0, lights: true});
+    for (const v of [a, b]) delete v.blackout;
+    lit = [a.id, b.id];
+    Object.assign(quiet(w), {depth: 0, targetDepth: 0});
+  }, [[3, {observation: 'tower', look: 0}]]);
+  assert.deepEqual(lit.map(id => last('lights in fog').contacts.find(c => c.id === id)?.method), ['lights', 'passive'], 'lights seen ahead, not off the arc');
+
+  play('clue and report together', 'intercept', {}, w => {
+    w.time = 100;
+    const v = w.ships.find(v => v.kind === 'escort');
+    Object.assign(v, at(w, 9000, 0), {speed: 0, alert: 30, clue: {x: 300, y: 300, time: 99}, report: {x: 1500, y: 1500, depth: 60, heading: 0, speed: 0, time: 99}});
+    deep(w).silent = true;
+  }, [[.25, {}]]);
+  assert.ok(last('clue and report together').ships.some(v => v.clue?.x === 300), 'a report no newer than the clue leaves it');
+
+  play('disabled ship', 'recon', {}, w => { Object.assign(merchants(w)[0], {disabled: true, speed: 5}); }, [[1, {}]]);
+  assert.equal(last('disabled ship').ships.find(v => v.disabled).speed, 0);
+
+  play('depth charges', 'intercept', {}, w => {
+    w.time = 200;
+    const v = w.ships.find(v => v.kind === 'escort');
+    Object.assign(v, at(w, 150, 0), {alert: 100, speed: 10, heading: 180, report: {x: w.x, y: w.y, depth: 40, heading: 0, speed: 6, time: 199}});
+    Object.assign(w, {depth: 40, targetDepth: 40, speed: 6, targetSpeed: 6, silent: false});
+  }, Array.from({length: 6}, () => [5, {}]));
+  assert.ok(named('depth charges').some(c => c.expected.world.blasts.some(b => b.kind === 'charge')), 'an escort dropped depth charges');
+
+  // A launch heard close by, and a splash at range, each with odds the
+  // right threshold passes and a nearby wrong one would not.
+  play('launch heard', 'recon', {}, w => {
+    deep(w);
+    soundIdIn(w, 42000, .91, .96);
+    emitSound(w, {type: 'launch', ...at(w, 60, 45), depth: w.depth, power: .75});
+  }, [[.5, {}]]);
+  assert.ok(heard('Possible torpedo launch heard'), 'a close launch heard');
+  play('splash at range', 'recon', {}, w => {
+    deep(w);
+    const distance = Math.hypot(2150, w.depth), odds = range => .85 / (1 + (distance / range) ** 2);
+    soundIdIn(w, 42000, odds(2000) + .003, odds(2200) - .003);
+    emitSound(w, {type: 'splashdown', ...at(w, 2150, 45), depth: 0, power: .65});
+  }, [[2, {}]]);
+  assert.ok(heard('Possible depth-charge splash heard'), 'a distant splash heard');
+
+  play('seeker at range', 'recon', {}, w => {
+    w.time = 100;
+    deep(w);
+    const p = at(w, 5500, 90), echo = {id: 7, ...p, depth: 30, speed: 40, time: w.time, inboundRun: false};
+    w.torpedoTracks = [{...echo, x: p.x + 60, time: w.time - 3, fixes: 1, activeAt: w.time - 3, activeX: p.x + 60, activeY: p.y, course: null, arrival: null}];
+    emitSound(w, {type: 'seeker', ...p, depth: 30, power: 1, echo});
+  }, [[4, {}]]);
+  assert.ok(last('seeker at range').torpedoTracks.some(t => t.id === 7 && t.time === 100), 'a distant seeker updates its torpedo track');
+
+  play('second sweep', 'recon', {}, w => {
+    w.time = 200;
+    deep(w);
+    const [v] = merchants(w);
+    clear(w, [v]);
+    Object.assign(v, at(w, 1000, 90), {speed: 0});
+    contact(w, v, 'passive').lastSweep = w.time - 110;
+    emitSound(w, {type: 'sweep', x: v.x, y: v.y, depth: 0, power: .85, vessel: v.id});
+  }, [[1, {}]]);
+  assert.ok(last('second sweep').contacts.some(c => c.sweepArea), 'a second sweep within two minutes marks its square');
+
+  // A passing sub and escort square off within the boat's hearing, on an
+  // ordinary day and on Christmas.
+  const passing = (w, day) => {
+    if (day !== undefined) w.environment.startDay = day;
+    const [a, b] = merchants(w);
+    clear(w, [a, b]);
+    deep(w);
+    Object.assign(a, at(w, 5300, 90), {id: 'passage-1-0-0', incidental: true, side: 'hostile', kind: 'sub', military: true, depth: 20, speed: 3});
+    Object.assign(b, {x: a.x, y: a.y + 1500, id: 'passage-1-0-1', incidental: true, side: 'friendly', kind: 'escort', military: true, speed: 3});
+  };
+  play('challenge ping', 'recon', {}, w => passing(w), Array.from({length: 10}, () => [30, {}]));
+  assert.ok(heard('Challenge ping heard'), 'a passing sub challenged within hearing');
+  play('holiday traffic', 'recon', {}, w => passing(w, 359), Array.from({length: 10}, () => [30, {}]));
+  assert.ok(named('holiday traffic').every(c => environmentAt(c.prior).holiday === 'christmas') && named('holiday traffic').some(c => c.expected.world.ships.some(v => v.parley)), 'traffic squares off on Christmas');
+
+  // A convoy lamp in view while an allied lamp is signaling.
+  play('two lamps', 'wolf-in-the-henhouse', {timeOfDay: 'night', weather: 'clear'}, w => {
+    const wolf = w.ships.find(v => v.id === 'wolf'), ally = w.ships.find(v => v.side === 'friendly' && v.kind !== 'sub' && v.id !== 'wolf');
+    Object.assign(quiet(w), at(ally, 1200, 180), {depth: 0, targetDepth: 0});
+    Object.assign(wolf, at(ally, 1200, 90), {speed: 0});
+  }, [...Array.from({length: 8}, () => [5, {observation: 'tower'}]),
+    ...Array.from({length: 8}, () => w => [5, {observation: 'tower', lampInView: w.convoy.message?.estimate.sender ?? null}])]);
+  assert.ok(named('two lamps').some(c => c.prior.alliedLamp?.message && c.prior.convoy.message && c.args[2].lampInView === c.prior.convoy.message.estimate.sender),
+    'a convoy lamp in view while an allied lamp signals');
+
+  play('time rate not a number', 'recon', {difficulty: {longPatrol: true}}, () => {}, [[1, {timeRate: NaN}]]);
+  assert.ok(Number.isFinite(last('time rate not a number').search.activeSeconds), 'the approach clock keeps counting');
+
+  play('blast at the edge', 'recon', {}, w => { deep(w); emitSound(w, {type: 'blast', ...at(w, 205, 90), depth: w.depth, power: 1.2}); }, [[.5, {}]]);
+  assert.ok(seen.has('An underwater explosion was close enough to damage your sub.'), 'a blast 205 m away damages the sub');
+
+  play('early lightning', 'recon', {weather: 'storm'}, w => { w.time = 22; w.nextLightningAt = 22.1; }, [[.25, {look: 90}]]);
+  assert.ok(last('early lightning').lightning.some(e => e.time === 22.25), 'lightning in the first half minute');
+
+  // Lightning that strikes, with one surfaced ship 5.5 km off.
+  let struck;
+  play('lightning at range', 'recon', {weather: 'storm'}, w => {
+    w.time = 100;
+    w.nextLightningAt = 100.1;
+    deep(w);
+    const [v] = merchants(w);
+    clear(w, [v]);
+    Object.assign(v, at(w, 5500, 0), {speed: 0});
+    struck = v.name;
+    const strikeSeed = r => { const g = {rng: r}; rand(g); rand(g); rand(g); return Math.floor(rand(g) * 1000000); };
+    while (hash01(strikeSeed(w.rng), 910) >= .09) rand(w);
+  }, [[.25, {}]]);
+  assert.ok(seen.has('Lightning struck ' + struck + '.'), 'lightning found the distant ship');
+
+  play('convoy charge', 'wolf-in-the-henhouse', {}, w => {
+    const wolf = w.ships.find(v => v.id === 'wolf');
+    soundIdIn(w, 14600, 0, .32);
+    w.blasts.push({id: w.soundSequence++, x: wolf.x + 100, y: wolf.y, depth: wolf.depth, delay: .1, totalDelay: 3, age: 0, exploded: false, kind: 'charge', convoyCharge: true});
+  }, [[.5, {}]]);
+  assert.ok(seen.has('An escort depth charge damaged the hunter.'), 'an escort charge damaged the hunter');
+
+  let watched;
+  play('drone over the fleet', 'tiebreaker', {}, w => {
+    const v = w.ships.find(v => v.side === 'friendly' && !v.incidental && v.hull > 0);
+    watched = v.id;
+    Object.assign(w, {x: v.x + 90, y: v.y, depth: 20, targetDepth: 20, speed: 0, targetSpeed: 0});
+    assert.ok(deployDrone(w), 'drone deployed');
+    Object.assign(w.drone, {x: v.x + 40, y: v.y, depth: 5, targetDepth: 5, heading: 270, targetHeading: 270});
+  }, [[.25, {observation: 'drone'}]]);
+  assert.equal(last('drone over the fleet').contacts.find(c => c.id === watched)?.method, 'visual', 'the drone sighted a fleet ship');
+
+  play('wreck at range', 'recon', {timeOfDay: 'day', weather: 'clear'}, w => {
+    Object.assign(quiet(w), {depth: 0, targetDepth: 0});
+    const [v] = merchants(w);
+    clear(w, [v]);
+    Object.assign(v, at(w, 1100, 0), {hull: 0, speed: 0, sinkDepth: 2});
+  }, [[.25, {observation: 'tower', look: 0}]]);
+  assert.ok(seen.has('Wreck sighted. Position marked on chart.'), 'a wreck sighted 1.1 km off');
+
   sameResults(await elm('patrolTick.step', calls.map(c => c.args)), calls.map(c => c.expected));
 });
