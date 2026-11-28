@@ -490,3 +490,80 @@ for (const [how, via] of SOURCES) test('a write after queued calls reaches the w
   step(t, 5, {timeRate: 4});
   sameResults([pageless(m)], [pageless(t)]);
 });
+
+// A write that puts an order back as it was, after calls queued with other
+// changes, still reaches the worker in its place: what the worker will hold
+// once the queued calls apply counts every one of them.
+for (const [how, via] of SOURCES) test('an order written back after queued calls reaches the worker, ' + how, async () => {
+  const tr = transport({...via, hold: true}), starting = elmSimulation(tr, strict);
+  await tr.release();
+  const sim = await starting, made = sim.create('recon', 20);
+  await tr.release();
+  const m = await made, t = createGame('recon', 20), heading = m.targetHeading;
+  const calls = [sim.step(m, 5, {timeRate: 4})];
+  m.targetSpeed = 9;
+  calls.push(sim.act(m, {kind: 'ping'}));
+  m.targetHeading = 45;
+  calls.push(sim.act(m, {kind: 'log', text: 'Come about.'}));
+  await tr.release();
+  await calls[0];
+  m.targetHeading = heading;
+  calls.push(sim.act(m, {kind: 'log', text: 'Belay that.'}));
+  for (let i = 1; i < 4; i++) { await tr.release(); await calls[i]; }
+  const last = sim.step(m, 5, {timeRate: 4});
+  await tr.release();
+  await last;
+  step(t, 5, {timeRate: 4});
+  t.targetSpeed = 9;
+  ping(t);
+  t.targetHeading = 45;
+  log(t, 'Come about.');
+  t.targetHeading = heading;
+  log(t, 'Belay that.');
+  step(t, 5, {timeRate: 4});
+  sameResults([pageless(m)], [pageless(t)]);
+});
+
+// An action's invalid numbers reach the reporter, as the TypeScript's do.
+for (const [how, via] of SOURCES) test('an action reports its invalid numbers, ' + how, async () => {
+  const sim = await elmSimulation(transport(via), strict), m = await sim.create('recon', 21), t = createGame('recon', 21);
+  const a = await announced(t, [], () => fireDeckGun(t, {bearing: NaN, elevation: 3}));
+  const b = await announced(m, [], () => sim.act(m, {kind: 'fireDeckGun', bearing: NaN, elevation: 3}));
+  assert.deepEqual(a.invalid.map(p => p.where), ['fireDeckGun bearing']);
+  sameResults([exact({result: b.result, invalid: b.invalid, world: pageless(m)})], [exact({result: a.result, invalid: a.invalid, world: pageless(t)})]);
+});
+
+// The adapter's restore checks and fills the page's own fields as the
+// TypeScript's does, refusing a save whose captain or photo numbering is bad.
+test('the adapter restores the page\'s own fields as the TypeScript does', async () => {
+  const sim = await elmSimulation(worker(), strict), base = JSON.parse(save(createGame('recon', 22)));
+  for (const patch of [{captain: 123}, {captain: 'x'.repeat(300)}, {photoSequence: -1}, {photoArchive: 'no'}])
+    assert.equal(await sim.restore(JSON.stringify({...base, ...patch})), restore(JSON.stringify({...base, ...patch})), JSON.stringify(patch).slice(0, 40));
+  const {photoArchive, photoSequence, captain, ...rest} = base, m = await sim.restore(JSON.stringify(rest)), t = restore(JSON.stringify(rest));
+  assert.deepEqual([m.photoArchive, m.photoSequence, m.captain], [t.photoArchive, t.photoSequence, t.captain]);
+});
+
+// A patrol loaded back into the worker goes as the page holds it, every
+// number exact: a negative zero stays negative.
+for (const [how, via] of SOURCES) test('a patrol loaded back keeps every number exact, ' + how, async () => {
+  const tr = transport(via), sim = await elmSimulation(tr), a = createGame('recon', 23);
+  const ma = await sim.restore(save(a));
+  await sim.restore(save(createGame('intercept', 24)));
+  for (const s of [ma, a]) s.alert = -0;
+  await sim.step(ma, 1, {timeRate: 1});
+  step(a, 1, {timeRate: 1});
+  const load = tr.sent.find(c => c.kind === 'load');
+  assert.ok(Object.is(load.world.alert, -0), 'the load carries the negative zero');
+  sameResults([pageless(ma)], [pageless(a)]);
+});
+
+// A reply that answers no command is a fault in the worker, and says so.
+test('a reply that answers no command is refused', async () => {
+  let deliver = null, sent = null;
+  const asked = new Promise(resolve => { sent = resolve; });
+  const starting = elmSimulation({send: () => sent(), listen: l => { deliver = l; }});
+  await asked;
+  deliver({boat: [], gun: [], drone: []});
+  await starting;
+  assert.throws(() => deliver({boat: []}), /replied to no command/);
+});

@@ -68,6 +68,10 @@ const isRecord = (v: unknown): v is Fields => !!v && typeof v === 'object' && !A
 // present field as malformed when it is undefined.
 const pick = (from: Fields, keys: readonly string[]) => Object.fromEntries(keys.filter(k => from[k] !== undefined).map(k => [k, from[k]]));
 const defined = (from: object) => pick(from as Fields, Object.keys(from));
+// A copy as JSON would carry it, undefined fields and functions left out,
+// but with every number exact: -0, NaN and the infinities included.
+const plain = (v: unknown): unknown => Array.isArray(v) ? v.map(x => x === undefined || typeof x === 'function' ? null : plain(x))
+  : isRecord(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined && typeof x !== 'function').map(([k, x]) => [k, plain(x)])) : v;
 
 export interface Options {onStray?: (fields: string[]) => void}
 
@@ -171,8 +175,8 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
   // over the last the page's orders the worker has not yet applied: those of
   // later calls, and those written since the page's last call. `own` is the
   // call's changes, which the reply has applied.
-  const landed = (s: World, t: Track, worlds: Changes[], own: Map<number, unknown> | null, before = () => {}, each: (index: number) => void = () => {}) => {
-    if (own && t.unreplied[0] === own) t.unreplied.shift();
+  const landed = (s: World, t: Track, worlds: Changes[], own: Map<number, unknown>, before = () => {}, each: (index: number) => void = () => {}) => {
+    if (t.unreplied[0] === own) t.unreplied.shift();
     const since = changed(s, t);
     before();
     for (const [i, world] of worlds.entries()) {
@@ -181,19 +185,19 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
       t.replied = simulated(s);
       each(i);
     }
-    if (!worlds.length) t.base = merged(t.base, own ? [own] : []);
     t.logged = merged(t.base, t.unreplied).map(key);
     const over = new Map([...t.unreplied.flatMap(c => [...c]), ...since]);
     if (!over.size || !worlds.length) return;
     checked(s, t);
     for (const [i, value] of over) {
-      const [part, f] = places[i], w = s as unknown as Fields, into = part ? w[part] as Fields : w;
-      if (value === undefined) delete into[f]; else into[f] = structuredClone(value);
+      const [part, f] = places[i], w = s as unknown as Fields;
+      (part ? w[part] as Fields : w)[f] = structuredClone(value);
     }
     t.replied = simulated(s);
   };
   let held: object | null = null;
-  // Loads a patrol the worker does not hold, as the worker last knew it.
+  // Loads a patrol the worker does not hold, as the worker last knew it; the
+  // world it sends back is that one, so the page's object stands as it is.
   const holding = async (s: World, t: Track, exchange: Exchange) => {
     if (s === held) return;
     const world = {...s, gun: {...s.gun}, drone: {...s.drone}} as Fields;
@@ -202,8 +206,7 @@ function ready(jobs: Queue, fields: {boat: string[]; gun: string[]; drone: strin
       if (t.base[i] === undefined) delete into[f]; else into[f] = t.base[i];
     });
     for (const k of PAGE_FIELDS) delete world[k];
-    const reply = await exchange({kind: 'load', world: JSON.parse(JSON.stringify(world))});
-    landed(s, t, [changesOf(reply)!], null);
+    await exchange({kind: 'load', world: plain(world)});
     held = s;
   };
   // Logs the page's order changes as this call's, then runs `job` in its turn.
