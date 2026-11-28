@@ -303,3 +303,38 @@ code that can saturate handles it where it arises, and a MAX that reaches
 later arithmetic is itself a bug to report. That answers the stickiness
 concern (MAX × 0.5 = 8.99e307, an ordinary finite number, where Infinity ×
 0.5 stays Infinity): saturated values must not travel.
+
+## Owner's decisions on MIN, division and the pilot (2026-11-27)
+
+- MIN is the smallest normal double, 2.2e-308; the subnormal range counts as
+  underflow and saturates to ±MIN.
+- Division returns a result the caller must handle by type, never a bare MAX.
+- A value reaching MAX in later arithmetic is a bug to report, as recommended;
+  saves reject saturated values by bound.
+- Narrowing or widening saturates anything beyond the target's range to the
+  target's MAX.
+- Pilot one module now, in stock Elm, to measure the ceremony and the time
+  per call before building the types more widely.
+
+### Catching "MAX × 0.5" at compile time
+
+The owner asked whether a type allowed only -MAX+1 .. MAX-1 could make
+multiplying MAX a compile error. Stock Elm cannot prove that a value never
+reaches MAX: proving it takes refinement or dependent types (Liquid Haskell,
+F*, Lean), or range inference added to the compiler. What Elm can do is make
+MAX unrepresentable and make the compiler force handling at exactly the
+operations that could produce it:
+
+- An opaque `Finite` type holds only values strictly between -MAX and MAX,
+  never NaN or an infinity. Its smart constructor is the only way in, so no
+  `Finite` ever holds MAX.
+- Operations whose result cannot leave the range are total and return
+  `Finite`: scaling by a unit-range factor, averaging, clamping, negation,
+  the absolute value.
+- Operations whose result can leave the range return a must-handle result:
+  division, and general multiplication and addition of two unbounded values.
+  The caller decides, in context, what saturation means.
+
+"MAX × 0.5" therefore cannot be written: no MAX value exists to multiply, and
+the operation that would have produced one already made its caller handle the
+overflow. The pilot measures how often that handling appears in real code.
