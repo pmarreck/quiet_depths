@@ -102,14 +102,14 @@ test('plain JSON transfers preserve the seeded simulation and reject invalid bac
  const {validPhoto}=await import('../src/photos.js');
  const {step,save}=await import('../src/sim.js');
  const s=createGame('survey',1729);s.captain='Rita Bilge';s.patrolId='a'.repeat(32);step(s,7.25);
- const entry={patrol:s,label:'Survey',image:'',station:null},decode=(file,type)=>decodeFile(JSON.stringify(file),type,restore,()=>assert.fail('unexpected station'),validPhoto);
- const imported=decode(saveDocument(entry),'patrol').patrol;
+ const entry={patrol:s,label:'Survey',image:'',station:null},decode=(file,type)=>decodeFile(JSON.stringify(file),type,async raw=>restore(raw),()=>assert.fail('unexpected station'),validPhoto);
+ const imported=(await decode(saveDocument(entry),'patrol')).patrol;
  step(s,11);step(imported,11);assert.equal(save(imported),save(s));
  const slot={...entry,id:2},setup={mission:'survey',seed:'0',captain:'Rita Bilge',defaultCaptain:'Nell Haddock',conditions:{weather:'rain',timeOfDay:'dusk',changing:true}};
  const file=stateDocument({current:entry,started:true,slots:[slot],setup,localStorage:{'quiet-depths-v1':{...s}}});
- assert.deepEqual(decode(file,'state').setup,setup);
+ assert.deepEqual((await decode(file,'state')).setup,setup);
  for(const patch of [{version:2},{format:'Quiet Depths patrol'},{slots:[slot,slot]},{slots:[{...slot,id:7}]},{started:true,current:null},{localStorage:{unrelated:true}},{localStorage:{'quiet-depths-v1':{version:1}}},{slots:[{...slot,image:'https://example.invalid/image'}]}]){
-  assert.throws(()=>decode({...file,...patch},'state'));
+  await assert.rejects(()=>decode({...file,...patch},'state'));
  }
 });
 

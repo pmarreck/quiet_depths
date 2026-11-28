@@ -151,7 +151,7 @@ test('the end-mission dialog asks in Elm, opens on its heading and sends only it
  assert.match(elm,/Unsuccessful ->\n {12}"Nothing toward the objective is aboard yet\. Ending now records an unsuccessful patrol\."/);
  assert.ok(app.includes(`endMission.ports.endMissionOrder.subscribe(answer=>{
  $('end-mission-dialog').close();
- if(answer==='end'&&canIssue(state,context())&&endPatrolEarly(state))updateUI();
+ if(answer==='end'&&canIssue(state,context()))endPatrolEarly(state).then(ended=>{if(ended)updateUI();});
 });`));
  assert.ok(app.includes(`const extraction=extractionPrompt(extractionArmed,state);extractionArmed=extraction.armed;if(extraction.ask)askEndMission();`));
  assert.match(app,/lossSoundPlayed=false;extractionArmed=true;/,'a new patrol arms the question');

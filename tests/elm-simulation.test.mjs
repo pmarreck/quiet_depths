@@ -13,8 +13,32 @@ import {refreshMirror} from '../src/world-mirror.js';
 import {synchronousPorts} from '../scripts/elm-sync-ports.mjs';
 import {compiledElm, sameResults, seeded, exact} from './sim-harness.mjs';
 
-// The worker as the page builds it, its replies delivered at once.
-const worker = () => compiledElm('elm/SimWorker.elm', synchronousPorts).SimWorker.init();
+// The worker's program, stock: each reply arrives once the event loop turns.
+const program = compiledElm('elm/SimWorker.elm').SimWorker;
+// The worker as the adapter reaches it. With `hold`, each reply waits until
+// the test releases it, so the test can act while a command is in flight;
+// `sent` lists the commands in the order they went.
+function transport({hold = false} = {}) {
+  const app = program.init(), held = [], sent = [];
+  let listener = null, arrived = null;
+  app.ports.replies.subscribe(reply => {
+    if (!hold) { listener(reply); return; }
+    held.push(reply);
+    arrived?.();
+  });
+  return {
+    send: command => { sent.push(command); app.ports.commands.send(command); },
+    listen: l => { listener = l; },
+    sent,
+    // Delivers the next reply once the worker has sent it.
+    async release() {
+      while (!held.length) await new Promise(resolve => { arrived = resolve; });
+      arrived = null;
+      listener(held.shift());
+    },
+  };
+}
+const worker = () => transport();
 // Fails a test that writes, on the page's patrol object, a field only the
 // simulation changes; the worker would never see it.
 const strict = {onStray: fields => { throw new Error('written outside the orders: ' + fields.join(', ')); }};
@@ -35,16 +59,18 @@ const TYPESCRIPT = {
 };
 
 // The replay marks and invalid numbers a patrol announces while `work` runs.
-function announced(world, marks, work) {
+async function announced(world, marks, work) {
   const invalid = [], previous = setInvalidNumberReporter(problem => invalid.push(problem));
   const before = marks.length;
-  try { return {result: work(), replay: marks.slice(before), invalid}; } finally { setInvalidNumberReporter(previous); }
+  try { return {result: await work(), replay: marks.slice(before), invalid}; } finally { setInvalidNumberReporter(previous); }
 }
 
-// The adapter relies on this: Elm runs each command's update and, with the
-// ports' timer removed, sends its reply before `send` returns, command after
-// command. A stock outgoing port answers once per turn of the event loop.
+// The page's bundle, until it moves to a Web Worker, removes the ports'
+// timer, so Elm sends each reply before `send` returns, command after
+// command. A stock outgoing port answers once per turn of the event loop,
+// which the adapter, now asynchronous, takes either way.
 test('the worker answers each command within the call, one after another', () => {
+  const worker = () => compiledElm('elm/SimWorker.elm', synchronousPorts).SimWorker.init();
   const stock = compiledElm('elm/SimWorker.elm').SimWorker.init();
   let late = null;
   stock.ports.replies.subscribe(r => { late = r; });
@@ -97,7 +123,7 @@ test('the page played through the Elm worker matches the TypeScript game', async
   let turn = 0, frames = 0, ticks = 0;
   for (const [n, {id}] of MISSIONS.entries()) for (const longPatrol of [false, true]) {
     const seed = 900 + 2 * n + Number(longPatrol), options = exact({difficulty: {longPatrol}, weather: pick(random, [undefined, 'storm', 'fog'])});
-    const t = createGame(id, seed, options), m = sim.create(id, seed, options);
+    const t = createGame(id, seed, options), m = await sim.create(id, seed, options);
     assert.deepEqual(pageless(m), pageless(t), id + ': created alike');
     const tMarks = [], mMarks = [];
     listenForReplayEvents(t, {mark: (time, event) => tMarks.push({time, event})});
@@ -128,7 +154,7 @@ test('the page played through the Elm worker matches the TypeScript game', async
       const kind = kinds[turn++ % kinds.length], target = t.ships[0] ?? t;
       const action = {kind, look: Math.floor(random() * 360), id: t.contacts[0]?.id ?? 'nobody', bearing: 90, elevation: 5, x: target.x, y: target.y, raised: random() < .5,
         area: {x: t.x + 1500, y: t.y + 2500, size: 10000}, text: 'Captain to the bridge.'};
-      const a = announced(t, tMarks, () => TYPESCRIPT[kind](t, action)), b = announced(m, mMarks, () => sim.act(m, action));
+      const a = await announced(t, tMarks, () => TYPESCRIPT[kind](t, action)), b = await announced(m, mMarks, () => sim.act(m, action));
       sameResults([exact({result: b.result ?? null, replay: b.replay, invalid: b.invalid, world: pageless(m)})], [exact({result: a.result ?? null, replay: a.replay, invalid: a.invalid, world: pageless(t)})]);
       const before = t;
       const dt = pick(random, [1 / 60, .25, 1, 5, 30, 90]), input = exact({timeRate: pick(random, [undefined, 1, 4, 16]), observation: pick(random, [undefined, null, 'scope', 'tower']),
@@ -137,8 +163,8 @@ test('the page played through the Elm worker matches the TypeScript game', async
         look: pick(random, [undefined, random() * 360])});
       const shipsBefore = new Map(m.ships.map(v => [v.id, v])), eventsBefore = new Set(m.events);
       const tTicks = [], mTicks = [];
-      const c = announced(t, tMarks, () => step(t, dt, {...input, afterTick: s => tTicks.push(pageless(s))}));
-      const d = announced(m, mMarks, () => sim.step(m, dt, {...input, afterTick: s => mTicks.push(pageless(s))}));
+      const c = await announced(t, tMarks, () => step(t, dt, {...input, afterTick: s => tTicks.push(pageless(s))}));
+      const d = await announced(m, mMarks, () => sim.step(m, dt, {...input, afterTick: s => mTicks.push(pageless(s))}));
       assert.equal(mTicks.length, tTicks.length, where + ': as many ticks');
       sameResults(mTicks, tTicks);
       sameResults([exact({replay: d.replay, invalid: d.invalid})], [exact({replay: c.replay, invalid: c.invalid})]);
@@ -146,7 +172,7 @@ test('the page played through the Elm worker matches the TypeScript game', async
       assert.ok(m.events.filter(e => eventsBefore.has(e)).length >= Math.min(eventsBefore.size, m.events.length) - 2, where + ': log lines keep their identity');
       frames++; ticks += tTicks.length;
     }
-    const resumed = sim.restore(JSON.stringify(m)), expected = restore(save(t));
+    const resumed = await sim.restore(JSON.stringify(m)), expected = restore(save(t));
     sameResults([resumed && pageless(resumed)], [expected && pageless(expected)]);
   }
   assert.ok(frames > 150 && ticks > 1000, 'many frames and ticks: ' + frames + ', ' + ticks);
@@ -160,14 +186,14 @@ test('the page can go back to a patrol the worker no longer holds', async () => 
   const sim = await elmSimulation(worker(), strict);
   const a = createGame('recon', 3), b = createGame('intercept', 4);
   for (const s of [a, b]) step(s, 30, {timeRate: 4});
-  const ma = sim.restore(save(a)), mb = sim.restore(save(b));
+  const ma = await sim.restore(save(a)), mb = await sim.restore(save(b));
   for (const [t, m] of [[a, ma], [b, mb], [a, ma]]) {
     step(t, 15, {timeRate: 4});
-    sim.step(m, 15, {timeRate: 4});
+    await sim.step(m, 15, {timeRate: 4});
     sameResults([pageless(m)], [pageless(t)]);
   }
   ping(a);
-  sim.act(ma, {kind: 'ping'});
+  await sim.act(ma, {kind: 'ping'});
   sameResults([pageless(ma)], [pageless(a)]);
 });
 
@@ -175,22 +201,22 @@ test('the page can go back to a patrol the worker no longer holds', async () => 
 // TypeScript or, once handed the adapter, to the Elm worker.
 test('the page-side simulation routes to the Elm worker and back', async () => {
   const page = await import('../src/simulation.js');
-  const typed = page.createGame('survey', 12);
-  page.step(typed, 30, {timeRate: 4});
-  page.ping(typed);
-  page.log(typed, 'Damage control assigned.');
+  const typed = await page.createGame('survey', 12);
+  await page.step(typed, 30, {timeRate: 4});
+  await page.ping(typed);
+  await page.log(typed, 'Damage control assigned.');
   assert.equal(page.elmSimulationActive(), false);
   page.useElmSimulation(await elmSimulation(worker(), strict));
   try {
     assert.equal(page.elmSimulationActive(), true);
-    const routed = page.createGame('survey', 12);
-    page.step(routed, 30, {timeRate: 4});
-    page.ping(routed);
-    page.log(routed, 'Damage control assigned.');
+    const routed = await page.createGame('survey', 12);
+    await page.step(routed, 30, {timeRate: 4});
+    await page.ping(routed);
+    await page.log(routed, 'Damage control assigned.');
     sameResults([pageless(routed)], [pageless(typed)]);
-    const resumed = page.restore(JSON.stringify(routed));
+    const resumed = await page.restore(JSON.stringify(routed));
     sameResults([pageless(resumed)], [pageless(restore(save(typed)))]);
-    assert.deepEqual(page.dronePhotograph(resumed), dronePhotograph(restore(save(typed))));
+    assert.deepEqual(await page.dronePhotograph(resumed), dronePhotograph(restore(save(typed))));
   } finally {
     page.useElmSimulation(null);
   }
@@ -214,20 +240,23 @@ test('every routed function matches the TypeScript', async () => {
     ];
   };
   // Each setup changes a saved patrol, which both modes then restore.
-  const play = (mission, setup) => {
+  const play = async (mission, setup) => {
     const base = createGame(mission, 31, {timeOfDay: 'day', weather: 'clear'});
     setup(base);
-    const s = page.restore(save(base));
-    page.step(s, 30, {timeRate: 4});
-    return calls(s).map(([name, call]) => ({name, result: exact(call() ?? null), world: pageless(s)}));
+    const s = await page.restore(save(base));
+    await page.step(s, 30, {timeRate: 4});
+    const out = [];
+    for (const [name, call] of calls(s)) out.push({name, result: exact(await call() ?? null), world: pageless(s)});
+    return out;
   };
+  const playAll = async () => { const out = []; for (const [mission, setup] of setups) out.push(await play(mission, setup)); return out; };
   const setups = [['surface-rescue', s => { s.ships = []; Object.assign(s, {x: s.site.x + 48, y: s.site.y, depth: 6, speed: 0, targetSpeed: 0}); }],
     ['recon', s => { Object.assign(s, {depth: 10, targetDepth: 10, speed: 2, targetSpeed: 2}); }],
     ['recon', s => { Object.assign(s, {x: s.home.x + 100, y: s.home.y, depth: 0, targetDepth: 0}); s.photos = ['p1']; }]];
-  const typed = setups.map(([mission, setup]) => play(mission, setup));
+  const typed = await playAll();
   page.useElmSimulation(await elmSimulation(worker(), strict));
   try {
-    const routed = setups.map(([mission, setup]) => play(mission, setup));
+    const routed = await playAll();
     for (const [n, steps] of typed.entries()) for (const [i, expected] of steps.entries()) sameResults([routed[n][i]], [expected]);
     assert.ok(typed.flat().some(c => c.name === 'endPatrolEarly' && c.result === 'partial') && typed.flat().some(c => c.name === 'startRescue' && c.result === true), 'the actions took effect');
   } finally {
@@ -237,12 +266,11 @@ test('every routed function matches the TypeScript', async () => {
 
 // The orders the adapter sends are exactly the fields the page writes: the
 // test above writes each of these, and the worker names no others.
-test('the worker takes as orders exactly the fields the page writes', () => {
-  const app = worker();
-  let reply = null;
-  app.ports.replies.subscribe(r => { reply = r; });
+test('the worker takes as orders exactly the fields the page writes', async () => {
+  const app = program.init();
+  const reply = new Promise(resolve => app.ports.replies.subscribe(resolve));
   app.ports.commands.send({kind: 'orderFields'});
-  assert.deepEqual(reply, {
+  assert.deepEqual(await reply, {
     boat: ['targetSpeed', 'targetDepth', 'targetHeading', 'silent', 'engine', 'dieselMode', 'route', 'scopeAngle', 'scopeSteerBearing', 'towerAngle', 'towerPitch', 'runSetting', 'imagers', 'repair',
       'photoCooldown', 'reconArchivedSequence', 'newYearWatch', 'patrolId'],
     gun: ['angle', 'elevation'],
@@ -255,15 +283,77 @@ test('the worker takes as orders exactly the fields the page writes', () => {
 test('the adapter names fields written outside the orders', async () => {
   const heard = [];
   const sim = await elmSimulation(worker(), {onStray: fields => heard.push(fields)});
-  const s = sim.create('recon', 8);
+  const s = await sim.create('recon', 8);
   Object.assign(s, {targetSpeed: 6, silent: true, captain: 'Hale'});
   s.drone.targetDepth = 30;
   s.gun.elevation = 4;
-  sim.step(s, 1, {});
+  await sim.step(s, 1, {});
   assert.deepEqual(heard, [], 'orders and page fields are the page\'s');
   s.x += 100;
   s.gun.ammo = 3;
   s.drone.battery = 1;
-  sim.step(s, 1, {});
+  await sim.step(s, 1, {});
   assert.deepEqual(heard.map(fields => [...fields].sort()), [['drone', 'gun', 'x']]);
+});
+
+// One command is in flight at a time, and each call carries the orders the
+// page changed before it, so every write keeps its place in the page's own
+// order: a write made after a call, even before that call's command is sent,
+// reaches the worker after it, and a reply never overwrites a write made
+// while it was in flight. The patrol under the worker, replies held and
+// released by the test, ends as the TypeScript's does with the same writes
+// and calls made synchronously in the same order.
+test('writes around a command in flight keep their place in the page\'s order', async () => {
+  const tr = transport({hold: true}), starting = elmSimulation(tr, strict);
+  await tr.release();
+  const sim = await starting, made = sim.create('recon', 5);
+  await tr.release();
+  const m = await made, t = createGame('recon', 5), route = {x: t.x + 900, y: t.y - 400};
+  for (const s of [m, t]) Object.assign(s, {targetSpeed: 8, photoCooldown: 3});
+  // The page: a step, written orders while it is in flight, a ping, more
+  // writes made after the ping was called, then a second step.
+  const stepped = sim.step(m, 5, {timeRate: 4});
+  await Promise.resolve();
+  m.targetDepth = 30;
+  const pinged = sim.act(m, {kind: 'ping'});
+  m.photoCooldown = 4;
+  m.route = structuredClone(route);
+  await tr.release();
+  await stepped;
+  assert.equal(m.targetDepth, 30, 'the reply did not overwrite a write made in flight');
+  assert.equal(m.photoCooldown, 4);
+  assert.deepEqual(m.route, route);
+  assert.equal(tr.sent.length, 3, 'the ping waits for the step\'s reply');
+  await tr.release();
+  assert.equal(await pinged, true);
+  const sentPing = tr.sent[3];
+  assert.equal(sentPing.kind, 'act');
+  assert.equal(sentPing.orders.targetDepth, 30, 'the ping carries the write made before it');
+  assert.notEqual(sentPing.orders.photoCooldown, 4, 'and not the one made after it');
+  assert.equal(sentPing.orders.route ?? null, null, 'nor the route written after it');
+  const second = sim.step(m, 5, {timeRate: 4});
+  await tr.release();
+  await second;
+  assert.equal(tr.sent[4].orders.photoCooldown, 4, 'the next call carries the later writes');
+  // The same page, synchronous, in the same order.
+  step(t, 5, {timeRate: 4});
+  t.targetDepth = 30;
+  ping(t);
+  t.photoCooldown = 4;
+  t.route = structuredClone(route);
+  step(t, 5, {timeRate: 4});
+  sameResults([pageless(m)], [pageless(t)]);
+});
+
+// A refused command applies nothing, and the orders it carried reach the
+// worker with the next call, so the page's order still holds.
+test('a refused command leaves the page\'s orders for the next call', async () => {
+  const sim = await elmSimulation(worker(), strict), m = await sim.create('intercept', 6), t = createGame('intercept', 6);
+  for (const s of [m, t]) s.targetSpeed = 5;
+  await assert.rejects(sim.act(m, {kind: 'fire'}), /refused a command/);
+  m.targetHeading = 45;
+  await sim.step(m, 10, {timeRate: 4});
+  t.targetHeading = 45;
+  step(t, 10, {timeRate: 4});
+  sameResults([pageless(m)], [pageless(t)]);
 });

@@ -52,8 +52,8 @@ export function writeSlot(id: number, expected: string, state: World, image: str
   });
 }
 
-export function unpackSlot(entry: SlotEntry) {
-  const patrol = entry.version === 1 && restore(entry.snapshot);
+export async function unpackSlot(entry: SlotEntry) {
+  const patrol = entry.version === 1 ? await restore(entry.snapshot) : null;
   if (!patrol || patrol.status !== 'patrol') throw new Error('This saved patrol could not be read.');
   return {id: entry.id, patrol, image: entry.image, label: entry.label, station: entry.station ?? null};
 }

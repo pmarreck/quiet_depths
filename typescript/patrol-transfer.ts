@@ -11,7 +11,8 @@ const validImage=(v:unknown)=>v===''||typeof v==='string'&&/^data:image\/(?:jpeg
 const missionId=(v:unknown)=>missions.some(m=>m.id===v);
 type Json=unknown;
 type Patrol={status:string;mission:string;patrol:{seed:number};captain?:string};
-type Decoder=(raw:string)=>Patrol|null;
+// The simulation's restore, which answers asynchronously.
+type Decoder=(raw:string)=>Promise<Patrol|null>;
 type SessionDecoder=(session:unknown)=>void;
 export interface PortablePatrol {patrol:Patrol;station:unknown;image:string;label:string}
 export interface SlotFile extends PortablePatrol {id:number}
@@ -20,9 +21,9 @@ export interface Backup {localStorage:Record<string,Json>;slots:SlotFile[];curre
 export const saveDocument=(save:PortablePatrol)=>({format:'Quiet Depths patrol',version:transferVersion,...save});
 export const stateDocument=(state:Backup)=>({format:'Quiet Depths state',version:transferVersion,...state});
 const bad=(what:string):never=>{throw new Error('Invalid '+what+'. No changes made.');};
-export function readPatrol(value:unknown,restore:Decoder,checkStation:SessionDecoder,active:boolean):PortablePatrol{
+export async function readPatrol(value:unknown,restore:Decoder,checkStation:SessionDecoder,active:boolean):Promise<PortablePatrol>{
   if(!object(value)||!object(value.patrol)||!validImage(value.image)||typeof value.label!=='string'||value.label.length>500)return bad('patrol file');
-  const patrol=restore(JSON.stringify(value.patrol));
+  const patrol=await restore(JSON.stringify(value.patrol));
   if(!patrol||active&&patrol.status!=='patrol')return bad('patrol snapshot');
   if(value.station!==null)checkStation(value.station);
   return {patrol,station:value.station,image:value.image as string,label:value.label};
@@ -46,10 +47,10 @@ export function replaceStorage(storage:Storage,entries:Record<string,Json>){
   for(const k of existing)storage.removeItem(k);
   for(const k of keys)storage.setItem(k,JSON.stringify(entries[k]));
 }
-function checkStorage(entries:Record<string,unknown>,restore:Decoder,photo:(p:unknown)=>boolean){
+async function checkStorage(entries:Record<string,unknown>,restore:Decoder,photo:(p:unknown)=>boolean){
   for(const [k,v] of Object.entries(entries)){
     if(!owned(k))bad('storage key');
-    if(k==='quiet-depths-v1'&&restore(JSON.stringify(v))?.status!=='patrol')bad('autosave');
+    if(k==='quiet-depths-v1'&&(await restore(JSON.stringify(v)))?.status!=='patrol')bad('autosave');
     if(k==='quiet-depths-photos-v1'&&(!Array.isArray(v)||v.length>24||!v.every(photo)))bad('photo archive');
     if(k.startsWith(outcomePrefix)&&(!/^[0-9a-f]{32}$/.test(k.slice(outcomePrefix.length))||!validOutcome(v)))bad('captain record');
     if(k.startsWith('quiet-depths-service-record-v1:')&&(!object(v)||!safeCount(v.ships)||!safeCount(v.submarines)))bad('service record');
@@ -60,7 +61,7 @@ function checkStorage(entries:Record<string,unknown>,restore:Decoder,photo:(p:un
     if(k==='quiet-depths-radio-history-v1'&&(!Array.isArray(v)||v.length>2||!v.every(n=>Number.isInteger(n)&&n>=1&&n<=8)))bad('radio history');
   }
 }
-export function decodeFile(text:string,kind:'patrol'|'state',restore:Decoder,checkStation:SessionDecoder,photo:(p:unknown)=>boolean){
+export async function decodeFile(text:string,kind:'patrol'|'state',restore:Decoder,checkStation:SessionDecoder,photo:(p:unknown)=>boolean){
   const v:unknown=JSON.parse(text);
   if(!object(v)||v.format!=='Quiet Depths '+kind||v.version!==transferVersion)throw new Error('Choose a supported Quiet Depths '+kind+' JSON file (version 1).');
   if(kind==='patrol')return readPatrol(v,restore,checkStation,true);
@@ -71,13 +72,13 @@ export function decodeFile(text:string,kind:'patrol'|'state',restore:Decoder,che
     !['random','dawn','day','dusk','night'].includes(String(s.conditions.timeOfDay))||
     !['random','clear','cloudy','rain','storm'].includes(String(s.conditions.weather)))return bad('mission setup');
   if(typeof v.started!=='boolean'||!Array.isArray(v.slots)||v.slots.length>slotCount||!object(v.localStorage))return bad('app backup');
-  checkStorage(v.localStorage,restore,photo);
-  const ids=new Set<number>();
-  const slots=v.slots.map(row=>{
+  await checkStorage(v.localStorage,restore,photo);
+  const ids=new Set<number>(),slots=[];
+  for(const row of v.slots){
     if(!object(row)||typeof row.id!=='number'||!Number.isInteger(row.id)||row.id<1||row.id>slotCount||ids.has(row.id))return bad('save slot');
-    ids.add(row.id);return {...readPatrol(row,restore,checkStation,true),id:row.id};
-  });
-  const current=v.current===null?null:readPatrol(v.current,restore,checkStation,false);
+    ids.add(row.id);slots.push({...await readPatrol(row,restore,checkStation,true),id:row.id});
+  }
+  const current=v.current===null?null:await readPatrol(v.current,restore,checkStation,false);
   if(v.started&&!current)return bad('live patrol');
   return {started:v.started,current,slots,setup:s as unknown as Setup,localStorage:v.localStorage} satisfies Backup;
 }

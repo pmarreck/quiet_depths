@@ -25,7 +25,7 @@ import {disciplinaryFinding} from './patrol-reports.js';
 import {depthLimit,pressureLevel} from './pressure.js';
 import {bearing,delta,distance,rad,clamp,MISSIONS,getSoundings} from './sim.js';
 import {createGame,restore,step,ping,photograph,fire,decoy,deployDrone,recallDrone,log,fireDeckGun,aimGunAt,orderScope,requestRecon,startRescue,dronePhotograph,endPatrolEarly,useElmSimulation} from './simulation.js';
-import {elmSimulation} from './elm-simulation.js';
+import {elmSimulation,portTransport} from './elm-simulation.js';
 import {droneDeployReason,SYSTEM_NAMES,DRONE_LIMITS} from './systems.js';
 import {separation} from './mechanics.js';
 import {operationApproach,operationConditions} from './missions.js';
@@ -61,9 +61,10 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 if(new URLSearchParams(location.search).get('sim')==='elm'){
  await new Promise((loaded,failed)=>{const tag=document.createElement('script');tag.src='sim-worker.js';tag.onload=loaded;tag.onerror=failed;document.head.append(tag);});
  // A field the page writes outside the orders would be lost; say which.
- useElmSimulation(await elmSimulation(globalThis.Elm.SimWorker.init(),{onStray:fields=>console.warn('Elm simulation: the page wrote '+fields.join(', ')+', which only the simulation changes; the write is lost.')}));
+ useElmSimulation(await elmSimulation(portTransport(globalThis.Elm.SimWorker.init()),{onStray:fields=>console.warn('Elm simulation: the page wrote '+fields.join(', ')+', which only the simulation changes; the write is lost.')}));
 }
-let state=createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
+// Every simulation call resolves once its effect is on the patrol object; see simulation.ts.
+let state=await createGame(),view='scope',zoom=1,rate=1,paused=false,selected=null,last=performance.now(),lastUI=0,lastSave=0,lastToast='',resultShown=false,toastTimer,renderClock=0,presentationSeconds=0;
 let chart={x:0,y:0,zoom:1,follow:true,reconArea:null},saved=null,patrolStarted=false;
 let installingBackup=false;
 let orderAxis=null,reconPlacement=false,photoKey='',lossStartedAt=0;const zooms={scope:1,tower:1,gun:1};let library=[];
@@ -89,7 +90,7 @@ try{invertRovPitch=localStorage.getItem('quiet-depths-invert-rov-pitch')==='true
 try{bindings=shortcutBindings(JSON.parse(localStorage.getItem('quiet-depths-shortcuts-v1')));}catch{}
 try{library=restorePhotos(JSON.parse(localStorage.getItem('quiet-depths-photos-v1')||'[]'));}catch{}
 state.photoArchive=library;
-try{saved=resumablePatrol(restore(localStorage.getItem('quiet-depths-v1')));}catch{}
+try{saved=resumablePatrol(await restore(localStorage.getItem('quiet-depths-v1')));}catch{}
 let scene=null;
 try{scene=new OceanScene($('world'));}catch(e){console.warn('WebGL unavailable',e);toast('WebGL unavailable. Sonar and chart are available.');view='sonar';}
 const held=new HeldInput(),keys=held.keys,commandControls=[];let drawer=null;
@@ -201,8 +202,9 @@ function openBriefing(){
  $('resume').classList.toggle('hidden',!resumablePatrol(current));
  refreshSlots();sound.update();
 }
-function start(setup=null,snapshot=null,station=null){
- if(!$('briefing').open)return;
+let starting=false;
+async function start(setup=null,snapshot=null,station=null){
+ if(!$('briefing').open||starting)return;
  const previousPatrol=state;
  if(setup===null){
   const resumed=snapshot||resumablePatrol(saved,patrolStarted?state:null);
@@ -215,7 +217,8 @@ function start(setup=null,snapshot=null,station=null){
   const seed=parsePatrolSeed(seedInput.value);
   seedInput.setCustomValidity(seed===undefined?'Enter a whole number from 0 to 4294967295.':'');
   if(!seedInput.reportValidity())return;
-  state=createGame(setup.mission,seed??randomSeed(),{...setup.conditions,difficulty});
+  starting=true;
+  try{state=await createGame(setup.mission,seed??randomSeed(),{...setup.conditions,difficulty});}finally{starting=false;}
   const chosen=captainName($('captain-name').value);
   state.captain=chosen||$('captain-name').placeholder;
   try{localStorage.setItem(captainPreference,JSON.stringify(chosen));}catch{}
@@ -228,7 +231,7 @@ function start(setup=null,snapshot=null,station=null){
   orbit=null;lossSoundPlayed=false;extractionArmed=true;
   recorder=scene&&state.difficulty.instantReplay?new ReplayRecorder(state):null;
  }
- renderClock=state.time;patrolStarted=true;document.body.classList.remove('standby');
+ renderClock=state.time;unsteppedTime=0;patrolStarted=true;document.body.classList.remove('standby');
  state.captain=patrolCaptain(state);
  state.patrolId??=setup===null?legacyPatrolId(state):crypto.randomUUID().replaceAll('-','');
  if(snapshot&&library.length){
@@ -397,7 +400,7 @@ $('briefing').addEventListener('close',()=>{
 function describePatrol(p){return 'Captain '+patrolCaptain(p)+' · '+MISSIONS.find(m=>m.id===p.mission).name;}
 async function importSelection(file,command,request){
  const full=command.action==='import-state';
- const data=decodeFile(await file.text(),full?'state':'patrol',restore,validateStation,validPhoto);
+ const data=await decodeFile(await file.text(),full?'state':'patrol',restore,validateStation,validPhoto);
  if(request!==transferRequest||!$('briefing').open)return;
  if(!full&&!command.revision){
   await writeSlot(command.id,'',data.patrol,data.image,data.label,data.station);
@@ -437,7 +440,7 @@ missionPicker.ports.transferFile.subscribe(async command=>{
   if(command.action==='export-state'){
    const current=portableCurrent(),setup={...command.setup,seed:$('patrol-seed').value,captain:$('captain-name').value,defaultCaptain:$('captain-name').placeholder};
    const name=current?patrolCaptain(current.patrol):captainName(setup.captain)||setup.defaultCaptain;
-   const slots=(await allSlotEntries()).map(unpackSlot),storage=readStorage(localStorage);
+   const slots=await Promise.all((await allSlotEntries()).map(unpackSlot)),storage=readStorage(localStorage);
    downloadJson(transferFilename(name),stateDocument({slots,localStorage:storage,current,started:patrolStarted,setup}));
   }else{
    const entry=command.action==='export-slot'?await readSlotEntry(command.id,command.revision):portableCurrent();
@@ -480,16 +483,20 @@ all('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));all('[data-
 $('open-orbit').onclick=changeOrbit;$('orbit-exit').onclick=changeOrbit;$('orbit-pause').onclick=()=>setPaused(!paused);
 $('torpedo-cam').onclick=e=>{const b=e.target.closest('[data-follow]');if(b)followDigit(Number(b.dataset.follow));};
 $('orbit-in').onclick=()=>zoomOrbit(1/1.2);$('orbit-out').onclick=()=>zoomOrbit(1.2);
-function scopeToggle(){if(!canIssue(state,context())||!operatingFraction(state.systems.periscope))return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}orderScope(state,!state.scope);if(!state.scope)scene?.clear();updateUI();}
+function scopeToggle(){if(!canIssue(state,context())||!operatingFraction(state.systems.periscope))return;if(state.depth>15){toast('Rise to 15 meters or less to raise the scope.');return;}orderScope(state,!state.scope).then(()=>{if(!state.scope)scene?.clear();updateUI();});}
 function takePhoto(){
  if(!canIssue(state,context())||state.photoCooldown>0)return;
- if(view==='drone'&&feedActive(state,'drone')){if(state.mission==='survey'){const result=dronePhotograph(state);toast(result.text);}state.photoCooldown=4;expose({source:'drone',takenAt:state.time,bearing:state.drone.heading,depth:state.drone.depth,caption:state.mission==='survey'?'ROV survey exposure':'ROV camera exposure',seed:state.patrol.seed,mission:state.mission});sound.tone('photo');updateUI();return;}
+ if(view==='drone'&&feedActive(state,'drone')){if(state.mission==='survey')dronePhotograph(state).then(result=>toast(result.text));state.photoCooldown=4;expose({source:'drone',takenAt:state.time,bearing:state.drone.heading,depth:state.drone.depth,caption:state.mission==='survey'?'ROV survey exposure':'ROV camera exposure',seed:state.patrol.seed,mission:state.mission});sound.tone('photo');updateUI();return;}
  if(view!=='scope'||!feedActive(state,'scope'))return;
  if(scopeWashed(state)){toast('A wave washed over the lens. Wait for the trough.');return;}
- const evidence=photograph(state,scopeBearing(state));state.photoCooldown=4;
- expose({source:'scope',takenAt:state.time,bearing:scopeBearing(state),depth:state.depth,caption:evidence?'Merchant silhouette · '+state.photos.length+'/'+state.patrol.photoGoal:'Periscope exposure',seed:state.patrol.seed,mission:state.mission});sound.tone('photo');updateUI();
+ const patrol=state,look=scopeBearing(state);
+ photograph(patrol,look).then(evidence=>{
+  if(patrol!==state)return;
+  expose({source:'scope',takenAt:state.time,bearing:look,depth:state.depth,caption:evidence?'Merchant silhouette · '+state.photos.length+'/'+state.patrol.photoGoal:'Periscope exposure',seed:state.patrol.seed,mission:state.mission});sound.tone('photo');updateUI();
+ });
+ state.photoCooldown=4;
 }
-function doPing(){if(!canIssue(state,context()))return;if(ping(state)){sound.tone('ping');setRate(1);}else toast(operatingFraction(state.systems.sonar)?'Sonar capacitors recharging.':'Sonar array offline.');updateUI();}
+function doPing(){if(!canIssue(state,context()))return;ping(state).then(pinged=>{if(pinged){sound.tone('ping');setRate(1);}else toast(operatingFraction(state.systems.sonar)?'Sonar capacitors recharging.':'Sonar array offline.');updateUI();});}
 function silent(forceBoat=false){if(!canIssue(state,context())||view==='drone'&&!forceBoat)return;state.silent=!state.silent;if(state.silent){state.targetSpeed=clamp(state.targetSpeed,-3,3);log(state,'Rig for silent running. Maximum three knots.');}updateUI();}
 $('scope-align-toggle').onclick=()=>{const open=$('scope-alignment').classList.toggle('open');$('scope-align-toggle').setAttribute('aria-expanded',String(open));};
 bindCommand('center-scope','click',()=>{alignScope(state,context(),'center');$('scope-alignment').classList.remove('open');$('scope-align-toggle').setAttribute('aria-expanded','false');},()=>feedActive(state,'scope'));
@@ -531,7 +538,7 @@ function assignDamageControl(){
  state.repair=120;log(state,'Damage control assigned. Sealing leaks, restoring equipment and pumping the bilge.');
  toast('Damage control working for 2 minutes. Uses battery.');
 }
-bindCommand('decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}},()=>state.decoys>0);
+bindCommand('decoy','click',()=>decoy(state).then(away=>{if(away){sound.tone('fire');toast('Noisemaker deployed. Turn away and go quiet.');}}),()=>state.decoys>0);
 // Torpedo orders from the Elm panel, checked as the button and slider were. Every
 // order counts as handled, refused or not, so the panel stops holding the run.
 function askEndMission(){
@@ -541,7 +548,7 @@ function askEndMission(){
 }
 endMission.ports.endMissionOrder.subscribe(answer=>{
  $('end-mission-dialog').close();
- if(answer==='end'&&canIssue(state,context())&&endPatrolEarly(state))updateUI();
+ if(answer==='end'&&canIssue(state,context()))endPatrolEarly(state).then(ended=>{if(ended)updateUI();});
 });
 const torpedoOrders={
  fire:{enabled:()=>!!state.contacts.find(c=>c.id===selected)&&operatingFraction(state.systems.tubes)>0&&torpedoTubes(state).next!==null&&state.depth<=100,run:()=>launchSelected()},
@@ -556,12 +563,12 @@ torpedoControl.ports.torpedoOrder.subscribe(({kind,value,seq})=>{
 });
 function visualAircraft(){const e=environmentAt(state);return isSurfaced(state)?state.aircraft.filter(p=>p.hull>0&&distance(state,p)<e.opticalRange):[];}
  $('contacts').onclick=e=>{const b=e.target.closest('[data-contact]');if(!b)return;selected=b.dataset.contact;$('gun-target').value=selected;const c=state.contacts.find(c=>c.id===selected);if(c&&view==='scope'&&feedActive(state,'scope')&&canIssue(state,context())){state.scopeSteerBearing=null;state.scopeAngle=relativeBearing(c.bearing,state.heading);}updateUI();};
-bindCommand('deploy-drone','click',()=>{if(deployDrone(state)){setView('drone');if(!compactLayout.matches)toast(rovKeyHint());}else toast(droneDeployReason(state));},()=>!droneDeployReason(state));
+bindCommand('deploy-drone','click',()=>deployDrone(state).then(launched=>{if(launched){setView('drone');if(!compactLayout.matches)toast(rovKeyHint());}else toast(droneDeployReason(state));}),()=>!droneDeployReason(state));
 bindCommand('drone-photo','click',takePhoto,()=>feedActive(state,'drone')&&state.photoCooldown===0);
 // The Elm operation card sends orders; each is checked against the moment it arrives.
 const operationOrders={
  'start-rescue':{enabled:()=>!!state.operation&&!state.operation.completed&&state.mission!=='survey'&&operationConditions(state).onStation,run:()=>{
-  if(startRescue(state)){setRate(1);toast(state.events[0].text);}
+  startRescue(state).then(started=>{if(started){setRate(1);toast(state.events[0].text);}});
  }},
  approach:{enabled:()=>!!operationApproach(state),run:()=>{const p=operationApproach(state);if(!p)return;state.route={x:p.x,y:p.y,radius:p.radius};state.targetDepth=p.depth;state.targetSpeed=3;state.silent=false;toast('Approach plotted. Sub will stop beside the site. Watch clearance.');}},
  hold:{enabled:()=>true,run:()=>{state.route=null;state.targetSpeed=0;state.targetDepth=operationApproach(state)?.depth??state.depth;toast('All stop. Ballast and planes holding ordered depth.');}},
@@ -1098,6 +1105,24 @@ function scheduleFrame(){
  if(patrolStarted&&frameRequest===null&&!$('briefing').open)frameRequest=requestAnimationFrame(frame);
 }
 $('briefing').addEventListener('close',()=>{last=performance.now();scheduleFrame();});
+// What the checks after a step compare: the patrol just before the step's
+// changes land, as values, since the worker's replies update records in place.
+function stepReadings(s){return {watch:{...s.watchWarnings},pressure:s.pressureAlarm,event:s.events[0],alert:s.alert,outsidePickup:distance(s,s.home)>=400,rescued:s.operation?.rescued||0,holding:s.operation?.holding,route:!!s.route};}
+// The sounds, notices and time compression changes a step's outcome calls for.
+function stepNotices(prior){
+ if(state.watchWarnings.battery>prior.watch.battery||state.watchWarnings.bottom&&!prior.watch.bottom)sound.tone('caution');
+ if(state.pressureAlarm>prior.pressure)setRate(1);
+ if((state.operation?.rescued||0)>prior.rescued)sound.tone('photo');
+ if(state.mission!=='survey'&&state.operation?.holding&&!prior.holding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}
+ if(prior.route&&!state.route){setRate(1);toast('Waypoint reached. All stop. Time compression disengaged.');}
+ if(prior.outsidePickup&&!['intercept','seek-and-destroy','big-kahuna'].includes(state.mission)&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
+ const extraction=extractionPrompt(extractionArmed,state);extractionArmed=extraction.armed;if(extraction.ask)askEndMission();
+ if(state.difficulty.showSuspicion&&state.alert>40&&prior.alert<=40){setRate(1);toast('Possible detection. Time compression disengaged.');sound.tone('contact');}
+ if(prior.event!==state.events[0]){const e=state.events[0];if(e.kind==='contact'||e.kind==='damage'||e.text.startsWith('Drone link')||(state.difficulty.showSuspicion&&state.alert>40&&rate>1))setRate(1);if(e.text.startsWith('Drone link')){toast(e.text);sound.tone('contact');}if(e.kind==='damage'&&!e.text.includes('Depth charge shock'))sound.tone(e.text.includes('in the water')?'contact':'damage');if(e.kind==='contact')sound.tone('contact');if(e.kind==='success'&&lastToast!==e.text){toast(e.text);lastToast=e.text;}}
+}
+// The simulation takes one step at a time; while one is in flight, each
+// frame's time waits to join the next, so the patrol keeps real time.
+let stepping=false,unsteppedTime=0,gunFiring=false;
 function frame(now){
  frameRequest=null;
  if(!patrolStarted||$('briefing').open)return;
@@ -1109,26 +1134,21 @@ function frame(now){
   scheduleFrame();return;
  }
  if(canIssue(state,ctx)){
-  const previousWatch=state.watchWarnings,previousPressure=state.pressureAlarm,before=state.events[0],priorAlert=state.alert,wasOutsidePickup=distance(state,state.home)>=400,priorRescued=state.operation?.rescued||0,wasHolding=state.operation?.holding;
-  applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')){if(fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}))setRate(1);}const hadRoute=!!state.route;const observation=['scope','gun','tower','drone'].includes(view)&&feedActive(state,view)?view:null;
-  let sampleTime=state.time;
-  step(state,realDt*rate,{timeRate:rate,lampInView:scene?.lampView===view?scene.lampSource:null,afterTick:s=>{
-   const quality=operatingFraction(s.systems.sonar);
-   if(quality>0)for(const mode of instruments){
-    const profile=s.imagers[mode];if(profile)currentPaper(mode,profile).advance(s,s.time-sampleTime,quality);
-   }
-   sampleTime=s.time;
-   recorder?.capture(s);
-  },observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)});renderClock=state.time;presentationSeconds+=realDt;
-  if(state.watchWarnings.battery>previousWatch.battery||state.watchWarnings.bottom&&!previousWatch.bottom)sound.tone('caution');
-  if(state.pressureAlarm>previousPressure)setRate(1);
-  if((state.operation?.rescued||0)>priorRescued)sound.tone('photo');
-  if(state.mission!=='survey'&&state.operation?.holding&&!wasHolding){setRate(1);toast('Rescue holding conditions met. Crew transfer underway.');}
-  if(hadRoute&&!state.route){setRate(1);toast('Waypoint reached. All stop. Time compression disengaged.');}
-  if(wasOutsidePickup&&!['intercept','seek-and-destroy','big-kahuna'].includes(state.mission)&&state.phase==='extract'&&distance(state,state.home)<400){setRate(1);toast('Pickup area reached. Surface to complete the patrol.');}
-  const extraction=extractionPrompt(extractionArmed,state);extractionArmed=extraction.armed;if(extraction.ask)askEndMission();
-  if(state.difficulty.showSuspicion&&state.alert>40&&priorAlert<=40){setRate(1);toast('Possible detection. Time compression disengaged.');sound.tone('contact');}
-  if(before!==state.events[0]){const e=state.events[0];if(e.kind==='contact'||e.kind==='damage'||e.text.startsWith('Drone link')||(state.difficulty.showSuspicion&&state.alert>40&&rate>1))setRate(1);if(e.text.startsWith('Drone link')){toast(e.text);sound.tone('contact');}if(e.kind==='damage'&&!e.text.includes('Depth charge shock'))sound.tone(e.text.includes('in the water')?'contact':'damage');if(e.kind==='contact')sound.tone('contact');if(e.kind==='success'&&lastToast!==e.text){toast(e.text);lastToast=e.text;}}
+  applyHelmKeys(state,ctx,keys,realDt);if(view==='gun'&&keys.has('KeyJ')&&feedActive(state,'gun')&&!gunFiring){gunFiring=true;fireDeckGun(state,{bearing:wrapHeading(state.heading+state.gun.angle),elevation:state.gun.elevation}).then(fired=>{if(fired)setRate(1);}).finally(()=>{gunFiring=false;});}const observation=['scope','gun','tower','drone'].includes(view)&&feedActive(state,view)?view:null;
+  unsteppedTime+=realDt*rate;
+  if(!stepping){
+   const patrol=state,dt=unsteppedTime;let sampleTime=state.time,prior=null;unsteppedTime=0;stepping=true;
+   step(patrol,dt,{timeRate:rate,lampInView:scene?.lampView===view?scene.lampSource:null,beforeTicks:s=>{prior=stepReadings(s);},afterTick:s=>{
+    const quality=operatingFraction(s.systems.sonar);
+    if(quality>0)for(const mode of instruments){
+     const profile=s.imagers[mode];if(profile)currentPaper(mode,profile).advance(s,s.time-sampleTime,quality);
+    }
+    sampleTime=s.time;
+    recorder?.capture(s);
+    if(s===state)renderClock=s.time;
+   },observation,look:view==='drone'?state.drone.heading:view==='gun'?state.heading+state.gun.angle:view==='tower'?state.heading+state.towerAngle:scopeBearing(state)}).then(()=>{if(patrol===state)stepNotices(prior);}).finally(()=>{stepping=false;});
+  }
+  presentationSeconds+=realDt;
   sound.update(state,ctx);
  }
  if(patrolStarted&&!ctx.modal&&!paused){
@@ -1158,7 +1178,7 @@ function renderSound(){
 function launchSelected(){
  const target=state.contacts.find(c=>c.id===selected);if(!target)return;
  if(state.depth>100){toast('Rise to 100 m or less to fire.');return;}if(target.side==='friendly'){toast('Friendly vessel identified. Hold fire.');return;}if(target.identified&&!target.military){toast('Identified neutral. Firing is withheld.');return;}
- if(fire(state,selected)){sound.tone('fire');setRate(1);toast('Torpedo running. Its own sonar will arm and acquire a return.');}
+ fire(state,selected).then(fired=>{if(fired){sound.tone('fire');setRate(1);toast('Torpedo running. Its own sonar will arm and acquire a return.');}});
 }
 function changeZoom(factor){if(!canIssue(state,context())||!feedActive(state,view))return;zoom=clamp(zoom*factor,1,opticalZoomLimit(view));zooms[view]=zoom;updateUI();}
 function responsiveTools(){
@@ -1201,12 +1221,12 @@ function initializeExtras(){
   updateUI();
  });
  bindCommand('mobile-ping','click',doPing,()=>state.pingCooldown===0&&operatingFraction(state.systems.sonar)>0);
- bindCommand('mobile-decoy','click',()=>{if(decoy(state)){sound.tone('fire');toast('Noisemaker away. Turn and go quiet.');}},()=>state.decoys>0);
+ bindCommand('mobile-decoy','click',()=>decoy(state).then(away=>{if(away){sound.tone('fire');toast('Noisemaker away. Turn and go quiet.');}}),()=>state.decoys>0);
  bindCommand('mobile-repair','click',assignDamageControl);
  bindCommand('monitor-recall','click',()=>recallDrone(state),()=>state.drone.mode==='remote');$('monitor-boat').onclick=()=>setView('chart');
  bindCommand('zoom-in','click',()=>changeZoom(1.3),()=>feedActive(state,view)&&zoom<opticalZoomLimit(view));bindCommand('zoom-out','click',()=>changeZoom(1/1.3),()=>feedActive(state,view)&&zoom>1);$('zoom-readout').onclick=()=>changeZoom(1);
  bindCommand('recon-place','click',beginReconArea);$('show-recon-chart').onclick=()=>{closeDrawer();setView('chart');if(!chart.reconArea&&!state.recon.area)beginReconArea();};
- bindCommand('request-recon','click',()=>{if(requestRecon(state,chart.reconArea)){setRate(1);toast('Recon task queued. Radio uplink needs 15 m or less; reception holds below 30 m.');persist();}},()=>!!chart.reconArea&&reconStatus(state).canRequest);
+ bindCommand('request-recon','click',()=>requestRecon(state,chart.reconArea).then(queued=>{if(queued){setRate(1);toast('Recon task queued. Radio uplink needs 15 m or less; reception holds below 30 m.');persist();}}),()=>!!chart.reconArea&&reconStatus(state).canRequest);
  $('close-photo').onclick=()=>$('photo-dialog').close();$('photo-gallery').onclick=e=>{const button=e.target.closest('[data-photo]');if(!button)return;const photo=photoArchive(state).find(p=>String(p.id)===button.dataset.photo);if(!photo)return;$('photo-full').src=photo.image;$('photo-title').textContent=photo.caption;$('photo-meta').textContent=photoMetadata(photo);$('photo-dialog').showModal();updateUI();sound.update();};
  for(let i=0;i<36;i++){const bubble=document.createElement('i');bubble.style.setProperty('--x',((i*61.803)%100)+'%');bubble.style.setProperty('--size',(7+i%8*4)+'px');bubble.style.setProperty('--duration',(5+i%7*.7)+'s');bubble.style.setProperty('--delay',(-i%13*.47)+'s');$('loss-bubbles').appendChild(bubble);}
 }
