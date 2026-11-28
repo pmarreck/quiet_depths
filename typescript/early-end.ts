@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/EarlyEnd.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 // Ending a patrol early at extraction: when the captain is asked, and what an
 // early end has earned. The Elm mission definition owns each mission's rule.
 import {missions} from './mission-catalog.ts';
