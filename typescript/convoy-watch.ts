@@ -1,3 +1,5 @@
+// Mirrored in elm/Sim/ConvoyWatch.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
+// Its allied lamp watch is elm/Sim/AlliedWatch.elm and its save checks elm/Sim/ConvoySaves.elm.
 import {recordLocalLaunch} from './mess-watch.ts';
 import {bearing, distance, log, rad, type LogEntry} from './mechanics.ts';
 import {hash01, scopeWashed, type Environment, type EnvironmentConfig} from './environment.ts';

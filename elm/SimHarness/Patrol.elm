@@ -13,10 +13,10 @@ import Sim.Boat exposing (Limits, Systems)
 import Sim.Coast as Coast exposing (Coastline)
 import Sim.Combat exposing (Gun)
 import Sim.Contact as Contact exposing (Contact)
+import Sim.ConvoyWatch exposing (AlliedLamp, Convoy)
 import Sim.Debrief as Debrief
 import Sim.Drone as Drone exposing (Drone)
 import Sim.FleetTheater exposing (Battle)
-import Sim.FleetVolleys exposing (Volley)
 import Sim.HostileTracks exposing (Noisemaker)
 import Sim.HullGeometry exposing (Body)
 import Sim.InvalidNumber exposing (InvalidNumber)
@@ -37,6 +37,7 @@ import SimHarness.Codec exposing (andMap)
 import SimHarness.ColdWatch as ColdWatch
 import SimHarness.Fleet as Fleet
 import SimHarness.Hulls exposing (body, logKind)
+import SimHarness.Lamp as Lamp
 import SimHarness.Objectives as Objectives
 import SimHarness.Ordnance exposing (airSupport, aircraft, blast, gunRound, torpedo)
 import SimHarness.Watch as Watch
@@ -121,7 +122,7 @@ type alias Patrol =
     , gun : Gun
     , crewQuietUntil : Float
     , nextId : Float
-    , convoy : Maybe { shot : Maybe Volley }
+    , convoy : Maybe Convoy
     , battle : Maybe Battle
     , traffic : Maybe Traffic
     , search : Maybe SearchArea
@@ -132,6 +133,7 @@ type alias Patrol =
     , photoCooldown : Float
     , decoys : Int
     , alert : Float
+    , alliedLamp : Maybe AlliedLamp
     }
 
 
@@ -319,7 +321,7 @@ decoder =
                                 |> andMap (D.field "gun" (D.map5 Gun (D.field "ammo" D.float) (D.field "cooldown" D.float) (D.field "shots" D.float) (D.field "angle" D.float) (D.field "elevation" D.float)))
                                 |> andMap (D.field "crewQuietUntil" D.float)
                                 |> andMap (D.field "nextId" D.float)
-                                |> andMap (optional "convoy" (D.nullable (D.map (\shot -> { shot = shot }) (optional "shot" (D.nullable Fleet.volley) |> D.map (Maybe.andThen identity)))) |> D.map (Maybe.andThen identity))
+                                |> andMap (optional "convoy" (D.nullable convoy) |> D.map (Maybe.andThen identity))
                                 |> andMap (optional "battle" (D.nullable Fleet.battle) |> D.map (Maybe.andThen identity))
                                 |> andMap (optional "traffic" ColdWatch.traffic)
                                 |> andMap (optional "search" Objectives.searchArea)
@@ -330,6 +332,7 @@ decoder =
                                 |> andMap (D.field "photoCooldown" D.float)
                                 |> andMap (D.field "decoys" D.int)
                                 |> andMap (D.field "alert" D.float)
+                                |> andMap (optional "alliedLamp" (D.map3 AlliedLamp (D.field "message" (D.nullable (Lamp.transmission Lamp.lampFix))) (D.field "sequence" D.float) (D.field "lastIssue" D.float)))
                         )
             )
 
@@ -465,3 +468,17 @@ encodeFields s =
             , field "unpoweredSince" E.float s.unpoweredSince
             , field "scopeTravel" E.float s.scopeTravel
             ]
+
+
+{-| The wolf in the henhouse's convoy: its lamp message and plotted pin, the
+telegram count, the raid's round and schedule, and a torpedo in the water.
+-}
+convoy : D.Decoder Convoy
+convoy =
+    D.map6 Convoy
+        (D.field "message" (D.nullable (Lamp.transmission Lamp.estimate)))
+        (D.field "pin" (D.nullable Lamp.estimate))
+        (D.field "number" D.float)
+        (D.field "round" D.int)
+        (D.field "next" D.float)
+        (D.field "shot" (D.nullable Fleet.volley))

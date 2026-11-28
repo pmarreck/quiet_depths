@@ -1,4 +1,4 @@
-module SimHarness.Lamp exposing (function)
+module SimHarness.Lamp exposing (encodeEstimate, encodeLampFix, encodeTransmission, estimate, function, lampFix, transmission)
 
 {-| Harness entries for signal lamps.
 -}
