@@ -1,3 +1,4 @@
+// Mirrored in elm/Sim/PatrolCreate.elm until the simulation moves to Elm: change both; tests/sim-*.test.mjs hold them equal.
 import {watchWarnings, bottomCall, batteryCall} from './watch-warnings.ts';
 import {freshTransmitters} from './sonar-transmitters.ts';
 import {freshTraffic} from './cold-watch.ts';

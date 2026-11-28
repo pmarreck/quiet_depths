@@ -1,4 +1,4 @@
-module SimHarness.WorldSave exposing (function)
+module SimHarness.WorldSave exposing (encodeWorld, function)
 
 {-| The whole world as a save writes it, to check that the Elm world record
 holds everything a TypeScript save carries apart from the page's own fields
