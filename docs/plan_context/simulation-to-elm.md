@@ -1117,3 +1117,88 @@ rescue begun below and on the surface, a survey photograph, an early end
 with part and none of the objective, a decoy with none left). Both matched
 on the first run. With `sim.ts` marked, 59 of 62 modules (98.1% of code
 lines) are mirrored; `captain` and `photos` stay with the page.
+
+## The worker and the page's adapter (2026-11-28, `5454ad7`)
+
+Built as planned, with one correction to the plan: Elm's ports do not
+answer within `send`. Each outgoing port's effect manager starts with, and
+returns to after every batch it delivers, `_Process_sleep(0)`, a
+zero-length timer, so a port delivers at most one batch per turn of the
+event loop; a second command in the same turn is answered only after the
+timer fires. A synchronous page cannot drive a stock worker command after
+command. Three ways forward:
+
+1. **Drop the timer in the worker's own compiled program** (what the code
+   does now). `scripts/elm-sync-ports.mjs` replaces that one line of the
+   runtime, failing unless the code is exactly as expected, so an Elm
+   upgrade that changes it fails the build. Only the worker's program takes
+   it; the page's UI programs keep stock ports. Nothing reenters Elm from a
+   reply (the adapter only stores it), which is what the timer guards. The
+   page keeps its synchronous control flow, so the switch stays small.
+2. **Make the page asynchronous around the simulation**: one batched
+   command per frame (the frame's actions and its step), results handled
+   when the reply arrives, rendering one frame behind. Stock Elm, but
+   app.js's synchronous uses of action results (about 20 call sites, toasts
+   and view changes) each become a reply handler.
+3. **Move the UI into Elm first** (an existing plan item), so the UI calls
+   the simulation directly and only rendering crosses a port, where
+   asynchrony costs nothing.
+
+Recommendation: 1 now, behind the query flag, with 3 as the long-term
+direction it does not preclude.
+
+The differential test plays every mission, short and long, continuously
+both ways (the TypeScript game's patrol, and the page's mirror of the
+worker's) with the same orders, actions and frames, and matched on every
+action result, every tick the per-tick hook sees, every replay mark and
+invalid number, the identities the page relies on (the patrol object,
+ships by id, unchanged log lines), and save then restore. Continuous play
+matters beyond the per-call tests: it would catch state the TypeScript
+keeps between frames that a save does not carry, such as shared references
+between records; none turned up.
+
+## Restore's mutation check (2026-11-28, `203d20d`)
+
+56 mutants across the five restore modules, run first against the three
+fast restore tests (about 30 s each) and then, for survivors, against the
+nested fuzz (about 150 s each). The fast tests failed 30. Most survivors
+were bounds no save reached, so a boundary test now tries each bound just
+inside and just outside the TypeScript's, at values a nearby wrong bound
+treats differently (a scope travel of 1.5, an imaging time half a second
+ahead, 29 wake marks, a bearing of 360, a 221-character debrief line, a
+31-character patrol id, a fuel fire of 24.5, a tube ready 50 s ahead, start
+day 366, a repair limit of 100.5, 2^53 where a safe integer belongs), plus
+the saves missions' own checks turn on (a convoy extracting with transports
+afloat, an unarmed sub hunt quarry, a carrier's fractional fighters, a
+partial or withdrawn patrol outside its objective phase, a legacy crew
+watch dated from launch, older warnings on a low battery). The test's
+first version named two missions by the wrong ids; creation fell back to
+the reconnaissance patrol, so the cases checked nothing until a listing of
+each case's verdict showed it. Final: 52 fail; four are equivalent, each
+refused or defaulted by a later check (torpedoes decode as an integer, a
+non-record drone is refused by its migration, every template number field
+decodes as a number, and an array read as an empty record reaches the same
+refusal or default).
+
+## The page behind `?sim=elm` (2026-11-28, `5a879e3`)
+
+The page imports its simulation from `typescript/simulation.ts`, which
+routes creation, restore, the frame step and the 14 actions to the
+TypeScript, or to the worker's adapter once the page hands it over. With
+`?sim=elm` the page loads `sim-worker.js` (the worker's own bundle, 1.0 MB
+optimized and unminified, built with its ports answering at once and
+precached for offline play) and hands it over before the first patrol;
+without it nothing changes. Save slots restore through the same module.
+
+The worker holds one patrol, but the page can restore others (a slot
+checked, an import validated) and go back. The adapter tracks which patrol
+object the worker holds and loads a different one into it before stepping
+or acting on it. Undefined fields are left out of commands, and an order
+the page may leave undefined (the route, the scope's steering bearing, the
+drone's nose pitch) reads as none, as JavaScript reads it; a first test of
+the page-side module found the log's optional kind sent as undefined.
+
+Not yet done: playing it in a browser. That needs either the owner or
+headless Chromium, whose restart after the low-memory guard stopped it
+waits on the owner's answer. Until then the TypeScript simulation stays
+the default.
